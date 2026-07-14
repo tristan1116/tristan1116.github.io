@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="借助的资料：《软件开发工具实践》实验手册">
+<meta property="og:type" content="article">
+<meta property="og:title" content="我们是如何创建这个博客网站的">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/07/%E6%88%91%E4%BB%AC%E6%98%AF%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%BD%91%E7%AB%99%E7%9A%84/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="借助的资料：《软件开发工具实践》实验手册">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-07T00:18:22.000Z">
+<meta property="article:modified_time" content="2026-07-11T01:02:46.558Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="Markdown">
+<meta property="article:tag" content="Hexo">
+<meta property="article:tag" content="Git">
+<meta property="article:tag" content="Node.js">
+<meta property="article:tag" content="VS Code">
+<meta property="article:tag" content="静态站点">
+<meta property="article:tag" content="VirtualBox">
+<meta property="article:tag" content="Ubuntu">
+<meta property="article:tag" content="虚拟机">
+<meta property="article:tag" content="Linux">
+<meta property="article:tag" content="SSH">
+<meta property="article:tag" content="CI&#x2F;CD">
+<meta property="article:tag" content="Nginx">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/07/%E6%88%91%E4%BB%AC%E6%98%AF%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%BD%91%E7%AB%99%E7%9A%84/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>我们是如何创建这个博客网站的 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/07/%E6%88%91%E4%BB%AC%E6%98%AF%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%BD%91%E7%AB%99%E7%9A%84/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          我们是如何创建这个博客网站的
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-07-07 08:18:22" itemprop="dateCreated datePublished" datetime="2026-07-07T08:18:22+08:00">2026-07-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-11 09:02:46" itemprop="dateModified" datetime="2026-07-11T09:02:46+08:00">2026-07-11</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%89%8D%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">前后端</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>19k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>17 分钟</span>
+            </span>
+            <div class="post-description">借助的资料：《软件开发工具实践》实验手册</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="《软件开发工具实践》实验手册"><a href="#《软件开发工具实践》实验手册" class="headerlink" title="《软件开发工具实践》实验手册"></a>《软件开发工具实践》实验手册</h1><h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><p><strong><a href="#%E5%AE%9E%E9%AA%8C%E4%BA%8C-web%E8%BD%AF%E4%BB%B6%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83">实验二 Web软件开发环境</a></strong> …………………… 5</p>
+<p><strong><a href="#%E5%AE%9E%E9%AA%8C%E4%B8%89-%E4%BB%A3%E7%A0%81%E7%BC%96%E8%BE%91%E5%99%A8">实验三 代码编辑器</a></strong> ……………………………. 10</p>
+<p><strong><a href="#%E5%AE%9E%E9%AA%8C%E5%9B%9B-web%E7%AB%99%E7%82%B9%E6%9E%84%E5%BB%BA">实验四 Web站点构建</a></strong> ………………………….. 15</p>
+<p><strong><a href="#%E5%AE%9E%E9%AA%8C%E4%BA%94-%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AE%89%E8%A3%85%E4%B8%8E%E4%BD%BF%E7%94%A8">实验五 虚拟机安装与使用</a></strong> …………………. 17</p>
+<p><strong><a href="#%E5%AE%9E%E9%AA%8C%E5%85%AD-linux%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE">实验六 Linux环境配置</a></strong> ………………………. 21</p>
+<p><strong><a href="#%E5%AE%9E%E9%AA%8C%E4%B8%83-%E8%BF%9C%E7%A8%8B%E7%99%BB%E5%BD%95%E7%AE%A1%E7%90%86">实验七 远程登录管理</a></strong> ………………………… 25</p>
+<p><strong><a href="#%E5%AE%9E%E9%AA%8C%E5%85%AB-%E8%BD%AF%E4%BB%B6%E9%83%A8%E7%BD%B2">实验八 软件部署</a></strong> ……………………………….. 29</p>
+<hr>
+<div style="page-break-after: always; break-after: page;"></div>
+
+
+<h1 id="实验二-Web软件开发环境"><a href="#实验二-Web软件开发环境" class="headerlink" title="实验二 Web软件开发环境"></a>实验二 Web软件开发环境</h1><h2 id="一、实验目标"><a href="#一、实验目标" class="headerlink" title="一、实验目标"></a>一、实验目标</h2><ol>
+<li>安装并运行一个Web博客软件（本实验选用 <strong>Hexo</strong> 静态博客框架）；</li>
+<li>了解和掌握Web开发环境的基础安装与配置（Node.js、npm、Git）；</li>
+<li>理解Web软件的B&#x2F;S架构特点以及静态站点与动态站点的区别。</li>
+</ol>
+<h2 id="二、背景知识"><a href="#二、背景知识" class="headerlink" title="二、背景知识"></a>二、背景知识</h2><h3 id="2-1-静态博客-vs-动态博客"><a href="#2-1-静态博客-vs-动态博客" class="headerlink" title="2.1 静态博客 vs 动态博客"></a>2.1 静态博客 vs 动态博客</h3><table>
+<thead>
+<tr>
+<th align="left">类型</th>
+<th align="left">原理</th>
+<th align="left">特点</th>
+<th align="left">典型代表</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>静态博客</strong></td>
+<td align="left">在本地将Markdown等源文件预编译为纯HTML页面</td>
+<td align="left">加载速度快、安全性高、无需数据库</td>
+<td align="left">Hexo、Hugo、VuePress、Jekyll</td>
+</tr>
+<tr>
+<td align="left"><strong>动态博客</strong></td>
+<td align="left">每次用户访问时由服务器端程序动态生成页面</td>
+<td align="left">功能丰富、有后台管理界面、需要数据库</td>
+<td align="left">WordPress、Typecho、Halo</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-Web开发环境的核心组件"><a href="#2-2-Web开发环境的核心组件" class="headerlink" title="2.2 Web开发环境的核心组件"></a>2.2 Web开发环境的核心组件</h3><table>
+<thead>
+<tr>
+<th align="left">组件</th>
+<th align="left">作用</th>
+<th align="left">本实验对应的工具</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>运行时环境</strong></td>
+<td align="left">执行编程语言代码</td>
+<td align="left">Node.js（运行JavaScript&#x2F;Hexo）</td>
+</tr>
+<tr>
+<td align="left"><strong>包管理器</strong></td>
+<td align="left">管理项目依赖库</td>
+<td align="left">npm（Node Package Manager）</td>
+</tr>
+<tr>
+<td align="left"><strong>版本控制</strong></td>
+<td align="left">代码管理与协作</td>
+<td align="left">Git</td>
+</tr>
+<tr>
+<td align="left"><strong>构建工具</strong></td>
+<td align="left">将源文件转换为可部署的网站</td>
+<td align="left">Hexo CLI</td>
+</tr>
+<tr>
+<td align="left"><strong>本地服务器</strong></td>
+<td align="left">在开发时预览网站效果</td>
+<td align="left">Hexo自带的server模块</td>
+</tr>
+</tbody></table>
+<h2 id="三、实验环境"><a href="#三、实验环境" class="headerlink" title="三、实验环境"></a>三、实验环境</h2><ul>
+<li><strong>操作系统</strong>：Windows 10&#x2F;11</li>
+<li><strong>网络</strong>：需要互联网连接以下载软件和安装依赖包</li>
+<li><strong>所需软件</strong>：<ul>
+<li>Node.js（LTS版本，含npm）</li>
+<li>Git for Windows</li>
+<li>Hexo CLI</li>
+<li>一个文本编辑器（VS Code或Notepad++等）</li>
+</ul>
+</li>
+</ul>
+<h2 id="四、详细操作步骤"><a href="#四、详细操作步骤" class="headerlink" title="四、详细操作步骤"></a>四、详细操作步骤</h2><h3 id="步骤一：安装Node-js与npm"><a href="#步骤一：安装Node-js与npm" class="headerlink" title="步骤一：安装Node.js与npm"></a>步骤一：安装Node.js与npm</h3><ol>
+<li>打开浏览器，访问 Node.js 官网：<strong><a target="_blank" rel="noopener" href="https://nodejs.org/">https://nodejs.org/</a></strong></li>
+<li>下载 <strong>LTS（长期支持）版本</strong> 的Windows安装包。</li>
+<li>双击下载的安装包，启动安装向导。</li>
+<li>在安装过程中，<strong>务必勾选“Automatically install the necessary tools”</strong>，并确保 <strong>“Add to PATH”</strong> 选项被选中。</li>
+<li>其余步骤保持默认，点击“Next”直至安装完成。</li>
+<li>安装完成后，打开命令提示符，输入以下命令验证安装是否成功：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">node -v</span><br><span class="line">npm -v</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="步骤二：配置npm镜像源（可选但推荐）"><a href="#步骤二：配置npm镜像源（可选但推荐）" class="headerlink" title="步骤二：配置npm镜像源（可选但推荐）"></a>步骤二：配置npm镜像源（可选但推荐）</h3><p>在命令提示符中执行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm config set registry https://registry.npmmirror.com</span><br></pre></td></tr></table></figure>
+
+<p>验证配置是否生效：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm config get registry</span><br></pre></td></tr></table></figure>
+
+<h3 id="步骤三：安装Git-for-Windows"><a href="#步骤三：安装Git-for-Windows" class="headerlink" title="步骤三：安装Git for Windows"></a>步骤三：安装Git for Windows</h3><ol>
+<li>打开浏览器，访问Git官网：<strong><a target="_blank" rel="noopener" href="https://git-scm.com/download/win">https://git-scm.com/download/win</a></strong></li>
+<li>下载适合你系统的安装包。</li>
+<li>双击安装包，启动安装向导。</li>
+<li>在安装过程中，当出现 <strong>“Select Components”</strong> 页面时，建议勾选 <strong>“Git Bash Here”</strong> 和 <strong>“Git GUI Here”</strong> 。</li>
+<li>在 <strong>“Choosing the default editor”</strong> 页面，可以选择VS Code（如果已安装）或其他编辑器。</li>
+<li>在 <strong>“Adjusting your PATH environment”</strong> 页面，选择 <strong>“Git from the command line and also from 3rd-party software”</strong> 。</li>
+<li>其余步骤保持默认，点击“Next”直至安装完成。</li>
+<li>安装完成后，<strong>重启命令提示符</strong>，输入以下命令验证：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git --version</span><br></pre></td></tr></table></figure></li>
+<li>配置Git的全局用户信息：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git config --global user.name &quot;你的姓名&quot;</span><br><span class="line">git config --global user.email &quot;你的邮箱@example.com&quot;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="步骤四：安装Hexo-CLI"><a href="#步骤四：安装Hexo-CLI" class="headerlink" title="步骤四：安装Hexo CLI"></a>步骤四：安装Hexo CLI</h3><p>在命令提示符中执行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install -g hexo-cli</span><br></pre></td></tr></table></figure>
+
+<p>验证安装：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo -v</span><br></pre></td></tr></table></figure>
+
+<h3 id="步骤五：初始化博客项目"><a href="#步骤五：初始化博客项目" class="headerlink" title="步骤五：初始化博客项目"></a>步骤五：初始化博客项目</h3><ol>
+<li>选择一个你希望存放博客源码的目录，进入该目录：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cd D:\Blog</span><br></pre></td></tr></table></figure></li>
+<li>执行初始化命令创建博客项目：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo init my-blog</span><br></pre></td></tr></table></figure></li>
+<li>进入项目目录：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cd my-blog</span><br></pre></td></tr></table></figure></li>
+<li>安装项目依赖（如果初始化时未自动完成）：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>初始化完成后，项目目录结构如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">my-blog/</span><br><span class="line">├── _config.yml      # 站点主配置文件</span><br><span class="line">├── package.json     # 项目依赖清单</span><br><span class="line">├── scaffolds/       # 文章模板</span><br><span class="line">├── source/          # 内容源文件</span><br><span class="line">│   └── _posts/      # 文章存放目录</span><br><span class="line">└── themes/          # 主题目录</span><br></pre></td></tr></table></figure>
+
+<h3 id="步骤六：本地预览博客"><a href="#步骤六：本地预览博客" class="headerlink" title="步骤六：本地预览博客"></a>步骤六：本地预览博客</h3><ol>
+<li>在项目目录下，启动本地预览服务：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo server</span><br></pre></td></tr></table></figure></li>
+<li>看到如下提示表示服务启动成功：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">INFO  Hexo is running at http://localhost:4000 . Press Ctrl+C to stop.</span><br></pre></td></tr></table></figure></li>
+<li>打开浏览器，访问 <strong><a target="_blank" rel="noopener" href="http://localhost:4000/">http://localhost:4000</a></strong> ，即可看到默认的Hexo博客首页。</li>
+</ol>
+<h3 id="步骤七：创建并发布一篇博客文章"><a href="#步骤七：创建并发布一篇博客文章" class="headerlink" title="步骤七：创建并发布一篇博客文章"></a>步骤七：创建并发布一篇博客文章</h3><ol>
+<li>在项目目录下，使用以下命令创建一篇新文章：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new &quot;我的第一篇博客&quot;</span><br></pre></td></tr></table></figure></li>
+<li>用文本编辑器打开生成的Markdown文件，修改Front-matter信息和正文内容。</li>
+<li>保存文件后，重新生成静态页面：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo generate</span><br></pre></td></tr></table></figure></li>
+<li>再次启动本地预览服务查看效果：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo server</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="步骤八：更换主题（可选）"><a href="#步骤八：更换主题（可选）" class="headerlink" title="步骤八：更换主题（可选）"></a>步骤八：更换主题（可选）</h3><p>以安装流行的NexT主题为例：</p>
+<ol>
+<li>在项目目录下，克隆NexT主题：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git clone https://github.com/theme-next/hexo-theme-next themes/next</span><br></pre></td></tr></table></figure></li>
+<li>打开项目根目录下的 <code>_config.yml</code> 文件，找到 <code>theme</code> 字段，将其修改为：<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">theme:</span> <span class="string">next</span></span><br></pre></td></tr></table></figure></li>
+<li>重新生成并预览。</li>
+</ol>
+<h2 id="五、常见问题与排错"><a href="#五、常见问题与排错" class="headerlink" title="五、常见问题与排错"></a>五、常见问题与排错</h2><table>
+<thead>
+<tr>
+<th align="left">问题现象</th>
+<th align="left">可能原因</th>
+<th align="left">解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>&#39;node&#39; 不是内部或外部命令</code></td>
+<td align="left">Node.js未正确安装或未添加到PATH</td>
+<td align="left">重新安装Node.js，确保勾选“Add to PATH”</td>
+</tr>
+<tr>
+<td align="left"><code>npm install</code> 速度极慢</td>
+<td align="left">默认使用国外镜像源</td>
+<td align="left">切换为国内镜像源</td>
+</tr>
+<tr>
+<td align="left"><code>hexo -v</code> 报错</td>
+<td align="left">Hexo CLI未全局安装</td>
+<td align="left">执行 <code>npm install -g hexo-cli</code></td>
+</tr>
+<tr>
+<td align="left"><code>hexo server</code> 启动后浏览器无法访问</td>
+<td align="left">端口4000被占用</td>
+<td align="left">更换端口：<code>hexo server -p 4001</code></td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th align="left">问题现象</th>
+<th align="left">可能原因</th>
+<th align="left">解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">安装VS Code后无法在命令行使用<code>code</code>命令</td>
+<td align="left">安装时未勾选“添加到PATH”</td>
+<td align="left">重新运行安装程序，勾选“添加到PATH”；或手动将VS Code安装目录添加到系统环境变量</td>
+</tr>
+<tr>
+<td align="left">扩展面板搜索不到插件</td>
+<td align="left">网络问题或搜索关键词不准确</td>
+<td align="left">检查网络连接；尝试使用准确的插件全名（如“Markdown All in One”）搜索</td>
+</tr>
+<tr>
+<td align="left">预览窗口不显示或显示异常</td>
+<td align="left">插件未正确安装或未启用</td>
+<td align="left">检查扩展面板中插件是否已启用；重启VS Code</td>
+</tr>
+<tr>
+<td align="left">预览中图片无法显示</td>
+<td align="left">图片路径错误</td>
+<td align="left">检查图片路径是否正确，建议使用相对路径</td>
+</tr>
+<tr>
+<td align="left"><code>[TOC]</code>不生成目录</td>
+<td align="left">未安装Markdown All in One插件</td>
+<td align="left">安装并启用Markdown All in One插件</td>
+</tr>
+</tbody></table>
+<h2 id="六、拓展与进阶"><a href="#六、拓展与进阶" class="headerlink" title="六、拓展与进阶"></a>六、拓展与进阶</h2><p>完成基础实验后，可尝试以下进阶操作：</p>
+<ol>
+<li><strong>自定义代码片段（Snippets）</strong> ：在VS Code中配置自定义代码片段，快速插入常用的Markdown结构（如表格、引用块等）</li>
+<li><strong>导出为PDF</strong>：使用Markdown Preview Enhanced插件，将Markdown文档导出为PDF格式</li>
+<li><strong>配置自定义CSS</strong>：在Markdown Preview Enhanced中加载自定义CSS，实现个性化排版风格</li>
+<li><strong>使用Mermaid绘制流程图</strong>：在Markdown中嵌入Mermaid代码，绘制流程图和时序图</li>
+<li><strong>连接Git版本管理</strong>：将Markdown文档纳入Git版本控制，追踪修改历史</li>
+</ol>
+<div style="page-break-after: always; break-after: page;"></div>
+
+
+
+<h1 id="实验三-代码编辑器"><a href="#实验三-代码编辑器" class="headerlink" title="实验三 代码编辑器"></a>实验三 代码编辑器</h1><h2 id="一、实验目标-1"><a href="#一、实验目标-1" class="headerlink" title="一、实验目标"></a>一、实验目标</h2><ol>
+<li>安装Visual Studio Code（VS Code）文本代码编辑器；</li>
+<li>安装和配置Markdown相关插件，掌握代码编辑器插件的基本概念；</li>
+<li>学习Markdown基础语法，使用VS Code完成Markdown文档的编辑和渲染任务。</li>
+</ol>
+<h2 id="二、背景知识-1"><a href="#二、背景知识-1" class="headerlink" title="二、背景知识"></a>二、背景知识</h2><h3 id="2-1-代码编辑器-vs-集成开发环境（IDE）"><a href="#2-1-代码编辑器-vs-集成开发环境（IDE）" class="headerlink" title="2.1 代码编辑器 vs 集成开发环境（IDE）"></a>2.1 代码编辑器 vs 集成开发环境（IDE）</h3><table>
+<thead>
+<tr>
+<th align="left">类型</th>
+<th align="left">特点</th>
+<th align="left">典型代表</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>代码编辑器</strong></td>
+<td align="left">轻量级、启动快、以编辑为核心功能、通过插件扩展能力</td>
+<td align="left">VS Code、Sublime Text、Notepad++</td>
+</tr>
+<tr>
+<td align="left"><strong>集成开发环境（IDE）</strong></td>
+<td align="left">功能全面、集成了编译&#x2F;调试&#x2F;构建&#x2F;版本控制等全套工具链</td>
+<td align="left">IntelliJ IDEA、PyCharm、Eclipse</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-插件（Extension）的概念"><a href="#2-2-插件（Extension）的概念" class="headerlink" title="2.2 插件（Extension）的概念"></a>2.2 插件（Extension）的概念</h3><p>插件是VS Code最核心的扩展机制。通过安装不同的插件，可以为编辑器增加语法高亮、代码补全、格式化、预览、调试等新功能。</p>
+<h3 id="2-3-Markdown简介"><a href="#2-3-Markdown简介" class="headerlink" title="2.3 Markdown简介"></a>2.3 Markdown简介</h3><p>Markdown是一种轻量级标记语言，通过简单的纯文本语法实现结构化文档的编写，并支持转换为HTML、PDF等格式。</p>
+<p><strong>Markdown的核心特点</strong>：</p>
+<ul>
+<li><strong>简洁性</strong>：仅需少量符号（如<code>#</code>、<code>*</code>、<code>-</code>）即可完成排版</li>
+<li><strong>可读性</strong>：未渲染的纯文本仍然清晰易读</li>
+<li><strong>兼容性</strong>：支持GitHub、各大博客平台、笔记工具等场景</li>
+</ul>
+<h2 id="三、实验环境-1"><a href="#三、实验环境-1" class="headerlink" title="三、实验环境"></a>三、实验环境</h2><ul>
+<li><strong>操作系统</strong>：Windows 10&#x2F;11</li>
+<li><strong>网络</strong>：需要互联网连接以下载软件和插件</li>
+<li><strong>所需软件</strong>：<ul>
+<li>Visual Studio Code</li>
+<li>VS Code插件：Markdown All in One、Markdown Preview Enhanced等</li>
+</ul>
+</li>
+</ul>
+<h2 id="四、详细操作步骤-1"><a href="#四、详细操作步骤-1" class="headerlink" title="四、详细操作步骤"></a>四、详细操作步骤</h2><h3 id="步骤一：安装Visual-Studio-Code"><a href="#步骤一：安装Visual-Studio-Code" class="headerlink" title="步骤一：安装Visual Studio Code"></a>步骤一：安装Visual Studio Code</h3><ol>
+<li>打开浏览器，访问VS Code官网：<strong><a target="_blank" rel="noopener" href="https://code.visualstudio.com/">https://code.visualstudio.com/</a></strong></li>
+<li>点击首页的 <strong>“Download for Windows”</strong> 按钮，下载最新版本的安装包。</li>
+<li>双击下载的安装包，启动安装向导。</li>
+<li>在 <strong>“选择附加任务”</strong> 页面，<strong>建议勾选以下选项</strong>：<ul>
+<li>✅ 创建桌面快捷方式</li>
+<li>✅ 将“通过Code打开”操作添加到Windows资源管理器文件上下文菜单</li>
+<li>✅ 将“通过Code打开”操作添加到Windows资源管理器目录上下文菜单</li>
+<li>✅ 将Code注册为受支持的文件类型的编辑器</li>
+<li>✅ 添加到PATH（<strong>必须勾选</strong>）</li>
+</ul>
+</li>
+<li>点击 <strong>“安装”</strong> 开始安装。</li>
+</ol>
+<h3 id="步骤二：首次运行与界面熟悉"><a href="#步骤二：首次运行与界面熟悉" class="headerlink" title="步骤二：首次运行与界面熟悉"></a>步骤二：首次运行与界面熟悉</h3><ol>
+<li>双击桌面上的VS Code快捷方式图标启动。</li>
+<li>熟悉VS Code的主界面布局：<ul>
+<li><strong>活动栏</strong>（左侧最窄的竖条）：包含资源管理器、搜索、源代码管理、运行和调试、扩展等图标</li>
+<li><strong>侧边栏</strong>（活动栏右侧）：显示当前活动栏工具的具体内容</li>
+<li><strong>编辑器区域</strong>（中央）：用于编辑文件的主要区域</li>
+<li><strong>面板</strong>（底部）：显示终端、输出、问题等</li>
+<li><strong>状态栏</strong>（底部最下方）：显示当前文件信息、Git分支、编码格式等</li>
+</ul>
+</li>
+</ol>
+<h3 id="步骤三：安装Markdown相关插件"><a href="#步骤三：安装Markdown相关插件" class="headerlink" title="步骤三：安装Markdown相关插件"></a>步骤三：安装Markdown相关插件</h3><h4 id="3-1-打开扩展面板"><a href="#3-1-打开扩展面板" class="headerlink" title="3.1 打开扩展面板"></a>3.1 打开扩展面板</h4><ul>
+<li>点击左侧活动栏中的 <strong>扩展图标</strong>（四个小方块组成的图标）</li>
+<li>或使用快捷键：**<code>Ctrl + Shift + X</code>**</li>
+</ul>
+<h4 id="3-2-安装核心插件"><a href="#3-2-安装核心插件" class="headerlink" title="3.2 安装核心插件"></a>3.2 安装核心插件</h4><p><strong>插件1：Markdown All in One</strong></p>
+<ul>
+<li>在扩展面板中搜索 <strong><code>Markdown All in One</code></strong></li>
+<li>点击 <strong>“安装”</strong> 按钮</li>
+<li>功能：目录生成、快捷键支持、自动完成、列表自动延续等</li>
+</ul>
+<p><strong>插件2：Markdown Preview Enhanced</strong></p>
+<ul>
+<li>在扩展面板中搜索 <strong><code>Markdown Preview Enhanced</code></strong></li>
+<li>点击 <strong>“安装”</strong> 按钮</li>
+<li>功能：数学公式（LaTeX）、流程图（Mermaid）、导出为PDF&#x2F;HTML等</li>
+</ul>
+<p><strong>插件3（可选）：Paste Image</strong></p>
+<ul>
+<li>在扩展面板中搜索 <strong><code>Paste Image</code></strong></li>
+<li>点击 <strong>“安装”</strong> 按钮</li>
+<li>功能：直接粘贴剪贴板中的图片到Markdown文件</li>
+</ul>
+<p><strong>插件4（可选）：markdownlint</strong></p>
+<ul>
+<li>用于检查Markdown语法错误和格式规范</li>
+</ul>
+<h3 id="步骤四：配置编辑器优化写作体验"><a href="#步骤四：配置编辑器优化写作体验" class="headerlink" title="步骤四：配置编辑器优化写作体验"></a>步骤四：配置编辑器优化写作体验</h3><ol>
+<li><strong>开启自动保存</strong>：按 <code>Ctrl + ,</code> 打开设置，搜索 <code>files.autoSave</code>，设置为 <code>afterDelay</code></li>
+<li><strong>开启单词折行</strong>：搜索 <code>editor.wordWrap</code>，设置为 <code>on</code></li>
+<li><strong>配置图片粘贴路径</strong>（如安装了Paste Image插件）：设置 <code>Paste Image: Path Type</code> 为 <code>relative</code></li>
+</ol>
+<h3 id="步骤五：创建并编辑第一个Markdown文件"><a href="#步骤五：创建并编辑第一个Markdown文件" class="headerlink" title="步骤五：创建并编辑第一个Markdown文件"></a>步骤五：创建并编辑第一个Markdown文件</h3><ol>
+<li>新建文件：<code>Ctrl + N</code>，保存为 <code>test.md</code></li>
+<li>输入以下内容：</li>
+</ol>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 我的第一个Markdown文档</span></span><br><span class="line"></span><br><span class="line"><span class="section">## 什么是Markdown？</span></span><br><span class="line"></span><br><span class="line">Markdown是一种<span class="strong">**轻量级**</span>的标记语言。</span><br><span class="line"></span><br><span class="line"><span class="section">### Markdown的核心特点</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">-</span> <span class="strong">**简洁性**</span>：仅需少量符号即可完成排版</span><br><span class="line"><span class="bullet">-</span> <span class="strong">**可读性**</span>：纯文本仍然清晰易读</span><br><span class="line"><span class="bullet">-</span> <span class="strong">**兼容性**</span>：支持GitHub、博客平台等多种场景</span><br><span class="line"></span><br><span class="line"><span class="section">### 一个代码示例</span></span><br><span class="line"></span><br><span class="line">​<span class="code">```javascript</span></span><br><span class="line"><span class="code">function hello() &#123;</span></span><br><span class="line"><span class="code">    console.log(&quot;Hello, Markdown!&quot;);</span></span><br><span class="line"><span class="code">&#125;</span></span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id=""><a href="#" class="headerlink" title=""></a></h2><hr>
+<div style="page-break-after: always; break-after: page;"></div>
+
+<h1 id="实验四：Web站点构建——操作说明书"><a href="#实验四：Web站点构建——操作说明书" class="headerlink" title="实验四：Web站点构建——操作说明书"></a>实验四：Web站点构建——操作说明书</h1><h2 id="一、实验目标-2"><a href="#一、实验目标-2" class="headerlink" title="一、实验目标"></a>一、实验目标</h2><ol>
+<li>使用静态站点构建工具（Hexo）构建一个静态Web博客站点；</li>
+<li>了解和掌握Web应用开发的基本要素与流程：环境准备 → 项目初始化 → 内容编写 → 主题配置 → 本地预览 → 部署上线；</li>
+<li>理解静态站点生成器（SSG）的工作原理及其与动态站点的区别。</li>
+</ol>
+<h2 id="二、背景知识-2"><a href="#二、背景知识-2" class="headerlink" title="二、背景知识"></a>二、背景知识</h2><h3 id="2-1-什么是静态站点生成器（SSG）？"><a href="#2-1-什么是静态站点生成器（SSG）？" class="headerlink" title="2.1 什么是静态站点生成器（SSG）？"></a>2.1 什么是静态站点生成器（SSG）？</h3><p>静态站点生成器（Static Site Generator, SSG）是一类工具，它将<strong>Markdown等源文件</strong>和<strong>模板文件</strong>作为输入，<strong>预先编译</strong>成完整的HTML、CSS、JavaScript静态网页。它的核心理念是“<strong>提前做好</strong>”，而非“<strong>现场制作</strong>”。</p>
+<p><strong>静态站点 vs 动态站点：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">对比维度</th>
+<th align="left">静态站点（SSG）</th>
+<th align="left">动态站点（如WordPress）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>页面生成时机</strong></td>
+<td align="left">构建时预先生成所有页面</td>
+<td align="left">用户访问时由服务器实时生成</td>
+</tr>
+<tr>
+<td align="left"><strong>数据库</strong></td>
+<td align="left">不需要</td>
+<td align="left">通常需要</td>
+</tr>
+<tr>
+<td align="left"><strong>访问速度</strong></td>
+<td align="left">极快（纯静态文件）</td>
+<td align="left">较慢（需执行后端代码+查数据库）</td>
+</tr>
+<tr>
+<td align="left"><strong>安全性</strong></td>
+<td align="left">高（无后端攻击面）</td>
+<td align="left">需额外防护</td>
+</tr>
+<tr>
+<td align="left"><strong>部署方式</strong></td>
+<td align="left">上传静态文件即可</td>
+<td align="left">需配置服务器环境和数据库</td>
+</tr>
+<tr>
+<td align="left"><strong>适用场景</strong></td>
+<td align="left">博客、文档站、个人网站</td>
+<td align="left">电商、社交、CMS</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-为什么选择Hexo？"><a href="#2-2-为什么选择Hexo？" class="headerlink" title="2.2 为什么选择Hexo？"></a>2.2 为什么选择Hexo？</h3><p>Hexo是一个基于Node.js的快速、简洁且高效的博客框架。它使用Markdown解析文章，在几秒内即可利用靓丽的主题生成静态网页。Hexo拥有<strong>400+主题</strong>和丰富的插件生态，适合技术博客和个人网站。</p>
+<h3 id="2-3-Web应用开发的基本流程"><a href="#2-3-Web应用开发的基本流程" class="headerlink" title="2.3 Web应用开发的基本流程"></a>2.3 Web应用开发的基本流程</h3><p>本次实验将完整覆盖Web应用开发的<strong>六个核心环节</strong>：</p>
+<blockquote>
+<p><strong>环境准备</strong> → <strong>项目初始化</strong> → <strong>内容编写</strong> → <strong>主题定制</strong> → <strong>本地预览</strong> → <strong>部署上线</strong></p>
+</blockquote>
+<h2 id="三、实验环境-2"><a href="#三、实验环境-2" class="headerlink" title="三、实验环境"></a>三、实验环境</h2><ul>
+<li><strong>操作系统</strong>：Windows 10&#x2F;11（本说明书以Windows为例）</li>
+<li><strong>网络</strong>：需要互联网连接</li>
+<li><strong>前置条件</strong>：已完成实验二（Node.js、npm、Git已安装并配置）</li>
+<li><strong>所需账号</strong>：GitHub账号（用于免费部署）</li>
+</ul>
+<h2 id="四、详细操作步骤-2"><a href="#四、详细操作步骤-2" class="headerlink" title="四、详细操作步骤"></a>四、详细操作步骤</h2><h3 id="步骤一：环境准备（2分钟）"><a href="#步骤一：环境准备（2分钟）" class="headerlink" title="步骤一：环境准备（2分钟）"></a>步骤一：环境准备（2分钟）</h3><blockquote>
+<p><strong>注意</strong>：如果你已完成实验二，Node.js、npm和Git应该已经安装好了。如未安装，请先参考实验二的操作说明书完成安装。</p>
+</blockquote>
+<p><strong>验证环境是否就绪：</strong></p>
+<p>打开命令提示符（CMD或PowerShell），依次执行以下命令验证：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">node -v        # 应输出 v20.x.x 或更高版本</span><br><span class="line">npm -v         # 应输出 10.x.x 或更高版本</span><br><span class="line">git --version  # 应输出 git version 2.x.x</span><br></pre></td></tr></table></figure>
+
+<p>如果上述命令都能正常输出版本号，说明环境已准备就绪。</p>
+<h3 id="步骤二：安装Hexo-CLI"><a href="#步骤二：安装Hexo-CLI" class="headerlink" title="步骤二：安装Hexo CLI"></a>步骤二：安装Hexo CLI</h3><p>在命令提示符中执行以下命令，全局安装Hexo命令行工具：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install -g hexo-cli</span><br></pre></td></tr></table></figure>
+
+<p>验证安装是否成功：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo -v</span><br></pre></td></tr></table></figure>
+
+<p>应输出Hexo的版本信息及依赖组件列表。</p>
+<h3 id="步骤三：初始化博客项目"><a href="#步骤三：初始化博客项目" class="headerlink" title="步骤三：初始化博客项目"></a>步骤三：初始化博客项目</h3><ol>
+<li><p>选择一个存放博客的目录（例如 <code>D:\Blog</code>），进入该目录：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cd D:\Blog</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>执行初始化命令：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo init my-blog</span><br></pre></td></tr></table></figure>
+<p>该命令会从GitHub克隆hexo-starter模板，并自动安装依赖。整个过程约需1-3分钟。</p>
+</li>
+<li><p>进入项目目录：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cd my-blog</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>手动安装依赖（如初始化时未自动完成）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p><strong>初始化完成后的目录结构</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">my-blog/</span><br><span class="line">├── _config.yml      # 站点主配置文件（核心配置文件）</span><br><span class="line">├── package.json     # 项目依赖清单</span><br><span class="line">├── scaffolds/       # 文章模板（新建文章时的默认格式）</span><br><span class="line">├── source/          # 内容源文件目录</span><br><span class="line">│   ├── _drafts/     # 草稿存放目录</span><br><span class="line">│   └── _posts/      # 文章存放目录（Markdown文件放这里）</span><br><span class="line">└── themes/          # 主题目录</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><strong>各目录&#x2F;文件的作用</strong>：</p>
+<ul>
+<li><code>_config.yml</code>：站点的<strong>全局配置文件</strong>，包含网站标题、作者、URL、主题等核心设置</li>
+<li><code>source/</code>：存放所有<strong>内容源文件</strong>（Markdown文章、图片等），<code>_posts</code>是主要的文章存放位置</li>
+<li><code>themes/</code>：存放<strong>主题</strong>，决定网站的外观和布局</li>
+<li><code>public/</code>：<strong>生成目录</strong>（运行<code>hexo generate</code>后自动产生），存放最终的静态HTML文件</li>
+</ul>
+</blockquote>
+<h3 id="步骤四：本地预览博客"><a href="#步骤四：本地预览博客" class="headerlink" title="步骤四：本地预览博客"></a>步骤四：本地预览博客</h3><p>在项目目录（<code>my-blog</code>）下，执行以下命令启动本地预览服务：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo server</span><br></pre></td></tr></table></figure>
+
+<p>或简写为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo s</span><br></pre></td></tr></table></figure>
+
+<p>看到如下提示表示启动成功：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">INFO  Hexo is running at http://localhost:4000 . Press Ctrl+C to stop.</span><br></pre></td></tr></table></figure>
+
+<p>打开浏览器，访问 <strong><a target="_blank" rel="noopener" href="http://localhost:4000/">http://localhost:4000</a></strong>，即可看到默认的Hexo博客首页。</p>
+<blockquote>
+<p><strong>提示</strong>：在服务器启动期间，Hexo会监视文件变动并自动更新，无需重启服务器。</p>
+</blockquote>
+<h3 id="步骤五：创建并编写博客文章"><a href="#步骤五：创建并编写博客文章" class="headerlink" title="步骤五：创建并编写博客文章"></a>步骤五：创建并编写博客文章</h3><ol>
+<li><p>在项目目录下创建一篇新文章：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new &quot;我的第一篇博客&quot;</span><br></pre></td></tr></table></figure>
+<p>这会在 <code>source/_posts/</code> 目录下生成一个名为 <code>我的第一篇博客.md</code> 的Markdown文件。</p>
+</li>
+<li><p>用VS Code打开该文件，其内容格式如下：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">title: 我的第一篇博客</span><br><span class="line">date: 2026-07-05 10:00:00</span><br><span class="line"><span class="section">tags:</span></span><br><span class="line"><span class="section">---</span></span><br><span class="line"></span><br><span class="line"><span class="section">## 欢迎来到我的博客</span></span><br><span class="line"></span><br><span class="line">这是我的第一篇博客文章。通过Hexo，我可以用Markdown轻松写作。</span><br><span class="line"></span><br><span class="line"><span class="section">### 为什么要写技术博客？</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">-</span> 记录学习和成长</span><br><span class="line"><span class="bullet">-</span> 分享知识和经验</span><br><span class="line"><span class="bullet">-</span> 打造个人技术品牌</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>Front-matter说明</strong>：文件开头的 <code>---</code> 之间的区域称为Front-matter，用于定义文章的<strong>元数据</strong>（标题、日期、标签、分类等）。</p>
+</li>
+<li><p>保存文件后，重新生成静态页面：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo generate</span><br></pre></td></tr></table></figure>
+<p>或简写为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo g</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>刷新浏览器（<a href="http://localhost:4000），即可看到新文章出现在博客首页。">http://localhost:4000），即可看到新文章出现在博客首页。</a></p>
+</li>
+</ol>
+<h3 id="步骤六：更换主题（以NexT为例）"><a href="#步骤六：更换主题（以NexT为例）" class="headerlink" title="步骤六：更换主题（以NexT为例）"></a>步骤六：更换主题（以NexT为例）</h3><p>Hexo拥有丰富的主题生态。更换主题只需两步：</p>
+<ol>
+<li><p><strong>下载主题</strong>：在项目目录下，克隆NexT主题到 <code>themes/next</code> 目录：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git clone https://github.com/theme-next/hexo-theme-next themes/next</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>修改配置</strong>：打开项目根目录下的 <code>_config.yml</code> 文件，找到 <code>theme</code> 字段，修改为：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">theme:</span> <span class="string">next</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>重新生成并预览</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">hexo clean   # 清理缓存（可选）</span><br><span class="line">hexo generate</span><br><span class="line">hexo server</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>刷新浏览器，即可看到NexT主题的新样式。</p>
+</li>
+</ol>
+<h3 id="步骤七：部署到GitHub-Pages（免费上线）"><a href="#步骤七：部署到GitHub-Pages（免费上线）" class="headerlink" title="步骤七：部署到GitHub Pages（免费上线）"></a>步骤七：部署到GitHub Pages（免费上线）</h3><p>将博客部署到互联网上，让全世界都能访问。</p>
+<h4 id="7-1-创建GitHub仓库"><a href="#7-1-创建GitHub仓库" class="headerlink" title="7.1 创建GitHub仓库"></a>7.1 创建GitHub仓库</h4><ol>
+<li>登录你的GitHub账号。</li>
+<li>点击右上角的 <strong>“+”</strong> → <strong>“New repository”</strong> 。</li>
+<li><strong>仓库名称</strong>必须设置为：**<code>你的GitHub用户名.github.io</code>** （例如用户名为 <code>zhangsan</code>，则仓库名为 <code>zhangsan.github.io</code>）。</li>
+<li>选择 <strong>“Public”</strong> （公开），不要勾选“Initialize this repository with a README”。</li>
+<li>点击 <strong>“Create repository”</strong> 。</li>
+</ol>
+<h4 id="7-2-安装部署插件"><a href="#7-2-安装部署插件" class="headerlink" title="7.2 安装部署插件"></a>7.2 安装部署插件</h4><p>在项目目录下安装Git部署插件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install hexo-deployer-git --save</span><br></pre></td></tr></table></figure>
+
+<h4 id="7-3-配置部署信息"><a href="#7-3-配置部署信息" class="headerlink" title="7.3 配置部署信息"></a>7.3 配置部署信息</h4><p>打开项目根目录下的 <code>_config.yml</code> 文件，在文件末尾添加以下配置：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">deploy:</span></span><br><span class="line">  <span class="attr">type:</span> <span class="string">git</span></span><br><span class="line">  <span class="attr">repo:</span> <span class="string">https://github.com/你的GitHub用户名/你的GitHub用户名.github.io.git</span></span><br><span class="line">  <span class="attr">branch:</span> <span class="string">main</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><strong>注意</strong>：如果你的默认分支是 <code>master</code>，则将 <code>branch</code> 改为 <code>master</code>。GitHub新仓库的默认分支通常为 <code>main</code>。</p>
+</blockquote>
+<h4 id="7-4-执行部署"><a href="#7-4-执行部署" class="headerlink" title="7.4 执行部署"></a>7.4 执行部署</h4><p>执行以下命令将博客部署到GitHub Pages：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo clean &amp;&amp; hexo generate &amp;&amp; hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>或分步执行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">hexo clean    # 清理缓存</span><br><span class="line">hexo generate # 生成静态文件</span><br><span class="line">hexo deploy   # 部署到GitHub</span><br></pre></td></tr></table></figure>
+
+<p>部署过程中，系统会提示你输入GitHub的用户名和密码（或Personal Access Token）。</p>
+<h4 id="7-5-访问你的博客"><a href="#7-5-访问你的博客" class="headerlink" title="7.5 访问你的博客"></a>7.5 访问你的博客</h4><p>部署完成后，在浏览器中访问：</p>
+<p><strong>https:&#x2F;&#x2F;你的GitHub用户名.github.io</strong></p>
+<p>即可看到你的博客正式上线！</p>
+<h2 id="五、常见问题与排错-1"><a href="#五、常见问题与排错-1" class="headerlink" title="五、常见问题与排错"></a>五、常见问题与排错</h2><table>
+<thead>
+<tr>
+<th align="left">问题现象</th>
+<th align="left">可能原因</th>
+<th align="left">解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>&#39;hexo&#39; 不是内部或外部命令</code></td>
+<td align="left">Hexo CLI未正确安装</td>
+<td align="left">执行 <code>npm install -g hexo-cli</code> 重新安装</td>
+</tr>
+<tr>
+<td align="left"><code>hexo init</code> 速度极慢或失败</td>
+<td align="left">网络问题，无法访问GitHub</td>
+<td align="left">配置代理，或使用Gitee镜像源；也可手动下载模板</td>
+</tr>
+<tr>
+<td align="left"><code>hexo server</code> 启动后浏览器无法访问</td>
+<td align="left">端口4000被占用</td>
+<td align="left">更换端口：<code>hexo server -p 4001</code></td>
+</tr>
+<tr>
+<td align="left">部署后GitHub Pages显示404</td>
+<td align="left">仓库名称不是 <code>用户名.github.io</code></td>
+<td align="left">检查仓库命名是否正确</td>
+</tr>
+<tr>
+<td align="left">部署后页面样式丢失</td>
+<td align="left">站点URL配置错误</td>
+<td align="left">检查 <code>_config.yml</code> 中的 <code>url</code> 字段是否设置为 <code>https://用户名.github.io</code></td>
+</tr>
+<tr>
+<td align="left">部署时提示认证失败</td>
+<td align="left">未配置Git凭证</td>
+<td align="left">使用Personal Access Token代替密码，或在Git中配置凭证缓存</td>
+</tr>
+</tbody></table>
+<div style="page-break-after: always; break-after: page;"></div>
+
+
+
+<h1 id="实验五-虚拟机安装与使用"><a href="#实验五-虚拟机安装与使用" class="headerlink" title="实验五 虚拟机安装与使用"></a>实验五 虚拟机安装与使用</h1><h2 id="一、实验目标-3"><a href="#一、实验目标-3" class="headerlink" title="一、实验目标"></a>一、实验目标</h2><ol>
+<li>使用虚拟机工具（VirtualBox）安装Linux系统（Ubuntu Server）；</li>
+<li>通过克隆技术构建一个多机虚拟化环境；</li>
+<li>了解和掌握基于虚拟机的开发环境的基本构建方法和配置。</li>
+</ol>
+<h2 id="二、背景知识-3"><a href="#二、背景知识-3" class="headerlink" title="二、背景知识"></a>二、背景知识</h2><h3 id="2-1-什么是虚拟化技术？"><a href="#2-1-什么是虚拟化技术？" class="headerlink" title="2.1 什么是虚拟化技术？"></a>2.1 什么是虚拟化技术？</h3><p>虚拟化技术允许在一台物理计算机（宿主机）上同时运行多个独立的操作系统（虚拟机），每个虚拟机都拥有自己独立的CPU、内存、硬盘和网络资源。</p>
+<h3 id="2-2-虚拟机网络的三种核心模式"><a href="#2-2-虚拟机网络的三种核心模式" class="headerlink" title="2.2 虚拟机网络的三种核心模式"></a>2.2 虚拟机网络的三种核心模式</h3><table>
+<thead>
+<tr>
+<th align="left">网络模式</th>
+<th align="left">特点</th>
+<th align="left">典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>NAT</strong></td>
+<td align="left">虚拟机通过宿主机上网，外部不可直达</td>
+<td align="left">日常上网、安装软件</td>
+</tr>
+<tr>
+<td align="left"><strong>桥接（Bridged）</strong></td>
+<td align="left">虚拟机直接接入宿主机所在局域网</td>
+<td align="left">需要被其他设备直接访问</td>
+</tr>
+<tr>
+<td align="left"><strong>仅主机（Host-Only）</strong></td>
+<td align="left">宿主机与虚拟机形成隔离私网</td>
+<td align="left">搭建内网互通实验环境</td>
+</tr>
+</tbody></table>
+<p>本实验将采用 <strong>“NAT + 仅主机”双网卡</strong>方案。</p>
+<h2 id="三、实验环境-3"><a href="#三、实验环境-3" class="headerlink" title="三、实验环境"></a>三、实验环境</h2><ul>
+<li><strong>操作系统</strong>：Windows 10&#x2F;11</li>
+<li><strong>网络</strong>：需要互联网连接</li>
+<li><strong>硬件要求</strong>：CPU支持VT-x&#x2F;AMD-V虚拟化技术；内存≥8GB；硬盘剩余空间≥50GB</li>
+<li><strong>所需软件</strong>：<ul>
+<li>Oracle VirtualBox</li>
+<li>Ubuntu Server 22.04 LTS ISO镜像</li>
+</ul>
+</li>
+</ul>
+<h2 id="四、详细操作步骤-3"><a href="#四、详细操作步骤-3" class="headerlink" title="四、详细操作步骤"></a>四、详细操作步骤</h2><h3 id="步骤一：下载与安装VirtualBox"><a href="#步骤一：下载与安装VirtualBox" class="headerlink" title="步骤一：下载与安装VirtualBox"></a>步骤一：下载与安装VirtualBox</h3><ol>
+<li>访问VirtualBox官网：<strong><a target="_blank" rel="noopener" href="https://www.virtualbox.org/">https://www.virtualbox.org/</a></strong></li>
+<li>下载Windows版本安装包并安装</li>
+<li>安装完成后<strong>重启电脑</strong></li>
+</ol>
+<h3 id="步骤二：下载Ubuntu-Server-ISO镜像"><a href="#步骤二：下载Ubuntu-Server-ISO镜像" class="headerlink" title="步骤二：下载Ubuntu Server ISO镜像"></a>步骤二：下载Ubuntu Server ISO镜像</h3><p>访问Ubuntu官网：<strong><a target="_blank" rel="noopener" href="https://ubuntu.com/download/server">https://ubuntu.com/download/server</a></strong> ，下载22.04 LTS版本。</p>
+<h3 id="步骤三：创建第一台虚拟机（模板机）"><a href="#步骤三：创建第一台虚拟机（模板机）" class="headerlink" title="步骤三：创建第一台虚拟机（模板机）"></a>步骤三：创建第一台虚拟机（模板机）</h3><h4 id="3-1-新建虚拟机"><a href="#3-1-新建虚拟机" class="headerlink" title="3.1 新建虚拟机"></a>3.1 新建虚拟机</h4><ul>
+<li><strong>名称</strong>：<code>ubuntu-template</code></li>
+<li><strong>ISO映像</strong>：选择下载的Ubuntu Server ISO</li>
+<li><strong>类型</strong>：Linux，<strong>版本</strong>：Ubuntu (64-bit)</li>
+</ul>
+<h4 id="3-2-分配硬件资源"><a href="#3-2-分配硬件资源" class="headerlink" title="3.2 分配硬件资源"></a>3.2 分配硬件资源</h4><ul>
+<li><strong>内存</strong>：2048 MB或以上</li>
+<li><strong>硬盘</strong>：VDI格式，动态分配，20 GB或以上</li>
+</ul>
+<h4 id="3-3-配置虚拟机网络（双网卡）"><a href="#3-3-配置虚拟机网络（双网卡）" class="headerlink" title="3.3 配置虚拟机网络（双网卡）"></a>3.3 配置虚拟机网络（双网卡）</h4><table>
+<thead>
+<tr>
+<th align="left">适配器</th>
+<th align="left">连接方式</th>
+<th align="left">用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">适配器1</td>
+<td align="left">NAT</td>
+<td align="left">上网和下载软件</td>
+</tr>
+<tr>
+<td align="left">适配器2</td>
+<td align="left">仅主机（Host-Only）适配器</td>
+<td align="left">多机互联</td>
+</tr>
+</tbody></table>
+<h3 id="步骤四：安装Ubuntu-Server"><a href="#步骤四：安装Ubuntu-Server" class="headerlink" title="步骤四：安装Ubuntu Server"></a>步骤四：安装Ubuntu Server</h3><ol>
+<li>启动虚拟机，选择 <strong>“Try or Install Ubuntu Server”</strong></li>
+<li>选择语言和键盘布局</li>
+<li>网络配置保持默认DHCP</li>
+<li>存储配置选择 <strong>“Use an entire disk”</strong></li>
+<li>设置用户名和密码</li>
+<li><strong>务必按空格键选中“Install OpenSSH server”</strong></li>
+<li>等待安装完成后重启</li>
+</ol>
+<h3 id="步骤五：配置静态IP地址"><a href="#步骤五：配置静态IP地址" class="headerlink" title="步骤五：配置静态IP地址"></a>步骤五：配置静态IP地址</h3><p>登录系统后，编辑Netplan配置文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> nano /etc/netplan/50-cloud-init.yaml</span><br></pre></td></tr></table></figure>
+
+<p>修改为：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">network:</span></span><br><span class="line">  <span class="attr">version:</span> <span class="number">2</span></span><br><span class="line">  <span class="attr">renderer:</span> <span class="string">networkd</span></span><br><span class="line">  <span class="attr">ethernets:</span></span><br><span class="line">    <span class="attr">enp0s3:</span>           <span class="comment"># NAT网卡</span></span><br><span class="line">      <span class="attr">dhcp4:</span> <span class="literal">yes</span></span><br><span class="line">    <span class="attr">enp0s8:</span>           <span class="comment"># 仅主机网卡</span></span><br><span class="line">      <span class="attr">dhcp4:</span> <span class="literal">no</span></span><br><span class="line">      <span class="attr">addresses:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="number">192.168</span><span class="number">.56</span><span class="number">.101</span><span class="string">/24</span></span><br><span class="line">      <span class="attr">nameservers:</span></span><br><span class="line">        <span class="attr">addresses:</span> [<span class="number">8.8</span><span class="number">.8</span><span class="number">.8</span>, <span class="number">114.114</span><span class="number">.114</span><span class="number">.114</span>]</span><br></pre></td></tr></table></figure>
+
+<p>应用配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> netplan apply</span><br></pre></td></tr></table></figure>
+
+<h3 id="步骤六：配置主机名与hosts解析"><a href="#步骤六：配置主机名与hosts解析" class="headerlink" title="步骤六：配置主机名与hosts解析"></a>步骤六：配置主机名与hosts解析</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> hostnamectl set-hostname template</span><br><span class="line"><span class="built_in">sudo</span> nano /etc/hosts</span><br></pre></td></tr></table></figure>
+
+<p>添加：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.56.101 template</span><br><span class="line">192.168.56.102 node1</span><br><span class="line">192.168.56.103 node2</span><br><span class="line">192.168.56.104 node3</span><br></pre></td></tr></table></figure>
+
+<h3 id="步骤七：克隆虚拟机"><a href="#步骤七：克隆虚拟机" class="headerlink" title="步骤七：克隆虚拟机"></a>步骤七：克隆虚拟机</h3><ol>
+<li>关闭模板机：<code>sudo shutdown now</code></li>
+<li>在VirtualBox中右键点击模板机 → <strong>“克隆”</strong></li>
+<li>选择 <strong>“完全克隆”</strong></li>
+<li>分别克隆出 <code>node1</code>、<code>node2</code>、<code>node3</code></li>
+</ol>
+<h3 id="步骤八：修改克隆机的主机名和IP"><a href="#步骤八：修改克隆机的主机名和IP" class="headerlink" title="步骤八：修改克隆机的主机名和IP"></a>步骤八：修改克隆机的主机名和IP</h3><p>对每台克隆机：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> hostnamectl set-hostname node1  <span class="comment"># 分别改为node1/node2/node3</span></span><br><span class="line"><span class="built_in">sudo</span> nano /etc/netplan/50-cloud-init.yaml  <span class="comment"># 修改IP为192.168.56.102/103/104</span></span><br><span class="line"><span class="built_in">sudo</span> netplan apply</span><br></pre></td></tr></table></figure>
+
+<h3 id="步骤九：验证多机环境"><a href="#步骤九：验证多机环境" class="headerlink" title="步骤九：验证多机环境"></a>步骤九：验证多机环境</h3><p>在node1上测试：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ping -c 3 8.8.8.8      <span class="comment"># 测试外网</span></span><br><span class="line">ping -c 3 192.168.56.1 <span class="comment"># 测试宿主机</span></span><br><span class="line">ping -c 3 node2        <span class="comment"># 测试其他虚拟机</span></span><br><span class="line">ping -c 3 node3</span><br></pre></td></tr></table></figure>
+
+<h2 id="五、常见问题与排错-2"><a href="#五、常见问题与排错-2" class="headerlink" title="五、常见问题与排错"></a>五、常见问题与排错</h2><table>
+<thead>
+<tr>
+<th align="left">问题现象</th>
+<th align="left">可能原因</th>
+<th align="left">解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">提示“VT-x&#x2F;AMD-V未启用”</td>
+<td align="left">BIOS中未开启硬件虚拟化</td>
+<td align="left">重启进入BIOS启用VT-x&#x2F;AMD-V</td>
+</tr>
+<tr>
+<td align="left">虚拟机无法上网</td>
+<td align="left">NAT网卡配置错误</td>
+<td align="left">检查<code>enp0s3</code>是否配置为<code>dhcp4: yes</code></td>
+</tr>
+<tr>
+<td align="left">虚拟机之间ping不通</td>
+<td align="left">仅主机网卡IP不在同一网段</td>
+<td align="left">检查IP是否都在<code>192.168.56.x/24</code>网段</td>
+</tr>
+<tr>
+<td align="left">克隆后网络无法使用</td>
+<td align="left">保留了原网卡的MAC地址</td>
+<td align="left">在VirtualBox中重新生成MAC地址</td>
+</tr>
+</tbody></table>
+<hr>
+<div style="page-break-after: always; break-after: page;"></div>
+
+<h1 id="实验六-Linux环境配置"><a href="#实验六-Linux环境配置" class="headerlink" title="实验六 Linux环境配置"></a>实验六 Linux环境配置</h1><h2 id="一、实验目标-4"><a href="#一、实验目标-4" class="headerlink" title="一、实验目标"></a>一、实验目标</h2><ol>
+<li>使用命令行进行Linux系统的基础操作；</li>
+<li>了解和简单管理常用系统配置文件（<code>/etc/passwd</code>、<code>/etc/group</code>、<code>/etc/profile</code>等）；</li>
+<li>了解和简单管理用户配置文件（<code>~/.bashrc</code>、<code>~/.profile</code>等）；</li>
+<li>掌握环境变量的查看、设置与管理方法。</li>
+</ol>
+<h2 id="二、背景知识-4"><a href="#二、背景知识-4" class="headerlink" title="二、背景知识"></a>二、背景知识</h2><h3 id="2-1-Linux命令行基础"><a href="#2-1-Linux命令行基础" class="headerlink" title="2.1 Linux命令行基础"></a>2.1 Linux命令行基础</h3><ul>
+<li><strong>命令提示符</strong>：<code>用户名@主机名:当前目录$</code>（<code>$</code>表示普通用户，<code>#</code>表示root用户）</li>
+<li><strong>Tab补全</strong>：输入命令或路径时按Tab键自动补全</li>
+<li><strong>快捷键</strong>：<code>Ctrl+C</code>终止当前命令，<code>Ctrl+D</code>退出终端</li>
+</ul>
+<h3 id="2-2-用户与权限"><a href="#2-2-用户与权限" class="headerlink" title="2.2 用户与权限"></a>2.2 用户与权限</h3><ul>
+<li><strong>root用户</strong>：最高权限用户</li>
+<li><strong>普通用户</strong>：受限权限用户，执行系统级操作时需要<code>sudo</code>提权</li>
+<li><strong>用户组</strong>：将多个用户归类，方便统一管理权限</li>
+</ul>
+<h3 id="2-3-环境变量"><a href="#2-3-环境变量" class="headerlink" title="2.3 环境变量"></a>2.3 环境变量</h3><ul>
+<li><code>PATH</code>：指定可执行文件的搜索路径</li>
+<li><code>HOME</code>：当前用户的主目录路径</li>
+<li><code>USER</code>：当前用户名</li>
+<li><code>SHELL</code>：当前使用的Shell类型</li>
+</ul>
+<h2 id="三、实验环境-4"><a href="#三、实验环境-4" class="headerlink" title="三、实验环境"></a>三、实验环境</h2><ul>
+<li><strong>操作系统</strong>：Ubuntu Server 22.04 LTS（在VirtualBox虚拟机中）</li>
+<li><strong>前置条件</strong>：已完成实验五，至少有一台运行中的Ubuntu虚拟机</li>
+</ul>
+<h2 id="四、详细操作步骤-4"><a href="#四、详细操作步骤-4" class="headerlink" title="四、详细操作步骤"></a>四、详细操作步骤</h2><h3 id="第一部分：系统基础操作"><a href="#第一部分：系统基础操作" class="headerlink" title="第一部分：系统基础操作"></a>第一部分：系统基础操作</h3><h4 id="步骤一：登录与查看系统信息"><a href="#步骤一：登录与查看系统信息" class="headerlink" title="步骤一：登录与查看系统信息"></a>步骤一：登录与查看系统信息</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">whoami</span>              <span class="comment"># 查看当前用户</span></span><br><span class="line"><span class="built_in">uname</span> -a            <span class="comment"># 查看内核与架构信息</span></span><br><span class="line">lsb_release -a      <span class="comment"># 查看Ubuntu版本</span></span><br><span class="line">hostname            <span class="comment"># 查看主机名</span></span><br><span class="line"><span class="built_in">pwd</span>                 <span class="comment"># 查看当前工作目录</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤二：文件与目录的基本操作"><a href="#步骤二：文件与目录的基本操作" class="headerlink" title="步骤二：文件与目录的基本操作"></a>步骤二：文件与目录的基本操作</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">ls</span> -lh              <span class="comment"># 列出文件（详细信息，易读大小）</span></span><br><span class="line"><span class="built_in">cd</span> ~                <span class="comment"># 切换到主目录</span></span><br><span class="line"><span class="built_in">mkdir</span> test_dir      <span class="comment"># 创建目录</span></span><br><span class="line"><span class="built_in">touch</span> test.txt      <span class="comment"># 创建空文件</span></span><br><span class="line"><span class="built_in">cp</span> test.txt test_copy.txt  <span class="comment"># 复制文件</span></span><br><span class="line"><span class="built_in">mv</span> test.txt /tmp/   <span class="comment"># 移动文件</span></span><br><span class="line"><span class="built_in">rm</span> -f test.txt      <span class="comment"># 删除文件</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>⚠️ <code>rm -rf</code>命令会永久删除文件且不可恢复，请谨慎使用！</p>
+</blockquote>
+<h4 id="步骤三：查看系统资源状态"><a href="#步骤三：查看系统资源状态" class="headerlink" title="步骤三：查看系统资源状态"></a>步骤三：查看系统资源状态</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">free -h             <span class="comment"># 查看内存使用</span></span><br><span class="line"><span class="built_in">df</span> -h               <span class="comment"># 查看磁盘使用</span></span><br><span class="line">top                 <span class="comment"># 查看进程和资源占用（按q退出）</span></span><br><span class="line"><span class="built_in">du</span> -sh *            <span class="comment"># 查看当前目录下各子目录的大小</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="第二部分：用户管理"><a href="#第二部分：用户管理" class="headerlink" title="第二部分：用户管理"></a>第二部分：用户管理</h3><h4 id="步骤四：查看用户与组配置文件"><a href="#步骤四：查看用户与组配置文件" class="headerlink" title="步骤四：查看用户与组配置文件"></a>步骤四：查看用户与组配置文件</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> /etc/passwd     <span class="comment"># 用户账户信息</span></span><br><span class="line"><span class="built_in">sudo</span> <span class="built_in">cat</span> /etc/shadow <span class="comment"># 加密密码信息（仅root可读）</span></span><br><span class="line"><span class="built_in">cat</span> /etc/group      <span class="comment"># 用户组信息</span></span><br><span class="line"><span class="built_in">id</span>                  <span class="comment"># 查看当前用户ID信息</span></span><br></pre></td></tr></table></figure>
+
+<p><code>/etc/passwd</code>文件格式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">用户名:密码占位符:UID:GID:用户描述:主目录:登录Shell</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤五：创建和管理用户"><a href="#步骤五：创建和管理用户" class="headerlink" title="步骤五：创建和管理用户"></a>步骤五：创建和管理用户</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> adduser testuser           <span class="comment"># 创建新用户</span></span><br><span class="line"><span class="built_in">sudo</span> passwd testuser            <span class="comment"># 设置密码</span></span><br><span class="line"><span class="built_in">sudo</span> usermod -aG <span class="built_in">sudo</span> testuser  <span class="comment"># 赋予sudo权限</span></span><br><span class="line"><span class="built_in">groups</span> testuser                 <span class="comment"># 查看用户所属组</span></span><br><span class="line">su - testuser                   <span class="comment"># 切换用户</span></span><br><span class="line"><span class="built_in">sudo</span> deluser -r testuser        <span class="comment"># 删除用户</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤六：文件权限管理"><a href="#步骤六：文件权限管理" class="headerlink" title="步骤六：文件权限管理"></a>步骤六：文件权限管理</h4><p>权限数字对照表：</p>
+<table>
+<thead>
+<tr>
+<th align="left">数字</th>
+<th align="left">权限</th>
+<th align="left">含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">7</td>
+<td align="left">rwx</td>
+<td align="left">读+写+执行</td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td align="left">rw-</td>
+<td align="left">读+写</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">r-x</td>
+<td align="left">读+执行</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left">r–</td>
+<td align="left">只读</td>
+</tr>
+<tr>
+<td align="left">0</td>
+<td align="left">—</td>
+<td align="left">无权限</td>
+</tr>
+</tbody></table>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">chmod</span> 755 test.txt              <span class="comment"># 数字法修改权限</span></span><br><span class="line"><span class="built_in">chmod</span> u+x test.txt              <span class="comment"># 符号法：所有者增加执行权限</span></span><br><span class="line"><span class="built_in">chmod</span> g-w test.txt              <span class="comment"># 符号法：去掉组的写权限</span></span><br><span class="line"><span class="built_in">sudo</span> <span class="built_in">chown</span> root:root test.txt   <span class="comment"># 修改所有者和组</span></span><br><span class="line"><span class="built_in">sudo</span> <span class="built_in">chgrp</span> www-data test.txt    <span class="comment"># 仅修改所属组</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="第三部分：环境变量与配置文件"><a href="#第三部分：环境变量与配置文件" class="headerlink" title="第三部分：环境变量与配置文件"></a>第三部分：环境变量与配置文件</h3><h4 id="步骤七：查看环境变量"><a href="#步骤七：查看环境变量" class="headerlink" title="步骤七：查看环境变量"></a>步骤七：查看环境变量</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">env</span>                 <span class="comment"># 查看所有环境变量</span></span><br><span class="line"><span class="built_in">echo</span> <span class="variable">$PATH</span>          <span class="comment"># 查看PATH变量</span></span><br><span class="line"><span class="built_in">echo</span> <span class="variable">$HOME</span>          <span class="comment"># 查看主目录</span></span><br><span class="line"><span class="built_in">echo</span> <span class="variable">$USER</span>          <span class="comment"># 查看当前用户名</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤八：临时设置环境变量"><a href="#步骤八：临时设置环境变量" class="headerlink" title="步骤八：临时设置环境变量"></a>步骤八：临时设置环境变量</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:/home/dev/mybin   <span class="comment"># 临时添加PATH</span></span><br><span class="line"><span class="built_in">export</span> MY_VAR=<span class="string">&quot;Hello World&quot;</span>          <span class="comment"># 临时创建变量</span></span><br><span class="line"><span class="built_in">echo</span> <span class="variable">$MY_VAR</span>                         <span class="comment"># 验证</span></span><br><span class="line"><span class="built_in">unset</span> MY_VAR                         <span class="comment"># 删除变量</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤九：永久设置环境变量（用户级）"><a href="#步骤九：永久设置环境变量（用户级）" class="headerlink" title="步骤九：永久设置环境变量（用户级）"></a>步骤九：永久设置环境变量（用户级）</h4><table>
+<thead>
+<tr>
+<th align="left">配置文件</th>
+<th align="left">加载时机</th>
+<th align="left">作用范围</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>~/.bashrc</code></td>
+<td align="left">每次打开新终端时执行</td>
+<td align="left">当前用户</td>
+</tr>
+<tr>
+<td align="left"><code>~/.profile</code></td>
+<td align="left">用户登录时执行一次</td>
+<td align="left">当前用户</td>
+</tr>
+<tr>
+<td align="left"><code>~/.bash_profile</code></td>
+<td align="left">用户登录时执行（优先于.profile）</td>
+<td align="left">当前用户</td>
+</tr>
+</tbody></table>
+<p>编辑 <code>~/.bashrc</code>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">nano ~/.bashrc</span><br><span class="line"><span class="comment"># 在末尾添加</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:/home/dev/mybin</span><br><span class="line"><span class="built_in">export</span> MY_CUSTOM_VAR=<span class="string">&quot;自定义变量&quot;</span></span><br><span class="line"><span class="built_in">alias</span> ll=<span class="string">&#x27;ls -alF&#x27;</span></span><br><span class="line"><span class="comment"># 保存后生效</span></span><br><span class="line"><span class="built_in">source</span> ~/.bashrc</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤十：永久设置环境变量（系统级）"><a href="#步骤十：永久设置环境变量（系统级）" class="headerlink" title="步骤十：永久设置环境变量（系统级）"></a>步骤十：永久设置环境变量（系统级）</h4><p><strong>方法一：<code>/etc/environment</code></strong> （所有用户生效，需要重启）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> nano /etc/environment</span><br><span class="line"><span class="comment"># 添加（不使用export）</span></span><br><span class="line">PATH=<span class="string">&quot;/usr/local/sbin:...:/my/custom/path&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>方法二：<code>/etc/profile</code></strong> （所有用户登录时执行）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> nano /etc/profile</span><br><span class="line"><span class="comment"># 在末尾添加</span></span><br><span class="line"><span class="built_in">export</span> JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64</span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:<span class="variable">$JAVA_HOME</span>/bin</span><br><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure>
+
+<p><strong>方法三（推荐）：<code>/etc/profile.d/</code></strong> ：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> nano /etc/profile.d/myenv.sh</span><br><span class="line"><span class="comment"># 添加</span></span><br><span class="line"><span class="built_in">export</span> MY_GLOBAL_VAR=<span class="string">&quot;全局变量&quot;</span></span><br><span class="line"><span class="built_in">source</span> /etc/profile.d/myenv.sh</span><br></pre></td></tr></table></figure>
+
+<h2 id="五、常见问题与排错-3"><a href="#五、常见问题与排错-3" class="headerlink" title="五、常见问题与排错"></a>五、常见问题与排错</h2><table>
+<thead>
+<tr>
+<th align="left">问题现象</th>
+<th align="left">可能原因</th>
+<th align="left">解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>sudo: command not found</code></td>
+<td align="left">用户不在sudo组中</td>
+<td align="left">以root用户登录或切换到root</td>
+</tr>
+<tr>
+<td align="left"><code>Permission denied</code></td>
+<td align="left">权限不足</td>
+<td align="left">使用<code>sudo</code>提权</td>
+</tr>
+<tr>
+<td align="left">修改<code>~/.bashrc</code>后不生效</td>
+<td align="left">未执行<code>source</code></td>
+<td align="left">执行<code>source ~/.bashrc</code></td>
+</tr>
+<tr>
+<td align="left">修改<code>/etc/environment</code>后不生效</td>
+<td align="left">需要重启</td>
+<td align="left">重启系统</td>
+</tr>
+</tbody></table>
+<hr>
+<div style="page-break-after: always; break-after: page;"></div>
+
+
+
+<h1 id="实验七-远程登录管理"><a href="#实验七-远程登录管理" class="headerlink" title="实验七 远程登录管理"></a>实验七 远程登录管理</h1><h2 id="一、实验目标-5"><a href="#一、实验目标-5" class="headerlink" title="一、实验目标"></a>一、实验目标</h2><ol>
+<li>安装和配置OpenSSH服务，实现多机之间的远程登录管理；</li>
+<li>配置SSH密钥认证，实现免密登录；</li>
+<li>了解多机开发环境下的账户管理方法；</li>
+<li>掌握使用SCP和rsync进行跨机文件传输与同步。</li>
+</ol>
+<h2 id="二、背景知识-5"><a href="#二、背景知识-5" class="headerlink" title="二、背景知识"></a>二、背景知识</h2><h3 id="2-1-什么是SSH？"><a href="#2-1-什么是SSH？" class="headerlink" title="2.1 什么是SSH？"></a>2.1 什么是SSH？</h3><p>SSH（Secure Shell）是一种<strong>加密网络协议</strong>，用于在不安全的网络中安全地远程登录和执行命令。SSH默认使用<strong>22端口</strong>。</p>
+<h3 id="2-2-SSH的两种认证方式"><a href="#2-2-SSH的两种认证方式" class="headerlink" title="2.2 SSH的两种认证方式"></a>2.2 SSH的两种认证方式</h3><table>
+<thead>
+<tr>
+<th align="left">认证方式</th>
+<th align="left">原理</th>
+<th align="left">安全性</th>
+<th align="left">适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>密码认证</strong></td>
+<td align="left">每次登录输入密码</td>
+<td align="left">较低</td>
+<td align="left">临时访问</td>
+</tr>
+<tr>
+<td align="left"><strong>密钥认证</strong></td>
+<td align="left">使用公钥&#x2F;私钥对验证身份</td>
+<td align="left">高</td>
+<td align="left">日常管理、自动化脚本</td>
+</tr>
+</tbody></table>
+<h3 id="2-3-文件传输工具"><a href="#2-3-文件传输工具" class="headerlink" title="2.3 文件传输工具"></a>2.3 文件传输工具</h3><table>
+<thead>
+<tr>
+<th align="left">工具</th>
+<th align="left">特点</th>
+<th align="left">适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>SCP</strong></td>
+<td align="left">基于SSH的简单复制</td>
+<td align="left">一次性、少量文件传输</td>
+</tr>
+<tr>
+<td align="left"><strong>rsync</strong></td>
+<td align="left">增量同步，只传输变化的部分</td>
+<td align="left">目录同步、定期备份</td>
+</tr>
+</tbody></table>
+<h2 id="三、实验环境-5"><a href="#三、实验环境-5" class="headerlink" title="三、实验环境"></a>三、实验环境</h2><ul>
+<li><strong>操作系统</strong>：Ubuntu Server 22.04 LTS</li>
+<li><strong>网络</strong>：所有虚拟机处于同一Host-Only网络（<code>192.168.56.0/24</code>）</li>
+<li><strong>前置条件</strong>：已完成实验五，拥有至少两台Ubuntu虚拟机（node1和node2）</li>
+</ul>
+<h2 id="四、详细操作步骤-5"><a href="#四、详细操作步骤-5" class="headerlink" title="四、详细操作步骤"></a>四、详细操作步骤</h2><h3 id="第一部分：SSH服务安装与基础配置"><a href="#第一部分：SSH服务安装与基础配置" class="headerlink" title="第一部分：SSH服务安装与基础配置"></a>第一部分：SSH服务安装与基础配置</h3><h4 id="步骤一：检查SSH服务状态"><a href="#步骤一：检查SSH服务状态" class="headerlink" title="步骤一：检查SSH服务状态"></a>步骤一：检查SSH服务状态</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> systemctl status ssh        <span class="comment"># 检查服务状态</span></span><br><span class="line"><span class="built_in">sudo</span> apt install openssh-server -y  <span class="comment"># 如未安装</span></span><br><span class="line"><span class="built_in">sudo</span> systemctl <span class="built_in">enable</span> ssh         <span class="comment"># 设置开机自启</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤二：配置SSH服务器"><a href="#步骤二：配置SSH服务器" class="headerlink" title="步骤二：配置SSH服务器"></a>步骤二：配置SSH服务器</h4><p>编辑 <code>/etc/ssh/sshd_config</code>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> nano /etc/ssh/sshd_config</span><br></pre></td></tr></table></figure>
+
+<p>关键配置项：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Port 22                    # 默认端口</span></span><br><span class="line">PermitRootLogin no            <span class="comment"># 禁止root直接登录</span></span><br><span class="line">PubkeyAuthentication <span class="built_in">yes</span>      <span class="comment"># 允许公钥认证</span></span><br><span class="line">PasswordAuthentication <span class="built_in">yes</span>    <span class="comment"># 允许密码认证</span></span><br></pre></td></tr></table></figure>
+
+<p>重启服务：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> systemctl restart ssh</span><br></pre></td></tr></table></figure>
+
+<h3 id="第二部分：SSH密钥认证配置"><a href="#第二部分：SSH密钥认证配置" class="headerlink" title="第二部分：SSH密钥认证配置"></a>第二部分：SSH密钥认证配置</h3><h4 id="步骤三：生成SSH密钥对（在node1上）"><a href="#步骤三：生成SSH密钥对（在node1上）" class="headerlink" title="步骤三：生成SSH密钥对（在node1上）"></a>步骤三：生成SSH密钥对（在node1上）</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh-keygen -t ed25519 -C <span class="string">&quot;你的邮箱@example.com&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>生成后查看：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">ls</span> ~/.ssh/</span><br><span class="line"><span class="comment"># id_ed25519（私钥） 和 id_ed25519.pub（公钥）</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤四：将公钥复制到远程服务器"><a href="#步骤四：将公钥复制到远程服务器" class="headerlink" title="步骤四：将公钥复制到远程服务器"></a>步骤四：将公钥复制到远程服务器</h4><p><strong>方法一（推荐）</strong> ：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh-copy-id dev@192.168.56.102</span><br></pre></td></tr></table></figure>
+
+<p><strong>方法二（手动）</strong> ：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> ~/.ssh/id_ed25519.pub</span><br><span class="line"><span class="comment"># 复制内容，在node2上执行：</span></span><br><span class="line"><span class="built_in">mkdir</span> -p ~/.ssh</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;粘贴公钥内容&quot;</span> &gt;&gt; ~/.ssh/authorized_keys</span><br><span class="line"><span class="built_in">chmod</span> 600 ~/.ssh/authorized_keys</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤五：测试免密登录"><a href="#步骤五：测试免密登录" class="headerlink" title="步骤五：测试免密登录"></a>步骤五：测试免密登录</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ssh dev@192.168.56.102</span><br><span class="line"><span class="comment"># 应无需密码直接登录</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="第三部分：文件传输"><a href="#第三部分：文件传输" class="headerlink" title="第三部分：文件传输"></a>第三部分：文件传输</h3><h4 id="步骤六：使用SCP传输文件"><a href="#步骤六：使用SCP传输文件" class="headerlink" title="步骤六：使用SCP传输文件"></a>步骤六：使用SCP传输文件</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 上传文件</span></span><br><span class="line">scp /home/dev/test.txt dev@192.168.56.102:/home/dev/</span><br><span class="line"></span><br><span class="line"><span class="comment"># 上传目录</span></span><br><span class="line">scp -r /home/dev/project/ dev@192.168.56.102:/home/dev/</span><br><span class="line"></span><br><span class="line"><span class="comment"># 下载文件</span></span><br><span class="line">scp dev@192.168.56.102:/home/dev/log.txt ./</span><br><span class="line"></span><br><span class="line"><span class="comment"># 下载目录</span></span><br><span class="line">scp -r dev@192.168.56.102:/home/dev/backup/ ./</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤七：使用rsync同步文件"><a href="#步骤七：使用rsync同步文件" class="headerlink" title="步骤七：使用rsync同步文件"></a>步骤七：使用rsync同步文件</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装rsync</span></span><br><span class="line"><span class="built_in">sudo</span> apt install rsync -y</span><br><span class="line"></span><br><span class="line"><span class="comment"># 本地同步</span></span><br><span class="line">rsync -avz /home/dev/source/ /home/dev/backup/</span><br><span class="line"></span><br><span class="line"><span class="comment"># 推送到远程</span></span><br><span class="line">rsync -avz -e ssh /home/dev/project/ dev@192.168.56.102:/home/dev/project/</span><br><span class="line"></span><br><span class="line"><span class="comment"># 从远程拉取</span></span><br><span class="line">rsync -avz -e ssh dev@192.168.56.102:/home/dev/logs/ ./logs/</span><br><span class="line"></span><br><span class="line"><span class="comment"># 保持完全一致（--delete会删除目标中多余的文件）</span></span><br><span class="line">rsync -avz --delete -e ssh /home/dev/source/ dev@192.168.56.102:/home/dev/dest/</span><br><span class="line"></span><br><span class="line"><span class="comment"># 排除特定文件</span></span><br><span class="line">rsync -avz --exclude=<span class="string">&#x27;*.log&#x27;</span> --exclude=<span class="string">&#x27;tmp/&#x27;</span> -e ssh /home/dev/ dev@192.168.56.102:/home/dev/</span><br></pre></td></tr></table></figure>
+
+<h2 id="五、常见问题与排错-4"><a href="#五、常见问题与排错-4" class="headerlink" title="五、常见问题与排错"></a>五、常见问题与排错</h2><table>
+<thead>
+<tr>
+<th align="left">问题现象</th>
+<th align="left">可能原因</th>
+<th align="left">解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>ssh: command not found</code></td>
+<td align="left">SSH客户端未安装</td>
+<td align="left"><code>sudo apt install openssh-client</code></td>
+</tr>
+<tr>
+<td align="left"><code>Connection refused</code></td>
+<td align="left">SSH服务未运行</td>
+<td align="left"><code>sudo systemctl start ssh</code></td>
+</tr>
+<tr>
+<td align="left"><code>Permission denied</code></td>
+<td align="left">密码错误或密钥未配置</td>
+<td align="left">检查用户名密码；检查<code>authorized_keys</code></td>
+</tr>
+<tr>
+<td align="left">配置免密后仍需密码</td>
+<td align="left">文件权限不对</td>
+<td align="left"><code>chmod 600 ~/.ssh/authorized_keys</code></td>
+</tr>
+<tr>
+<td align="left"><code>rsync: command not found</code></td>
+<td align="left">远程未安装rsync</td>
+<td align="left"><code>sudo apt install rsync -y</code></td>
+</tr>
+</tbody></table>
+<hr>
+<div style="page-break-after: always; break-after: page;"></div>
+
+
+
+<h1 id="实验八-软件部署"><a href="#实验八-软件部署" class="headerlink" title="实验八 软件部署"></a>实验八 软件部署</h1><h2 id="一、实验目标-6"><a href="#一、实验目标-6" class="headerlink" title="一、实验目标"></a>一、实验目标</h2><ol>
+<li>综合运用前七个实验所学的各类工具；</li>
+<li>构建和模拟一个完整的网络环境；</li>
+<li>完整体验和实现Web静态站点从<strong>开发</strong>到<strong>部署</strong>的全过程；</li>
+<li>掌握自动化部署（CI&#x2F;CD）的基本概念与实践方法。</li>
+</ol>
+<h2 id="二、背景知识-6"><a href="#二、背景知识-6" class="headerlink" title="二、背景知识"></a>二、背景知识</h2><h3 id="2-1-什么是CI-CD？"><a href="#2-1-什么是CI-CD？" class="headerlink" title="2.1 什么是CI&#x2F;CD？"></a>2.1 什么是CI&#x2F;CD？</h3><table>
+<thead>
+<tr>
+<th align="left">概念</th>
+<th align="left">含义</th>
+<th align="left">在本实验中的体现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>持续集成（CI）</strong></td>
+<td align="left">代码变更后自动进行构建和测试</td>
+<td align="left">推送代码后自动执行<code>hexo generate</code></td>
+</tr>
+<tr>
+<td align="left"><strong>持续部署（CD）</strong></td>
+<td align="left">构建通过后自动部署到生产环境</td>
+<td align="left">静态文件自动推送到GitHub Pages</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-本实验的整体架构"><a href="#2-2-本实验的整体架构" class="headerlink" title="2.2 本实验的整体架构"></a>2.2 本实验的整体架构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                         开发阶段（本地环境）                            │</span><br><span class="line">│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐        │</span><br><span class="line">│  │ VS Code  │───▶│ Markdown │───▶│  Hexo    │───▶│   Git    │        │</span><br><span class="line">│  │ (编辑器) │    │ (写文章) │    │ (生成)   │    │ (推送)   │        │</span><br><span class="line">│  └──────────┘    └──────────┘    └──────────┘    └────┬─────┘        │</span><br><span class="line">└────────────────────────────────────────────────────────┼──────────────┘</span><br><span class="line">                                                         ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    GitHub Actions (CI/CD)                              │</span><br><span class="line">│         检出代码 → 安装Node.js → 安装依赖 → hexo generate             │</span><br><span class="line">└─────────────────────────────────────────────────────────┬──────────────┘</span><br><span class="line">                                                         ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    GitHub Pages (生产环境)                             │</span><br><span class="line">│                      静态HTML文件托管                                   │</span><br><span class="line">└─────────────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h2 id="三、实验环境-6"><a href="#三、实验环境-6" class="headerlink" title="三、实验环境"></a>三、实验环境</h2><ul>
+<li><strong>操作系统</strong>：Windows 10&#x2F;11 + Ubuntu Server 22.04（虚拟机）</li>
+<li><strong>前置条件</strong>：已完成实验二、三、四、五、七</li>
+<li><strong>所需账号</strong>：GitHub账号</li>
+</ul>
+<h2 id="四、详细操作步骤-6"><a href="#四、详细操作步骤-6" class="headerlink" title="四、详细操作步骤"></a>四、详细操作步骤</h2><h3 id="第一部分：GitHub-Pages自动化部署"><a href="#第一部分：GitHub-Pages自动化部署" class="headerlink" title="第一部分：GitHub Pages自动化部署"></a>第一部分：GitHub Pages自动化部署</h3><h4 id="步骤一：准备工作"><a href="#步骤一：准备工作" class="headerlink" title="步骤一：准备工作"></a>步骤一：准备工作</h4><p>确认Hexo博客正常运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> ~/my-blog</span><br><span class="line">hexo server</span><br></pre></td></tr></table></figure>
+
+<p>确认Git配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git config --global user.name</span><br><span class="line">git config --global user.email</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤二：创建两个GitHub仓库"><a href="#步骤二：创建两个GitHub仓库" class="headerlink" title="步骤二：创建两个GitHub仓库"></a>步骤二：创建两个GitHub仓库</h4><table>
+<thead>
+<tr>
+<th align="left">仓库</th>
+<th align="left">名称</th>
+<th align="left">可见性</th>
+<th align="left">用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">源码仓库</td>
+<td align="left"><code>my-blog</code></td>
+<td align="left">Private</td>
+<td align="left">存放Hexo源码</td>
+</tr>
+<tr>
+<td align="left">部署仓库</td>
+<td align="left"><code>用户名.github.io</code></td>
+<td align="left">Public</td>
+<td align="left">托管静态页面</td>
+</tr>
+</tbody></table>
+<h4 id="步骤三：将本地项目关联到源码仓库"><a href="#步骤三：将本地项目关联到源码仓库" class="headerlink" title="步骤三：将本地项目关联到源码仓库"></a>步骤三：将本地项目关联到源码仓库</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> ~/my-blog</span><br><span class="line">git init</span><br><span class="line">git remote add origin https://github.com/你的用户名/my-blog.git</span><br></pre></td></tr></table></figure>
+
+<p>创建<code>.gitignore</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">node_modules/</span><br><span class="line">.DS_Store</span><br><span class="line">public/</span><br><span class="line">.deploy_git/</span><br></pre></td></tr></table></figure>
+
+<p>提交并推送：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">git add .</span><br><span class="line">git commit -m <span class="string">&quot;初始化Hexo博客源码&quot;</span></span><br><span class="line">git branch -M main</span><br><span class="line">git push -u origin main</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤四：配置GitHub-Actions"><a href="#步骤四：配置GitHub-Actions" class="headerlink" title="步骤四：配置GitHub Actions"></a>步骤四：配置GitHub Actions</h4><p>创建工作流目录和文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> -p .github/workflows</span><br><span class="line">nano .github/workflows/deploy.yml</span><br></pre></td></tr></table></figure>
+
+<p>配置文件内容（<strong>请修改用户名</strong>）：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">Deploy</span> <span class="string">to</span> <span class="string">GitHub</span> <span class="string">Pages</span></span><br><span class="line"></span><br><span class="line"><span class="attr">on:</span></span><br><span class="line">  <span class="attr">push:</span></span><br><span class="line">    <span class="attr">branches:</span> [<span class="string">main</span>]</span><br><span class="line">  <span class="attr">workflow_dispatch:</span></span><br><span class="line"></span><br><span class="line"><span class="attr">jobs:</span></span><br><span class="line">  <span class="attr">deploy:</span></span><br><span class="line">    <span class="attr">runs-on:</span> <span class="string">ubuntu-latest</span></span><br><span class="line">    <span class="attr">steps:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">检出源码</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">actions/checkout@v3</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">安装Node.js</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">actions/setup-node@v3</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">node-version:</span> <span class="string">&#x27;20&#x27;</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">缓存依赖</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">actions/cache@v3</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">path:</span> <span class="string">~/.npm</span></span><br><span class="line">          <span class="attr">key:</span> <span class="string">$&#123;&#123;</span> <span class="string">runner.os</span> <span class="string">&#125;&#125;-node-$&#123;&#123;</span> <span class="string">hashFiles(&#x27;**/package-lock.json&#x27;)</span> <span class="string">&#125;&#125;</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">安装依赖</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">npm</span> <span class="string">install</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">生成静态文件</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">npx</span> <span class="string">hexo</span> <span class="string">generate</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">创建.nojekyll文件</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">echo</span> <span class="string">&quot;&quot;</span> <span class="string">&gt;</span> <span class="string">public/.nojekyll</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">部署到GitHub</span> <span class="string">Pages</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">peaceiris/actions-gh-pages@v3</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">personal_token:</span> <span class="string">$&#123;&#123;</span> <span class="string">secrets.PERSONAL_TOKEN</span> <span class="string">&#125;&#125;</span></span><br><span class="line">          <span class="attr">publish_dir:</span> <span class="string">./public</span></span><br><span class="line">          <span class="attr">publish_branch:</span> <span class="string">main</span></span><br><span class="line">          <span class="attr">external_repository:</span> <span class="string">你的用户名/你的用户名.github.io</span></span><br></pre></td></tr></table></figure>
+
+<p>提交并推送：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git add .github/workflows/deploy.yml</span><br><span class="line">git commit -m <span class="string">&quot;添加GitHub Actions自动部署&quot;</span></span><br><span class="line">git push</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤五：生成并配置Personal-Access-Token"><a href="#步骤五：生成并配置Personal-Access-Token" class="headerlink" title="步骤五：生成并配置Personal Access Token"></a>步骤五：生成并配置Personal Access Token</h4><ol>
+<li>GitHub → Settings → Developer settings → Personal access tokens</li>
+<li>Generate new token，勾选<code>repo</code>权限</li>
+<li>复制Token</li>
+<li>在源码仓库 → Settings → Secrets → Actions → New repository secret<ul>
+<li>Name: <code>PERSONAL_TOKEN</code></li>
+<li>Secret: 粘贴Token</li>
+</ul>
+</li>
+</ol>
+<h4 id="步骤六：配置GitHub-Pages"><a href="#步骤六：配置GitHub-Pages" class="headerlink" title="步骤六：配置GitHub Pages"></a>步骤六：配置GitHub Pages</h4><p>部署仓库 → Settings → Pages → Branch: <code>main</code> → Save</p>
+<p>访问：<strong>https:&#x2F;&#x2F;你的用户名.github.io</strong></p>
+<h3 id="第二部分：部署到云服务器（虚拟机）"><a href="#第二部分：部署到云服务器（虚拟机）" class="headerlink" title="第二部分：部署到云服务器（虚拟机）"></a>第二部分：部署到云服务器（虚拟机）</h3><h4 id="步骤七：安装和配置Nginx"><a href="#步骤七：安装和配置Nginx" class="headerlink" title="步骤七：安装和配置Nginx"></a>步骤七：安装和配置Nginx</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> apt update</span><br><span class="line"><span class="built_in">sudo</span> apt install nginx -y</span><br><span class="line"><span class="built_in">sudo</span> systemctl start nginx</span><br><span class="line"><span class="built_in">sudo</span> systemctl <span class="built_in">enable</span> nginx</span><br></pre></td></tr></table></figure>
+
+<p>创建站点目录：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> <span class="built_in">mkdir</span> -p /var/www/blog</span><br><span class="line"><span class="built_in">sudo</span> <span class="built_in">chown</span> -R <span class="variable">$USER</span>:<span class="variable">$USER</span> /var/www/blog</span><br></pre></td></tr></table></figure>
+
+<p>创建Nginx配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> nano /etc/nginx/sites-available/blog</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">server</span> &#123;</span><br><span class="line">    <span class="attribute">listen</span> <span class="number">80</span>;</span><br><span class="line">    <span class="attribute">server_name</span> _;</span><br><span class="line">    <span class="attribute">root</span> /var/www/blog;</span><br><span class="line">    <span class="attribute">index</span> index.html;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>启用站点：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> <span class="built_in">ln</span> -s /etc/nginx/sites-available/blog /etc/nginx/sites-enabled/</span><br><span class="line"><span class="built_in">sudo</span> nginx -t</span><br><span class="line"><span class="built_in">sudo</span> systemctl reload nginx</span><br></pre></td></tr></table></figure>
+
+<h4 id="步骤八：使用rsync部署"><a href="#步骤八：使用rsync部署" class="headerlink" title="步骤八：使用rsync部署"></a>步骤八：使用rsync部署</h4><p>在本地生成静态文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> ~/my-blog</span><br><span class="line">hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>同步到服务器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rsync -avz -e ssh --delete public/ dev@192.168.56.101:/var/www/blog/</span><br></pre></td></tr></table></figure>
+
+<p>访问虚拟机IP查看部署结果。</p>
+<h2 id="五、常见问题与排错-5"><a href="#五、常见问题与排错-5" class="headerlink" title="五、常见问题与排错"></a>五、常见问题与排错</h2><table>
+<thead>
+<tr>
+<th align="left">问题现象</th>
+<th align="left">可能原因</th>
+<th align="left">解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">GitHub Actions失败</td>
+<td align="left">Token权限不足</td>
+<td align="left">检查Token是否勾选<code>repo</code>权限</td>
+</tr>
+<tr>
+<td align="left">GitHub Pages显示404</td>
+<td align="left">仓库命名错误</td>
+<td align="left">必须为<code>用户名.github.io</code></td>
+</tr>
+<tr>
+<td align="left">部署后样式丢失</td>
+<td align="left">站点URL配置错误</td>
+<td align="left">检查<code>_config.yml</code>中<code>url</code>字段</td>
+</tr>
+<tr>
+<td align="left">rsync连接被拒绝</td>
+<td align="left">SSH服务未运行</td>
+<td align="left"><code>sudo systemctl status ssh</code></td>
+</tr>
+<tr>
+<td align="left">Nginx显示默认页</td>
+<td align="left">站点配置未生效</td>
+<td align="left">检查sites-enabled链接</td>
+</tr>
+</tbody></table>
+<hr>
+<div style="page-break-after: always; break-after: page;"></div>
+
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Markdown/" rel="tag"># Markdown</a>
+              <a href="/tags/Hexo/" rel="tag"># Hexo</a>
+              <a href="/tags/Git/" rel="tag"># Git</a>
+              <a href="/tags/Node-js/" rel="tag"># Node.js</a>
+              <a href="/tags/VS-Code/" rel="tag"># VS Code</a>
+              <a href="/tags/%E9%9D%99%E6%80%81%E7%AB%99%E7%82%B9/" rel="tag"># 静态站点</a>
+              <a href="/tags/VirtualBox/" rel="tag"># VirtualBox</a>
+              <a href="/tags/Ubuntu/" rel="tag"># Ubuntu</a>
+              <a href="/tags/%E8%99%9A%E6%8B%9F%E6%9C%BA/" rel="tag"># 虚拟机</a>
+              <a href="/tags/Linux/" rel="tag"># Linux</a>
+              <a href="/tags/SSH/" rel="tag"># SSH</a>
+              <a href="/tags/CI-CD/" rel="tag"># CI/CD</a>
+              <a href="/tags/Nginx/" rel="tag"># Nginx</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/" rel="prev" title="我的第一篇hexo博客！">
+      <i class="fa fa-chevron-left"></i> 我的第一篇hexo博客！
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/07/08/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A_%E5%AE%9E%E9%AA%8C2-4_Hexo%E5%8D%9A%E5%AE%A2%E4%B8%8EVS_Code%E7%BC%96%E8%BE%91%E5%B7%A5%E5%85%B7%E9%93%BE/" rel="next" title="实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链">
+      实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E3%80%8A%E8%BD%AF%E4%BB%B6%E5%BC%80%E5%8F%91%E5%B7%A5%E5%85%B7%E5%AE%9E%E8%B7%B5%E3%80%8B%E5%AE%9E%E9%AA%8C%E6%89%8B%E5%86%8C"><span class="nav-number">1.</span> <span class="nav-text">《软件开发工具实践》实验手册</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E5%BD%95"><span class="nav-number">1.1.</span> <span class="nav-text">目录</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E4%BA%8C-Web%E8%BD%AF%E4%BB%B6%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83"><span class="nav-number">2.</span> <span class="nav-text">实验二 Web软件开发环境</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E6%A0%87"><span class="nav-number">2.1.</span> <span class="nav-text">一、实验目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86"><span class="nav-number">2.2.</span> <span class="nav-text">二、背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2-vs-%E5%8A%A8%E6%80%81%E5%8D%9A%E5%AE%A2"><span class="nav-number">2.2.1.</span> <span class="nav-text">2.1 静态博客 vs 动态博客</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-Web%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83%E7%9A%84%E6%A0%B8%E5%BF%83%E7%BB%84%E4%BB%B6"><span class="nav-number">2.2.2.</span> <span class="nav-text">2.2 Web开发环境的核心组件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83"><span class="nav-number">2.3.</span> <span class="nav-text">三、实验环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4"><span class="nav-number">2.4.</span> <span class="nav-text">四、详细操作步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%80%EF%BC%9A%E5%AE%89%E8%A3%85Node-js%E4%B8%8Enpm"><span class="nav-number">2.4.1.</span> <span class="nav-text">步骤一：安装Node.js与npm</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%8C%EF%BC%9A%E9%85%8D%E7%BD%AEnpm%E9%95%9C%E5%83%8F%E6%BA%90%EF%BC%88%E5%8F%AF%E9%80%89%E4%BD%86%E6%8E%A8%E8%8D%90%EF%BC%89"><span class="nav-number">2.4.2.</span> <span class="nav-text">步骤二：配置npm镜像源（可选但推荐）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%89%EF%BC%9A%E5%AE%89%E8%A3%85Git-for-Windows"><span class="nav-number">2.4.3.</span> <span class="nav-text">步骤三：安装Git for Windows</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%9B%9B%EF%BC%9A%E5%AE%89%E8%A3%85Hexo-CLI"><span class="nav-number">2.4.4.</span> <span class="nav-text">步骤四：安装Hexo CLI</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%94%EF%BC%9A%E5%88%9D%E5%A7%8B%E5%8C%96%E5%8D%9A%E5%AE%A2%E9%A1%B9%E7%9B%AE"><span class="nav-number">2.4.5.</span> <span class="nav-text">步骤五：初始化博客项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AD%EF%BC%9A%E6%9C%AC%E5%9C%B0%E9%A2%84%E8%A7%88%E5%8D%9A%E5%AE%A2"><span class="nav-number">2.4.6.</span> <span class="nav-text">步骤六：本地预览博客</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%83%EF%BC%9A%E5%88%9B%E5%BB%BA%E5%B9%B6%E5%8F%91%E5%B8%83%E4%B8%80%E7%AF%87%E5%8D%9A%E5%AE%A2%E6%96%87%E7%AB%A0"><span class="nav-number">2.4.7.</span> <span class="nav-text">步骤七：创建并发布一篇博客文章</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AB%EF%BC%9A%E6%9B%B4%E6%8D%A2%E4%B8%BB%E9%A2%98%EF%BC%88%E5%8F%AF%E9%80%89%EF%BC%89"><span class="nav-number">2.4.8.</span> <span class="nav-text">步骤八：更换主题（可选）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E6%8E%92%E9%94%99"><span class="nav-number">2.5.</span> <span class="nav-text">五、常见问题与排错</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E6%8B%93%E5%B1%95%E4%B8%8E%E8%BF%9B%E9%98%B6"><span class="nav-number">2.6.</span> <span class="nav-text">六、拓展与进阶</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E4%B8%89-%E4%BB%A3%E7%A0%81%E7%BC%96%E8%BE%91%E5%99%A8"><span class="nav-number">3.</span> <span class="nav-text">实验三 代码编辑器</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E6%A0%87-1"><span class="nav-number">3.1.</span> <span class="nav-text">一、实验目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86-1"><span class="nav-number">3.2.</span> <span class="nav-text">二、背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E4%BB%A3%E7%A0%81%E7%BC%96%E8%BE%91%E5%99%A8-vs-%E9%9B%86%E6%88%90%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83%EF%BC%88IDE%EF%BC%89"><span class="nav-number">3.2.1.</span> <span class="nav-text">2.1 代码编辑器 vs 集成开发环境（IDE）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E6%8F%92%E4%BB%B6%EF%BC%88Extension%EF%BC%89%E7%9A%84%E6%A6%82%E5%BF%B5"><span class="nav-number">3.2.2.</span> <span class="nav-text">2.2 插件（Extension）的概念</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Markdown%E7%AE%80%E4%BB%8B"><span class="nav-number">3.2.3.</span> <span class="nav-text">2.3 Markdown简介</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83-1"><span class="nav-number">3.3.</span> <span class="nav-text">三、实验环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4-1"><span class="nav-number">3.4.</span> <span class="nav-text">四、详细操作步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%80%EF%BC%9A%E5%AE%89%E8%A3%85Visual-Studio-Code"><span class="nav-number">3.4.1.</span> <span class="nav-text">步骤一：安装Visual Studio Code</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%8C%EF%BC%9A%E9%A6%96%E6%AC%A1%E8%BF%90%E8%A1%8C%E4%B8%8E%E7%95%8C%E9%9D%A2%E7%86%9F%E6%82%89"><span class="nav-number">3.4.2.</span> <span class="nav-text">步骤二：首次运行与界面熟悉</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%89%EF%BC%9A%E5%AE%89%E8%A3%85Markdown%E7%9B%B8%E5%85%B3%E6%8F%92%E4%BB%B6"><span class="nav-number">3.4.3.</span> <span class="nav-text">步骤三：安装Markdown相关插件</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-%E6%89%93%E5%BC%80%E6%89%A9%E5%B1%95%E9%9D%A2%E6%9D%BF"><span class="nav-number">3.4.3.1.</span> <span class="nav-text">3.1 打开扩展面板</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-%E5%AE%89%E8%A3%85%E6%A0%B8%E5%BF%83%E6%8F%92%E4%BB%B6"><span class="nav-number">3.4.3.2.</span> <span class="nav-text">3.2 安装核心插件</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%9B%9B%EF%BC%9A%E9%85%8D%E7%BD%AE%E7%BC%96%E8%BE%91%E5%99%A8%E4%BC%98%E5%8C%96%E5%86%99%E4%BD%9C%E4%BD%93%E9%AA%8C"><span class="nav-number">3.4.4.</span> <span class="nav-text">步骤四：配置编辑器优化写作体验</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%94%EF%BC%9A%E5%88%9B%E5%BB%BA%E5%B9%B6%E7%BC%96%E8%BE%91%E7%AC%AC%E4%B8%80%E4%B8%AAMarkdown%E6%96%87%E4%BB%B6"><span class="nav-number">3.4.5.</span> <span class="nav-text">步骤五：创建并编辑第一个Markdown文件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link"><span class="nav-number">3.5.</span> <span class="nav-text"></span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E5%9B%9B%EF%BC%9AWeb%E7%AB%99%E7%82%B9%E6%9E%84%E5%BB%BA%E2%80%94%E2%80%94%E6%93%8D%E4%BD%9C%E8%AF%B4%E6%98%8E%E4%B9%A6"><span class="nav-number">4.</span> <span class="nav-text">实验四：Web站点构建——操作说明书</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E6%A0%87-2"><span class="nav-number">4.1.</span> <span class="nav-text">一、实验目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86-2"><span class="nav-number">4.2.</span> <span class="nav-text">二、背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E4%BB%80%E4%B9%88%E6%98%AF%E9%9D%99%E6%80%81%E7%AB%99%E7%82%B9%E7%94%9F%E6%88%90%E5%99%A8%EF%BC%88SSG%EF%BC%89%EF%BC%9F"><span class="nav-number">4.2.1.</span> <span class="nav-text">2.1 什么是静态站点生成器（SSG）？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%80%89%E6%8B%A9Hexo%EF%BC%9F"><span class="nav-number">4.2.2.</span> <span class="nav-text">2.2 为什么选择Hexo？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Web%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%B5%81%E7%A8%8B"><span class="nav-number">4.2.3.</span> <span class="nav-text">2.3 Web应用开发的基本流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83-2"><span class="nav-number">4.3.</span> <span class="nav-text">三、实验环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4-2"><span class="nav-number">4.4.</span> <span class="nav-text">四、详细操作步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%80%EF%BC%9A%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87%EF%BC%882%E5%88%86%E9%92%9F%EF%BC%89"><span class="nav-number">4.4.1.</span> <span class="nav-text">步骤一：环境准备（2分钟）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%8C%EF%BC%9A%E5%AE%89%E8%A3%85Hexo-CLI"><span class="nav-number">4.4.2.</span> <span class="nav-text">步骤二：安装Hexo CLI</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%89%EF%BC%9A%E5%88%9D%E5%A7%8B%E5%8C%96%E5%8D%9A%E5%AE%A2%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.4.3.</span> <span class="nav-text">步骤三：初始化博客项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%9B%9B%EF%BC%9A%E6%9C%AC%E5%9C%B0%E9%A2%84%E8%A7%88%E5%8D%9A%E5%AE%A2"><span class="nav-number">4.4.4.</span> <span class="nav-text">步骤四：本地预览博客</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%94%EF%BC%9A%E5%88%9B%E5%BB%BA%E5%B9%B6%E7%BC%96%E5%86%99%E5%8D%9A%E5%AE%A2%E6%96%87%E7%AB%A0"><span class="nav-number">4.4.5.</span> <span class="nav-text">步骤五：创建并编写博客文章</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AD%EF%BC%9A%E6%9B%B4%E6%8D%A2%E4%B8%BB%E9%A2%98%EF%BC%88%E4%BB%A5NexT%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="nav-number">4.4.6.</span> <span class="nav-text">步骤六：更换主题（以NexT为例）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%83%EF%BC%9A%E9%83%A8%E7%BD%B2%E5%88%B0GitHub-Pages%EF%BC%88%E5%85%8D%E8%B4%B9%E4%B8%8A%E7%BA%BF%EF%BC%89"><span class="nav-number">4.4.7.</span> <span class="nav-text">步骤七：部署到GitHub Pages（免费上线）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#7-1-%E5%88%9B%E5%BB%BAGitHub%E4%BB%93%E5%BA%93"><span class="nav-number">4.4.7.1.</span> <span class="nav-text">7.1 创建GitHub仓库</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#7-2-%E5%AE%89%E8%A3%85%E9%83%A8%E7%BD%B2%E6%8F%92%E4%BB%B6"><span class="nav-number">4.4.7.2.</span> <span class="nav-text">7.2 安装部署插件</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#7-3-%E9%85%8D%E7%BD%AE%E9%83%A8%E7%BD%B2%E4%BF%A1%E6%81%AF"><span class="nav-number">4.4.7.3.</span> <span class="nav-text">7.3 配置部署信息</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#7-4-%E6%89%A7%E8%A1%8C%E9%83%A8%E7%BD%B2"><span class="nav-number">4.4.7.4.</span> <span class="nav-text">7.4 执行部署</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#7-5-%E8%AE%BF%E9%97%AE%E4%BD%A0%E7%9A%84%E5%8D%9A%E5%AE%A2"><span class="nav-number">4.4.7.5.</span> <span class="nav-text">7.5 访问你的博客</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E6%8E%92%E9%94%99-1"><span class="nav-number">4.5.</span> <span class="nav-text">五、常见问题与排错</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E4%BA%94-%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AE%89%E8%A3%85%E4%B8%8E%E4%BD%BF%E7%94%A8"><span class="nav-number">5.</span> <span class="nav-text">实验五 虚拟机安装与使用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E6%A0%87-3"><span class="nav-number">5.1.</span> <span class="nav-text">一、实验目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86-3"><span class="nav-number">5.2.</span> <span class="nav-text">二、背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E4%BB%80%E4%B9%88%E6%98%AF%E8%99%9A%E6%8B%9F%E5%8C%96%E6%8A%80%E6%9C%AF%EF%BC%9F"><span class="nav-number">5.2.1.</span> <span class="nav-text">2.1 什么是虚拟化技术？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E8%99%9A%E6%8B%9F%E6%9C%BA%E7%BD%91%E7%BB%9C%E7%9A%84%E4%B8%89%E7%A7%8D%E6%A0%B8%E5%BF%83%E6%A8%A1%E5%BC%8F"><span class="nav-number">5.2.2.</span> <span class="nav-text">2.2 虚拟机网络的三种核心模式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83-3"><span class="nav-number">5.3.</span> <span class="nav-text">三、实验环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4-3"><span class="nav-number">5.4.</span> <span class="nav-text">四、详细操作步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%80%EF%BC%9A%E4%B8%8B%E8%BD%BD%E4%B8%8E%E5%AE%89%E8%A3%85VirtualBox"><span class="nav-number">5.4.1.</span> <span class="nav-text">步骤一：下载与安装VirtualBox</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%8C%EF%BC%9A%E4%B8%8B%E8%BD%BDUbuntu-Server-ISO%E9%95%9C%E5%83%8F"><span class="nav-number">5.4.2.</span> <span class="nav-text">步骤二：下载Ubuntu Server ISO镜像</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%89%EF%BC%9A%E5%88%9B%E5%BB%BA%E7%AC%AC%E4%B8%80%E5%8F%B0%E8%99%9A%E6%8B%9F%E6%9C%BA%EF%BC%88%E6%A8%A1%E6%9D%BF%E6%9C%BA%EF%BC%89"><span class="nav-number">5.4.3.</span> <span class="nav-text">步骤三：创建第一台虚拟机（模板机）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-%E6%96%B0%E5%BB%BA%E8%99%9A%E6%8B%9F%E6%9C%BA"><span class="nav-number">5.4.3.1.</span> <span class="nav-text">3.1 新建虚拟机</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-%E5%88%86%E9%85%8D%E7%A1%AC%E4%BB%B6%E8%B5%84%E6%BA%90"><span class="nav-number">5.4.3.2.</span> <span class="nav-text">3.2 分配硬件资源</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-3-%E9%85%8D%E7%BD%AE%E8%99%9A%E6%8B%9F%E6%9C%BA%E7%BD%91%E7%BB%9C%EF%BC%88%E5%8F%8C%E7%BD%91%E5%8D%A1%EF%BC%89"><span class="nav-number">5.4.3.3.</span> <span class="nav-text">3.3 配置虚拟机网络（双网卡）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%9B%9B%EF%BC%9A%E5%AE%89%E8%A3%85Ubuntu-Server"><span class="nav-number">5.4.4.</span> <span class="nav-text">步骤四：安装Ubuntu Server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%94%EF%BC%9A%E9%85%8D%E7%BD%AE%E9%9D%99%E6%80%81IP%E5%9C%B0%E5%9D%80"><span class="nav-number">5.4.5.</span> <span class="nav-text">步骤五：配置静态IP地址</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AD%EF%BC%9A%E9%85%8D%E7%BD%AE%E4%B8%BB%E6%9C%BA%E5%90%8D%E4%B8%8Ehosts%E8%A7%A3%E6%9E%90"><span class="nav-number">5.4.6.</span> <span class="nav-text">步骤六：配置主机名与hosts解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%83%EF%BC%9A%E5%85%8B%E9%9A%86%E8%99%9A%E6%8B%9F%E6%9C%BA"><span class="nav-number">5.4.7.</span> <span class="nav-text">步骤七：克隆虚拟机</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AB%EF%BC%9A%E4%BF%AE%E6%94%B9%E5%85%8B%E9%9A%86%E6%9C%BA%E7%9A%84%E4%B8%BB%E6%9C%BA%E5%90%8D%E5%92%8CIP"><span class="nav-number">5.4.8.</span> <span class="nav-text">步骤八：修改克隆机的主机名和IP</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B9%9D%EF%BC%9A%E9%AA%8C%E8%AF%81%E5%A4%9A%E6%9C%BA%E7%8E%AF%E5%A2%83"><span class="nav-number">5.4.9.</span> <span class="nav-text">步骤九：验证多机环境</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E6%8E%92%E9%94%99-2"><span class="nav-number">5.5.</span> <span class="nav-text">五、常见问题与排错</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E5%85%AD-Linux%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE"><span class="nav-number">6.</span> <span class="nav-text">实验六 Linux环境配置</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E6%A0%87-4"><span class="nav-number">6.1.</span> <span class="nav-text">一、实验目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86-4"><span class="nav-number">6.2.</span> <span class="nav-text">二、背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-Linux%E5%91%BD%E4%BB%A4%E8%A1%8C%E5%9F%BA%E7%A1%80"><span class="nav-number">6.2.1.</span> <span class="nav-text">2.1 Linux命令行基础</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E7%94%A8%E6%88%B7%E4%B8%8E%E6%9D%83%E9%99%90"><span class="nav-number">6.2.2.</span> <span class="nav-text">2.2 用户与权限</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="nav-number">6.2.3.</span> <span class="nav-text">2.3 环境变量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83-4"><span class="nav-number">6.3.</span> <span class="nav-text">三、实验环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4-4"><span class="nav-number">6.4.</span> <span class="nav-text">四、详细操作步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E9%83%A8%E5%88%86%EF%BC%9A%E7%B3%BB%E7%BB%9F%E5%9F%BA%E7%A1%80%E6%93%8D%E4%BD%9C"><span class="nav-number">6.4.1.</span> <span class="nav-text">第一部分：系统基础操作</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%80%EF%BC%9A%E7%99%BB%E5%BD%95%E4%B8%8E%E6%9F%A5%E7%9C%8B%E7%B3%BB%E7%BB%9F%E4%BF%A1%E6%81%AF"><span class="nav-number">6.4.1.1.</span> <span class="nav-text">步骤一：登录与查看系统信息</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%8C%EF%BC%9A%E6%96%87%E4%BB%B6%E4%B8%8E%E7%9B%AE%E5%BD%95%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C"><span class="nav-number">6.4.1.2.</span> <span class="nav-text">步骤二：文件与目录的基本操作</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%89%EF%BC%9A%E6%9F%A5%E7%9C%8B%E7%B3%BB%E7%BB%9F%E8%B5%84%E6%BA%90%E7%8A%B6%E6%80%81"><span class="nav-number">6.4.1.3.</span> <span class="nav-text">步骤三：查看系统资源状态</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E9%83%A8%E5%88%86%EF%BC%9A%E7%94%A8%E6%88%B7%E7%AE%A1%E7%90%86"><span class="nav-number">6.4.2.</span> <span class="nav-text">第二部分：用户管理</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%9B%9B%EF%BC%9A%E6%9F%A5%E7%9C%8B%E7%94%A8%E6%88%B7%E4%B8%8E%E7%BB%84%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6"><span class="nav-number">6.4.2.1.</span> <span class="nav-text">步骤四：查看用户与组配置文件</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%94%EF%BC%9A%E5%88%9B%E5%BB%BA%E5%92%8C%E7%AE%A1%E7%90%86%E7%94%A8%E6%88%B7"><span class="nav-number">6.4.2.2.</span> <span class="nav-text">步骤五：创建和管理用户</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AD%EF%BC%9A%E6%96%87%E4%BB%B6%E6%9D%83%E9%99%90%E7%AE%A1%E7%90%86"><span class="nav-number">6.4.2.3.</span> <span class="nav-text">步骤六：文件权限管理</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E9%83%A8%E5%88%86%EF%BC%9A%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%E4%B8%8E%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6"><span class="nav-number">6.4.3.</span> <span class="nav-text">第三部分：环境变量与配置文件</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%83%EF%BC%9A%E6%9F%A5%E7%9C%8B%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="nav-number">6.4.3.1.</span> <span class="nav-text">步骤七：查看环境变量</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AB%EF%BC%9A%E4%B8%B4%E6%97%B6%E8%AE%BE%E7%BD%AE%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="nav-number">6.4.3.2.</span> <span class="nav-text">步骤八：临时设置环境变量</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B9%9D%EF%BC%9A%E6%B0%B8%E4%B9%85%E8%AE%BE%E7%BD%AE%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%EF%BC%88%E7%94%A8%E6%88%B7%E7%BA%A7%EF%BC%89"><span class="nav-number">6.4.3.3.</span> <span class="nav-text">步骤九：永久设置环境变量（用户级）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%8D%81%EF%BC%9A%E6%B0%B8%E4%B9%85%E8%AE%BE%E7%BD%AE%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%EF%BC%88%E7%B3%BB%E7%BB%9F%E7%BA%A7%EF%BC%89"><span class="nav-number">6.4.3.4.</span> <span class="nav-text">步骤十：永久设置环境变量（系统级）</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E6%8E%92%E9%94%99-3"><span class="nav-number">6.5.</span> <span class="nav-text">五、常见问题与排错</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E4%B8%83-%E8%BF%9C%E7%A8%8B%E7%99%BB%E5%BD%95%E7%AE%A1%E7%90%86"><span class="nav-number">7.</span> <span class="nav-text">实验七 远程登录管理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E6%A0%87-5"><span class="nav-number">7.1.</span> <span class="nav-text">一、实验目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86-5"><span class="nav-number">7.2.</span> <span class="nav-text">二、背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E4%BB%80%E4%B9%88%E6%98%AFSSH%EF%BC%9F"><span class="nav-number">7.2.1.</span> <span class="nav-text">2.1 什么是SSH？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-SSH%E7%9A%84%E4%B8%A4%E7%A7%8D%E8%AE%A4%E8%AF%81%E6%96%B9%E5%BC%8F"><span class="nav-number">7.2.2.</span> <span class="nav-text">2.2 SSH的两种认证方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E6%96%87%E4%BB%B6%E4%BC%A0%E8%BE%93%E5%B7%A5%E5%85%B7"><span class="nav-number">7.2.3.</span> <span class="nav-text">2.3 文件传输工具</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83-5"><span class="nav-number">7.3.</span> <span class="nav-text">三、实验环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4-5"><span class="nav-number">7.4.</span> <span class="nav-text">四、详细操作步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E9%83%A8%E5%88%86%EF%BC%9ASSH%E6%9C%8D%E5%8A%A1%E5%AE%89%E8%A3%85%E4%B8%8E%E5%9F%BA%E7%A1%80%E9%85%8D%E7%BD%AE"><span class="nav-number">7.4.1.</span> <span class="nav-text">第一部分：SSH服务安装与基础配置</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%80%EF%BC%9A%E6%A3%80%E6%9F%A5SSH%E6%9C%8D%E5%8A%A1%E7%8A%B6%E6%80%81"><span class="nav-number">7.4.1.1.</span> <span class="nav-text">步骤一：检查SSH服务状态</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%8C%EF%BC%9A%E9%85%8D%E7%BD%AESSH%E6%9C%8D%E5%8A%A1%E5%99%A8"><span class="nav-number">7.4.1.2.</span> <span class="nav-text">步骤二：配置SSH服务器</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E9%83%A8%E5%88%86%EF%BC%9ASSH%E5%AF%86%E9%92%A5%E8%AE%A4%E8%AF%81%E9%85%8D%E7%BD%AE"><span class="nav-number">7.4.2.</span> <span class="nav-text">第二部分：SSH密钥认证配置</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%89%EF%BC%9A%E7%94%9F%E6%88%90SSH%E5%AF%86%E9%92%A5%E5%AF%B9%EF%BC%88%E5%9C%A8node1%E4%B8%8A%EF%BC%89"><span class="nav-number">7.4.2.1.</span> <span class="nav-text">步骤三：生成SSH密钥对（在node1上）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%9B%9B%EF%BC%9A%E5%B0%86%E5%85%AC%E9%92%A5%E5%A4%8D%E5%88%B6%E5%88%B0%E8%BF%9C%E7%A8%8B%E6%9C%8D%E5%8A%A1%E5%99%A8"><span class="nav-number">7.4.2.2.</span> <span class="nav-text">步骤四：将公钥复制到远程服务器</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%94%EF%BC%9A%E6%B5%8B%E8%AF%95%E5%85%8D%E5%AF%86%E7%99%BB%E5%BD%95"><span class="nav-number">7.4.2.3.</span> <span class="nav-text">步骤五：测试免密登录</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E9%83%A8%E5%88%86%EF%BC%9A%E6%96%87%E4%BB%B6%E4%BC%A0%E8%BE%93"><span class="nav-number">7.4.3.</span> <span class="nav-text">第三部分：文件传输</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AD%EF%BC%9A%E4%BD%BF%E7%94%A8SCP%E4%BC%A0%E8%BE%93%E6%96%87%E4%BB%B6"><span class="nav-number">7.4.3.1.</span> <span class="nav-text">步骤六：使用SCP传输文件</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%83%EF%BC%9A%E4%BD%BF%E7%94%A8rsync%E5%90%8C%E6%AD%A5%E6%96%87%E4%BB%B6"><span class="nav-number">7.4.3.2.</span> <span class="nav-text">步骤七：使用rsync同步文件</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E6%8E%92%E9%94%99-4"><span class="nav-number">7.5.</span> <span class="nav-text">五、常见问题与排错</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E5%85%AB-%E8%BD%AF%E4%BB%B6%E9%83%A8%E7%BD%B2"><span class="nav-number">8.</span> <span class="nav-text">实验八 软件部署</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E6%A0%87-6"><span class="nav-number">8.1.</span> <span class="nav-text">一、实验目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86-6"><span class="nav-number">8.2.</span> <span class="nav-text">二、背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E4%BB%80%E4%B9%88%E6%98%AFCI-CD%EF%BC%9F"><span class="nav-number">8.2.1.</span> <span class="nav-text">2.1 什么是CI&#x2F;CD？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E6%9C%AC%E5%AE%9E%E9%AA%8C%E7%9A%84%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84"><span class="nav-number">8.2.2.</span> <span class="nav-text">2.2 本实验的整体架构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83-6"><span class="nav-number">8.3.</span> <span class="nav-text">三、实验环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4-6"><span class="nav-number">8.4.</span> <span class="nav-text">四、详细操作步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E9%83%A8%E5%88%86%EF%BC%9AGitHub-Pages%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2"><span class="nav-number">8.4.1.</span> <span class="nav-text">第一部分：GitHub Pages自动化部署</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%80%EF%BC%9A%E5%87%86%E5%A4%87%E5%B7%A5%E4%BD%9C"><span class="nav-number">8.4.1.1.</span> <span class="nav-text">步骤一：准备工作</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%8C%EF%BC%9A%E5%88%9B%E5%BB%BA%E4%B8%A4%E4%B8%AAGitHub%E4%BB%93%E5%BA%93"><span class="nav-number">8.4.1.2.</span> <span class="nav-text">步骤二：创建两个GitHub仓库</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%89%EF%BC%9A%E5%B0%86%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%85%B3%E8%81%94%E5%88%B0%E6%BA%90%E7%A0%81%E4%BB%93%E5%BA%93"><span class="nav-number">8.4.1.3.</span> <span class="nav-text">步骤三：将本地项目关联到源码仓库</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%9B%9B%EF%BC%9A%E9%85%8D%E7%BD%AEGitHub-Actions"><span class="nav-number">8.4.1.4.</span> <span class="nav-text">步骤四：配置GitHub Actions</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%BA%94%EF%BC%9A%E7%94%9F%E6%88%90%E5%B9%B6%E9%85%8D%E7%BD%AEPersonal-Access-Token"><span class="nav-number">8.4.1.5.</span> <span class="nav-text">步骤五：生成并配置Personal Access Token</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AD%EF%BC%9A%E9%85%8D%E7%BD%AEGitHub-Pages"><span class="nav-number">8.4.1.6.</span> <span class="nav-text">步骤六：配置GitHub Pages</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E9%83%A8%E5%88%86%EF%BC%9A%E9%83%A8%E7%BD%B2%E5%88%B0%E4%BA%91%E6%9C%8D%E5%8A%A1%E5%99%A8%EF%BC%88%E8%99%9A%E6%8B%9F%E6%9C%BA%EF%BC%89"><span class="nav-number">8.4.2.</span> <span class="nav-text">第二部分：部署到云服务器（虚拟机）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E4%B8%83%EF%BC%9A%E5%AE%89%E8%A3%85%E5%92%8C%E9%85%8D%E7%BD%AENginx"><span class="nav-number">8.4.2.1.</span> <span class="nav-text">步骤七：安装和配置Nginx</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4%E5%85%AB%EF%BC%9A%E4%BD%BF%E7%94%A8rsync%E9%83%A8%E7%BD%B2"><span class="nav-number">8.4.2.2.</span> <span class="nav-text">步骤八：使用rsync部署</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E6%8E%92%E9%94%99-5"><span class="nav-number">8.5.</span> <span class="nav-text">五、常见问题与排错</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">18</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">147k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:14</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

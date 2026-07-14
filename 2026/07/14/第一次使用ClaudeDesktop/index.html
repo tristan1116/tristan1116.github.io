@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="这是我第一次借助 Claude Desktop--桌面端大模型，排查并修复一个我之前束手无策的问题的全过程。不得不感叹一声：桌面级大模型，真的很强大！">
+<meta property="og:type" content="article">
+<meta property="og:title" content="第一次使用 Claude Desktop —— 桌面级大模型太强大了！">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/14/%E7%AC%AC%E4%B8%80%E6%AC%A1%E4%BD%BF%E7%94%A8ClaudeDesktop/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="这是我第一次借助 Claude Desktop--桌面端大模型，排查并修复一个我之前束手无策的问题的全过程。不得不感叹一声：桌面级大模型，真的很强大！">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/claude-desktop-exp/before-fix.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/claude-desktop-exp/after-fix.png">
+<meta property="article:published_time" content="2026-07-14T05:30:00.000Z">
+<meta property="article:modified_time" content="2026-07-14T06:54:09.995Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="Markdown">
+<meta property="article:tag" content="Hexo">
+<meta property="article:tag" content="Claude">
+<meta property="article:tag" content="AI">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/claude-desktop-exp/before-fix.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/14/%E7%AC%AC%E4%B8%80%E6%AC%A1%E4%BD%BF%E7%94%A8ClaudeDesktop/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>第一次使用 Claude Desktop —— 桌面级大模型太强大了！ | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/14/%E7%AC%AC%E4%B8%80%E6%AC%A1%E4%BD%BF%E7%94%A8ClaudeDesktop/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          第一次使用 Claude Desktop —— 桌面级大模型太强大了！
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-14 13:30:00 / 修改时间：14:54:09" itemprop="dateCreated datePublished" datetime="2026-07-14T13:30:00+08:00">2026-07-14</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%80%9A%E7%94%A8%E6%8A%80%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">通用技能</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>2 分钟</span>
+            </span>
+            <div class="post-description">这是我第一次借助 Claude Desktop--桌面端大模型，排查并修复一个我之前束手无策的问题的全过程。不得不感叹一声：桌面级大模型，真的很强大！</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>这是我第一次使用 <strong>Claude Desktop（桌面端大模型，内部接入DeepSeek V4）</strong> 的真实体验。这篇文章就用对话的形式，原汁原味地记录下全过程。</p>
+<blockquote>
+<p>另外，关于下面提到的一个陌生概念的解释： <strong>TOC</strong> 是什么——TOC 是 <strong>Table of Contents（目录&#x2F;大纲）</strong> 的缩写，就是博客文章侧边栏里那个展示标题层级的小导航。它能让你快速跳转到文章的各个章节，当前浏览到哪里，对应的标题就会高亮变色，非常方便。</p>
+</blockquote>
+<hr>
+<h2 id="发现问题"><a href="#发现问题" class="headerlink" title="发现问题"></a>发现问题</h2><p><strong>我：</strong> 我的博客里有一篇文章，在本地 Typora 里显示一切正常，大纲只显示最低等级的标题，高等级的标题隐藏起来。但放到网页上就不行了，所有等级的标题都全部显示出来，不会隐藏，也不会把当前正在浏览的标题内容变色。这和我其他的文章都不一样。</p>
+<p><img src="/./../images/claude-desktop-exp/before-fix.png" alt="修复前的文章页面 — TOC 目录混乱，所有标题都平铺显示，没有层级结构"></p>
+<hr>
+<h2 id="求助-AI"><a href="#求助-AI" class="headerlink" title="求助 AI"></a>求助 AI</h2><p>于是我把问题抛给了 Claude Desktop，并把整个博客文件夹的权限给它。</p>
+<hr>
+<h2 id="诊断过程"><a href="#诊断过程" class="headerlink" title="诊断过程"></a>诊断过程</h2><p><strong>Claude：</strong> 让我对比一下正常文章和问题文章的差异……</p>
+<p>（片刻后）</p>
+<p><strong>Claude：</strong> 我发现两个问题。</p>
+<p><strong>问题一：孤立的 <code>&lt;/div&gt;</code> 标签</strong></p>
+<p>你的问题文章第 46 行有一个 <code>&lt;/div&gt;</code>，但没有对应的 <code>&lt;div&gt;</code> 开头。这个标签破坏了网页的 HTML 结构，导致主题的 TOC JavaScript 无法正常工作，所以所有标题都乱了。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">46  &lt;/div&gt;    ← 这个标签是多余的</span><br></pre></td></tr></table></figure>
+
+<p><strong>问题二：标题层级错误</strong></p>
+<p>正常文章全文只有一个 <code>#</code>（h1，一级标题），而你同学用 AI 生成的这篇文章有 **8 个 <code>#</code>**：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 《软件开发工具实践》</span></span><br><span class="line"><span class="section"># 实验报告</span></span><br><span class="line"><span class="section"># 实验2-4：Hexo 博客搭建...</span></span><br><span class="line"><span class="section"># 实验5：VirtualBox...</span></span><br><span class="line"><span class="section"># 实验6：Linux 基础操作...</span></span><br></pre></td></tr></table></figure>
+
+<p>每个实验章节都用了一个 <code>h1</code>。但博客主题的 TOC 依赖正确的标题层级来生成折叠结构。8 个 <code>h1</code> 平铺在一起，TOC 就不知道该怎么折叠了。</p>
+<p><strong>我：</strong> 那怎么修？</p>
+<p><strong>Claude：</strong> 两步走——</p>
+<ol>
+<li>删除孤立的 <code>&lt;/div&gt;</code> 标签</li>
+<li>把多余的 <code>h1</code> 降级为 <code>h2</code>，让文章只有<strong>一个</strong> <code>h1</code></li>
+</ol>
+<hr>
+<h2 id="精准修复"><a href="#精准修复" class="headerlink" title="精准修复"></a>精准修复</h2><p><strong>我：</strong> 你帮我改吧。</p>
+<p>于是 Claude 直接读取了我的 Markdown 文件，一键完成了修改。</p>
+<p>改完之后我重新构建了博客，问题果然解决了！🎉</p>
+<p>但我又得寸进尺了：</p>
+<p><strong>我：</strong> 我希望低等级的标题不要那么多并列的，只留下几个实验的实验名。比如在网页上点进这篇文章的时候，大纲里只显示这几个实验名称，而不显示具体的细节。</p>
+<p><strong>Claude：</strong> 明白了。需要做两件事——</p>
+<ol>
+<li>把所有 <code>## 一、实验目的</code>、<code>## 二、实验环境与概念</code> 这样的子章节标题从 <code>h2</code> 降级为 <code>h3</code></li>
+<li>在文章头部加一个配置 <code>toc_max_depth: 2</code>，告诉主题”侧边栏只显示到 h2，h3 及以下收起来”</li>
+</ol>
+<p>不过手动改太累了，我来写个脚本自动处理。</p>
+<p>于是它写了一个 Python 脚本，<strong>一次性修改了 32 处标题</strong>，精确地只改了那些需要降级的标题，没有误改代码块里的内容。整个过程仅用了不到 30 秒。</p>
+<p><img src="/./../images/claude-desktop-exp/after-fix.png" alt="修复后的文章页面 — TOC 只显示 5 个实验名称，简洁清晰，滚动时自动高亮"></p>
+<hr>
+<h2 id="效果验证"><a href="#效果验证" class="headerlink" title="效果验证"></a>效果验证</h2><p>最终效果：点击进入文章，侧边栏大纲简洁地只显示了几个实验名称，没有繁杂的子标题，滚动到哪个实验，对应的标题就会高亮变色。✨</p>
+<table>
+<thead>
+<tr>
+<th>修复前</th>
+<th>修复后</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>所有标题平铺展开，密密麻麻</td>
+<td>只显示实验名称，清爽简洁</td>
+</tr>
+<tr>
+<td>滚动时不会高亮</td>
+<td>滚动时对应标题自动变色</td>
+</tr>
+<tr>
+<td>HTML 结构被破坏</td>
+<td>结构完整，功能正常</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="感想"><a href="#感想" class="headerlink" title="感想"></a>感想</h2><p>这次经历让我深刻感受到 <strong>桌面级大模型和网页版大模型的本质区别</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>网页版 AI</th>
+<th>桌面端 AI（Claude Desktop）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>只能聊天对话</td>
+<td>能直接读写我的文件</td>
+</tr>
+<tr>
+<td>要我复制粘贴代码</td>
+<td>能一键修改文件</td>
+</tr>
+<tr>
+<td>只能”告诉你怎么做”</td>
+<td>能”直接帮你做”</td>
+</tr>
+<tr>
+<td>看不到我的项目结构</td>
+<td>能浏览整个项目文件夹</td>
+</tr>
+<tr>
+<td>遇到大文件就超长</td>
+<td>有超大上下文窗口</td>
+</tr>
+</tbody></table>
+<p>最让我震撼的一刻，是 Claude 直接写了一个 Python 脚本，<strong>批量修改了我文章中的 32 处标题</strong>。这不是在教我怎么做，而是真正地和我<strong>并肩协作</strong>——我发现问题，它分析定位，我确认方案，它动手执行。</p>
+<p>这已经不是”搜索引擎”或”聊天机器人”了，这是一个<strong>真正的编程伙伴</strong>。</p>
+<p>另外，这篇文章也是claude帮我写的。我所做的仅仅是提出想要写一篇新文章来记录下这个时刻，然后稍微修改了一点点claude生成的框架的细节，在它把文章生成后加上两张图片，稍微润色一下。从头到尾花了不超过我十分钟的时间，以及调用deepseek v4 api 的几毛钱–真的太夸张了！</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Markdown/" rel="tag"># Markdown</a>
+              <a href="/tags/Hexo/" rel="tag"># Hexo</a>
+              <a href="/tags/Claude/" rel="tag"># Claude</a>
+              <a href="/tags/AI/" rel="tag"># AI</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/13/%E4%B8%80%E6%AC%A1%E6%88%90%E5%8A%9F%E7%9A%84Git%E5%88%86%E6%94%AF%E7%BB%9F%E4%B8%80%E5%AE%9E%E6%88%98/" rel="prev" title="一次成功的Git分支统一实战">
+      <i class="fa fa-chevron-left"></i> 一次成功的Git分支统一实战
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%91%E7%8E%B0%E9%97%AE%E9%A2%98"><span class="nav-number">1.</span> <span class="nav-text">发现问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B1%82%E5%8A%A9-AI"><span class="nav-number">2.</span> <span class="nav-text">求助 AI</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%8A%E6%96%AD%E8%BF%87%E7%A8%8B"><span class="nav-number">3.</span> <span class="nav-text">诊断过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B2%BE%E5%87%86%E4%BF%AE%E5%A4%8D"><span class="nav-number">4.</span> <span class="nav-text">精准修复</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E9%AA%8C%E8%AF%81"><span class="nav-number">5.</span> <span class="nav-text">效果验证</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%84%9F%E6%83%B3"><span class="nav-number">6.</span> <span class="nav-text">感想</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">18</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">147k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:14</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

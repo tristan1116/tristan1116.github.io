@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="我在学习如何用VS Code使用git管理 Hexo 博客源码时，发现了一个令我困惑的现象。我的本地仓库有一个 &#96;master&#96; 分支，远程 GitHub 仓库却使用 &#96;main&#96; 分支，但每次推送后博客都能正常更新。这背后是什么原理？下面是我和deepseek这位朋友关于这个问题的完整对话记录。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="一件关于Git分支的神奇小事 ：为什么我的 &#96;master&#96; 能推送到并且持续更新 &#96;main&#96;？">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/13/%E5%AD%A6%E4%B9%A0git%E6%97%B6%E9%81%87%E5%88%B0%E7%9A%84%E4%B8%80%E4%BB%B6%E7%A5%9E%E5%A5%87%E7%9A%84%E4%BA%8B/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="我在学习如何用VS Code使用git管理 Hexo 博客源码时，发现了一个令我困惑的现象。我的本地仓库有一个 &#96;master&#96; 分支，远程 GitHub 仓库却使用 &#96;main&#96; 分支，但每次推送后博客都能正常更新。这背后是什么原理？下面是我和deepseek这位朋友关于这个问题的完整对话记录。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-13T14:25:22.000Z">
+<meta property="article:modified_time" content="2026-07-13T14:27:15.394Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="Git">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/13/%E5%AD%A6%E4%B9%A0git%E6%97%B6%E9%81%87%E5%88%B0%E7%9A%84%E4%B8%80%E4%BB%B6%E7%A5%9E%E5%A5%87%E7%9A%84%E4%BA%8B/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>一件关于Git分支的神奇小事 ：为什么我的 `master` 能推送到并且持续更新 `main`？ | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/13/%E5%AD%A6%E4%B9%A0git%E6%97%B6%E9%81%87%E5%88%B0%E7%9A%84%E4%B8%80%E4%BB%B6%E7%A5%9E%E5%A5%87%E7%9A%84%E4%BA%8B/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          一件关于Git分支的神奇小事 ：为什么我的 `master` 能推送到并且持续更新 `main`？
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-13 22:25:22 / 修改时间：22:27:15" itemprop="dateCreated datePublished" datetime="2026-07-13T22:25:22+08:00">2026-07-13</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%80%9A%E7%94%A8%E6%8A%80%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">通用技能</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+            <div class="post-description">我在学习如何用VS Code使用git管理 Hexo 博客源码时，发现了一个令我困惑的现象。我的本地仓库有一个 `master` 分支，远程 GitHub 仓库却使用 `main` 分支，但每次推送后博客都能正常更新。这背后是什么原理？下面是我和deepseek这位朋友关于这个问题的完整对话记录。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="一件关于Git分支的神奇小事-：为什么我的-master-能推送到并且持续更新-main？"><a href="#一件关于Git分支的神奇小事-：为什么我的-master-能推送到并且持续更新-main？" class="headerlink" title="一件关于Git分支的神奇小事 ：为什么我的 master 能推送到并且持续更新 main？"></a>一件关于Git分支的神奇小事 ：为什么我的 <code>master</code> 能推送到并且持续更新 <code>main</code>？</h1><hr>
+<p><strong>我</strong>：我在学习用 VSCode 使用 Git，用到我的 Hexo 博客的例子。可以看到，源代码管理里主要有三个地方，分别是存储库、更改和图表。图表里面显示了我的 commit 记录，这里可以很清楚的看到我每一次更改的东西。我不太懂的是存储库和更改。为什么我有两个存储库，<code>my-blog01</code> 存在 <code>main</code> 分支，而 <code>.deploy_git</code> 存在 <code>master</code> 里。这两个是什么时候，在哪个实验设置的？另外，这里的更改和我之前一直在 Git Bash 终端里用的命令对比，有什么相同和不同之处？</p>
+<p><strong>朋友</strong>：看到你的截图，我明白了。你看到的这两个仓库（<code>my-blog01</code> 和 <code>.deploy_git</code>），正是 Hexo 博客部署机制的核心。它们不是“两个仓库”，而是“两个独立的东西”，我来帮你理清。</p>
+<ul>
+<li>**<code>my-blog01</code> (源码仓库)**：这就是你在终端里运行 <code>git init</code> 建立的那个仓库。它存放的是你所有文章的 <code>.md</code> 源文件、主题配置、插件等。你手动写的所有 commit 都在这个仓库里，是你的工作核心。</li>
+<li>**<code>.deploy_git</code> (部署仓库)**：你完全不需要手动操作它。它是当你第一次运行 <code>hexo d</code> 命令时，Hexo 在本地自动生成的一个“匿名”仓库。它的作用，是把 Hexo 编译生成的静态网页文件推送到 GitHub 的 <code>你的用户名.github.io</code> 仓库里。它通常固定使用 <code>master</code> 分支，因为这是 GitHub Pages 服务默认读取的分支。</li>
+</ul>
+<p>至于和 Git Bash 命令的区别，它们本质上完全一样，只是操作的对象和目标不同。一个是图形界面，一个是文字命令。关键在于你在哪个目录下打开 VS Code。如果你打开的是 <code>my-blog01</code> 文件夹，那源代码管理界面的所有操作，都等同于在这个目录下执行 Git 命令。</p>
+<p><strong>我</strong>：但是我的 config 文件里现在是这样设置的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">deploy:</span><br><span class="line">  type: &#x27;git&#x27;</span><br><span class="line">  repo: https://github.com/tristan1116/tristan1116.github.io.git</span><br><span class="line">  branch: main</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>朋友</strong>：看到你的配置了！这和你的截图对上了。你配置中写的 <code>branch: main</code> 并没有生效，<code>.deploy_git</code> 仓库目前实际使用的是默认的 <code>master</code> 分支。这通常是因为 <code>.deploy_git</code> 是在你第一次运行 <code>hexo d</code> 时被自动创建的，当时你电脑的 Git 全局配置可能默认使用 <code>master</code> 作为初始分支名。</p>
+<p><strong>我</strong>：我去 GitHub 上看了设置，显示：</p>
+<blockquote>
+<p>Your GitHub Pages site is currently being built from the main branch</p>
+</blockquote>
+<p><strong>朋友</strong>：太好了！这个信息非常关键。你的 GitHub Pages 正在从 <code>main</code> 分支构建，这意味着你的 <code>_config.yml</code> 中写的 <code>branch: main</code> 是正确的。但是，你本地的 <code>.deploy_git</code> 仓库却在 <code>master</code> 分支上。</p>
+<p><strong>这会造成一个“版本错位”</strong>：虽然你配置想推送到 <code>main</code>，但 Hexo 实际推到了 <code>master</code>。而 GitHub Pages 只读取 <code>main</code>，所以你的博客现在很可能没有更新到最新内容。</p>
+<p><strong>我</strong>：但是神奇的是，我的本地版本和网页版本是同步的，我每次 push，都能顺利更新。这其中的具体原因是什么？</p>
+<p><strong>朋友</strong>：确实很神奇！你能成功更新，说明这个“错位”并没有影响你，这背后有具体的技术原因。</p>
+<p>关键在于，你的 <code>.deploy_git</code> 仓库的 <code>master</code> 分支，其实和远程仓库的 <code>main</code> 分支是同一个东西。当你运行 <code>hexo d</code> 时，它执行的是 <code>git push</code>。由于你的本地分支是 <code>master</code>，而远程仓库的 <code>main</code> 分支和 <code>master</code> 分支在 Git 内部是通过提交历史（commit）关联的。因为你在本地 <code>master</code> 上的新提交，在远程 <code>main</code> 上并没有冲突，所以推送成功。</p>
+<p><strong>我</strong>：我之前并不了解 Git 分支这种知识，只会 <code>git add</code>、<code>commit</code> 和 <code>push</code> 三板斧。所以对你的解释，我有点晕了。你能否从更基础的东西开始讲？比如介绍一下 Git 分支的基本逻辑什么的？</p>
+<p><strong>朋友</strong>：没问题！我们从头开始，用最通俗的方式把 Git 分支讲清楚。</p>
+<p>想象你在写一本日记，每天写一篇。Git 就是帮你管理这本日记的工具。</p>
+<ul>
+<li><code>git add</code>：相当于你把今天写好的草稿放到了书桌上。</li>
+<li><code>git commit</code>：相当于你正式把这篇日记誊写到了日记本上。</li>
+<li><code>git push</code>：相当于你把这本日记本的内容，复印了一份寄给了朋友（远程仓库）。</li>
+</ul>
+<p><strong>分支</strong>可以理解成时间线的“分叉”。假设你的日记写得很好，你想尝试一个新风格，但又不想影响原来的日记主线。这时候，你就可以复制一本新的日记本，在新本子上随便写。这本“新日记本”就是 Git 里的分支。</p>
+<p><strong>我</strong>：我对于前两件事基本理解了，但对于第三件事（为什么错位还能推送成功）还是感到很神奇。我想进一步了解一下这其中的原理。</p>
+<p><strong>朋友</strong>：好的，觉得“神奇”就对了，这说明你已经开始触碰到 Git 最核心的设计思想了。我们把这个“魔术”的底牌掀开。</p>
+<p>其实原理并不复杂，但需要跳出“分支等于文件夹”这个直观印象。在 Git 的内部，<strong>分支其实非常轻量，它仅仅是一个“贴纸”或“书签”</strong>，贴在某次提交（commit）上面。</p>
+<ul>
+<li><strong>提交（Commit）</strong>：这才是 Git 真正保存内容的地方。每次 <code>commit</code>，Git 都会把当前所有文件的状态打包，生成一个独一无二的 ID。</li>
+<li><strong>分支（Branch）</strong>：它只是一个指向某个 commit ID 的指针。</li>
+</ul>
+<p>所以，你的本地 <code>master</code> 和远程 <code>main</code>，虽然名字不同，但它们指向的是同一个提交历史。<code>git push</code> 操作的对象是<strong>提交（commit）</strong>，而不是分支名。分支名只是为了让人们方便地找到这些提交。</p>
+<p><strong>我</strong>：我好像理解了一点，但又没完全理解。我是否可以这么说，我目前之所以每次从本地提交到 GitHub 上去都能顺利在网站上同步，是因为这完全是线性的，只有我一个人在提交，每一次只有一个新的 commit 从我的 <code>master</code> 出发，到达 GitHub 上的 <code>main</code>。所以它们二者恰好能够完美对上？如果是这样的话，关于你的问题，是不是会出现，<code>main</code> 和 <code>master</code> 不能再完美契合的情况？但具体是什么样，我说不出来。</p>
+<p><strong>朋友</strong>：<strong>完全正确！</strong> 你不仅理解了，而且抓住了最核心的一点。你的这个推断非常精准。</p>
+<blockquote>
+<p>“我目前之所以每次都能顺利同步，是因为这完全是线性的，只有我一个人在提交，每一次只有一个新的 commit 从我的 master 出发，到达 github 上的 main。所以它们二者恰好能够完美对上？”</p>
+</blockquote>
+<p><strong>是的，就是这个原因！</strong></p>
+<blockquote>
+<p>“如果是这样的话，关于你的问题，是不是会出现，main 和 master 不能再完美契合的情况？”</p>
+</blockquote>
+<p><strong>是的，一定会！</strong> 只要远程仓库的 <code>main</code> 分支，在你上次推送之后，又有了新的、你本地没有的提交，那么“完美契合”就会被打破。这种“新的提交”可能来自：你自己在另一台电脑上提交并推送了，或者别人推送了新的提交。</p>
+<p>当这种情况发生时，Git 会拒绝你的 <code>push</code>，并提示：</p>
+<blockquote>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">error: failed to push some refs to ...</span><br></pre></td></tr></table></figure>
+</blockquote>
+<p>你需要先 <code>git pull</code> 把远程的更新拉取到本地，解决可能的冲突，然后再推送。</p>
+<p><strong>我</strong>：哈哈，我终于理解了，Git 确实很神奇，也很好玩！</p>
+<p><strong>朋友</strong>：哈哈，太好了！能帮你把这个“神奇”的点打通，我也很开心！你总结得特别到位——Git 确实很神奇，也很好玩。它就像一个精密的时光机，不仅帮你记录每一次变化，还给了你穿梭于不同时间线（分支）的自由。一旦理解了它的核心逻辑，用起来会特别顺手，而且很有成就感。</p>
+<hr>
+<blockquote>
+<p><strong>后记</strong>：这次对话让我对 Git 分支有了本质的理解。从最初只会“三板斧”，到后来理解分支是指针而非复制，再到明白了为什么我的 <code>master</code> 能成功推送到 <code>main</code>，整个过程就像解开了一个有趣的谜题。记录下来，既是对这段学习经历的纪念，也希望能帮到其他遇到类似困惑的朋友。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Git/" rel="tag"># Git</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/13/typora%E5%92%8Chexo%E6%A0%BC%E5%BC%8F%E5%86%B2%E7%AA%81%E7%9A%84%E9%97%AE%E9%A2%98%E5%92%8C%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/" rel="prev" title="typora和hexo格式冲突的问题汇总和解决方案">
+      <i class="fa fa-chevron-left"></i> typora和hexo格式冲突的问题汇总和解决方案
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/07/13/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" rel="next" title="数据结构学习笔记">
+      数据结构学习笔记 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%80%E4%BB%B6%E5%85%B3%E4%BA%8EGit%E5%88%86%E6%94%AF%E7%9A%84%E7%A5%9E%E5%A5%87%E5%B0%8F%E4%BA%8B-%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%88%91%E7%9A%84-master-%E8%83%BD%E6%8E%A8%E9%80%81%E5%88%B0%E5%B9%B6%E4%B8%94%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0-main%EF%BC%9F"><span class="nav-number">1.</span> <span class="nav-text">一件关于Git分支的神奇小事 ：为什么我的 master 能推送到并且持续更新 main？</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">18</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">147k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:14</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

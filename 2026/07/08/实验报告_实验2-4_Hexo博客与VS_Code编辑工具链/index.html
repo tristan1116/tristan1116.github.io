@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="静态博客搭建与 VS Code 编辑工具链">
+<meta property="og:type" content="article">
+<meta property="og:title" content="实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/08/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A_%E5%AE%9E%E9%AA%8C2-4_Hexo%E5%8D%9A%E5%AE%A2%E4%B8%8EVS_Code%E7%BC%96%E8%BE%91%E5%B7%A5%E5%85%B7%E9%93%BE/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="静态博客搭建与 VS Code 编辑工具链">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-08T14:37:20.000Z">
+<meta property="article:modified_time" content="2026-07-11T01:04:58.065Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="Markdown">
+<meta property="article:tag" content="Hexo">
+<meta property="article:tag" content="Git">
+<meta property="article:tag" content="Node.js">
+<meta property="article:tag" content="VS Code">
+<meta property="article:tag" content="静态站点">
+<meta property="article:tag" content="YAML">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/08/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A_%E5%AE%9E%E9%AA%8C2-4_Hexo%E5%8D%9A%E5%AE%A2%E4%B8%8EVS_Code%E7%BC%96%E8%BE%91%E5%B7%A5%E5%85%B7%E9%93%BE/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/08/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A_%E5%AE%9E%E9%AA%8C2-4_Hexo%E5%8D%9A%E5%AE%A2%E4%B8%8EVS_Code%E7%BC%96%E8%BE%91%E5%B7%A5%E5%85%B7%E9%93%BE/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-07-08 22:37:20" itemprop="dateCreated datePublished" datetime="2026-07-08T22:37:20+08:00">2026-07-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-11 09:04:58" itemprop="dateModified" datetime="2026-07-11T09:04:58+08:00">2026-07-11</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%89%8D%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">前端</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>7.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>7 分钟</span>
+            </span>
+            <div class="post-description">静态博客搭建与 VS Code 编辑工具链</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="实验2-4：Hexo-静态博客搭建与-VS-Code-编辑工具链"><a href="#实验2-4：Hexo-静态博客搭建与-VS-Code-编辑工具链" class="headerlink" title="实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链"></a>实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链</h1><blockquote>
+<p><strong>实验日期：</strong> 2026年7月7日 - 7月8日<br><strong>实验环境：</strong> Windows 11 + Node.js LTS + Git + VS Code + GitHub<br><strong>实验目标：</strong> 掌握 Hexo 静态博客搭建、VS Code 编辑配置、Markdown 编写及 GitHub Pages 部署的完整 Web 开发工具链</p>
+</blockquote>
+<hr>
+<h2 id="一、实验目的"><a href="#一、实验目的" class="headerlink" title="一、实验目的"></a>一、实验目的</h2><h3 id="实验2：Hexo-静态博客（本地搭建）"><a href="#实验2：Hexo-静态博客（本地搭建）" class="headerlink" title="实验2：Hexo 静态博客（本地搭建）"></a>实验2：Hexo 静态博客（本地搭建）</h3><ol>
+<li>理解静态站点生成器（SSG）的概念与优势</li>
+<li>掌握 Node.js、npm、Git 的安装与配置</li>
+<li>学会使用 Hexo CLI 初始化和管理博客项目</li>
+<li>掌握 Hexo 主题的安装与切换</li>
+</ol>
+<h3 id="实验3：VS-Code-与-Markdown"><a href="#实验3：VS-Code-与-Markdown" class="headerlink" title="实验3：VS Code 与 Markdown"></a>实验3：VS Code 与 Markdown</h3><ol>
+<li>理解编辑器与 IDE 的区别</li>
+<li>掌握 VS Code 的安装和基础配置</li>
+<li>学会安装和管理 VS Code 扩展</li>
+<li>掌握 Markdown 语法及常用写作技巧</li>
+<li>了解 Mermaid 图表在 Markdown 中的使用</li>
+</ol>
+<h3 id="实验4：SSG-与-GitHub-Pages-部署"><a href="#实验4：SSG-与-GitHub-Pages-部署" class="headerlink" title="实验4：SSG 与 GitHub Pages 部署"></a>实验4：SSG 与 GitHub Pages 部署</h3><ol>
+<li>深入理解 SSG 与传统 CMS 的区别</li>
+<li>掌握 Hexo 的部署配置</li>
+<li>学会将博客部署到 GitHub Pages</li>
+<li>掌握 Front-matter 的完整配置方式</li>
+</ol>
+<hr>
+<h2 id="二、实验环境与概念"><a href="#二、实验环境与概念" class="headerlink" title="二、实验环境与概念"></a>二、实验环境与概念</h2><h3 id="工具链总览"><a href="#工具链总览" class="headerlink" title="工具链总览"></a>工具链总览</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────┐    ┌──────────────┐    ┌──────────────┐</span><br><span class="line">│   VS Code    │───▶│    Hexo      │───▶│  GitHub Pages│</span><br><span class="line">│  Markdown    │    │  生成静态页   │    │  静态托管     │</span><br><span class="line">│  编写文章     │    │  hexo g -d   │    │  自动发布     │</span><br><span class="line">└──────────────┘    └──────────────┘    └──────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="环境配置"><a href="#环境配置" class="headerlink" title="环境配置"></a>环境配置</h3><table>
+<thead>
+<tr>
+<th>工具</th>
+<th>版本</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td>11</td>
+<td>操作系统</td>
+</tr>
+<tr>
+<td>Node.js</td>
+<td>v20.x LTS</td>
+<td>JavaScript 运行时</td>
+</tr>
+<tr>
+<td>npm</td>
+<td>10.x</td>
+<td>Node 包管理器</td>
+</tr>
+<tr>
+<td>Git</td>
+<td>2.x</td>
+<td>版本控制</td>
+</tr>
+<tr>
+<td>Hexo CLI</td>
+<td>7.x</td>
+<td>静态博客框架</td>
+</tr>
+<tr>
+<td>VS Code</td>
+<td>最新版</td>
+<td>代码编辑器</td>
+</tr>
+</tbody></table>
+<h3 id="SSG-vs-CMS-概念对比"><a href="#SSG-vs-CMS-概念对比" class="headerlink" title="SSG vs CMS 概念对比"></a>SSG vs CMS 概念对比</h3><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>SSG（Hexo&#x2F;Hugo）</th>
+<th>CMS（WordPress）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>渲染时机</td>
+<td>构建时预渲染</td>
+<td>请求时动态渲染</td>
+</tr>
+<tr>
+<td>服务器需求</td>
+<td>静态文件服务器</td>
+<td>PHP + 数据库</td>
+</tr>
+<tr>
+<td>加载速度</td>
+<td>⚡ 极快</td>
+<td>🐢 较慢</td>
+</tr>
+<tr>
+<td>安全性</td>
+<td>🔒 高（无后端攻击面）</td>
+<td>⚠️ 需定期更新</td>
+</tr>
+<tr>
+<td>托管成本</td>
+<td>💰 低（GitHub Pages 免费）</td>
+<td>需付费服务器</td>
+</tr>
+<tr>
+<td>内容管理</td>
+<td>Git + Markdown</td>
+<td>Web 后台界面</td>
+</tr>
+<tr>
+<td>版本控制</td>
+<td>✅ 天然支持</td>
+<td>❌ 需额外方案</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="三、实验步骤"><a href="#三、实验步骤" class="headerlink" title="三、实验步骤"></a>三、实验步骤</h2><h3 id="阶段一：环境搭建（实验2）"><a href="#阶段一：环境搭建（实验2）" class="headerlink" title="阶段一：环境搭建（实验2）"></a>阶段一：环境搭建（实验2）</h3><h4 id="1-1-安装-Node-js-与-Git"><a href="#1-1-安装-Node-js-与-Git" class="headerlink" title="1.1 安装 Node.js 与 Git"></a>1.1 安装 Node.js 与 Git</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 从 https://nodejs.org/ 下载 LTS 版本安装</span></span><br><span class="line"><span class="comment"># 验证安装</span></span><br><span class="line">node -v    <span class="comment"># v20.x.x</span></span><br><span class="line">npm -v     <span class="comment"># 10.x.x</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 从 https://git-scm.com/download/win 下载 Git 安装</span></span><br><span class="line">git --version    <span class="comment"># git version 2.x.x</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 配置 Git 用户信息</span></span><br><span class="line">git config --global user.name <span class="string">&quot;Your Name&quot;</span></span><br><span class="line">git config --global user.email <span class="string">&quot;your@example.com&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 配置 npm 镜像（提升国内下载速度）</span></span><br><span class="line">npm config <span class="built_in">set</span> registry https://registry.npmmirror.com</span><br></pre></td></tr></table></figure>
+
+<h4 id="1-2-安装-Hexo-CLI-并初始化项目"><a href="#1-2-安装-Hexo-CLI-并初始化项目" class="headerlink" title="1.2 安装 Hexo CLI 并初始化项目"></a>1.2 安装 Hexo CLI 并初始化项目</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装 Hexo CLI</span></span><br><span class="line">npm install -g hexo-cli</span><br><span class="line">hexo -v</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建博客目录并初始化</span></span><br><span class="line"><span class="built_in">mkdir</span> D:\Blog &amp;&amp; <span class="built_in">cd</span> D:\Blog</span><br><span class="line">hexo init my-blog</span><br><span class="line"><span class="built_in">cd</span> my-blog</span><br><span class="line">npm install</span><br></pre></td></tr></table></figure>
+
+<h4 id="1-3-项目目录结构"><a href="#1-3-项目目录结构" class="headerlink" title="1.3 项目目录结构"></a>1.3 项目目录结构</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">my-blog/</span><br><span class="line">├── _config.yml          # 站点配置文件（核心）</span><br><span class="line">├── package.json         # 依赖管理</span><br><span class="line">├── scaffolds/           # 文章模板（draft/page/post）</span><br><span class="line">├── source/              # 源文件目录</span><br><span class="line">│   ├── _drafts/         # 草稿</span><br><span class="line">│   └── _posts/          # 已发布文章</span><br><span class="line">├── themes/              # 主题目录</span><br><span class="line">└── node_modules/        # 依赖包</span><br></pre></td></tr></table></figure>
+
+<h4 id="1-4-启动本地预览"><a href="#1-4-启动本地预览" class="headerlink" title="1.4 启动本地预览"></a>1.4 启动本地预览</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">hexo server      <span class="comment"># 简写: hexo s</span></span><br><span class="line"><span class="comment"># 浏览器访问 http://localhost:4000</span></span><br><span class="line"><span class="comment"># 端口冲突时: hexo server -p 4001</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="1-5-创建文章与安装主题"><a href="#1-5-创建文章与安装主题" class="headerlink" title="1.5 创建文章与安装主题"></a>1.5 创建文章与安装主题</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建第一篇文章</span></span><br><span class="line">hexo new <span class="string">&quot;Hello World&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 安装 NexT 主题</span></span><br><span class="line">git <span class="built_in">clone</span> https://github.com/theme-next/hexo-theme-next themes/next</span><br><span class="line"></span><br><span class="line"><span class="comment"># 修改 _config.yml 中 theme 字段</span></span><br><span class="line"><span class="comment"># theme: next</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="1-6-站点配置（-config-yml）"><a href="#1-6-站点配置（-config-yml）" class="headerlink" title="1.6 站点配置（_config.yml）"></a>1.6 站点配置（<code>_config.yml</code>）</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Site</span></span><br><span class="line"><span class="attr">title:</span> <span class="string">软件开发工具实践</span> <span class="bullet">-</span> <span class="string">个人博客</span></span><br><span class="line"><span class="attr">subtitle:</span> <span class="string">&#x27;Software Development Tools Practice&#x27;</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">&#x27;学习使用Hexo搭建静态博客，掌握SSG、CI/CD等现代开发工具&#x27;</span></span><br><span class="line"><span class="attr">author:</span> <span class="string">Student</span></span><br><span class="line"><span class="attr">language:</span> <span class="string">zh-CN</span></span><br><span class="line"><span class="attr">timezone:</span> <span class="string">&#x27;Asia/Shanghai&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># URL</span></span><br><span class="line"><span class="attr">url:</span> <span class="string">https://&lt;username&gt;.github.io</span></span><br><span class="line"><span class="attr">root:</span> <span class="string">/</span></span><br><span class="line"><span class="attr">permalink:</span> <span class="string">:year/:month/:day/:title/</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="阶段二：VS-Code-配置与-Markdown-写作（实验3）"><a href="#阶段二：VS-Code-配置与-Markdown-写作（实验3）" class="headerlink" title="阶段二：VS Code 配置与 Markdown 写作（实验3）"></a>阶段二：VS Code 配置与 Markdown 写作（实验3）</h3><h4 id="2-1-安装-VS-Code-及推荐扩展"><a href="#2-1-安装-VS-Code-及推荐扩展" class="headerlink" title="2.1 安装 VS Code 及推荐扩展"></a>2.1 安装 VS Code 及推荐扩展</h4><p>从 <a target="_blank" rel="noopener" href="https://code.visualstudio.com/">https://code.visualstudio.com/</a> 下载安装。关键安装选项：</p>
+<ul>
+<li>✅ 添加到 PATH（允许使用 <code>code</code> 命令）</li>
+<li>✅ 将 “Open with Code” 添加到右键菜单</li>
+</ul>
+<p>安装以下扩展：</p>
+<table>
+<thead>
+<tr>
+<th>扩展名称</th>
+<th>标识符</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Markdown All in One</strong></td>
+<td>yzhang.markdown-all-in-one</td>
+<td>快捷键、自动目录、列表编辑</td>
+</tr>
+<tr>
+<td><strong>Markdown Preview Enhanced</strong></td>
+<td>shd101wyy.markdown-preview-enhanced</td>
+<td>增强预览、Mermaid、LaTeX、PDF导出</td>
+</tr>
+<tr>
+<td><strong>Paste Image</strong></td>
+<td>mushan.vscode-paste-image</td>
+<td>剪贴板图片粘贴</td>
+</tr>
+<tr>
+<td><strong>markdownlint</strong></td>
+<td>davidanson.vscode-markdownlint</td>
+<td>Markdown 语法规范检查</td>
+</tr>
+</tbody></table>
+<h4 id="2-2-VS-Code-推荐设置（settings-json）"><a href="#2-2-VS-Code-推荐设置（settings-json）" class="headerlink" title="2.2 VS Code 推荐设置（settings.json）"></a>2.2 VS Code 推荐设置（<code>settings.json</code>）</h4><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="comment">// 自动保存</span></span><br><span class="line">  <span class="attr">&quot;files.autoSave&quot;</span><span class="punctuation">:</span> <span class="string">&quot;afterDelay&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;files.autoSaveDelay&quot;</span><span class="punctuation">:</span> <span class="number">1000</span><span class="punctuation">,</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// Markdown 自动换行</span></span><br><span class="line">  <span class="attr">&quot;editor.wordWrap&quot;</span><span class="punctuation">:</span> <span class="string">&quot;on&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;[markdown]&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;editor.wordWrap&quot;</span><span class="punctuation">:</span> <span class="string">&quot;on&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;editor.tabSize&quot;</span><span class="punctuation">:</span> <span class="number">2</span></span><br><span class="line">  <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// Paste Image 配置</span></span><br><span class="line">  <span class="attr">&quot;pasteImage.path&quot;</span><span class="punctuation">:</span> <span class="string">&quot;$&#123;currentFileDir&#125;/images&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;pasteImage.basePath&quot;</span><span class="punctuation">:</span> <span class="string">&quot;$&#123;currentFileDir&#125;&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;pasteImage.prefix&quot;</span><span class="punctuation">:</span> <span class="string">&quot;./&quot;</span><span class="punctuation">,</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// markdownlint 放宽限制</span></span><br><span class="line">  <span class="attr">&quot;markdownlint.config&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;MD013&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;MD033&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;MD041&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="2-3-Markdown-核心语法"><a href="#2-3-Markdown-核心语法" class="headerlink" title="2.3 Markdown 核心语法"></a>2.3 Markdown 核心语法</h4><h5 id="标题与文本样式"><a href="#标题与文本样式" class="headerlink" title="标题与文本样式"></a>标题与文本样式</h5><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 一级标题  ## 二级标题  ### 三级标题</span></span><br><span class="line"><span class="strong">**粗体**</span>  <span class="emphasis">*斜体*</span>  ~~删除线~~  <span class="code">`行内代码`</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h5><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">-</span> 无序列表项</span><br><span class="line"><span class="bullet">1.</span> 有序列表项</span><br><span class="line"><span class="bullet">-</span> [x] 已完成任务</span><br><span class="line"><span class="bullet">-</span> [ ] 待完成任务</span><br></pre></td></tr></table></figure>
+
+<h5 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h5><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="code">```javascript</span></span><br><span class="line"><span class="code">function hello() &#123;</span></span><br><span class="line"><span class="code">  console.log(&quot;Hello, Markdown!&quot;);</span></span><br><span class="line"><span class="code">&#125;</span></span><br><span class="line"><span class="code">```</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="表格"><a href="#表格" class="headerlink" title="表格"></a>表格</h5><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">| 列1 | 列2 | 列3 |</span><br><span class="line">|-----|-----|-----|</span><br><span class="line">| A   | B   | C   |</span><br></pre></td></tr></table></figure>
+
+<h5 id="链接与图片、引用"><a href="#链接与图片、引用" class="headerlink" title="链接与图片、引用"></a>链接与图片、引用</h5><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[<span class="string">链接文字</span>](<span class="link">https://example.com</span>)</span><br><span class="line">![<span class="string">图片描述</span>](<span class="link">image.png</span>)</span><br><span class="line"><span class="quote">&gt; 这是一段引用文字</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="2-4-Markdown-All-in-One-常用快捷键"><a href="#2-4-Markdown-All-in-One-常用快捷键" class="headerlink" title="2.4 Markdown All in One 常用快捷键"></a>2.4 Markdown All in One 常用快捷键</h4><table>
+<thead>
+<tr>
+<th>功能</th>
+<th>快捷键</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>自动目录</td>
+<td>输入 <code>[TOC]</code></td>
+</tr>
+<tr>
+<td>加粗</td>
+<td><code>Ctrl + B</code></td>
+</tr>
+<tr>
+<td>斜体</td>
+<td><code>Ctrl + I</code></td>
+</tr>
+<tr>
+<td>预览</td>
+<td><code>Ctrl + Shift + V</code></td>
+</tr>
+<tr>
+<td>侧边预览</td>
+<td><code>Ctrl + K V</code></td>
+</tr>
+</tbody></table>
+<h4 id="2-5-Mermaid-图表"><a href="#2-5-Mermaid-图表" class="headerlink" title="2.5 Mermaid 图表"></a>2.5 Mermaid 图表</h4><p>在 Markdown Preview Enhanced 中可渲染 Mermaid 图表：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="code">```mermaid</span></span><br><span class="line"><span class="code">flowchart TD</span></span><br><span class="line"><span class="code">    A[开始] --&gt; B[安装Node.js]</span></span><br><span class="line"><span class="code">    B --&gt; C[安装Hexo]</span></span><br><span class="line"><span class="code">    C --&gt; D[搭建博客]</span></span><br><span class="line"><span class="code">    D --&gt; E[部署上线]</span></span><br><span class="line"><span class="code">    E --&gt; F[完成]</span></span><br><span class="line"><span class="code">```</span></span><br></pre></td></tr></table></figure>
+
+<p>支持的图表类型：流程图（flowchart）、时序图（sequenceDiagram）、类图（classDiagram）、甘特图（gantt）、状态图（stateDiagram）、饼图（pie）。</p>
+<h4 id="2-6-编辑器-vs-IDE-对比"><a href="#2-6-编辑器-vs-IDE-对比" class="headerlink" title="2.6 编辑器 vs IDE 对比"></a>2.6 编辑器 vs IDE 对比</h4><table>
+<thead>
+<tr>
+<th>特性</th>
+<th>编辑器（VS Code）</th>
+<th>IDE（IntelliJ IDEA）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>启动速度</td>
+<td>快</td>
+<td>较慢</td>
+</tr>
+<tr>
+<td>资源占用</td>
+<td>低</td>
+<td>高</td>
+</tr>
+<tr>
+<td>扩展生态</td>
+<td>极丰富</td>
+<td>丰富</td>
+</tr>
+<tr>
+<td>语言支持</td>
+<td>通过扩展</td>
+<td>内置</td>
+</tr>
+<tr>
+<td>调试功能</td>
+<td>通过扩展</td>
+<td>内置强大</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>通用开发</td>
+<td>特定语言深度开发</td>
+</tr>
+</tbody></table>
+<hr>
+<h3 id="阶段三：GitHub-Pages-部署（实验4）"><a href="#阶段三：GitHub-Pages-部署（实验4）" class="headerlink" title="阶段三：GitHub Pages 部署（实验4）"></a>阶段三：GitHub Pages 部署（实验4）</h3><h4 id="3-1-创建-GitHub-Pages-仓库"><a href="#3-1-创建-GitHub-Pages-仓库" class="headerlink" title="3.1 创建 GitHub Pages 仓库"></a>3.1 创建 GitHub Pages 仓库</h4><ol>
+<li>登录 <a target="_blank" rel="noopener" href="https://github.com/">GitHub</a></li>
+<li>创建新仓库，命名格式：<code>&lt;username&gt;.github.io</code></li>
+<li>选择 <strong>Public</strong>，勾选 “Add a README file”</li>
+</ol>
+<h4 id="3-2-安装部署插件并配置"><a href="#3-2-安装部署插件并配置" class="headerlink" title="3.2 安装部署插件并配置"></a>3.2 安装部署插件并配置</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> my-blog</span><br><span class="line">npm install hexo-deployer-git --save</span><br></pre></td></tr></table></figure>
+
+<p>编辑 <code>_config.yml</code> 配置部署：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># URL</span></span><br><span class="line"><span class="attr">url:</span> <span class="string">https://&lt;username&gt;.github.io</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Deployment</span></span><br><span class="line"><span class="attr">deploy:</span></span><br><span class="line">  <span class="attr">type:</span> <span class="string">git</span></span><br><span class="line">  <span class="attr">repo:</span> <span class="string">https://github.com/&lt;username&gt;/&lt;username&gt;.github.io.git</span></span><br><span class="line">  <span class="attr">branch:</span> <span class="string">main</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="3-3-配置-Git-认证"><a href="#3-3-配置-Git-认证" class="headerlink" title="3.3 配置 Git 认证"></a>3.3 配置 Git 认证</h4><p><strong>方法A：Personal Access Token（推荐）</strong></p>
+<ol>
+<li>GitHub → Settings → Developer settings → Personal access tokens</li>
+<li>Generate new token (classic)</li>
+<li>勾选 <code>repo</code> 权限，生成并保存 Token</li>
+<li>部署时使用 Token 作为密码</li>
+</ol>
+<p><strong>方法B：SSH Key</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ssh-keygen -t ed25519 -C <span class="string">&quot;your@email.com&quot;</span></span><br><span class="line"><span class="comment"># 将 ~/.ssh/id_ed25519.pub 添加到 GitHub SSH Keys</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="3-4-执行部署"><a href="#3-4-执行部署" class="headerlink" title="3.4 执行部署"></a>3.4 执行部署</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 清理 → 生成 → 部署</span></span><br><span class="line">hexo clean &amp;&amp; hexo generate &amp;&amp; hexo deploy</span><br><span class="line"></span><br><span class="line"><span class="comment"># 简写</span></span><br><span class="line">hexo clean &amp;&amp; hexo g &amp;&amp; hexo d</span><br></pre></td></tr></table></figure>
+
+<h4 id="3-5-启用-GitHub-Pages"><a href="#3-5-启用-GitHub-Pages" class="headerlink" title="3.5 启用 GitHub Pages"></a>3.5 启用 GitHub Pages</h4><p>在 <code>&lt;username&gt;.github.io</code> 仓库 → Settings → Pages：</p>
+<ul>
+<li>Source: Deploy from a branch</li>
+<li>Branch: <code>main</code>，文件夹 <code>/ (root)</code></li>
+<li>保存后访问 <code>https://&lt;username&gt;.github.io</code></li>
+</ul>
+<h4 id="3-6-创建博客文章"><a href="#3-6-创建博客文章" class="headerlink" title="3.6 创建博客文章"></a>3.6 创建博客文章</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">hexo new <span class="string">&quot;SSG入门介绍&quot;</span></span><br><span class="line">hexo new <span class="string">&quot;Front-matter配置详解&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>Front-matter 完整配置示例：</strong></p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">title:</span> <span class="string">文章标题</span></span><br><span class="line"><span class="attr">date:</span> <span class="number">2026-07-07 14:00:00</span></span><br><span class="line"><span class="attr">updated:</span> <span class="number">2026-07-07 16:00:00</span></span><br><span class="line"><span class="attr">tags:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">SSG</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">Hexo</span></span><br><span class="line"><span class="attr">categories:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">Web技术</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">文章摘要描述</span></span><br><span class="line"><span class="attr">comments:</span> <span class="literal">true</span></span><br><span class="line"><span class="meta">---</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="3-7-部署流程示意"><a href="#3-7-部署流程示意" class="headerlink" title="3.7 部署流程示意"></a>3.7 部署流程示意</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">[本地] Markdown 文章</span><br><span class="line">    │</span><br><span class="line">    ├── hexo generate ──→ public/ (HTML/CSS/JS)</span><br><span class="line">    │</span><br><span class="line">    └── hexo deploy ──→ GitHub Pages 仓库</span><br><span class="line">                              │</span><br><span class="line">                              └── https://&lt;username&gt;.github.io</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、实验结果"><a href="#四、实验结果" class="headerlink" title="四、实验结果"></a>四、实验结果</h2><h3 id="成功标准"><a href="#成功标准" class="headerlink" title="成功标准"></a>成功标准</h3><ul>
+<li><input checked="" disabled="" type="checkbox"> Node.js、Git、Hexo CLI 安装并验证成功</li>
+<li><input checked="" disabled="" type="checkbox"> <code>hexo init</code> 创建标准项目结构</li>
+<li><input checked="" disabled="" type="checkbox"> <code>hexo server</code> 本地预览正常（<a href="http://localhost:4000）">http://localhost:4000）</a></li>
+<li><input checked="" disabled="" type="checkbox"> NexT 主题安装并切换成功</li>
+<li><input checked="" disabled="" type="checkbox"> VS Code 安装完成，<code>code</code> 命令可用</li>
+<li><input checked="" disabled="" type="checkbox"> 四款 Markdown 扩展安装成功</li>
+<li><input checked="" disabled="" type="checkbox"> Markdown 文件可正常预览（<code>Ctrl + Shift + V</code>）</li>
+<li><input checked="" disabled="" type="checkbox"> Mermaid 图表正常渲染</li>
+<li><input checked="" disabled="" type="checkbox"> <code>hexo-deployer-git</code> 插件安装完成</li>
+<li><input checked="" disabled="" type="checkbox"> GitHub Pages 仓库创建成功</li>
+<li><input checked="" disabled="" type="checkbox"> <code>hexo deploy</code> 执行成功</li>
+<li><input checked="" disabled="" type="checkbox"> 通过 <code>https://&lt;username&gt;.github.io</code> 可正常访问博客</li>
+</ul>
+<h3 id="交付物清单"><a href="#交付物清单" class="headerlink" title="交付物清单"></a>交付物清单</h3><table>
+<thead>
+<tr>
+<th>文件</th>
+<th>说明</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>hexo-blog/_config.yml</code></td>
+<td>站点主配置文件</td>
+<td>实验2</td>
+</tr>
+<tr>
+<td><code>hexo-blog/package.json</code></td>
+<td>依赖包配置</td>
+<td>实验2</td>
+</tr>
+<tr>
+<td><code>hexo-blog/scaffolds/</code></td>
+<td>文章模板（post&#x2F;draft&#x2F;page）</td>
+<td>实验2</td>
+</tr>
+<tr>
+<td><code>hexo-blog/source/_posts/hello-world.md</code></td>
+<td>第一篇文章</td>
+<td>实验2</td>
+</tr>
+<tr>
+<td><code>hexo-blog/source/_posts/ssg-introduction.md</code></td>
+<td>SSG入门介绍</td>
+<td>实验4</td>
+</tr>
+<tr>
+<td><code>hexo-blog/source/_posts/front-matter-demo.md</code></td>
+<td>Front-matter详解</td>
+<td>实验4</td>
+</tr>
+<tr>
+<td><code>hexo-blog/source/about/index.md</code></td>
+<td>关于页面</td>
+<td>实验2</td>
+</tr>
+<tr>
+<td><code>docs/exp3-vscode-markdown/demo/syntax-demo.md</code></td>
+<td>Markdown语法演示</td>
+<td>实验3</td>
+</tr>
+<tr>
+<td><code>docs/exp3-vscode-markdown/demo/mermaid-demo.md</code></td>
+<td>Mermaid图表演示</td>
+<td>实验3</td>
+</tr>
+<tr>
+<td><code>docs/exp3-vscode-markdown/.vscode/extensions.json</code></td>
+<td>VS Code推荐扩展</td>
+<td>实验3</td>
+</tr>
+<tr>
+<td><code>docs/exp3-vscode-markdown/.vscode/settings.json</code></td>
+<td>VS Code推荐设置</td>
+<td>实验3</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="五、常见问题与解决"><a href="#五、常见问题与解决" class="headerlink" title="五、常见问题与解决"></a>五、常见问题与解决</h2><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>原因</th>
+<th>解决方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;hexo&#39; 不是内部命令</code></td>
+<td>Hexo CLI 未安装或 PATH 问题</td>
+<td><code>npm install -g hexo-cli</code>，确保 Node.js 添加到 PATH</td>
+</tr>
+<tr>
+<td><code>hexo init</code> 失败</td>
+<td>网络问题或 npm 源慢</td>
+<td>配置镜像：<code>npm config set registry https://registry.npmmirror.com</code></td>
+</tr>
+<tr>
+<td><code>hexo server</code> 端口冲突</td>
+<td>4000 端口被占用</td>
+<td>使用 <code>hexo server -p 4001</code> 切换端口</td>
+</tr>
+<tr>
+<td>NexT 主题不显示</td>
+<td><code>_config.yml</code> 中 theme 未修改</td>
+<td>确认 <code>theme: next</code> 配置正确</td>
+</tr>
+<tr>
+<td><code>code</code> 命令不可用</td>
+<td>安装时未勾选 PATH</td>
+<td>VS Code内按 <code>Ctrl+Shift+P</code> → “Install ‘code’ command in PATH”</td>
+</tr>
+<tr>
+<td>Markdown 预览不显示 Mermaid</td>
+<td>未使用正确预览插件</td>
+<td>使用 Markdown Preview Enhanced 预览</td>
+</tr>
+<tr>
+<td>粘贴图片路径错误</td>
+<td>Paste Image 配置问题</td>
+<td>检查 <code>pasteImage.path</code> 和 <code>basePath</code> 设置</td>
+</tr>
+<tr>
+<td><code>hexo deploy</code> 报 403</td>
+<td>Git 认证失败</td>
+<td>使用 Personal Access Token 代替密码</td>
+</tr>
+<tr>
+<td>GitHub Pages 显示 404</td>
+<td>仓库名或分支不正确</td>
+<td>确认仓库名为 <code>&lt;username&gt;.github.io</code>，Pages 分支选 main</td>
+</tr>
+<tr>
+<td>部署后样式丢失</td>
+<td><code>url</code> 和 <code>root</code> 配置错误</td>
+<td>确保 <code>_config.yml</code> 中 <code>url</code> 与 Pages 地址一致</td>
+</tr>
+<tr>
+<td><code>ERROR Deployer not found</code></td>
+<td>未安装部署插件</td>
+<td><code>npm install hexo-deployer-git --save</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="六、实验总结"><a href="#六、实验总结" class="headerlink" title="六、实验总结"></a>六、实验总结</h2><p>通过实验2-4，成功搭建了一套完整的 <strong>“编写 → 生成 → 部署”</strong> 个人博客工作流：</p>
+<ol>
+<li><strong>环境搭建（实验2）：</strong> 在 Windows 上安装配置了 Node.js、Git、Hexo CLI，成功创建标准 Hexo 项目并安装 NexT 主题，实现了本地博客预览</li>
+<li><strong>编辑工具链（实验3）：</strong> 配置了 VS Code 编辑器和 Markdown 写作环境，掌握了 Markdown 核心语法和 Mermaid 图表，显著提升了文档和博客文章的编写效率</li>
+<li><strong>部署发布（实验4）：</strong> 深入理解了 SSG 与 CMS 的架构差异，成功将 Hexo 博客部署到 GitHub Pages，实现了免费、安全的静态网站托管</li>
+<li><strong>技术收获：</strong> 掌握了 <code>编写(Markdown) → 版本控制(Git) → 静态生成(Hexo) → 自动部署(GitHub Pages)</code> 的现代 Web 开发基础工具链，为后续实验8的 CI&#x2F;CD 自动化打下了基础</li>
+</ol>
+<p>本阶段搭建的 Hexo 博客项目和 GitHub Pages 托管将作为实验8（CI&#x2F;CD 自动化部署）的基础平台。</p>
+<hr>
+<blockquote>
+<p>📎 <strong>相关实验：</strong> 实验1（网络基础） | 实验5（虚拟化环境） | 实验8（CI&#x2F;CD自动化）</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Markdown/" rel="tag"># Markdown</a>
+              <a href="/tags/Hexo/" rel="tag"># Hexo</a>
+              <a href="/tags/Git/" rel="tag"># Git</a>
+              <a href="/tags/Node-js/" rel="tag"># Node.js</a>
+              <a href="/tags/VS-Code/" rel="tag"># VS Code</a>
+              <a href="/tags/%E9%9D%99%E6%80%81%E7%AB%99%E7%82%B9/" rel="tag"># 静态站点</a>
+              <a href="/tags/YAML/" rel="tag"># YAML</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/07/%E6%88%91%E4%BB%AC%E6%98%AF%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%BD%91%E7%AB%99%E7%9A%84/" rel="prev" title="我们是如何创建这个博客网站的">
+      <i class="fa fa-chevron-left"></i> 我们是如何创建这个博客网站的
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/07/08/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A_%E5%AE%9E%E9%AA%8C5_VirtualBox%E4%B8%8EUbuntu_Server%E8%99%9A%E6%8B%9F%E6%9C%BA%E6%90%AD%E5%BB%BA/" rel="next" title="实验5：VirtualBox 与 Ubuntu Server 虚拟机搭建">
+      实验5：VirtualBox 与 Ubuntu Server 虚拟机搭建 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C2-4%EF%BC%9AHexo-%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2%E6%90%AD%E5%BB%BA%E4%B8%8E-VS-Code-%E7%BC%96%E8%BE%91%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="nav-number">1.</span> <span class="nav-text">实验2-4：Hexo 静态博客搭建与 VS Code 编辑工具链</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%9B%AE%E7%9A%84"><span class="nav-number">1.1.</span> <span class="nav-text">一、实验目的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C2%EF%BC%9AHexo-%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2%EF%BC%88%E6%9C%AC%E5%9C%B0%E6%90%AD%E5%BB%BA%EF%BC%89"><span class="nav-number">1.1.1.</span> <span class="nav-text">实验2：Hexo 静态博客（本地搭建）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C3%EF%BC%9AVS-Code-%E4%B8%8E-Markdown"><span class="nav-number">1.1.2.</span> <span class="nav-text">实验3：VS Code 与 Markdown</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C4%EF%BC%9ASSG-%E4%B8%8E-GitHub-Pages-%E9%83%A8%E7%BD%B2"><span class="nav-number">1.1.3.</span> <span class="nav-text">实验4：SSG 与 GitHub Pages 部署</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83%E4%B8%8E%E6%A6%82%E5%BF%B5"><span class="nav-number">1.2.</span> <span class="nav-text">二、实验环境与概念</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%93%BE%E6%80%BB%E8%A7%88"><span class="nav-number">1.2.1.</span> <span class="nav-text">工具链总览</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE"><span class="nav-number">1.2.2.</span> <span class="nav-text">环境配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SSG-vs-CMS-%E6%A6%82%E5%BF%B5%E5%AF%B9%E6%AF%94"><span class="nav-number">1.2.3.</span> <span class="nav-text">SSG vs CMS 概念对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E9%AA%8C%E6%AD%A5%E9%AA%A4"><span class="nav-number">1.3.</span> <span class="nav-text">三、实验步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B5%E4%B8%80%EF%BC%9A%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%EF%BC%88%E5%AE%9E%E9%AA%8C2%EF%BC%89"><span class="nav-number">1.3.1.</span> <span class="nav-text">阶段一：环境搭建（实验2）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-1-%E5%AE%89%E8%A3%85-Node-js-%E4%B8%8E-Git"><span class="nav-number">1.3.1.1.</span> <span class="nav-text">1.1 安装 Node.js 与 Git</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1-2-%E5%AE%89%E8%A3%85-Hexo-CLI-%E5%B9%B6%E5%88%9D%E5%A7%8B%E5%8C%96%E9%A1%B9%E7%9B%AE"><span class="nav-number">1.3.1.2.</span> <span class="nav-text">1.2 安装 Hexo CLI 并初始化项目</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1-3-%E9%A1%B9%E7%9B%AE%E7%9B%AE%E5%BD%95%E7%BB%93%E6%9E%84"><span class="nav-number">1.3.1.3.</span> <span class="nav-text">1.3 项目目录结构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1-4-%E5%90%AF%E5%8A%A8%E6%9C%AC%E5%9C%B0%E9%A2%84%E8%A7%88"><span class="nav-number">1.3.1.4.</span> <span class="nav-text">1.4 启动本地预览</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1-5-%E5%88%9B%E5%BB%BA%E6%96%87%E7%AB%A0%E4%B8%8E%E5%AE%89%E8%A3%85%E4%B8%BB%E9%A2%98"><span class="nav-number">1.3.1.5.</span> <span class="nav-text">1.5 创建文章与安装主题</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1-6-%E7%AB%99%E7%82%B9%E9%85%8D%E7%BD%AE%EF%BC%88-config-yml%EF%BC%89"><span class="nav-number">1.3.1.6.</span> <span class="nav-text">1.6 站点配置（_config.yml）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B5%E4%BA%8C%EF%BC%9AVS-Code-%E9%85%8D%E7%BD%AE%E4%B8%8E-Markdown-%E5%86%99%E4%BD%9C%EF%BC%88%E5%AE%9E%E9%AA%8C3%EF%BC%89"><span class="nav-number">1.3.2.</span> <span class="nav-text">阶段二：VS Code 配置与 Markdown 写作（实验3）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#2-1-%E5%AE%89%E8%A3%85-VS-Code-%E5%8F%8A%E6%8E%A8%E8%8D%90%E6%89%A9%E5%B1%95"><span class="nav-number">1.3.2.1.</span> <span class="nav-text">2.1 安装 VS Code 及推荐扩展</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-2-VS-Code-%E6%8E%A8%E8%8D%90%E8%AE%BE%E7%BD%AE%EF%BC%88settings-json%EF%BC%89"><span class="nav-number">1.3.2.2.</span> <span class="nav-text">2.2 VS Code 推荐设置（settings.json）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-3-Markdown-%E6%A0%B8%E5%BF%83%E8%AF%AD%E6%B3%95"><span class="nav-number">1.3.2.3.</span> <span class="nav-text">2.3 Markdown 核心语法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%A0%87%E9%A2%98%E4%B8%8E%E6%96%87%E6%9C%AC%E6%A0%B7%E5%BC%8F"><span class="nav-number">1.3.2.3.1.</span> <span class="nav-text">标题与文本样式</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%97%E8%A1%A8"><span class="nav-number">1.3.2.3.2.</span> <span class="nav-text">列表</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E5%9D%97"><span class="nav-number">1.3.2.3.3.</span> <span class="nav-text">代码块</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E8%A1%A8%E6%A0%BC"><span class="nav-number">1.3.2.3.4.</span> <span class="nav-text">表格</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%93%BE%E6%8E%A5%E4%B8%8E%E5%9B%BE%E7%89%87%E3%80%81%E5%BC%95%E7%94%A8"><span class="nav-number">1.3.2.3.5.</span> <span class="nav-text">链接与图片、引用</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-4-Markdown-All-in-One-%E5%B8%B8%E7%94%A8%E5%BF%AB%E6%8D%B7%E9%94%AE"><span class="nav-number">1.3.2.4.</span> <span class="nav-text">2.4 Markdown All in One 常用快捷键</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-5-Mermaid-%E5%9B%BE%E8%A1%A8"><span class="nav-number">1.3.2.5.</span> <span class="nav-text">2.5 Mermaid 图表</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-6-%E7%BC%96%E8%BE%91%E5%99%A8-vs-IDE-%E5%AF%B9%E6%AF%94"><span class="nav-number">1.3.2.6.</span> <span class="nav-text">2.6 编辑器 vs IDE 对比</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B5%E4%B8%89%EF%BC%9AGitHub-Pages-%E9%83%A8%E7%BD%B2%EF%BC%88%E5%AE%9E%E9%AA%8C4%EF%BC%89"><span class="nav-number">1.3.3.</span> <span class="nav-text">阶段三：GitHub Pages 部署（实验4）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-%E5%88%9B%E5%BB%BA-GitHub-Pages-%E4%BB%93%E5%BA%93"><span class="nav-number">1.3.3.1.</span> <span class="nav-text">3.1 创建 GitHub Pages 仓库</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-%E5%AE%89%E8%A3%85%E9%83%A8%E7%BD%B2%E6%8F%92%E4%BB%B6%E5%B9%B6%E9%85%8D%E7%BD%AE"><span class="nav-number">1.3.3.2.</span> <span class="nav-text">3.2 安装部署插件并配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-3-%E9%85%8D%E7%BD%AE-Git-%E8%AE%A4%E8%AF%81"><span class="nav-number">1.3.3.3.</span> <span class="nav-text">3.3 配置 Git 认证</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-4-%E6%89%A7%E8%A1%8C%E9%83%A8%E7%BD%B2"><span class="nav-number">1.3.3.4.</span> <span class="nav-text">3.4 执行部署</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-5-%E5%90%AF%E7%94%A8-GitHub-Pages"><span class="nav-number">1.3.3.5.</span> <span class="nav-text">3.5 启用 GitHub Pages</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-6-%E5%88%9B%E5%BB%BA%E5%8D%9A%E5%AE%A2%E6%96%87%E7%AB%A0"><span class="nav-number">1.3.3.6.</span> <span class="nav-text">3.6 创建博客文章</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-7-%E9%83%A8%E7%BD%B2%E6%B5%81%E7%A8%8B%E7%A4%BA%E6%84%8F"><span class="nav-number">1.3.3.7.</span> <span class="nav-text">3.7 部署流程示意</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%AE%9E%E9%AA%8C%E7%BB%93%E6%9E%9C"><span class="nav-number">1.4.</span> <span class="nav-text">四、实验结果</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%88%90%E5%8A%9F%E6%A0%87%E5%87%86"><span class="nav-number">1.4.1.</span> <span class="nav-text">成功标准</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%A4%E4%BB%98%E7%89%A9%E6%B8%85%E5%8D%95"><span class="nav-number">1.4.2.</span> <span class="nav-text">交付物清单</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E8%A7%A3%E5%86%B3"><span class="nav-number">1.5.</span> <span class="nav-text">五、常见问题与解决</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%AE%9E%E9%AA%8C%E6%80%BB%E7%BB%93"><span class="nav-number">1.6.</span> <span class="nav-text">六、实验总结</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">18</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">147k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:14</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
