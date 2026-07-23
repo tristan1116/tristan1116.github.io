@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="以通俗易懂的方式，结合图解和代码示例，剖析从预处理到编译、汇编、链接的完整软件构造流程。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从源代码到可执行文件——初步理解编译、链接与软件构造体系">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/17/%E4%BB%8E%E6%BA%90%E4%BB%A3%E7%A0%81%E5%88%B0%E5%8F%AF%E6%89%A7%E8%A1%8C%E6%96%87%E4%BB%B6%E2%80%94%E2%80%94%E5%88%9D%E6%AD%A5%E7%90%86%E8%A7%A3%E7%BC%96%E8%AF%91%E3%80%81%E9%93%BE%E6%8E%A5%E4%B8%8E%E8%BD%AF%E4%BB%B6%E6%9E%84%E9%80%A0%E4%BD%93%E7%B3%BB/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="以通俗易懂的方式，结合图解和代码示例，剖析从预处理到编译、汇编、链接的完整软件构造流程。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-17T08:00:00.000Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="C&#x2F;C++">
+<meta property="article:tag" content="编译原理">
+<meta property="article:tag" content="开发工具">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/17/%E4%BB%8E%E6%BA%90%E4%BB%A3%E7%A0%81%E5%88%B0%E5%8F%AF%E6%89%A7%E8%A1%8C%E6%96%87%E4%BB%B6%E2%80%94%E2%80%94%E5%88%9D%E6%AD%A5%E7%90%86%E8%A7%A3%E7%BC%96%E8%AF%91%E3%80%81%E9%93%BE%E6%8E%A5%E4%B8%8E%E8%BD%AF%E4%BB%B6%E6%9E%84%E9%80%A0%E4%BD%93%E7%B3%BB/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>从源代码到可执行文件——初步理解编译、链接与软件构造体系 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/17/%E4%BB%8E%E6%BA%90%E4%BB%A3%E7%A0%81%E5%88%B0%E5%8F%AF%E6%89%A7%E8%A1%8C%E6%96%87%E4%BB%B6%E2%80%94%E2%80%94%E5%88%9D%E6%AD%A5%E7%90%86%E8%A7%A3%E7%BC%96%E8%AF%91%E3%80%81%E9%93%BE%E6%8E%A5%E4%B8%8E%E8%BD%AF%E4%BB%B6%E6%9E%84%E9%80%A0%E4%BD%93%E7%B3%BB/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从源代码到可执行文件——初步理解编译、链接与软件构造体系
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-07-17 16:00:00" itemprop="dateCreated datePublished" datetime="2026-07-17T16:00:00+08:00">2026-07-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-23 11:22:09" itemprop="dateModified" datetime="2026-07-23T11:22:09+08:00">2026-07-23</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/C-C/" itemprop="url" rel="index"><span itemprop="name">C/C++</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>7.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>7 分钟</span>
+            </span>
+            <div class="post-description">以通俗易懂的方式，结合图解和代码示例，剖析从预处理到编译、汇编、链接的完整软件构造流程。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="从源代码到可执行文件——初步理解编译、链接与软件构造体系"><a href="#从源代码到可执行文件——初步理解编译、链接与软件构造体系" class="headerlink" title="从源代码到可执行文件——初步理解编译、链接与软件构造体系"></a>从源代码到可执行文件——初步理解编译、链接与软件构造体系</h1><h2 id="从一个问题出发"><a href="#从一个问题出发" class="headerlink" title="从一个问题出发"></a>从一个问题出发</h2><p>我之前主要使用vs2022,codeblocks,clion等调试运行c&#x2F;c++程序。而昨天我第一次使用vscode 来调试c&#x2F;c++程序，遇到了一个问题：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">undefined reference to &#x27;函数名&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>我在 <code>main.c</code> 里写了 <code>#include &quot;SeqTable.h&quot;</code>，SeqTable.h 里有函数声明，SeqTable.c 里有函数实现——一切看起来都对。编译器却告诉我它”找不到函数的定义”。</p>
+<p>要真正理解这个问题，需要先弄明白：<strong>从我们写的 <code>.c</code> 文件，到能双击运行的 <code>.exe</code> 文件，中间到底发生了什么？</strong></p>
+<p>于是我查阅了一些资料，和claude一起，尝试把这件事彻底弄清楚。</p>
+<hr>
+<h2 id="一、全景图：四步走"><a href="#一、全景图：四步走" class="headerlink" title="一、全景图：四步走"></a>一、全景图：四步走</h2><p>一个 C&#x2F;C++ 程序从源码到可执行文件，要经历四个阶段：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">flowchart LR</span><br><span class="line">    A[&quot;📄 源代码&lt;br/&gt;main.c / hello.cpp&quot;] --&gt;|&quot;预处理器 cpp&quot;| B[&quot;📄 预处理后源文件&lt;br/&gt;main.i / hello.ii&quot;]</span><br><span class="line">    B --&gt;|&quot;编译器 gcc/g++&quot;| C[&quot;📄 汇编代码&lt;br/&gt;main.s / hello.s&quot;]</span><br><span class="line">    C --&gt;|&quot;汇编器 as&quot;| D[&quot;📦 目标文件&lt;br/&gt;main.o / hello.o&quot;]</span><br><span class="line">    D --&gt;|&quot;链接器 ld&quot;| E[&quot;🚀 可执行文件&lt;br/&gt;main.exe / a.out&quot;]</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>日常中说的”编译”，通常指的是这四步的总和。但在技术上，这四步各有分工。</p>
+</blockquote>
+<p>下面来逐一拆解。</p>
+<hr>
+<h2 id="二、预处理（Preprocessing）"><a href="#二、预处理（Preprocessing）" class="headerlink" title="二、预处理（Preprocessing）"></a>二、预处理（Preprocessing）</h2><blockquote>
+<p><strong>把人类写的代码变成”纯机器能读的代码”</strong></p>
+</blockquote>
+<p>预处理是四步中最不被人注意的一步——因为大多数时候它都在幕后自动完成。但它做的事情非常重要。</p>
+<h3 id="2-1-预处理干了什么"><a href="#2-1-预处理干了什么" class="headerlink" title="2.1 预处理干了什么"></a>2.1 预处理干了什么</h3><p>预处理器的任务可以概括为四个字：<strong>文本替换</strong>。具体包括：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>原始代码</th>
+<th>预处理后</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>头文件展开</strong></td>
+<td><code>#include &lt;stdio.h&gt;</code></td>
+<td>把 stdio.h 的全部内容复制进来</td>
+</tr>
+<tr>
+<td><strong>宏替换</strong></td>
+<td><code>#define MAX 100</code><br/><code>int arr[MAX];</code></td>
+<td><code>int arr[100];</code></td>
+</tr>
+<tr>
+<td><strong>条件编译</strong></td>
+<td><code>#ifdef DEBUG</code><br/><code>printf(&quot;debug\n&quot;);</code><br/><code>#endif</code></td>
+<td>如果定义了 DEBUG 就保留，否则删掉</td>
+</tr>
+<tr>
+<td><strong>删除注释</strong></td>
+<td><code>// 这是一行注释</code></td>
+<td>注释被空白替代</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-为什么需要预处理"><a href="#2-2-为什么需要预处理" class="headerlink" title="2.2 为什么需要预处理"></a>2.2 为什么需要预处理</h3><p>预处理解决的核心问题是<strong>代码复用</strong>。</p>
+<p>你写的程序需要用 <code>printf</code>，但你的 <code>.c</code> 文件里并没有 <code>printf</code> 的代码——它只是在 <code>stdio.h</code> 里声明了一下。预处理阶段，预处理器会把 <code>stdio.h</code>（以及里面层层包含的所有头文件）全部在你当前文件里展开。展开后，你的源文件从几十行变成了几千行——里面有了 <code>printf</code> 的声明，编译器于是知道”有这么一个函数，参数是这样的，返回值是这样的”。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph 预处理前</span><br><span class="line">        A[&quot;main.c&lt;br/&gt;#include &amp;lt;stdio.h&amp;gt;&lt;br/&gt;int main() &#123;&lt;br/&gt;  printf(&amp;quot;hello&amp;quot;);&lt;br/&gt;&#125;&quot;]</span><br><span class="line">    end</span><br><span class="line">    subgraph 预处理后</span><br><span class="line">        B[&quot;main.i（几千行）&lt;br/&gt;...stdio.h全部内容展开...&lt;br/&gt;...里面又include的各种头文件...&lt;br/&gt;int main() &#123;&lt;br/&gt;  printf(&amp;quot;hello&amp;quot;);&lt;br/&gt;&#125;&quot;]</span><br><span class="line">    end</span><br><span class="line">    A --&gt;|&quot;gcc -E&quot;| B</span><br><span class="line">    style A fill:#e8f4fd,stroke:#333</span><br><span class="line">    style B fill:#f5e6d3,stroke:#333</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-亲手试试"><a href="#2-3-亲手试试" class="headerlink" title="2.3 亲手试试"></a>2.3 亲手试试</h3><p>你可以用 GCC 命令手动看到预处理的结果：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 对 C 文件做预处理，输出到 .i 文件</span></span><br><span class="line">gcc -E main.c -o main.i</span><br><span class="line"></span><br><span class="line"><span class="comment"># 对 C++ 文件做预处理</span></span><br><span class="line">g++ -E main.cpp -o main.ii</span><br></pre></td></tr></table></figure>
+
+<p>打开生成的 <code>.i</code> 文件，你会发现——原来短短几十行的程序，展开后竟然有上千行。</p>
+<hr>
+<h2 id="三、编译（Compilation）"><a href="#三、编译（Compilation）" class="headerlink" title="三、编译（Compilation）"></a>三、编译（Compilation）</h2><blockquote>
+<p><strong>把 C&#x2F;C++ 代码翻译成汇编语言</strong></p>
+</blockquote>
+<h3 id="3-1-编译器在做什么"><a href="#3-1-编译器在做什么" class="headerlink" title="3.1 编译器在做什么"></a>3.1 编译器在做什么</h3><p>编译是这四步中<strong>最复杂的一步</strong>。编译器拿到预处理后的源代码后，要做以下几件事：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    A[&quot;源代码&lt;br/&gt;（C/C++ 文本）&quot;] --&gt; B[&quot;词法分析&lt;br/&gt;把代码切成 Token&quot;]</span><br><span class="line">    B --&gt; C[&quot;语法分析&lt;br/&gt;检查语法，生成语法树&quot;]</span><br><span class="line">    C --&gt; D[&quot;语义分析&lt;br/&gt;检查类型、作用域等&quot;]</span><br><span class="line">    D --&gt; E[&quot;中间代码生成&lt;br/&gt;与机器无关的中间表示&quot;]</span><br><span class="line">    E --&gt; F[&quot;代码优化&lt;br/&gt;去掉冗余、循环展开等&quot;]</span><br><span class="line">    F --&gt; G[&quot;目标代码生成&lt;br/&gt;输出汇编语言&quot;]</span><br></pre></td></tr></table></figure>
+
+<p>每一层的解释：</p>
+<p><strong>词法分析</strong>：把代码文本切分成一个个”单词”（Token）。比如 <code>int a = 5;</code> 被切分为：<code>int</code>（关键字）、<code>a</code>（标识符）、<code>=</code>（操作符）、<code>5</code>（字面量）、<code>;</code>（分号）。</p>
+<p><strong>语法分析</strong>：检查这些 Token 能不能组成合法的句子。如果写 <code>int a = ;</code>，少了右边的值，这步就会报语法错误。</p>
+<p><strong>语义分析</strong>：检查语句的”含义”是否对。比如把 <code>int</code> 类型的变量赋给 <code>char*</code> 指针——语法上没错，但语义上不对，编译器会警告。</p>
+<p><strong>代码优化</strong>：在保证程序行为不变的前提下，让生成的机器码更高效。比如：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 优化前</span></span><br><span class="line"><span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">100</span>; i++) &#123;</span><br><span class="line">    <span class="type">int</span> x = a + b;   <span class="comment">// a+b 每次都重新算</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 编译器可能把 a+b 提到循环外面，因为值没变</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>目标代码生成</strong>：把经过优化后的中间代码，翻译成当前平台的<strong>汇编语言</strong>。</p>
+<h3 id="3-2-亲手试试"><a href="#3-2-亲手试试" class="headerlink" title="3.2 亲手试试"></a>3.2 亲手试试</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只编译不汇编，输出汇编代码</span></span><br><span class="line">gcc -S main.c -o main.s</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查看生成的汇编代码</span></span><br><span class="line"><span class="built_in">cat</span> main.s</span><br></pre></td></tr></table></figure>
+
+<p>你会看到类似这样的汇编输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">main:</span><br><span class="line">    pushq   %rbp</span><br><span class="line">    movq    %rsp, %rbp</span><br><span class="line">    leaq    .LC0(%rip), %rax</span><br><span class="line">    movq    %rax, %rcx</span><br><span class="line">    call    printf</span><br><span class="line">    movl    $0, %eax</span><br><span class="line">    popq    %rbp</span><br><span class="line">    ret</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、汇编（Assembly）"><a href="#四、汇编（Assembly）" class="headerlink" title="四、汇编（Assembly）"></a>四、汇编（Assembly）</h2><blockquote>
+<p><strong>把汇编代码翻译成机器码</strong></p>
+</blockquote>
+<h3 id="4-1-汇编器在做什么"><a href="#4-1-汇编器在做什么" class="headerlink" title="4.1 汇编器在做什么"></a>4.1 汇编器在做什么</h3><p>汇编这一步相对简单——把人类可读的汇编助记符（<code>mov</code>, <code>push</code>, <code>call</code> 等）翻译成机器可以直接执行的<strong>机器码</strong>（0 和 1 组成的二进制指令）。</p>
+<p>汇编器的输入是 <code>.s</code> 汇编文件，输出是 <code>.o</code> 目标文件。</p>
+<h3 id="4-2-目标文件里有什么"><a href="#4-2-目标文件里有什么" class="headerlink" title="4.2 目标文件里有什么"></a>4.2 目标文件里有什么</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────┐</span><br><span class="line">│         main.o               │</span><br><span class="line">├──────────────────────────────┤</span><br><span class="line">│  代码段（.text）              │</span><br><span class="line">│  ┌──────────────────────┐    │</span><br><span class="line">│  │ 机器指令（二进制）      │    │  ← main 函数的机器码</span><br><span class="line">│  │ 55 48 89 e5 48 8d... │    │</span><br><span class="line">│  └──────────────────────┘    │</span><br><span class="line">│                              │</span><br><span class="line">│  数据段（.data）              │</span><br><span class="line">│  ┌──────────────────────┐    │</span><br><span class="line">│  │ 全局变量的初始值        │    │</span><br><span class="line">│  └──────────────────────┘    │</span><br><span class="line">│                              │</span><br><span class="line">│  符号表（symbol table）       │</span><br><span class="line">│  ┌──────────────────────┐    │</span><br><span class="line">│  │ main    → 代码段某位置  │    │  ← 我定义了这些东西，别人可以用</span><br><span class="line">│  │ printf  → ???（未定义） │    │  ← 我需要别人提供这个东西</span><br><span class="line">│  └──────────────────────┘    │</span><br><span class="line">│                              │</span><br><span class="line">│  重定位表（relocation）        │</span><br><span class="line">│  ┌──────────────────────┐    │</span><br><span class="line">│  │ 对 printf 的调用       │    │  ← 这些地址尚未确定</span><br><span class="line">│  │ 位置：0x0024          │    │</span><br><span class="line">│  └──────────────────────┘    │</span><br><span class="line">└──────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>**这里藏着最重要的概念——“未解析的符号”**。</p>
+<p>你的 <code>main.o</code> 里调用了 <code>printf</code>，但 <code>printf</code> 的实现不在 <code>main.o</code> 里——它在系统的 C 库（libc）里。所以 <code>main.o</code> 的符号表里，对 <code>printf</code> 标记的是”未定义的，需要别人提供”。</p>
+<p>同样，如果你写了一个多文件项目：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">main.c → #include &quot;add.h&quot;, 调用了 add(3,5)</span><br><span class="line">add.c  → 实现了 add(int m, int n) &#123; return m+n; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>它们各自编译成 <code>main.o</code> 和 <code>add.o</code>：</p>
+<ul>
+<li><code>main.o</code> 的符号表里：<code>add</code> 是”未定义的，需要别人提供”</li>
+<li><code>add.o</code> 的符号表里：<code>add</code> 是”已定义的，提供给人用”</li>
+</ul>
+<p><strong>“undefined reference” 的本质就是</strong>：在链接时，有个符号在所有 <code>.o</code> 文件里都没找到定义。比如你忘了编译 <code>add.c</code>，那 <code>add.o</code> 根本不存在，链接器找不到 <code>add</code>，就报 <code>undefined reference to &#39;add&#39;</code>。</p>
+<h3 id="4-3-亲手试试"><a href="#4-3-亲手试试" class="headerlink" title="4.3 亲手试试"></a>4.3 亲手试试</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只编译+汇编，不链接，生成目标文件</span></span><br><span class="line">gcc -c main.c -o main.o</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查看目标文件的符号表</span></span><br><span class="line">nm main.o</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查看目标文件的详细结构</span></span><br><span class="line">objdump -h main.o</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、链接（Linking）"><a href="#五、链接（Linking）" class="headerlink" title="五、链接（Linking）"></a>五、链接（Linking）</h2><blockquote>
+<p><strong>把所有目标文件拼在一起，填上缺失的地址</strong></p>
+</blockquote>
+<p>链接是新手最容易困惑的一步，也是”undefined reference”这道常客的温床。</p>
+<h3 id="5-1-链接器做了什么"><a href="#5-1-链接器做了什么" class="headerlink" title="5.1 链接器做了什么"></a>5.1 链接器做了什么</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph 输入</span><br><span class="line">        A[&quot;main.o&lt;br/&gt;代码 + 符号表&lt;br/&gt;(引用了 printf, add)&quot;]</span><br><span class="line">        B[&quot;add.o&lt;br/&gt;代码 + 符号表&lt;br/&gt;(提供了 add)&quot;]</span><br><span class="line">        C[&quot;libc.a&lt;br/&gt;系统库&lt;br/&gt;(提供了 printf)&quot;]</span><br><span class="line">    end</span><br><span class="line">    subgraph 链接器</span><br><span class="line">        D[&quot;1. 符号解析&lt;br/&gt;把每个.o里的「未定义」和别的.o里的「已定义」对上&quot;]</span><br><span class="line">        E[&quot;2. 重定位&lt;br/&gt;把代码里的符号引用替换成实际地址&quot;]</span><br><span class="line">        F[&quot;3. 段合并&lt;br/&gt;把所有 .text 段拼一起, 所有 .data 段拼一起&quot;]</span><br><span class="line">    end</span><br><span class="line">    subgraph 输出</span><br><span class="line">        G[&quot;🚀 可执行文件&lt;br/&gt;main.exe&quot;]</span><br><span class="line">    end</span><br><span class="line">    A --&gt; D</span><br><span class="line">    B --&gt; D</span><br><span class="line">    C --&gt; D</span><br><span class="line">    D --&gt; E --&gt; F --&gt; G</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-一个多文件项目的完整链接流程"><a href="#5-2-一个多文件项目的完整链接流程" class="headerlink" title="5.2 一个多文件项目的完整链接流程"></a>5.2 一个多文件项目的完整链接流程</h3><p>用你课程里的例子来说明。下面是一个最简单的情况——<code>main.cpp</code> 和 <code>add.cpp</code> 两个源文件，通过头文件 <code>add.h</code> 连接：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">multi_file_project/</span><br><span class="line">├── main.cpp        ← 主程序，调用了 add()</span><br><span class="line">├── add.cpp         ← 实现了 add() 函数</span><br><span class="line">└── add.h           ← 声明了 add() 函数</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><figcaption><span>add.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> _ADD_H_</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> _ADD_H_</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">add</span><span class="params">(<span class="type">int</span> m, <span class="type">int</span> n)</span></span>;   <span class="comment">// 函数声明（告诉编译器：有这么一个函数）</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><figcaption><span>add.cpp</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">add</span><span class="params">(<span class="type">int</span> m, <span class="type">int</span> n)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> m + n;         <span class="comment">// 函数定义（函数体在这里）</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><figcaption><span>main.cpp</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;add.h&quot;</span>          <span class="comment">// 只 include 了头文件</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    cout &lt;&lt; <span class="built_in">add</span>(<span class="number">3</span>, <span class="number">8</span>) &lt;&lt; endl;  <span class="comment">// 调用了 add 函数</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>手动编译这三件套</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 方式一：一条命令全搞定（适合小项目）</span></span><br><span class="line">g++ main.cpp add.cpp -o main</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方式二：分步走（适合大项目，也是 CMake/Makefile 背后做的事）</span></span><br><span class="line">g++ -c main.cpp -o main.o      <span class="comment"># 第 1 步：只编译 main.cpp，不链接</span></span><br><span class="line">g++ -c add.cpp -o add.o        <span class="comment"># 第 2 步：只编译 add.cpp，不链接</span></span><br><span class="line">g++ main.o add.o -o main       <span class="comment"># 第 3 步：把两个 .o 链接成可执行文件</span></span><br></pre></td></tr></table></figure>
+
+<p>这三条命令把四个阶段完整走了一遍，对应关系如下：</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>对应阶段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>g++ -c main.cpp -o main.o</code></td>
+<td>预处理 → 编译 → 汇编，但不链接</td>
+</tr>
+<tr>
+<td><code>g++ -c add.cpp -o add.o</code></td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>g++ main.o add.o -o main</code></td>
+<td>链接</td>
+</tr>
+</tbody></table>
+<p><strong>回到最初的问题——为什么 F5 调试报 “undefined reference”？</strong></p>
+<p>VS Code 自动生成的 <code>tasks.json</code> 里，编译参数写的是 <code>$&#123;file&#125;</code>——只编译<strong>当前打开的那个文件</strong>。所以当你按 F5 调试 <code>main.c</code> 时，它等价于执行了：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc main.c -o main</span><br></pre></td></tr></table></figure>
+
+<p><code>add.c</code> 没有被编译！<code>add.o</code> 不存在！链接器找不到 <code>add</code> 的定义——啪，<code>undefined reference to &#39;add&#39;</code>。</p>
+<p>修法很简单：把 <code>$&#123;file&#125;</code> 改成 <code>$&#123;fileDirname&#125;\\*.c</code>，让编译器把当前目录里<strong>所有 <code>.c</code> 文件</strong>都编译进同一个可执行文件。</p>
+<hr>
+<h2 id="六、编译命令速查表"><a href="#六、编译命令速查表" class="headerlink" title="六、编译命令速查表"></a>六、编译命令速查表</h2><table>
+<thead>
+<tr>
+<th>目标</th>
+<th>GCC 命令</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一步到可执行文件</td>
+<td><code>gcc main.c add.c -o main</code></td>
+<td>四步自动走完</td>
+</tr>
+<tr>
+<td>只预处理</td>
+<td><code>gcc -E main.c -o main.i</code></td>
+<td>看到头文件展开后的样子</td>
+</tr>
+<tr>
+<td>只编译到汇编</td>
+<td><code>gcc -S main.c -o main.s</code></td>
+<td>看到汇编代码</td>
+</tr>
+<tr>
+<td>只编译+汇编</td>
+<td><code>gcc -c main.c -o main.o</code></td>
+<td>生成 .o 目标文件</td>
+</tr>
+<tr>
+<td>只看符号表</td>
+<td><code>nm main.o</code></td>
+<td>看”定义了啥””需要啥”</td>
+</tr>
+<tr>
+<td>查看目标文件结构</td>
+<td><code>objdump -h main.o</code></td>
+<td>看到代码段、数据段</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="七、静态库与动态库"><a href="#七、静态库与动态库" class="headerlink" title="七、静态库与动态库"></a>七、静态库与动态库</h2><p>你的资料里有两个文件夹——<code>static/</code> 和 <code>dynamic/</code>。这就是库的两种形式。</p>
+<h3 id="7-1-静态库（-a-lib）"><a href="#7-1-静态库（-a-lib）" class="headerlink" title="7.1 静态库（.a &#x2F; .lib）"></a>7.1 静态库（.a &#x2F; .lib）</h3><p><strong>本质</strong>：一堆 <code>.o</code> 文件打成的包。</p>
+<p>链接时，链接器把库里的代码<strong>拷贝一份</strong>到你的可执行文件里。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">main.o + libadd.a(add.o)  →  链接  →  main.exe（add 的代码在里面了）</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>运行时不需要库文件</td>
+<td>每个程序都有一份拷贝，占空间</td>
+</tr>
+<tr>
+<td>不依赖外部环境</td>
+<td>库更新后需要重新编译链接</td>
+</tr>
+<tr>
+<td>部署简单</td>
+<td>可执行文件体积大</td>
+</tr>
+</tbody></table>
+<h3 id="7-2-动态库（-so-dll）"><a href="#7-2-动态库（-so-dll）" class="headerlink" title="7.2 动态库（.so &#x2F; .dll）"></a>7.2 动态库（.so &#x2F; .dll）</h3><p><strong>本质</strong>：库代码留在<code>.so</code>文件里，可执行文件里只记录”我需要这个库”。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">程序启动  →  OS 加载 main.exe  →  OS 发现它需要 libadd.so  →  加载 libadd.so  →  把 add() 的地址填到 main 的调用处</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>多个程序共享一份库</td>
+<td>部署时需要带上或确保安装了库文件</td>
+</tr>
+<tr>
+<td>库升级不需要重编译程序</td>
+<td>运行时查找库失败程序就崩了</td>
+</tr>
+<tr>
+<td>可执行文件体积小</td>
+<td>不同版本的库可能不兼容</td>
+</tr>
+</tbody></table>
+<h3 id="7-3-工作中的类比"><a href="#7-3-工作中的类比" class="headerlink" title="7.3 工作中的类比"></a>7.3 工作中的类比</h3><table>
+<thead>
+<tr>
+<th></th>
+<th>静态库 (<code>.a</code>)</th>
+<th>动态库 (<code>.so</code> &#x2F; <code>.dll</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>类比</td>
+<td>文章里把别人的文字<strong>全文引用</strong>进来</td>
+<td>文章里给出<strong>参考文献</strong>，让读者自己去查</td>
+</tr>
+<tr>
+<td>链接时机</td>
+<td>编译时（生成 exe 的时候）</td>
+<td>运行时（双击 exe 之后）</td>
+</tr>
+<tr>
+<td>体积</td>
+<td>exe 变大</td>
+<td>exe 不变</td>
+</tr>
+<tr>
+<td>更新</td>
+<td>库改了，重新编译 exe</td>
+<td>库改了，换一个 .so 文件就行</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="八、CMake-的角色"><a href="#八、CMake-的角色" class="headerlink" title="八、CMake 的角色"></a>八、CMake 的角色</h2><figure class="highlight cmake"><figcaption><span>CMakeLists.txt</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">cmake_minimum_required</span>(VERSION <span class="number">2.8</span>)</span><br><span class="line"><span class="keyword">project</span>(SWAP)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 相当于 g++ -I include  ——  告诉编译器去哪儿找头文件</span></span><br><span class="line"><span class="keyword">include_directories</span>(<span class="keyword">include</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 相当于 g++ main.cpp src/swap.cpp -o swap_cmake</span></span><br><span class="line"><span class="keyword">add_executable</span>(swap_cmake main.cpp src/swap.cpp)</span><br></pre></td></tr></table></figure>
+
+<p>CMake 本身不是编译器，它是<strong>构建系统生成器</strong>。它的工作流程是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CMakeLists.txt  →  CMake 读取  →  生成 Makefile  →  make 读取  →  调用 g++ 编译</span><br></pre></td></tr></table></figure>
+
+<p>所以当你写了复杂的多文件项目，不用手动敲 <code>g++ main.cpp a.cpp b.cpp c.cpp d.cpp -I include -o myapp</code>——交给 CMake，让它来跟踪依赖关系。</p>
+<hr>
+<h2 id="九、总结：回到你的-VS-Code-问题"><a href="#九、总结：回到你的-VS-Code-问题" class="headerlink" title="九、总结：回到你的 VS Code 问题"></a>九、总结：回到你的 VS Code 问题</h2><p>现在你应该能看明白 <code>tasks.json</code> 和”undefined reference”之间的关系了：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">你按 F5 调试</span><br><span class="line">  ↓</span><br><span class="line">VS Code 执行 tasks.json 里定义的&quot;编译任务&quot;</span><br><span class="line">  ↓</span><br><span class="line">gcc $&#123;file&#125; -o xxx.exe    ← 只编译当前这一个文件！</span><br><span class="line">  ↓</span><br><span class="line">当前文件 (main.c) 里调用了 SeqTable.c 里的函数</span><br><span class="line">但 SeqTable.c 根本没被编译 → SeqTable.o 不存在</span><br><span class="line">  ↓</span><br><span class="line">链接器找遍了所有 .o 找不到那个函数的定义</span><br><span class="line">  ↓</span><br><span class="line">undefined reference to &#x27;函数名&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>修改方法就是让 <code>$&#123;file&#125;</code> 变成 <code>$&#123;fileDirname&#125;\\*.c</code>，把整个目录的源文件都纳入编译。</p>
+<hr>
+<h2 id="十、核心概念对照表"><a href="#十、核心概念对照表" class="headerlink" title="十、核心概念对照表"></a>十、核心概念对照表</h2><table>
+<thead>
+<tr>
+<th>概念</th>
+<th>一句话解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>预处理</td>
+<td>展开 <code>#include</code>、替换 <code>#define</code>、删除注释</td>
+</tr>
+<tr>
+<td>编译</td>
+<td>把 C&#x2F;C++ 翻译成汇编语言</td>
+</tr>
+<tr>
+<td>汇编</td>
+<td>把汇编翻译成机器码（<code>.o</code> 文件）</td>
+</tr>
+<tr>
+<td>链接</td>
+<td>把多个 <code>.o</code> + 库拼成一个可执行文件</td>
+</tr>
+<tr>
+<td><code>.o</code> 目标文件</td>
+<td>编译和汇编的输出，包含机器码 + 符号表</td>
+</tr>
+<tr>
+<td>符号表</td>
+<td>记录”我提供了什么”和”我需要什么”</td>
+</tr>
+<tr>
+<td>undefined reference</td>
+<td>链接时发现需要的符号没有任何地方提供定义</td>
+</tr>
+<tr>
+<td>静态库 <code>.a</code></td>
+<td>链接时把库代码拷进 exe</td>
+</tr>
+<tr>
+<td>动态库 <code>.so</code></td>
+<td>运行时才加载库代码</td>
+</tr>
+<tr>
+<td>CMake</td>
+<td>帮你生成 Makefile 的构建工具</td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C-C/" rel="tag"># C/C++</a>
+              <a href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/" rel="tag"># 编译原理</a>
+              <a href="/tags/%E5%BC%80%E5%8F%91%E5%B7%A5%E5%85%B7/" rel="tag"># 开发工具</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/17/C++%20%E5%A4%9A%E6%96%87%E4%BB%B6%E9%A1%B9%E7%9B%AE%E7%BC%96%E8%AF%91%E8%B0%83%E8%AF%95%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5/" rel="prev" title="VS Code C/C++ 多文件项目编译调试问题排查">
+      <i class="fa fa-chevron-left"></i> VS Code C/C++ 多文件项目编译调试问题排查
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/07/18/%E6%B4%9B%E8%B0%B7P1328-%E7%94%9F%E6%B4%BB%E5%A4%A7%E7%88%86%E7%82%B8%E7%89%88%E7%9F%B3%E5%A4%B4%E5%89%AA%E5%88%80%E5%B8%83-%E9%A2%98%E8%A7%A3/" rel="next" title="洛谷P1328 - 生活大爆炸版石头剪刀布 - 题解">
+      洛谷P1328 - 生活大爆炸版石头剪刀布 - 题解 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%8E%E6%BA%90%E4%BB%A3%E7%A0%81%E5%88%B0%E5%8F%AF%E6%89%A7%E8%A1%8C%E6%96%87%E4%BB%B6%E2%80%94%E2%80%94%E5%88%9D%E6%AD%A5%E7%90%86%E8%A7%A3%E7%BC%96%E8%AF%91%E3%80%81%E9%93%BE%E6%8E%A5%E4%B8%8E%E8%BD%AF%E4%BB%B6%E6%9E%84%E9%80%A0%E4%BD%93%E7%B3%BB"><span class="nav-number">1.</span> <span class="nav-text">从源代码到可执行文件——初步理解编译、链接与软件构造体系</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E4%B8%80%E4%B8%AA%E9%97%AE%E9%A2%98%E5%87%BA%E5%8F%91"><span class="nav-number">1.1.</span> <span class="nav-text">从一个问题出发</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%85%A8%E6%99%AF%E5%9B%BE%EF%BC%9A%E5%9B%9B%E6%AD%A5%E8%B5%B0"><span class="nav-number">1.2.</span> <span class="nav-text">一、全景图：四步走</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E9%A2%84%E5%A4%84%E7%90%86%EF%BC%88Preprocessing%EF%BC%89"><span class="nav-number">1.3.</span> <span class="nav-text">二、预处理（Preprocessing）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E7%BC%96%E8%AF%91%EF%BC%88Compilation%EF%BC%89"><span class="nav-number">1.4.</span> <span class="nav-text">三、编译（Compilation）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%B1%87%E7%BC%96%EF%BC%88Assembly%EF%BC%89"><span class="nav-number">1.5.</span> <span class="nav-text">四、汇编（Assembly）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E9%93%BE%E6%8E%A5%EF%BC%88Linking%EF%BC%89"><span class="nav-number">1.6.</span> <span class="nav-text">五、链接（Linking）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E7%BC%96%E8%AF%91%E5%91%BD%E4%BB%A4%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-number">1.7.</span> <span class="nav-text">六、编译命令速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E9%9D%99%E6%80%81%E5%BA%93%E4%B8%8E%E5%8A%A8%E6%80%81%E5%BA%93"><span class="nav-number">1.8.</span> <span class="nav-text">七、静态库与动态库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81CMake-%E7%9A%84%E8%A7%92%E8%89%B2"><span class="nav-number">1.9.</span> <span class="nav-text">八、CMake 的角色</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E6%80%BB%E7%BB%93%EF%BC%9A%E5%9B%9E%E5%88%B0%E4%BD%A0%E7%9A%84-VS-Code-%E9%97%AE%E9%A2%98"><span class="nav-number">1.10.</span> <span class="nav-text">九、总结：回到你的 VS Code 问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5%E5%AF%B9%E7%85%A7%E8%A1%A8"><span class="nav-number">1.11.</span> <span class="nav-text">十、核心概念对照表</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">20</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">24</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">152k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:18</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

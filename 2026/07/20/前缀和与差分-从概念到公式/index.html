@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="前缀和与差分是算法竞赛和面试中非常基础的预处理工具。本文用图解法讲清一维&#x2F;二维前缀和与差分的核心公式，不涉及具体代码，为后面的具体题目做铺垫。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="前缀和与差分 —— 从概念到公式">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="前缀和与差分是算法竞赛和面试中非常基础的预处理工具。本文用图解法讲清一维&#x2F;二维前缀和与差分的核心公式，不涉及具体代码，为后面的具体题目做铺垫。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-20T03:30:00.000Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="前缀和&amp;差分">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>前缀和与差分 —— 从概念到公式 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          前缀和与差分 —— 从概念到公式
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-07-20 11:30:00" itemprop="dateCreated datePublished" datetime="2026-07-20T11:30:00+08:00">2026-07-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-23 11:22:09" itemprop="dateModified" datetime="2026-07-23T11:22:09+08:00">2026-07-23</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index"><span itemprop="name">算法</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>5 分钟</span>
+            </span>
+            <div class="post-description">前缀和与差分是算法竞赛和面试中非常基础的预处理工具。本文用图解法讲清一维/二维前缀和与差分的核心公式，不涉及具体代码，为后面的具体题目做铺垫。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
+<p>最直接的做法：每次从 3 加到 7。如果数组很大（比如 10 万个数），问你 10 万次，那总共要算 100 亿次加法——太慢了。<br>如果换一种思路，我能不能<strong>提前把「前 i 个数的和」全部算好存起来</strong>，这样每次询问直接用减法得到结果？</p>
+<p>这就是<strong>前缀和</strong>的核心思想——<strong>预处理，换时间</strong>。</p>
+<hr>
+<h2 id="二、一维前缀和"><a href="#二、一维前缀和" class="headerlink" title="二、一维前缀和"></a>二、一维前缀和</h2><h3 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="2.1 定义"></a>2.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，定义前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">s[i] = a[1] + a[2] + ... + a[i]   （前 i 个数的总和）</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-核心公式"><a href="#2-2-核心公式" class="headerlink" title="2.2 核心公式"></a>2.2 核心公式</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">s[i] = s[i-1] + a[i]</span><br></pre></td></tr></table></figure>
+
+<p>边界条件：<code>s[0] = 0</code>（前 0 个数的和为 0）。</p>
+<blockquote>
+<p>公式的意思是：前 i 个数的和 &#x3D; 前 i-1 个数的和 + 第 i 个数。</p>
+</blockquote>
+<h3 id="2-3-图示"><a href="#2-3-图示" class="headerlink" title="2.3 图示"></a>2.3 图示</h3><p>假设原数组 <code>a</code> 如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">下标：  1    2    3    4    5</span><br><span class="line">a[]：  2    5    3    1    4</span><br></pre></td></tr></table></figure>
+
+<p>逐个计算前缀和：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">s[1] = 0 + 2 = 2</span><br><span class="line">s[2] = 2 + 5 = 7</span><br><span class="line">s[3] = 7 + 3 = 10</span><br><span class="line">s[4] = 10 + 1 = 11</span><br><span class="line">s[5] = 11 + 4 = 15</span><br></pre></td></tr></table></figure>
+
+<p>得到前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">s[]：  2    7    10   11   15</span><br><span class="line">      ↑    ↑    ↑    ↑    ↑</span><br><span class="line">      前1  前2  前3  前4  前5</span><br></pre></td></tr></table></figure>
+
+<p>可以直观地看到：<code>s[i]</code> 就是从第一个数一直加到第 i 个数的「累计值」。</p>
+<h3 id="2-4-用途：快速求区间和"><a href="#2-4-用途：快速求区间和" class="headerlink" title="2.4 用途：快速求区间和"></a>2.4 用途：快速求区间和</h3><p>现在想求 <code>a[2] + a[3] + a[4]</code>（即区间 <code>[2, 4]</code> 的和）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">区间[2,4]的和 = s[4] - s[1] = 11 - 2 = 9</span><br><span class="line">验证：5 + 3 + 1 = 9  ✅</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心公式：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">区间 [l, r] 的和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>文字理解：<strong>前 r 个数的和 减去 前 l-1 个数的和</strong>，剩下的就是第 l 个到第 r 个。</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">                   ┌─────────── 区间[l, r] ───────────┐</span><br><span class="line">                   │                                   │</span><br><span class="line">a[1] a[2] ... a[l-1]  a[l] a[l+1] ... a[r-1] a[r]  a[r+1] ...</span><br><span class="line">├──── 前 l-1 项 ────┤├────────── 前 r 项 ──────────┤</span><br><span class="line">                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</span><br><span class="line">                     s[r] = 前 r 项的总和</span><br><span class="line">     s[l-1] = 前 l-1 项的总和</span><br><span class="line">             </span><br><span class="line">     区间和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<p>预处理完 <code>s</code> 数组后，<strong>每次求区间和只需要 O(1) 的时间</strong>（一次减法），这就是前缀和的威力。</p>
+<hr>
+<h2 id="三、二维前缀和"><a href="#三、二维前缀和" class="headerlink" title="三、二维前缀和"></a>三、二维前缀和</h2><h3 id="3-1-问题升级"><a href="#3-1-问题升级" class="headerlink" title="3.1 问题升级"></a>3.1 问题升级</h3><p>如果你面对的<strong>不是一维数组，而是一个二维矩阵</strong>，想快速求出<strong>任意一个子矩形内所有数的和</strong>，怎么办？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">    列1  列2  列3  列4</span><br><span class="line">行1   1    2    3    4</span><br><span class="line">行2   5    6    7    8</span><br><span class="line">行3   9   10   11   12</span><br></pre></td></tr></table></figure>
+
+<p>比如：求从 <code>[2][2]</code> 到 <code>[3][4]</code> 这个 2×3 矩形里所有数的和。</p>
+<p>类比一维的思路：<strong>二维前缀和</strong>就是提前算好从 <code>[1][1]</code> 到 <code>[i][j]</code> 这个矩形内所有数的总和。</p>
+<h3 id="3-2-核心公式"><a href="#3-2-核心公式" class="headerlink" title="3.2 核心公式"></a>3.2 核心公式</h3><p>定义 <code>s[i][j]</code> &#x3D; 从左上角 <code>(1,1)</code> 到右下角 <code>(i,j)</code> 的矩形区域内所有元素的和。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-3-图解：容斥原理"><a href="#3-3-图解：容斥原理" class="headerlink" title="3.3 图解：容斥原理"></a>3.3 图解：容斥原理</h3><p>公式看着复杂，其实核心就是<strong>容斥原理</strong>——两个有重叠的区域合并时，<strong>加完两边，减掉重叠</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">             列1     列2    ...   列j-1    列j    列j+1</span><br><span class="line">     ┌──────────────────────────────────────────────────┐</span><br><span class="line">行1   │                                                  │</span><br><span class="line">     │                      A区域                        │</span><br><span class="line"> ...  │                  s[i-1][j]                       │</span><br><span class="line">     │              ┌──────────────┐                     │</span><br><span class="line">行i-1 │              │  重叠部分    │                     │</span><br><span class="line">     │              │ s[i-1][j-1]  │                     │</span><br><span class="line">     │              └──────────────┘                     │</span><br><span class="line">     ├─────────────────────────────┬────────────────────┤</span><br><span class="line">行i   │          B区域             │      a[i][j]       │</span><br><span class="line">     │       s[i][j-1]            │      (当前格子)     │</span><br><span class="line">     └─────────────────────────────┴────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>把 s[i][j] 拆成三块来看：</p>
+<ul>
+<li><strong>A 区域</strong> &#x3D; <code>s[i-1][j]</code>：第 1<del>i-1 行、第 1</del>j 列（不含第 i 行）</li>
+<li><strong>B 区域</strong> &#x3D; <code>s[i][j-1]</code>：第 1<del>i 行、第 1</del>j-1 列（不含第 j 列）</li>
+<li><strong>重叠部分</strong> &#x3D; <code>s[i-1][j-1]</code>：A 和 B 都覆盖的左上角</li>
+</ul>
+<p>根据容斥原理（两个集合的并集 &#x3D; 各自之和 − 交集）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">s[i][j] = |A ∪ B| + a[i][j]</span><br><span class="line">        = |A| + |B| − |A ∩ B| + a[i][j]</span><br><span class="line">        = s[i-1][j] + s[i][j-1] − s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-4-用途：求子矩阵和"><a href="#3-4-用途：求子矩阵和" class="headerlink" title="3.4 用途：求子矩阵和"></a>3.4 用途：求子矩阵和</h3><p>现在想求矩形区域 <code>(x1, y1)</code> 到 <code>(x2, y2)</code> 的和：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">子矩阵和 = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</span><br></pre></td></tr></table></figure>
+
+<p>同样还是<strong>面积加减法</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">(x1,y1) ───────────── (x1,y2)</span><br><span class="line">   │                     │</span><br><span class="line">   │    ┌────────────┐   │</span><br><span class="line">   │    │  目标矩形    │   │</span><br><span class="line">   │    │ (红色区域)   │   │</span><br><span class="line">   │    └────────────┘   │</span><br><span class="line">(x2,y1) ───────────── (x2,y2)</span><br></pre></td></tr></table></figure>
+
+<p>怎么从 <code>s[x2][y2]</code>（整个大矩形）扣出目标红色区域？</p>
+<ol>
+<li><strong>减</strong>掉上边部分 <code>s[x1-1][y2]</code>  </li>
+<li><strong>减</strong>掉左边部分 <code>s[x2][y1-1]</code>  </li>
+<li>左上角区域 <code>s[x1-1][y1-1]</code> 被减了两次，<strong>加</strong>回来</li>
+</ol>
+<hr>
+<h2 id="四、差分"><a href="#四、差分" class="headerlink" title="四、差分"></a>四、差分</h2><h3 id="4-1-差分是前缀和的逆运算"><a href="#4-1-差分是前缀和的逆运算" class="headerlink" title="4.1 差分是前缀和的逆运算"></a>4.1 差分是前缀和的逆运算</h3><p>先回顾前缀和的定义：<code>s[i] = a[1] + ... + a[i]</code>。</p>
+<p>那反过来，已知 <code>s</code> 怎么求 <code>a</code>？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">a[i] = s[i] - s[i-1]</span><br></pre></td></tr></table></figure>
+
+<p><strong>这就是差分。</strong> 对前缀和数组求差分，就得到原数组；对差分数组求前缀和，也得到原数组——两者互逆。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">原数组 a</span><br><span class="line">  │  求前缀和</span><br><span class="line">  ▼</span><br><span class="line">前缀和数组 s</span><br><span class="line">  │  求差分（相邻两项相减）</span><br><span class="line">  ▼</span><br><span class="line">原数组 a</span><br></pre></td></tr></table></figure>
+
+<p>那差分有什么用？看一个场景：</p>
+<blockquote>
+<p>如果要反复给数组的某个区间统一加上一个数，最后再看结果，能不能快速做？</p>
+</blockquote>
+<p>暴力做法是每次从 l 到 r 逐个加，太慢。差分能做到时间复杂度是<strong>O(1)， 一次标记，最后统一还原</strong>。</p>
+<hr>
+<h2 id="五、一维差分"><a href="#五、一维差分" class="headerlink" title="五、一维差分"></a>五、一维差分</h2><h3 id="5-1-定义"><a href="#5-1-定义" class="headerlink" title="5.1 定义"></a>5.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，差分数组 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">b[i] = a[i] - a[i-1]</span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>b[1] = a[1]</code>（<code>a[0] = 0</code>）。</p>
+<h3 id="5-2-核心操作：区间加-c"><a href="#5-2-核心操作：区间加-c" class="headerlink" title="5.2 核心操作：区间加 c"></a>5.2 核心操作：区间加 c</h3><p>给 <code>a[l] ~ a[r]</code> 每个数都加 <code>c</code>，分成两步：</p>
+<blockquote>
+<p><strong>① 在差分数组上改两个位置 → ② 再对差分数组求一次前缀和，就得到修改后的原数组</strong></p>
+</blockquote>
+<p>改哪两个位置？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">b[l]   += c</span><br><span class="line">b[r+1] -= c</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，在差分数组上做完标记后，<strong>只要再求一遍前缀和就能得到修改后的数组</strong>。<br>不是说好了差分和前缀和是逆运算吗？为什么这样改两个位置就能让一整段加上 c？<br>拿一个具体的例子走一遍就明白了。</p>
+<hr>
+<h4 id="举个具体的例子"><a href="#举个具体的例子" class="headerlink" title="举个具体的例子"></a>举个具体的例子</h4><p>假设原数组 <code>a</code> 长度为 6：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">a[]：      2    5    3    1    4    6</span><br></pre></td></tr></table></figure>
+
+<p>先按定义造出差分数组 <code>b</code>（<code>b[i] = a[i] - a[i-1]</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">b[1] = a[1] - 0      = 2</span><br><span class="line">b[2] = a[2] - a[1]   = 5 - 2   = 3</span><br><span class="line">b[3] = a[3] - a[2]   = 3 - 5   = -2</span><br><span class="line">b[4] = a[4] - a[3]   = 1 - 3   = -2</span><br><span class="line">b[5] = a[5] - a[4]   = 4 - 1   = 3</span><br><span class="line">b[6] = a[6] - a[5]   = 6 - 4   = 2</span><br><span class="line"></span><br><span class="line">b[]：      2    3   -2   -2    3    2</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="现在，我想给-a-3-a-5-每个数都加上-5"><a href="#现在，我想给-a-3-a-5-每个数都加上-5" class="headerlink" title="现在，我想给 a[3] ~ a[5] 每个数都加上 5"></a>现在，我想给 a[3] ~ a[5] 每个数都加上 5</h4><p>按照公式，改 <code>b</code> 的两个位置：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">b[3] += 5      （原来是 -2，变成 3）</span><br><span class="line">b[6] -= 5      （原来是 2，变成 -3）</span><br></pre></td></tr></table></figure>
+
+<p>修改后的 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">b[]：      2    3    3   -2    3   -3</span><br><span class="line">                    ↑ b[3] 从 -2 变成 3</span><br><span class="line">                                   ↑ b[6] 从 2 变成 -3</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="关键一步：对修改后的-b-求前缀和，看看会发生什么"><a href="#关键一步：对修改后的-b-求前缀和，看看会发生什么" class="headerlink" title="关键一步：对修改后的 b 求前缀和，看看会发生什么"></a>关键一步：对修改后的 b 求前缀和，看看会发生什么</h4><p>还记得前缀和怎么算吗？**<code>s[i] = s[i-1] + b[i]</code>**。一步步来：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">s[1] = 0 + b[1] = 0 + 2  = 2</span><br><span class="line">s[2] = 2 + b[2] = 2 + 3  = 5</span><br><span class="line">s[3] = 5 + b[3] = 5 + 3  = 8    ← 注意，这里用的是修改后的 b[3]（加了 5）</span><br><span class="line">s[4] = 8 + b[4] = 8 + (-2)= 6</span><br><span class="line">s[5] = 6 + b[5] = 6 + 3  = 9</span><br><span class="line">s[6] = 9 + b[6] = 9 + (-3)= 6    ← 这里用的是修改后的 b[6]（减了 5）</span><br></pre></td></tr></table></figure>
+
+<p>得到新的 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">s[]：      2    5    8    6    9    6</span><br></pre></td></tr></table></figure>
+
+<p>对比原来的 <code>a</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">原来 a：   2    5    3    1    4    6</span><br><span class="line">新的 s：   2    5    8    6    9    6</span><br><span class="line">                          ↑    ↑    ↑</span><br><span class="line">                     a[3]+5  a[4]+5  a[5]+5</span><br></pre></td></tr></table></figure>
+
+<p><strong>正好</strong>只有 <code>a[3] ~ a[5]</code> 加了 5，前面和后面都没变！–很神奇对吧！</p>
+<hr>
+<h4 id="为什么？"><a href="#为什么？" class="headerlink" title="为什么？"></a>为什么？</h4><p>原因藏在<strong>前缀和的累加特性</strong>里。把 <code>b</code> 看成一系列”<strong>标记</strong>“：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">b[]：  2    3    3   -2    3   -3</span><br><span class="line">                 ↑</span><br><span class="line">           这里 b[3] 多了一个 +5</span><br><span class="line">                                ↑</span><br><span class="line">                          这里 b[6] 多了一个 -5</span><br></pre></td></tr></table></figure>
+
+<p>对 <code>b</code> 求前缀和时，每个位置的值会<strong>一直往后累加</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">位置1：       2                                 = 2</span><br><span class="line">位置2：       2 + 3                             = 5</span><br><span class="line">位置3：       2 + 3 + 3      ← +5 从这里开始     = 8 ← 比原来多了 5</span><br><span class="line">位置4：       2 + 3 + 3 + (-2)    ← +5 还在继续   = 6 ← 比原来多了 5</span><br><span class="line">位置5：       2 + 3 + 3 + (-2) + 3               = 9 ← 比原来多了 5</span><br><span class="line">位置6：       2 + 3 + 3 + (-2) + 3 + (-3)        = 6 ← +5 和 -5 抵消了！</span><br><span class="line">           ↑ 前 5 项还带着 +5     这里又减了 5 ──┘</span><br></pre></td></tr></table></figure>
+
+<p>把过程画出来看更清楚：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">在 b[3] 放一个 +5 → 从位置 3 开始，所有数都多了 5</span><br><span class="line">                                              ┌───────────────────</span><br><span class="line">位置:    1      2      3      4      5      6 │</span><br><span class="line">累加:    2      5      8      6      9      6 │</span><br><span class="line">        ──────────────────────────────────────┘</span><br><span class="line">                            ← +5 一直跟着 →  </span><br><span class="line">                                              然后在 b[6] 放一个 -5 → +5 被抵消</span><br><span class="line"></span><br><span class="line">位置:    1      2      3      4      5      6</span><br><span class="line">累加:    2      5      8      6      9      6  </span><br><span class="line">                                     +5 被 -5 抵消 → 变回原样</span><br></pre></td></tr></table></figure>
+
+<p><strong>结论：</strong> <code>b[l] += c</code> 让 +c 从位置 l 开始一直往后传，<code>b[r+1] -= c</code> 让它在 r+1 处被抵消。一传一挡，<strong>c 就只落在了 [l, r] 这一段上</strong>。</p>
+<h3 id="5-3-完整流程"><a href="#5-3-完整流程" class="headerlink" title="5.3 完整流程"></a>5.3 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1. 由原数组 a 构造差分数组 b</span><br><span class="line">2. 在 b 上进行区间修改（b[l] += c, b[r+1] -= c）</span><br><span class="line">3. 所有修改完成后，对 b 求一遍前缀和 → 得到修改后的 a</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>前缀和和差分正好互补：</p>
+<ul>
+<li><strong>前缀和</strong>：一次预处理，多次<strong>查询</strong>区间和</li>
+<li><strong>差分</strong>：多次<strong>修改</strong>区间值，最后一次性看结果</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="六、二维差分"><a href="#六、二维差分" class="headerlink" title="六、二维差分"></a>六、二维差分</h2><h3 id="6-1-定义"><a href="#6-1-定义" class="headerlink" title="6.1 定义"></a>6.1 定义</h3><p>和一维完全对称：<strong>对 b 求二维前缀和 &#x3D; 原矩阵 a</strong>。</p>
+<p>构造公式（对二维前缀和公式做逆运算）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">b[i][j] = a[i][j] - a[i-1][j] - a[i][j-1] + a[i-1][j-1]</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-核心操作：子矩阵加-c"><a href="#6-2-核心操作：子矩阵加-c" class="headerlink" title="6.2 核心操作：子矩阵加 c"></a>6.2 核心操作：子矩阵加 c</h3><p>给矩形 <code>(x1,y1)</code> 到 <code>(x2,y2)</code> 内每个数加 <code>c</code>，只需改<strong>四个点</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">b[x1][y1]     += c</span><br><span class="line">b[x1][y2+1]   -= c</span><br><span class="line">b[x2+1][y1]   -= c</span><br><span class="line">b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-图解"><a href="#6-3-图解" class="headerlink" title="6.3 图解"></a>6.3 图解</h3><p>一维是在<strong>两端</strong>做标记，二维是在<strong>四个角</strong>做标记：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">b[x1][y1] += c        b[x1][y2+1] -= c</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">     │                          │</span><br><span class="line">     │       目标区域            │</span><br><span class="line">     │      (+c 的区域)          │</span><br><span class="line">     │                          │</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">b[x2+1][y1] -= c      b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<p>和一维同理，四个标记经过二维前缀和后，只有矩形内部被加了 c。</p>
+<h3 id="6-4-完整流程"><a href="#6-4-完整流程" class="headerlink" title="6.4 完整流程"></a>6.4 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1. 构造二维差分数组 b</span><br><span class="line">2. 在 b 上进行子矩阵修改（改四个角）</span><br><span class="line">3. 所有修改完成后，对 b 求二维前缀和 → 得到修改后的矩阵 a</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、总结对照"><a href="#七、总结对照" class="headerlink" title="七、总结对照"></a>七、总结对照</h2><h3 id="公式速查表"><a href="#公式速查表" class="headerlink" title="公式速查表"></a>公式速查表</h3><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>公式</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一维前缀和</td>
+<td><code>s[i] = s[i-1] + a[i]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>一维区间和</td>
+<td><code>sum[l,r] = s[r] - s[l-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>二维前缀和</td>
+<td><code>s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>二维子矩阵和</td>
+<td><code>sum = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>一维差分</td>
+<td><code>b[l] += c, b[r+1] -= c</code></td>
+<td>区间加减</td>
+</tr>
+<tr>
+<td>二维差分</td>
+<td><code>b[x1][y1] += c, b[x1][y2+1] -= c, b[x2+1][y1] -= c, b[x2+1][y2+1] += c</code></td>
+<td>子矩阵加减</td>
+</tr>
+</tbody></table>
+<h3 id="一张图理解全部关系"><a href="#一张图理解全部关系" class="headerlink" title="一张图理解全部关系"></a>一张图理解全部关系</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">         求前缀和               求差分</span><br><span class="line">原数组 ────────→ 前缀和数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">         求差分                 求前缀和</span><br><span class="line">原数组 ────────→ 差分数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">前缀和与差分就像积分与求导，是互逆的运算</span><br></pre></td></tr></table></figure>
+
+<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>什么时候用</th>
+<th>耗时</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>前缀和</strong></td>
+<td>多次<strong>查询</strong>区间和&#x2F;子矩阵和</td>
+<td>预处理 O(n)，每次查询 O(1)</td>
+</tr>
+<tr>
+<td><strong>差分</strong></td>
+<td>多次<strong>修改</strong>区间&#x2F;子矩阵的值，最后一次性查看结果</td>
+<td>每次修改 O(1)，最后恢复 O(n)</td>
+</tr>
+<tr>
+<td><strong>前缀和 + 差分</strong></td>
+<td>多次修改 + 多次查询</td>
+<td>差分做修改，前缀和做查询，中间通过「求前缀和」衔接</td>
+</tr>
+</tbody></table>
+<h3 id="关键注意点"><a href="#关键注意点" class="headerlink" title="关键注意点"></a>关键注意点</h3><ol>
+<li><strong>数组下标从 1 开始</strong>，避免出现 <code>l-1 = 0</code> 时越界</li>
+<li>设 <code>s[0] = 0</code>（一维）或 <code>s[0][*] = s[*][0] = 0</code>（二维），统一边界条件</li>
+<li><strong>先修改，后查询</strong>——差分所有的修改操作做完后，最后求一遍前缀和才能得到最终结果</li>
+<li>二维的「面积加减法」理解了，前缀和和差分的四个公式<strong>其实是一个思路</strong>，不需要死记硬背</li>
+</ol>
+<hr>
+<blockquote>
+<p>前缀和是「累加」，差分是「标记」——这对互逆的算法体现了预处理和批量操作的核心思想，是算法竞赛和面试中最高频的基础技巧之一。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%89%8D%E7%BC%80%E5%92%8C-%E5%B7%AE%E5%88%86/" rel="tag"># 前缀和&差分</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/" rel="prev" title="Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴">
+      <i class="fa fa-chevron-left"></i> Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/07/23/%E6%B4%9B%E8%B0%B7B3612-%5B%E6%B7%B1%E8%BF%9B1.%E4%BE%8B1%5D-%E6%B1%82%E5%8C%BA%E9%97%B4%E5%92%8C-%E9%A2%98%E8%A7%A3/" rel="next" title="洛谷B3612-[深进1.例1]-求区间和-题解">
+      洛谷B3612-[深进1.例1]-求区间和-题解 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%89%8D%E7%BC%80%E5%92%8C%EF%BC%9F"><span class="nav-number">1.</span> <span class="nav-text">一、为什么需要前缀和？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%80%E7%BB%B4%E5%89%8D%E7%BC%80%E5%92%8C"><span class="nav-number">2.</span> <span class="nav-text">二、一维前缀和</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E5%AE%9A%E4%B9%89"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E6%A0%B8%E5%BF%83%E5%85%AC%E5%BC%8F"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 核心公式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E5%9B%BE%E7%A4%BA"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 图示</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E7%94%A8%E9%80%94%EF%BC%9A%E5%BF%AB%E9%80%9F%E6%B1%82%E5%8C%BA%E9%97%B4%E5%92%8C"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 用途：快速求区间和</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E4%BA%8C%E7%BB%B4%E5%89%8D%E7%BC%80%E5%92%8C"><span class="nav-number">3.</span> <span class="nav-text">三、二维前缀和</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E9%97%AE%E9%A2%98%E5%8D%87%E7%BA%A7"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 问题升级</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E6%A0%B8%E5%BF%83%E5%85%AC%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 核心公式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E5%9B%BE%E8%A7%A3%EF%BC%9A%E5%AE%B9%E6%96%A5%E5%8E%9F%E7%90%86"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 图解：容斥原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E7%94%A8%E9%80%94%EF%BC%9A%E6%B1%82%E5%AD%90%E7%9F%A9%E9%98%B5%E5%92%8C"><span class="nav-number">3.4.</span> <span class="nav-text">3.4 用途：求子矩阵和</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%B7%AE%E5%88%86"><span class="nav-number">4.</span> <span class="nav-text">四、差分</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E5%B7%AE%E5%88%86%E6%98%AF%E5%89%8D%E7%BC%80%E5%92%8C%E7%9A%84%E9%80%86%E8%BF%90%E7%AE%97"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 差分是前缀和的逆运算</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E4%B8%80%E7%BB%B4%E5%B7%AE%E5%88%86"><span class="nav-number">5.</span> <span class="nav-text">五、一维差分</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E5%AE%9A%E4%B9%89"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-%E6%A0%B8%E5%BF%83%E6%93%8D%E4%BD%9C%EF%BC%9A%E5%8C%BA%E9%97%B4%E5%8A%A0-c"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 核心操作：区间加 c</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BE%E4%B8%AA%E5%85%B7%E4%BD%93%E7%9A%84%E4%BE%8B%E5%AD%90"><span class="nav-number">5.2.1.</span> <span class="nav-text">举个具体的例子</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%8E%B0%E5%9C%A8%EF%BC%8C%E6%88%91%E6%83%B3%E7%BB%99-a-3-a-5-%E6%AF%8F%E4%B8%AA%E6%95%B0%E9%83%BD%E5%8A%A0%E4%B8%8A-5"><span class="nav-number">5.2.2.</span> <span class="nav-text">现在，我想给 a[3] ~ a[5] 每个数都加上 5</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E4%B8%80%E6%AD%A5%EF%BC%9A%E5%AF%B9%E4%BF%AE%E6%94%B9%E5%90%8E%E7%9A%84-b-%E6%B1%82%E5%89%8D%E7%BC%80%E5%92%8C%EF%BC%8C%E7%9C%8B%E7%9C%8B%E4%BC%9A%E5%8F%91%E7%94%9F%E4%BB%80%E4%B9%88"><span class="nav-number">5.2.3.</span> <span class="nav-text">关键一步：对修改后的 b 求前缀和，看看会发生什么</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-number">5.2.4.</span> <span class="nav-text">为什么？</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 完整流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E4%BA%8C%E7%BB%B4%E5%B7%AE%E5%88%86"><span class="nav-number">6.</span> <span class="nav-text">六、二维差分</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-%E5%AE%9A%E4%B9%89"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-%E6%A0%B8%E5%BF%83%E6%93%8D%E4%BD%9C%EF%BC%9A%E5%AD%90%E7%9F%A9%E9%98%B5%E5%8A%A0-c"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 核心操作：子矩阵加 c</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-%E5%9B%BE%E8%A7%A3"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 图解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B"><span class="nav-number">6.4.</span> <span class="nav-text">6.4 完整流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E6%80%BB%E7%BB%93%E5%AF%B9%E7%85%A7"><span class="nav-number">7.</span> <span class="nav-text">七、总结对照</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%AC%E5%BC%8F%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-number">7.1.</span> <span class="nav-text">公式速查表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E5%BC%A0%E5%9B%BE%E7%90%86%E8%A7%A3%E5%85%A8%E9%83%A8%E5%85%B3%E7%B3%BB"><span class="nav-number">7.2.</span> <span class="nav-text">一张图理解全部关系</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="nav-number">7.3.</span> <span class="nav-text">使用场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E6%B3%A8%E6%84%8F%E7%82%B9"><span class="nav-number">7.4.</span> <span class="nav-text">关键注意点</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">20</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">24</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">152k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:18</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
