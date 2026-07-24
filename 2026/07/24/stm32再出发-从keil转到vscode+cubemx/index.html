@@ -38,8 +38,8 @@
 <meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-device-list.png">
 <meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-launch-gdb.png">
 <meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-continue-button.png">
-<meta property="article:published_time" content="2026-07-24T20:30:00.000Z">
-<meta property="article:modified_time" content="2026-07-24T13:14:40.671Z">
+<meta property="article:published_time" content="2026-07-24T12:30:00.000Z">
+<meta property="article:modified_time" content="2026-07-24T13:24:56.155Z">
 <meta property="article:author" content="童诗轩">
 <meta property="article:tag" content="VS Code">
 <meta property="article:tag" content="STM32">
@@ -228,7 +228,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2026-07-24 20:30:00 / 修改时间：13:14:40" itemprop="dateCreated datePublished" datetime="2026-07-24T20:30:00+00:00">2026-07-24</time>
+              <time title="创建时间：2026-07-24 12:30:00 / 修改时间：13:24:56" itemprop="dateCreated datePublished" datetime="2026-07-24T12:30:00+00:00">2026-07-24</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -246,14 +246,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>5k</span>
+              <span>4.9k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>4 分钟</span>
             </span>
             <div class="post-description">从零开始，搭建 VS Code + STM32CubeMX 的嵌入式开发工具链，生成第一段代码，编译烧录，点亮第一盏灯。记录整个过程中遇到的所有坑和解决方法。</div>
 
@@ -275,7 +275,7 @@
 </ul>
 <p>最终效果：通过 <strong>VS Code</strong> 管理项目，只用写核心的功能代码，一键编译，一键烧录到开发板，LED 灯点亮并闪烁。</p>
 <hr>
-<h2 id="一、工具链概览"><a href="#一、工具链概览" class="headerlink" title="一、工具链概览"></a>一、工具链概览</h2><p>先搞清楚每样东西是干什么的：</p>
+<h2 id="工具链概览"><a href="#工具链概览" class="headerlink" title="工具链概览"></a>工具链概览</h2><p>先搞清楚每样东西是干什么的：</p>
 <table>
 <thead>
 <tr>
@@ -308,20 +308,20 @@
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CubeMX 配置引脚 → 生成代码 → VS Code 编写LED灯闪烁的逻辑 → 编译 → 烧录 → 跑起来！</span><br></pre></td></tr></table></figure>
 
 <hr>
-<h2 id="二、安装步骤"><a href="#二、安装步骤" class="headerlink" title="二、安装步骤"></a>二、安装步骤</h2><h3 id="2-1-安装-STM32CubeMX"><a href="#2-1-安装-STM32CubeMX" class="headerlink" title="2.1 安装 STM32CubeMX"></a>2.1 安装 STM32CubeMX</h3><ol>
+<h2 id="安装步骤"><a href="#安装步骤" class="headerlink" title="安装步骤"></a>安装步骤</h2><h3 id="安装-STM32CubeMX"><a href="#安装-STM32CubeMX" class="headerlink" title="安装 STM32CubeMX"></a>安装 STM32CubeMX</h3><ol>
 <li>去 <a target="_blank" rel="noopener" href="https://www.st.com/en/development-tools/stm32cubemx.html">ST 官网</a> 下载 STM32CubeMX（需要注册 ST 账号，免费）</li>
 <li>运行安装程序，一直下一步</li>
 <li>安装过程中它会自动下载芯片支持包（STM32Cube FW_F1 等），等它下载完就行</li>
 </ol>
 <p>安装完成后桌面上会有个 <code>STM32CubeMX</code> 的图标。</p>
-<h3 id="2-2-安装-VS-Code-与-STM32-扩展"><a href="#2-2-安装-VS-Code-与-STM32-扩展" class="headerlink" title="2.2 安装 VS Code 与 STM32 扩展"></a>2.2 安装 VS Code 与 STM32 扩展</h3><ol>
+<h3 id="安装-VS-Code-与-STM32-扩展"><a href="#安装-VS-Code-与-STM32-扩展" class="headerlink" title="安装 VS Code 与 STM32 扩展"></a>安装 VS Code 与 STM32 扩展</h3><ol>
 <li>去 <a target="_blank" rel="noopener" href="https://code.visualstudio.com/">VS Code 官网</a> 下载安装</li>
 <li>安装完成后，打开 VS Code，点左侧的扩展图标（或按 <code>Ctrl+Shift+X</code>）</li>
 <li>搜索 <strong>STM32</strong>，找到 STMicroelectronics 官方出的 <strong>STM32 VS Code Extension</strong>，点击安装</li>
 <li>安装完成后，VS Code 会自动检测并建议安装一些配套工具，确认即可</li>
 </ol>
 <p>这个扩展帮我们集成了编译和烧录的功能，不用自己手动配 CMake 和命令行。</p>
-<h3 id="2-3-安装-ST-Link-驱动"><a href="#2-3-安装-ST-Link-驱动" class="headerlink" title="2.3 安装 ST-Link 驱动"></a>2.3 安装 ST-Link 驱动</h3><p>ST-Link 是连接电脑和开发板的调试器。插上电脑后，如果设备管理器里显示黄色感叹号，说明没装驱动。</p>
+<h3 id="安装-ST-Link-驱动"><a href="#安装-ST-Link-驱动" class="headerlink" title="安装 ST-Link 驱动"></a>安装 ST-Link 驱动</h3><p>ST-Link 是连接电脑和开发板的调试器。插上电脑后，如果设备管理器里显示黄色感叹号，说明没装驱动。</p>
 <p><strong>解决方法：</strong></p>
 <ol>
 <li>下载 <a target="_blank" rel="noopener" href="https://www.st.com/en/development-tools/stsw-link009.html">ST-Link 驱动</a>（<code>en.stsw-link009.zip</code>）</li>
@@ -333,13 +333,13 @@
 <p>如果不想单独装驱动，安装 STM32CubeProgrammer 也会自动装好 ST-Link 驱动。</p>
 </blockquote>
 <hr>
-<h2 id="三、创建第一个项目"><a href="#三、创建第一个项目" class="headerlink" title="三、创建第一个项目"></a>三、创建第一个项目</h2><h3 id="3-1-在-CubeMX-中新建项目"><a href="#3-1-在-CubeMX-中新建项目" class="headerlink" title="3.1 在 CubeMX 中新建项目"></a>3.1 在 CubeMX 中新建项目</h3><ol>
+<h2 id="创建第一个项目"><a href="#创建第一个项目" class="headerlink" title="创建第一个项目"></a>创建第一个项目</h2><h3 id="在-CubeMX-中新建项目"><a href="#在-CubeMX-中新建项目" class="headerlink" title="在 CubeMX 中新建项目"></a>在 CubeMX 中新建项目</h3><ol>
 <li>打开 STM32CubeMX</li>
 <li>点击 <strong>“New Project”</strong></li>
 <li>在搜索框输入 <strong>STM32F103C8T6</strong>（我用的是 Keysking大佬开发的集成开发板），双击选中</li>
 <li>弹窗问是否初始化外设，点 <strong>“No”</strong></li>
 </ol>
-<h3 id="3-2-配置引脚"><a href="#3-2-配置引脚" class="headerlink" title="3.2 配置引脚"></a>3.2 配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
+<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
 <p><strong>配置 LED 灯引脚（PA7）：</strong></p>
 <ol>
 <li><p>在芯片图上找到 <strong>PA7</strong>，点击它</p>
@@ -359,7 +359,7 @@
 <li><p>其他保持默认：推挽输出、无上下拉、低速度</p>
 </li>
 </ol>
-<h3 id="3-3-配置调试接口"><a href="#3-3-配置调试接口" class="headerlink" title="3.3 配置调试接口"></a>3.3 配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：![屏幕截图 2026-07-24 211145](.&#x2F;..&#x2F;images&#x2F;stm32再出发-从keil转到vscode+cubemx&#x2F;屏幕截图 2026-07-24 211145.png)</p>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：![屏幕截图 2026-07-24 211145](.&#x2F;..&#x2F;images&#x2F;stm32再出发-从keil转到vscode+cubemx&#x2F;屏幕截图 2026-07-24 211145.png)</p>
 <ul>
 <li><strong>Debug</strong> 选择 <strong>Serial Wire</strong></li>
 <li>这样 PA13&#x2F;SWDIO 和 PA14&#x2F;SWCLK 会被自动配置，用于 ST-Link 调试</li>
@@ -367,7 +367,7 @@
 <blockquote>
 <p>这一步很重要！否则烧录一次后，下次 SWD 就被禁用了，再也烧不进新程序。</p>
 </blockquote>
-<h3 id="3-4-选择工具链"><a href="#3-4-选择工具链" class="headerlink" title="3.4 选择工具链"></a>3.4 选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
+<h3 id="选择工具链"><a href="#选择工具链" class="headerlink" title="选择工具链"></a>选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
 <table>
 <thead>
 <tr>
@@ -394,21 +394,21 @@
 </tbody></table>
 <p>点击右上角 **”Generate Code”**，生成代码。弹窗问要不要打开项目，选 **”Open Project”**，它会自动用 VS Code 打开。</p>
 <hr>
-<h2 id="四、在-VS-Code-中编写代码"><a href="#四、在-VS-Code-中编写代码" class="headerlink" title="四、在 VS Code 中编写代码"></a>四、在 VS Code 中编写代码</h2><p>项目打开后，目录结构大致是这样：</p>
+<h2 id="在-VS-Code-中编写代码"><a href="#在-VS-Code-中编写代码" class="headerlink" title="在 VS Code 中编写代码"></a>在 VS Code 中编写代码</h2><p>项目打开后，目录结构大致是这样：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">stm32code-demo/</span><br><span class="line">├── Core/</span><br><span class="line">│   ├── Inc/</span><br><span class="line">│   │   └── main.h           ← 引脚宏定义在这里</span><br><span class="line">│   └── Src/</span><br><span class="line">│       └── main.c           ← 主程序</span><br><span class="line">├── Drivers/                  ← HAL 库和 CMSIS</span><br><span class="line">├── cmake/                    ← CMake 配置</span><br><span class="line">├── CMakeLists.txt            ← CMake 主文件</span><br><span class="line">└── stm32code-demo.ioc        ← CubeMX 配置文件（不要删）</span><br></pre></td></tr></table></figure>
 
-<h3 id="4-1-认识-main-c"><a href="#4-1-认识-main-c" class="headerlink" title="4.1 认识 main.c"></a>4.1 认识 main.c</h3><p>CubeMX 生成的 <code>main.c</code> 骨架代码结构如下：</p>
+<h3 id="认识-main-c"><a href="#认识-main-c" class="headerlink" title="认识 main.c"></a>认识 main.c</h3><p>CubeMX 生成的 <code>main.c</code> 骨架代码结构如下：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();                 <span class="comment">// 1. 初始化 HAL 库</span></span><br><span class="line">    SystemClock_Config();       <span class="comment">// 2. 配置系统时钟</span></span><br><span class="line">    MX_GPIO_Init();             <span class="comment">// 3. 初始化 GPIO（在这里配置引脚）</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">    <span class="comment">// 4. 用户初始化代码写在这里</span></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 5. 主循环 —— 反复执行的逻辑</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
 <p>关键点：**<code>USER CODE BEGIN</code> 和 <code>USER CODE END</code> 之间的代码**，CubeMX 重新生成时不会覆盖。你自己的逻辑都写在这之间。</p>
-<h3 id="4-2-写点灯代码"><a href="#4-2-写点灯代码" class="headerlink" title="4.2 写点灯代码"></a>4.2 写点灯代码</h3><p><strong>让 LED 一直亮：</strong> 不需要写任何代码。<code>MX_GPIO_Init()</code> 里已经通过 <code>HAL_GPIO_WritePin()</code> 设好了初始电平，灯自然会亮。</p>
+<h3 id="写点灯代码"><a href="#写点灯代码" class="headerlink" title="写点灯代码"></a>写点灯代码</h3><p><strong>让 LED 一直亮：</strong> 不需要写任何代码。<code>MX_GPIO_Init()</code> 里已经通过 <code>HAL_GPIO_WritePin()</code> 设好了初始电平，灯自然会亮。</p>
 <p><strong>让 LED 闪烁：</strong> 在 <code>while(1)</code> 里写翻转逻辑：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);    <span class="comment">// PA7 翻转电平</span></span><br><span class="line">  HAL_Delay(<span class="number">500</span>);                             <span class="comment">// 等 500ms</span></span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
 <blockquote>
 <p>如果用到了 User Label，也可以写成 <code>HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);</code></p>
 </blockquote>
-<h3 id="4-4-关于-USER-CODE-区块"><a href="#4-4-关于-USER-CODE-区块" class="headerlink" title="4.4 关于 USER CODE 区块"></a>4.4 关于 USER CODE 区块</h3><p>这是 CubeMX 最贴心的设计之一。每次 CubeMX 重新生成代码时：</p>
+<h3 id="关于-USER-CODE-区块"><a href="#关于-USER-CODE-区块" class="headerlink" title="关于 USER CODE 区块"></a>关于 USER CODE 区块</h3><p>这是 CubeMX 最贴心的设计之一。每次 CubeMX 重新生成代码时：</p>
 <ul>
 <li>✅ <code>USER CODE BEGIN/END</code> 之间的内容会被保留</li>
 <li>❌ 外部的代码会被完全覆盖</li>
@@ -445,8 +445,8 @@
 </tr>
 </tbody></table>
 <hr>
-<h2 id="五、编译"><a href="#五、编译" class="headerlink" title="五、编译"></a>五、编译</h2><p>写好了代码，怎么编译成开发板能运行的机器码？</p>
-<h3 id="5-1-通过-VS-Code-编译"><a href="#5-1-通过-VS-Code-编译" class="headerlink" title="5.1 通过 VS Code 编译"></a>5.1 通过 VS Code 编译</h3><p>在 VS Code 底部状态栏，ST 扩展提供了按钮：</p>
+<h2 id="编译"><a href="#编译" class="headerlink" title="编译"></a>编译</h2><p>写好了代码，怎么编译成开发板能运行的机器码？</p>
+<h3 id="通过-VS-Code-编译"><a href="#通过-VS-Code-编译" class="headerlink" title="通过 VS Code 编译"></a>通过 VS Code 编译</h3><p>在 VS Code 底部状态栏，ST 扩展提供了按钮：</p>
 <ol>
 <li>先点 <strong>齿轮图标  “生成”</strong> → 开始编译</li>
 <li>观察底部终端面板的输出</li>
@@ -460,7 +460,7 @@
 <li><code>stm32code-demo.elf</code> — 可执行文件（包含调试信息）</li>
 <li><code>stm32code-demo.bin</code> — 纯二进制文件（用于烧录）</li>
 </ul>
-<h3 id="5-2-常见编译错误"><a href="#5-2-常见编译错误" class="headerlink" title="5.2 常见编译错误"></a>5.2 常见编译错误</h3><table>
+<h3 id="常见编译错误"><a href="#常见编译错误" class="headerlink" title="常见编译错误"></a>常见编译错误</h3><table>
 <thead>
 <tr>
 <th>错误</th>
@@ -485,8 +485,8 @@
 </tr>
 </tbody></table>
 <hr>
-<h2 id="六、烧录"><a href="#六、烧录" class="headerlink" title="六、烧录"></a>六、烧录</h2><p>编译通过后，把程序下载到开发板上。</p>
-<h3 id="6-1-硬件连接"><a href="#6-1-硬件连接" class="headerlink" title="6.1 硬件连接"></a>6.1 硬件连接</h3><p>ST-Link 和开发板通过 SWD 接口连接，只需要 4 根线：</p>
+<h2 id="烧录"><a href="#烧录" class="headerlink" title="烧录"></a>烧录</h2><p>编译通过后，把程序下载到开发板上。</p>
+<h3 id="硬件连接"><a href="#硬件连接" class="headerlink" title="硬件连接"></a>硬件连接</h3><p>ST-Link 和开发板通过 SWD 接口连接，只需要 4 根线：</p>
 <table>
 <thead>
 <tr>
@@ -514,7 +514,7 @@
 <blockquote>
 <p>有些 ST-Link 还多一根 NRST（复位）线，也可以接上，但不是必须的。</p>
 </blockquote>
-<h3 id="6-2-驱动问题排坑"><a href="#6-2-驱动问题排坑" class="headerlink" title="6.2 驱动问题排坑"></a>6.2 驱动问题排坑</h3><p>插上 ST-Link 后，如果 VS Code 检测不到设备，大概率是驱动没装。</p>
+<h3 id="驱动问题排坑"><a href="#驱动问题排坑" class="headerlink" title="驱动问题排坑"></a>驱动问题排坑</h3><p>插上 ST-Link 后，如果 VS Code 检测不到设备，大概率是驱动没装。</p>
 <p><strong>排坑步骤：</strong></p>
 <ol>
 <li>打开<strong>设备管理器</strong>（Win + X → 设备管理器）</li>
@@ -523,7 +523,7 @@
 <li>装好驱动后，重新插拔 ST-Link</li>
 <li>设备管理器里应该显示正常</li>
 </ol>
-<h3 id="6-3-烧录到开发板"><a href="#6-3-烧录到开发板" class="headerlink" title="6.3 烧录到开发板"></a>6.3 烧录到开发板</h3><p>驱动正常后，在 VS Code 中：</p>
+<h3 id="烧录到开发板"><a href="#烧录到开发板" class="headerlink" title="烧录到开发板"></a>烧录到开发板</h3><p>驱动正常后，在 VS Code 中：</p>
 <ol>
 <li>点击左侧的 <strong>运行和调试</strong> 图标（🦖 或 <code>Ctrl+Shift+D</code>），打开运行和调试面板</li>
 <li>确认下方 <strong>STM32Cube设备与开发板</strong> 列表中能看到 <code>STM32 STLink</code>（<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-device-list.png" alt="STM32设备列表"></li>
@@ -532,7 +532,7 @@
 <li>点击 VS Code 上方调试工具栏中的 <strong>继续</strong> 按钮（▶️ 图标）<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-continue-button.png" alt="点击继续按钮运行程序"></li>
 <li>程序开始运行，LED 灯闪烁 🎉</li>
 </ol>
-<h3 id="6-4-如何确认烧录成功"><a href="#6-4-如何确认烧录成功" class="headerlink" title="6.4 如何确认烧录成功"></a>6.4 如何确认烧录成功</h3><p>烧录完成后，如果代码写的是闪烁逻辑，会看到：</p>
+<h3 id="如何确认烧录成功"><a href="#如何确认烧录成功" class="headerlink" title="如何确认烧录成功"></a>如何确认烧录成功</h3><p>烧录完成后，如果代码写的是闪烁逻辑，会看到：</p>
 <ul>
 <li>LED 以 500ms 的间隔一亮一灭 💡</li>
 <li>这说明：程序成功烧录 → 芯片运行 → GPIO 正常翻转</li>
@@ -559,7 +559,7 @@
 </tr>
 </tbody></table>
 <hr>
-<h2 id="七、总结"><a href="#七、总结" class="headerlink" title="七、总结"></a>七、总结</h2><h3 id="7-1-与传统-Keil-开发的对比"><a href="#7-1-与传统-Keil-开发的对比" class="headerlink" title="7.1 与传统 Keil 开发的对比"></a>7.1 与传统 Keil 开发的对比</h3><table>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="与传统-Keil-开发的对比"><a href="#与传统-Keil-开发的对比" class="headerlink" title="与传统 Keil 开发的对比"></a>与传统 Keil 开发的对比</h3><table>
 <thead>
 <tr>
 <th>对比项</th>
@@ -598,9 +598,9 @@
 <td>平缓（HAL 封装好了，只关心核心功能）</td>
 </tr>
 </tbody></table>
-<h3 id="7-2-工作流总结"><a href="#7-2-工作流总结" class="headerlink" title="7.2 工作流总结"></a>7.2 工作流总结</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">1.  打开 CubeMX → 配引脚 → Generate Code</span><br><span class="line">2.  在 VS Code 中打开项目</span><br><span class="line">3.  在 USER CODE 区域写业务逻辑</span><br><span class="line">4.  Ctrl+Shift+P → STM32: Build</span><br><span class="line">5.  插上 ST-Link 连接开发板</span><br><span class="line">6.  Ctrl+Shift+P → STM32: Download</span><br><span class="line">7.  🎉 灯亮了！</span><br></pre></td></tr></table></figure>
+<h3 id="工作流总结"><a href="#工作流总结" class="headerlink" title="工作流总结"></a>工作流总结</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">1.  打开 CubeMX → 配引脚 → Generate Code</span><br><span class="line">2.  在 VS Code 中打开项目</span><br><span class="line">3.  在 USER CODE 区域写业务逻辑</span><br><span class="line">4.  Ctrl+Shift+P → STM32: Build</span><br><span class="line">5.  插上 ST-Link 连接开发板</span><br><span class="line">6.  Ctrl+Shift+P → STM32: Download</span><br><span class="line">7.  🎉 灯亮了！</span><br></pre></td></tr></table></figure>
 
-<h3 id="7-3-后续学习路线"><a href="#7-3-后续学习路线" class="headerlink" title="7.3 后续学习路线"></a>7.3 后续学习路线</h3><p>点灯是嵌入式开发的 **”Hello World”**，下一步可以学：</p>
+<h3 id="后续学习路线"><a href="#后续学习路线" class="headerlink" title="后续学习路线"></a>后续学习路线</h3><p>点灯是嵌入式开发的 **”Hello World”**，下一步可以学：</p>
 <ul>
 <li><strong>外部中断</strong> —— 按键控制 LED</li>
 <li><strong>定时器&#x2F;PWM</strong> —— 呼吸灯、舵机控制</li>
@@ -700,7 +700,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%B7%A5%E5%85%B7%E9%93%BE%E6%A6%82%E8%A7%88"><span class="nav-number">2.</span> <span class="nav-text">一、工具链概览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E5%AE%89%E8%A3%85%E6%AD%A5%E9%AA%A4"><span class="nav-number">3.</span> <span class="nav-text">二、安装步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E5%AE%89%E8%A3%85-STM32CubeMX"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 安装 STM32CubeMX</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E5%AE%89%E8%A3%85-VS-Code-%E4%B8%8E-STM32-%E6%89%A9%E5%B1%95"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 安装 VS Code 与 STM32 扩展</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E5%AE%89%E8%A3%85-ST-Link-%E9%A9%B1%E5%8A%A8"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 安装 ST-Link 驱动</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%88%9B%E5%BB%BA%E7%AC%AC%E4%B8%80%E4%B8%AA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.</span> <span class="nav-text">三、创建第一个项目</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E5%9C%A8-CubeMX-%E4%B8%AD%E6%96%B0%E5%BB%BA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 在 CubeMX 中新建项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E9%85%8D%E7%BD%AE%E5%BC%95%E8%84%9A"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 配置引脚</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E9%85%8D%E7%BD%AE%E8%B0%83%E8%AF%95%E6%8E%A5%E5%8F%A3"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 配置调试接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E9%80%89%E6%8B%A9%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="nav-number">4.4.</span> <span class="nav-text">3.4 选择工具链</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%9C%A8-VS-Code-%E4%B8%AD%E7%BC%96%E5%86%99%E4%BB%A3%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">四、在 VS Code 中编写代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E8%AE%A4%E8%AF%86-main-c"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 认识 main.c</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-%E5%86%99%E7%82%B9%E7%81%AF%E4%BB%A3%E7%A0%81"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 写点灯代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-%E5%85%B3%E4%BA%8E-USER-CODE-%E5%8C%BA%E5%9D%97"><span class="nav-number">5.3.</span> <span class="nav-text">4.4 关于 USER CODE 区块</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E7%BC%96%E8%AF%91"><span class="nav-number">6.</span> <span class="nav-text">五、编译</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E9%80%9A%E8%BF%87-VS-Code-%E7%BC%96%E8%AF%91"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 通过 VS Code 编译</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-%E5%B8%B8%E8%A7%81%E7%BC%96%E8%AF%91%E9%94%99%E8%AF%AF"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 常见编译错误</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E7%83%A7%E5%BD%95"><span class="nav-number">7.</span> <span class="nav-text">六、烧录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 硬件连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-%E9%A9%B1%E5%8A%A8%E9%97%AE%E9%A2%98%E6%8E%92%E5%9D%91"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 驱动问题排坑</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-%E7%83%A7%E5%BD%95%E5%88%B0%E5%BC%80%E5%8F%91%E6%9D%BF"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 烧录到开发板</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-%E5%A6%82%E4%BD%95%E7%A1%AE%E8%AE%A4%E7%83%A7%E5%BD%95%E6%88%90%E5%8A%9F"><span class="nav-number">7.4.</span> <span class="nav-text">6.4 如何确认烧录成功</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E6%80%BB%E7%BB%93"><span class="nav-number">8.</span> <span class="nav-text">七、总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-%E4%B8%8E%E4%BC%A0%E7%BB%9F-Keil-%E5%BC%80%E5%8F%91%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 与传统 Keil 开发的对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-%E5%B7%A5%E4%BD%9C%E6%B5%81%E6%80%BB%E7%BB%93"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 工作流总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-%E5%90%8E%E7%BB%AD%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF"><span class="nav-number">8.3.</span> <span class="nav-text">7.3 后续学习路线</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">9.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%93%BE%E6%A6%82%E8%A7%88"><span class="nav-number">2.</span> <span class="nav-text">工具链概览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%89%E8%A3%85%E6%AD%A5%E9%AA%A4"><span class="nav-number">3.</span> <span class="nav-text">安装步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-STM32CubeMX"><span class="nav-number">3.1.</span> <span class="nav-text">安装 STM32CubeMX</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-VS-Code-%E4%B8%8E-STM32-%E6%89%A9%E5%B1%95"><span class="nav-number">3.2.</span> <span class="nav-text">安装 VS Code 与 STM32 扩展</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-ST-Link-%E9%A9%B1%E5%8A%A8"><span class="nav-number">3.3.</span> <span class="nav-text">安装 ST-Link 驱动</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E7%AC%AC%E4%B8%80%E4%B8%AA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.</span> <span class="nav-text">创建第一个项目</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8-CubeMX-%E4%B8%AD%E6%96%B0%E5%BB%BA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.1.</span> <span class="nav-text">在 CubeMX 中新建项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E5%BC%95%E8%84%9A"><span class="nav-number">4.2.</span> <span class="nav-text">配置引脚</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E8%B0%83%E8%AF%95%E6%8E%A5%E5%8F%A3"><span class="nav-number">4.3.</span> <span class="nav-text">配置调试接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="nav-number">4.4.</span> <span class="nav-text">选择工具链</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%A8-VS-Code-%E4%B8%AD%E7%BC%96%E5%86%99%E4%BB%A3%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">在 VS Code 中编写代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A4%E8%AF%86-main-c"><span class="nav-number">5.1.</span> <span class="nav-text">认识 main.c</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E7%82%B9%E7%81%AF%E4%BB%A3%E7%A0%81"><span class="nav-number">5.2.</span> <span class="nav-text">写点灯代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E-USER-CODE-%E5%8C%BA%E5%9D%97"><span class="nav-number">5.3.</span> <span class="nav-text">关于 USER CODE 区块</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91"><span class="nav-number">6.</span> <span class="nav-text">编译</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E8%BF%87-VS-Code-%E7%BC%96%E8%AF%91"><span class="nav-number">6.1.</span> <span class="nav-text">通过 VS Code 编译</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E7%BC%96%E8%AF%91%E9%94%99%E8%AF%AF"><span class="nav-number">6.2.</span> <span class="nav-text">常见编译错误</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%83%A7%E5%BD%95"><span class="nav-number">7.</span> <span class="nav-text">烧录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5"><span class="nav-number">7.1.</span> <span class="nav-text">硬件连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A9%B1%E5%8A%A8%E9%97%AE%E9%A2%98%E6%8E%92%E5%9D%91"><span class="nav-number">7.2.</span> <span class="nav-text">驱动问题排坑</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%83%A7%E5%BD%95%E5%88%B0%E5%BC%80%E5%8F%91%E6%9D%BF"><span class="nav-number">7.3.</span> <span class="nav-text">烧录到开发板</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E7%A1%AE%E8%AE%A4%E7%83%A7%E5%BD%95%E6%88%90%E5%8A%9F"><span class="nav-number">7.4.</span> <span class="nav-text">如何确认烧录成功</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">8.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E%E4%BC%A0%E7%BB%9F-Keil-%E5%BC%80%E5%8F%91%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">8.1.</span> <span class="nav-text">与传统 Keil 开发的对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E6%B5%81%E6%80%BB%E7%BB%93"><span class="nav-number">8.2.</span> <span class="nav-text">工作流总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8E%E7%BB%AD%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF"><span class="nav-number">8.3.</span> <span class="nav-text">后续学习路线</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">9.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -763,7 +763,7 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">159k</span>
+    <span title="站点总字数">158k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
