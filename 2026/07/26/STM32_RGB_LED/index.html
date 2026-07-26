@@ -35,7 +35,7 @@
 <meta property="og:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/label_setting.png">
 <meta property="og:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/pinout_overview.png">
 <meta property="article:published_time" content="2026-07-26T11:20:00.000Z">
-<meta property="article:modified_time" content="2026-07-26T04:15:28.930Z">
+<meta property="article:modified_time" content="2026-07-26T08:30:05.975Z">
 <meta property="article:author" content="童诗轩">
 <meta property="article:tag" content="VS Code">
 <meta property="article:tag" content="STM32">
@@ -225,7 +225,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2026-07-26 11:20:00 / 修改时间：04:15:28" itemprop="dateCreated datePublished" datetime="2026-07-26T11:20:00+00:00">2026-07-26</time>
+              <time title="创建时间：2026-07-26 11:20:00 / 修改时间：08:30:05" itemprop="dateCreated datePublished" datetime="2026-07-26T11:20:00+00:00">2026-07-26</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -243,14 +243,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.5k</span>
+              <span>4.1k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>4 分钟</span>
             </span>
             <div class="post-description">在stm32的上一篇博客中，我主要介绍了工具链的安装和第一个点灯程序。这一次我在此基础上更进一步——用三个LED灯做出绚烂流水灯效果，顺便把CubeMX的多引脚配置和状态机编程的思路走一遍。另外，由于该博客网站流量有限，我把成果展示视频放在了b站上，文中有视频链接。</div>
 
@@ -447,26 +447,54 @@
 </tr>
 </thead>
 <tbody><tr>
-<td align="left"><code>HAL_GPIO_WritePin(端口, 引脚, 电平)</code></td>
-<td align="left">设置指定引脚的高低电平</td>
-</tr>
-<tr>
-<td align="left"><code>HAL_GPIO_TogglePin(端口, 引脚)</code></td>
-<td align="left">翻转指定引脚的电平（这次没用上）</td>
+<td align="left"><code>HAL_GPIO_WritePin(GPIO端口, 引脚号, 电平)</code></td>
+<td align="left">设置指定引脚输出高或低电平</td>
 </tr>
 <tr>
 <td align="left"><code>HAL_Delay(毫秒)</code></td>
 <td align="left">延时，单位毫秒</td>
 </tr>
 </tbody></table>
-<p><strong>逻辑分析：</strong></p>
-<p>每个LED的亮灭由 <code>state</code> 的值决定。<code>state</code> 每300ms加1，大于5后归0，形成循环。</p>
-<p>这里每个LED的亮灭条件是用<strong>区间判断</strong>写的，比如绿色LED在 <code>state &gt;= 1 &amp;&amp; state &lt;= 3</code> 时亮。你也可以改成查表法——用一个数组存6种状态，每次读数组取值——逻辑会更清晰，但原理是一样的。</p>
-<p><strong>为什么要用 User Label？</strong></p>
-<p>对比一下两种写法：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 不用 User Label — 要记引脚号</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 用 User Label — 一眼能看懂</span></span><br><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
+<p>重点看 <code>HAL_GPIO_WritePin</code>，它的三个参数分别是：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="left">取值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>GPIO端口</strong></td>
+<td align="left">引脚属于哪个GPIO组（GPIOA、GPIOB…）</td>
+<td align="left"><code>GPIOA</code>、<code>GPIOB</code> 等</td>
+</tr>
+<tr>
+<td align="left"><strong>引脚号</strong></td>
+<td align="left">具体第几个引脚</td>
+<td align="left"><code>GPIO_PIN_0</code>、<code>GPIO_PIN_6</code>、<code>GPIO_PIN_7</code> 等</td>
+</tr>
+<tr>
+<td align="left"><strong>电平</strong></td>
+<td align="left">输出高电平还是低电平</td>
+<td align="left"><code>GPIO_PIN_SET</code>（高电平&#x2F;亮）或 <code>GPIO_PIN_RESET</code>（低电平&#x2F;灭）</td>
+</tr>
+</tbody></table>
+<p>所以 <code>HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET)</code> 的意思就是：<strong>让 GPIOB 组的第 0 号引脚输出高电平</strong>——对应到电路上，就是红色 LED 亮了。</p>
+<p>但问题来了——每次写代码都要记”红色LED在PB0、蓝色在PA6……”，引脚一多根本记不住。这时就体现出 <strong>User Label</strong> 的作用了。</p>
+<p>回头看在 CubeMX 里配置的那几个标签，生成代码后会变成宏定义：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br></pre></td></tr></table></figure>
 
-<p>代码的可读性差距很大。尤其在项目变复杂之后，User Label 能帮你省大量查引脚表的时间。</p>
+<p>这样一来，上面的代码就可以写成：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
+
+<p>不用记引脚号，代码自己就能说明白自己在干什么。对比一下两种写法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 不用 User Label — 每次要回想&quot;PB0是什么灯来着？&quot;</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 用 User Label — 一眼能看懂：红色LED亮</span></span><br><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
+
+<p>在项目只有一两个LED时差距还不明显，但当你同时操作多个引脚时，User Label 能让代码可读性提升一个档次，再也不用对着引脚表一个个对了。</p>
+<p><strong>逻辑分析：</strong></p>
+<p>每个LED的亮灭由 <code>state</code> 的值决定。<code>state</code> 每300ms加1，到5后归0，形成循环。</p>
+<p>这里每个LED的亮灭条件是用<strong>区间判断</strong>写的，比如绿色LED在 <code>state &gt;= 1 &amp;&amp; state &lt;= 3</code> 时亮。你也可以改成查表法——用一个数组存6种状态，每次读数组取值——逻辑会更清晰，但原理是一样的。</p>
 <hr>
 <h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>编译和烧录的步骤和上一篇完全一样，不再重复写一遍了：</p>
 <ol>
