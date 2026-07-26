@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="在stm32的上一篇博客中，我主要介绍了工具链的安装和第一个点灯程序。这一次我在此基础上更进一步——用三个LED灯做出绚烂流水灯效果，顺便把CubeMX的多引脚配置和状态机编程的思路走一遍。另外，由于该博客网站流量有限，我把成果展示视频放在了b站上，文中有视频链接。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——用三色LED打造绚烂流水灯">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/26/STM32_RGB_LED/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="在stm32的上一篇博客中，我主要介绍了工具链的安装和第一个点灯程序。这一次我在此基础上更进一步——用三个LED灯做出绚烂流水灯效果，顺便把CubeMX的多引脚配置和状态机编程的思路走一遍。另外，由于该博客网站流量有限，我把成果展示视频放在了b站上，文中有视频链接。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/schematic.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/pinout_1.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/pinout_2.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/label_setting.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/pinout_overview.png">
+<meta property="article:published_time" content="2026-07-26T11:20:00.000Z">
+<meta property="article:modified_time" content="2026-07-26T04:15:28.930Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="VS Code">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="GPIO">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_RGB_LED/schematic.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/26/STM32_RGB_LED/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——用三色LED打造绚烂流水灯 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/26/STM32_RGB_LED/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——用三色LED打造绚烂流水灯
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-26 11:20:00 / 修改时间：04:15:28" itemprop="dateCreated datePublished" datetime="2026-07-26T11:20:00+00:00">2026-07-26</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+            <div class="post-description">在stm32的上一篇博客中，我主要介绍了工具链的安装和第一个点灯程序。这一次我在此基础上更进一步——用三个LED灯做出绚烂流水灯效果，顺便把CubeMX的多引脚配置和状态机编程的思路走一遍。另外，由于该博客网站流量有限，我把成果展示视频放在了b站上，文中有视频链接。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>这块板子是 keysking大佬开发的集成开发板，板上载了三个LED，分别连接在以下引脚：</p>
+<table>
+<thead>
+<tr>
+<th align="left">LED</th>
+<th align="center">引脚</th>
+<th align="center">控制信号</th>
+<th align="center">限流电阻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">🔴 红色</td>
+<td align="center">PB0</td>
+<td align="center">GPIO 高电平亮</td>
+<td align="center">板载已集成</td>
+</tr>
+<tr>
+<td align="left">🟢 绿色</td>
+<td align="center">PA7</td>
+<td align="center">GPIO 高电平亮</td>
+<td align="center">板载已集成</td>
+</tr>
+<tr>
+<td align="left">🔵 蓝色</td>
+<td align="center">PA6</td>
+<td align="center">GPIO 高电平亮</td>
+<td align="center">板载已集成</td>
+</tr>
+</tbody></table>
+<p>电路原理图是这样的<img src="/./../images/STM32_RGB_LED/schematic.png" alt="schematic"></p>
+<p>电路原理很简单：GPIO 引脚输出高电平时，LED 通过限流电阻接地，灯就亮了。</p>
+<blockquote>
+<p>如果你用的是其他开发板，只需要设置或者查询一下LED对应的引脚号，原理是一样的。</p>
+</blockquote>
+<hr>
+<h2 id="CubeMX-引脚配置"><a href="#CubeMX-引脚配置" class="headerlink" title="CubeMX 引脚配置"></a>CubeMX 引脚配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>打开 CubeMX，新建项目，芯片选择 <strong>STM32F103C8T6</strong>，步骤和上一篇完全一样，不再重复。</p>
+<h3 id="配置三个GPIO引脚"><a href="#配置三个GPIO引脚" class="headerlink" title="配置三个GPIO引脚"></a>配置三个GPIO引脚</h3><p>这次要用到三个引脚，分别控制三个颜色的LED：</p>
+<table>
+<thead>
+<tr>
+<th align="left">LED</th>
+<th align="center">引脚</th>
+<th align="left">功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">🔴 红色</td>
+<td align="center">PB0</td>
+<td align="left">GPIO_Output</td>
+</tr>
+<tr>
+<td align="left">🟢 绿色</td>
+<td align="center">PA7</td>
+<td align="left">GPIO_Output</td>
+</tr>
+<tr>
+<td align="left">🔵 蓝色</td>
+<td align="center">PA6</td>
+<td align="left">GPIO_Output</td>
+</tr>
+</tbody></table>
+<p>在芯片图上依次配置 <strong>PB0 → GPIO_Output</strong>、<strong>PA7 → GPIO_Output</strong>、<strong>PA6 → GPIO_Output</strong>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_RGB_LED/pinout_1.png" alt="pinout_1"></p>
+<p><img src="/./../images/STM32_RGB_LED/pinout_2.png" alt="pinout_2"></p>
+</blockquote>
+<p>配置完成后，右键各个引脚，给每个引脚起一个<strong>User Label</strong>（用户标签），这样生成的代码里就不用记 PB0、PA6 这种编号了，直接写 <code>LED_RED</code>、<code>LED_BLUE</code> 就行，可读性高很多。</p>
+<p>以 PA6 为例：在芯片界面中找到 PA6，在 <code>ENTER User Label</code> 一栏输入 <code>LED_BLUE</code>。同样，PA7 标为 <code>LED_GREEN</code>，PB0 标为 <code>LED_RED</code>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_RGB_LED/label_setting.png" alt="label_setting"></p>
+</blockquote>
+<blockquote>
+<p><img src="/./../images/STM32_RGB_LED/pinout_overview.png" alt="pinout_overview"></p>
+</blockquote>
+<p>其他参数保持默认即可：</p>
+<ul>
+<li><strong>Output mode</strong>：Push-Pull（推挽输出）</li>
+<li><strong>Pull</strong>：No pull（无上下拉）</li>
+<li><strong>Speed</strong>：Low（低速即可，LED不需要高速翻转）</li>
+<li><strong>Initial level</strong>：Low（初始低电平，LED默认熄灭）</li>
+</ul>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>这一步<strong>非常重要</strong>——如果不配，烧录一次后 SWD 就被禁用了，再也烧不进新程序。</p>
+<p>在 System Core → SYS 中，将 <strong>Debug</strong> 设为 <strong>Serial Wire</strong>。</p>
+<blockquote>
+<p>这一步在上一篇博客里也强调过，如果你的项目是从之前的 CubeMX 项目改过来的，记得检查这一步有没有漏掉。</p>
+</blockquote>
+<h3 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h3><p>切换到 <strong>Project Manager</strong> 标签页：</p>
+<table>
+<thead>
+<tr>
+<th>设置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project Name</strong></td>
+<td><code>LED_Blink</code></td>
+</tr>
+<tr>
+<td><strong>Toolchain &#x2F; IDE</strong></td>
+<td><strong>CMake</strong></td>
+</tr>
+<tr>
+<td><strong>Toolchain Location</strong></td>
+<td>保持默认</td>
+</tr>
+</tbody></table>
+<p>点击 <strong>Generate Code</strong>，生成后用 VS Code 打开项目。</p>
+<hr>
+<h2 id="VS-Code-中编写核心代码"><a href="#VS-Code-中编写核心代码" class="headerlink" title="VS Code 中编写核心代码"></a>VS Code 中编写核心代码</h2><h3 id="认识-main-h-中的引脚宏定义"><a href="#认识-main-h-中的引脚宏定义" class="headerlink" title="认识 main.h 中的引脚宏定义"></a>认识 main.h 中的引脚宏定义</h3><p>CubeMX 生成的 <code>main.h</code> 里，User Label 会自动转换成宏定义：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 蓝色 LED — PA6</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_Pin GPIO_PIN_6</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br></pre></td></tr></table></figure>
+
+<p>有了这些宏，后面的代码就不用记引脚号了，直接写 <code>LED_RED_Pin</code> 就行。</p>
+<h3 id="状态机思路"><a href="#状态机思路" class="headerlink" title="状态机思路"></a>状态机思路</h3><p>我们要实现的效果是：三个LED按照不同的组合依次亮灭，通过红绿蓝三色的搭配混合出绚烂的灯光变化。</p>
+<p>这里设计成一个<strong>6状态的循环</strong>，每个状态持续300ms：</p>
+<table>
+<thead>
+<tr>
+<th align="center">状态</th>
+<th align="center">红色(PB0)</th>
+<th align="center">绿色(PA7)</th>
+<th align="center">蓝色(PA6)</th>
+<th align="center">实际颜色</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢灭</td>
+<td align="center">🔵灭</td>
+<td align="center">🔴 红色</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢亮</td>
+<td align="center">🔵灭</td>
+<td align="center">🟡 黄色（红+绿）</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢亮</td>
+<td align="center">🔵亮</td>
+<td align="center">⚪ 白色（红+绿+蓝）</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="center">🔴灭</td>
+<td align="center">🟢亮</td>
+<td align="center">🔵亮</td>
+<td align="center">🟢 青色（绿+蓝）</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="center">🔴灭</td>
+<td align="center">🟢灭</td>
+<td align="center">🔵亮</td>
+<td align="center">🔵 蓝色</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢灭</td>
+<td align="center">🔵亮</td>
+<td align="center">🟣 紫色（红+蓝）</td>
+</tr>
+</tbody></table>
+<p>每300ms切换到下一个状态，完成一轮（6个状态）后回到状态0，一直循环。</p>
+<h3 id="main-c-核心代码"><a href="#main-c-核心代码" class="headerlink" title="main.c 核心代码"></a>main.c 核心代码</h3><p>打开 <code>main.c</code>，在 <code>USER CODE BEGIN 2</code> 中定义一个状态变量：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"><span class="type">int</span> state = <span class="number">0</span>;</span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
+
+<p>然后在 <code>while(1)</code> 中编写状态切换逻辑：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">// 红色LED：状态0、1、2、5 时亮，3、4 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &lt;= <span class="number">2</span> || state == <span class="number">5</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 绿色LED：状态1、2、3 时亮，0、4、5 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &gt;= <span class="number">1</span> &amp;&amp; state &lt;= <span class="number">3</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 蓝色LED：状态2、3、4、5 时亮，0、1 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &gt;= <span class="number">2</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  HAL_Delay(<span class="number">300</span>);  <span class="comment">// 每个状态维持300ms</span></span><br><span class="line">  state++;</span><br><span class="line">  <span class="keyword">if</span> (state &gt; <span class="number">5</span>)</span><br><span class="line">      state = <span class="number">0</span>;   <span class="comment">// 循环回状态0</span></span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 3 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h3><p><strong>用到的HAL函数：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_GPIO_WritePin(端口, 引脚, 电平)</code></td>
+<td align="left">设置指定引脚的高低电平</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_GPIO_TogglePin(端口, 引脚)</code></td>
+<td align="left">翻转指定引脚的电平（这次没用上）</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_Delay(毫秒)</code></td>
+<td align="left">延时，单位毫秒</td>
+</tr>
+</tbody></table>
+<p><strong>逻辑分析：</strong></p>
+<p>每个LED的亮灭由 <code>state</code> 的值决定。<code>state</code> 每300ms加1，大于5后归0，形成循环。</p>
+<p>这里每个LED的亮灭条件是用<strong>区间判断</strong>写的，比如绿色LED在 <code>state &gt;= 1 &amp;&amp; state &lt;= 3</code> 时亮。你也可以改成查表法——用一个数组存6种状态，每次读数组取值——逻辑会更清晰，但原理是一样的。</p>
+<p><strong>为什么要用 User Label？</strong></p>
+<p>对比一下两种写法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 不用 User Label — 要记引脚号</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 用 User Label — 一眼能看懂</span></span><br><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
+
+<p>代码的可读性差距很大。尤其在项目变复杂之后，User Label 能帮你省大量查引脚表的时间。</p>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>编译和烧录的步骤和上一篇完全一样，不再重复写一遍了：</p>
+<ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
+<li>连接 ST-Link，点击<strong>运行和调试</strong> → 选择 STM32Cube:STM32 Launch STLink GDB Server</li>
+<li>点击<strong>继续</strong>按钮，程序开始运行</li>
+</ol>
+<blockquote>
+<p>如果遇到编译或烧录的问题，翻回去看上一篇的排坑部分。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后，三色 LED 会以 300ms 的间隔循环变化：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">红色亮 → 红+绿亮 → 全亮 → 绿+蓝亮 → 蓝色亮 → 红+蓝亮 → 回到红色亮 ...</span><br></pre></td></tr></table></figure>
+
+<p>红色、绿色、蓝色以不同的组合交替出现，看起来就像在调色盘上不断调出新的颜色，比单灯闪烁丰富太多了。</p>
+<blockquote>
+<p>效果展示视频：<a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1dq356YEse/">https://www.bilibili.com/video/BV1dq356YEse/</a></p>
+</blockquote>
+<hr>
+<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><p>这个状态机虽然简单，但稍加扩展就能玩出更多花样：</p>
+<ul>
+<li><strong>改变速度</strong>：把 <code>state++</code> 放到定时器中断里，用按键调节速度</li>
+<li><strong>呼吸效果</strong>：把 GPIO 换成 PWM，LED 就能渐亮渐灭</li>
+<li><strong>更多状态</strong>：把6种组合扩展到 2³ &#x3D; 8 种（全亮&#x2F;全灭也加进来），或者用随机数控制</li>
+<li><strong>查表法</strong>：用一个二维数组存所有状态，<code>while(1)</code> 里取第 <code>state</code> 行的值写入引脚，代码更简洁</li>
+</ul>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的项目相比上一篇的单灯闪烁，主要多了两个新东西：</p>
+<ol>
+<li><strong>多引脚配置</strong> —— CubeMX 里配多个 GPIO，用 User Label 区分</li>
+<li><strong>状态机编程</strong> —— 用一个变量控制多个LED的亮灭组合，比单独控制每个灯要简洁得多</li>
+</ol>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="./STM32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx.html">上一篇文章：《STM32再出发》</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/VS-Code/" rel="tag"># VS Code</a>
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/GPIO/" rel="tag"># GPIO</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/" rel="prev" title="STM32再出发——从Keil转到VSCode+CubeMX">
+      <i class="fa fa-chevron-left"></i> STM32再出发——从Keil转到VSCode+CubeMX
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E5%8E%9F%E7%90%86"><span class="nav-number">1.</span> <span class="nav-text">硬件原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E5%BC%95%E8%84%9A%E9%85%8D%E7%BD%AE"><span class="nav-number">2.</span> <span class="nav-text">CubeMX 引脚配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E5%BB%BA%E9%A1%B9%E7%9B%AE"><span class="nav-number">2.1.</span> <span class="nav-text">新建项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E4%B8%89%E4%B8%AAGPIO%E5%BC%95%E8%84%9A"><span class="nav-number">2.2.</span> <span class="nav-text">配置三个GPIO引脚</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E8%B0%83%E8%AF%95%E6%8E%A5%E5%8F%A3"><span class="nav-number">2.3.</span> <span class="nav-text">配置调试接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%9F%E6%88%90%E4%BB%A3%E7%A0%81"><span class="nav-number">2.4.</span> <span class="nav-text">生成代码</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VS-Code-%E4%B8%AD%E7%BC%96%E5%86%99%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">3.</span> <span class="nav-text">VS Code 中编写核心代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A4%E8%AF%86-main-h-%E4%B8%AD%E7%9A%84%E5%BC%95%E8%84%9A%E5%AE%8F%E5%AE%9A%E4%B9%89"><span class="nav-number">3.1.</span> <span class="nav-text">认识 main.h 中的引脚宏定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%8A%B6%E6%80%81%E6%9C%BA%E6%80%9D%E8%B7%AF"><span class="nav-number">3.2.</span> <span class="nav-text">状态机思路</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#main-c-%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">3.3.</span> <span class="nav-text">main.c 核心代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E8%AE%B2%E8%A7%A3"><span class="nav-number">3.4.</span> <span class="nav-text">代码讲解</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91-%E7%83%A7%E5%BD%95"><span class="nav-number">4.</span> <span class="nav-text">编译 &amp; 烧录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E5%B1%95%E7%A4%BA"><span class="nav-number">5.</span> <span class="nav-text">效果展示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E9%98%B6%E6%80%9D%E8%B7%AF"><span class="nav-number">6.</span> <span class="nav-text">进阶思路</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">7.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">8.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">23</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">163k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:28</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
