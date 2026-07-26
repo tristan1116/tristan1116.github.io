@@ -25,7 +25,7 @@
   <meta name="description" content="经过我一段时间的摸索，我发现claude code是比claude desktop更好用、更方便、更稳定的agent工具。我认为，即便是没有任何IT方面知识的普通人，都能够在很短的时间内上手使用它。所以有了这篇博客--我尝试用一篇文章，一步一步手把手教会普通人，如何在自己的电脑上部署目前最先进、最强大的ai agent工具之一--claude code。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴">
-<meta property="og:url" content="http://tristan1116.github.io/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/index.html">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4_%E5%A4%87%E4%BB%BD_2026-07-26/index.html">
 <meta property="og:site_name" content="童诗轩的博客网站">
 <meta property="og:description" content="经过我一段时间的摸索，我发现claude code是比claude desktop更好用、更方便、更稳定的agent工具。我认为，即便是没有任何IT方面知识的普通人，都能够在很短的时间内上手使用它。所以有了这篇博客--我尝试用一篇文章，一步一步手把手教会普通人，如何在自己的电脑上部署目前最先进、最强大的ai agent工具之一--claude code。">
 <meta property="og:locale" content="zh_CN">
@@ -44,7 +44,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://tristan1116.github.io/images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722191348760.png">
 
-<link rel="canonical" href="http://tristan1116.github.io/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/">
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4_%E5%A4%87%E4%BB%BD_2026-07-26/">
 
 
 <script id="page-configurations">
@@ -200,7 +200,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4_%E5%A4%87%E4%BB%BD_2026-07-26/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
@@ -268,10 +268,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>最近 Kimi 新出的 K3 模型很火，也很强。我研究之后发现，虽然它确实很强，但它很昂贵，很慢。在它开源降价提速前，我认为，对大多数人来说，它暂时还不是一个非常实用的选择。</p>
-<p>所以 Claude Code + DeepSeek 是目前性价比最高、普通人真正能用上的组合：速度快（Flash 模型基本秒回），价格便宜（充十块钱能用很久），而且人人都能轻松上手。</p>
-<p>下面我就从零开始，一步步教你怎么配置和使用。</p>
-<h2 id="上篇：手把手安装配置"><a href="#上篇：手把手安装配置" class="headerlink" title="上篇：手把手安装配置"></a>上篇：手把手安装配置</h2><h3 id="🤔-先判断一下：你是否需要-Claude-Code？"><a href="#🤔-先判断一下：你是否需要-Claude-Code？" class="headerlink" title="🤔 先判断一下：你是否需要 Claude Code？"></a>🤔 先判断一下：你是否需要 Claude Code？</h3><p>Claude Code 和网页版 AI 都是同一种AI 大脑，但使用方式和性能不同。下面这个表格可以帮你判断自己适合哪个：</p>
+        <h2 id="上篇：手把手安装配置"><a href="#上篇：手把手安装配置" class="headerlink" title="上篇：手把手安装配置"></a>上篇：手把手安装配置</h2><h3 id="🤔-先判断一下：你是否需要-Claude-Code？"><a href="#🤔-先判断一下：你是否需要-Claude-Code？" class="headerlink" title="🤔 先判断一下：你是否需要 Claude Code？"></a>🤔 先判断一下：你是否需要 Claude Code？</h3><p>Claude Code 和网页版 AI 都是同一种AI 大脑，但使用方式和性能不同。下面这个表格可以帮你判断自己适合哪个：</p>
 <table>
 <thead>
 <tr>
@@ -938,13 +935,8 @@
 <p>Claude Code 读了 <code>.vscode/tasks.json</code>，立刻定位到问题：<code>&quot;$&#123;file&#125;&quot;</code> 只编译当前打开的单个文件，改成 <code>&quot;$&#123;fileDirname&#125;\\*.c&quot;</code> 就好了。还给出了修改前后的对比表格和验证方法。</p>
 <p>这个排查过程如果用搜索引擎，要学会描述问题、筛选结果、判断哪个答案适合自己的环境。我以前就经常卡在这一步。现在 Claude Code 直接读我的配置文件，一步到位。</p>
 <hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>我不太愿意用”工具”来描述claude code，它太智能了。</p>
-<p>就像我喜欢看的钢铁侠，唯一一个凭借自己的知识成为英雄的人，有一个ai助手–贾维斯，随时随地帮他分析、计算、兜底。</p>
-<p>当然，我不是钢铁侠，Claude Code 也不是贾维斯。</p>
-<p>但只要你用过它，你就会懂这种感觉——<br>在终端里敲几行字，按下回车，<br>整个屏幕开始滚动，代码一行一行地刷新。</p>
-<p>它时不时停下来问你：<br>“我要读这个文件，可以吗？”<br>“这里有个 bug，我帮你修了，你看看对不对？”<br>“这篇博客写好了，你要不要调整一下语气？”</p>
-<p>就像一个很靠谱的搭档，坐在你旁边跟你一起干活。<br>盯着屏幕，那种”旁边有个人”的踏实感，<br>确实跟以前一个人闷头学的时候，完全不一样了。</p>
-<p>如果你也在学什么东西，希望它也能给你这种感觉。😊</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>最近新发布的kimi k3模型很火，但我研究了之后发现，k3确实很强，但它很昂贵，很慢，不适合大部分人使用，至少在它还没开源前是这样。所有claude code + deepseek，就是我们目前能够遇到的最好用的工具，我甚至不太愿意用“工具”这个词来描述它，它太智能了。</p>
+<p>我很喜欢漫威的电影，尤其是钢铁侠，他是唯一一个靠自己的知识成为英雄的普通人。他有一个专属的ai助手，贾维斯，随时随地帮他分析、计算、兜底。当然，Claude Code 不是贾维斯，我也不是钢铁侠。但自从有了它，我也有了一个专属于我的ai助手，我可以随时随地召唤它帮我做事–就像在电影里那样。</p>
 <hr>
 <blockquote>
 <p>📌 Claude Code 官方文档：<a target="_blank" rel="noopener" href="https://docs.anthropic.com/en/docs/claude-code">https://docs.anthropic.com/en/docs/claude-code</a></p>
@@ -970,12 +962,12 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4_%E5%A4%87%E4%BB%BD_2026-07-26/" rel="prev" title="Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴">
-      <i class="fa fa-chevron-left"></i> Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴
+    <a href="/2026/07/18/%E6%B4%9B%E8%B0%B7P1328-%E7%94%9F%E6%B4%BB%E5%A4%A7%E7%88%86%E7%82%B8%E7%89%88%E7%9F%B3%E5%A4%B4%E5%89%AA%E5%88%80%E5%B8%83-%E9%A2%98%E8%A7%A3/" rel="prev" title="洛谷P1328 - 生活大爆炸版石头剪刀布 - 题解">
+      <i class="fa fa-chevron-left"></i> 洛谷P1328 - 生活大爆炸版石头剪刀布 - 题解
     </a></div>
       <div class="post-nav-item">
-    <a href="/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/" rel="next" title="前缀和与差分 —— 从概念到公式">
-      前缀和与差分 —— 从概念到公式 <i class="fa fa-chevron-right"></i>
+    <a href="/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/" rel="next" title="Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴">
+      Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
