@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="前面三篇博客分别介绍了点灯、RGB流水灯和按键输入，已经用到了GPIO的推挽输出和上拉输入等模式。但GPIO一共有八种工作模式，它们在内部电路上有什么区别？什么时候该用哪种？本文从内部电路结构出发，逐一拆解这八大模式，帮助理解背后&quot;为什么&quot;。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32--浅析GPIO八大模式">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/27/stm32-gpio-eight-modes/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="前面三篇博客分别介绍了点灯、RGB流水灯和按键输入，已经用到了GPIO的推挽输出和上拉输入等模式。但GPIO一共有八种工作模式，它们在内部电路上有什么区别？什么时候该用哪种？本文从内部电路结构出发，逐一拆解这八大模式，帮助理解背后&quot;为什么&quot;。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-gpio-eight-modes/image-20260727221629861.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727213728237.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727214136258.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727214222002.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727214346566.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727214716103.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727214908086.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727215442581.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/image-20260727215312807.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/alternate_output.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/alternate_input.png">
+<meta property="article:published_time" content="2026-07-27T10:02:02.000Z">
+<meta property="article:modified_time" content="2026-07-27T14:18:23.188Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="GPIO">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/stm32-gpio-eight-modes/image-20260727221629861.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/27/stm32-gpio-eight-modes/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32--浅析GPIO八大模式 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/27/stm32-gpio-eight-modes/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32--浅析GPIO八大模式
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-27 10:02:02 / 修改时间：14:18:23" itemprop="dateCreated datePublished" datetime="2026-07-27T10:02:02+00:00">2026-07-27</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>4 分钟</span>
+            </span>
+            <div class="post-description">前面三篇博客分别介绍了点灯、RGB流水灯和按键输入，已经用到了GPIO的推挽输出和上拉输入等模式。但GPIO一共有八种工作模式，它们在内部电路上有什么区别？什么时候该用哪种？本文从内部电路结构出发，逐一拆解这八大模式，帮助理解背后"为什么"。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>回顾前面三篇博客，我们已经接触过几种 GPIO 模式：</p>
+<table>
+<thead>
+<tr>
+<th align="left">博客</th>
+<th align="left">用到的 GPIO 模式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">STM32再出发</a></td>
+<td align="left"><strong>推挽输出</strong>（驱动 LED）</td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/07/26/STM32_RGB_LED/">三色LED流水灯</a></td>
+<td align="left"><strong>推挽输出</strong>（三个 LED，状态机控制）</td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/07/26/STM32_Key_Input/">按键输入</a></td>
+<td align="left"><strong>上拉输入</strong>（KEY2 内部上拉）+ <strong>浮空输入+外部上拉</strong>（KEY1 板载上拉）</td>
+</tr>
+</tbody></table>
+<p>除了上述几种模式，GPIO还有其他的输入输出模式。这篇文章就是对于GPIO八大模式的总结和梳理，顺便把前几篇博客里实际用到的 GPIO 模式串联起来分析一下。</p>
+<hr>
+<h2 id="GPIO-内部结构速览"><a href="#GPIO-内部结构速览" class="headerlink" title="GPIO 内部结构速览"></a>GPIO 内部结构速览</h2><p>在拆解 8 种模式之前，先认识一下 GPIO 引脚内部的核心组件。</p>
+<blockquote>
+<p><img src="/./../images/stm32-gpio-eight-modes/image-20260727221629861.png" alt="image-20260727221629861"></p>
+</blockquote>
+<h3 id="关键元件"><a href="#关键元件" class="headerlink" title="关键元件"></a>关键元件</h3><table>
+<thead>
+<tr>
+<th align="left">元件</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>保护二极管</strong></td>
+<td align="left">钳位电压：引脚电压 &gt; VDD 时电流引入 VDD，&lt; VSS 时引入 VSS，防止高压损坏芯片</td>
+</tr>
+<tr>
+<td align="left"><strong>施密特触发器</strong></td>
+<td align="left">将模拟电压转换为干净的数字电平，具备滞回特性，有效抗噪声</td>
+</tr>
+<tr>
+<td align="left"><strong>上拉&#x2F;下拉电阻</strong></td>
+<td align="left">输入模式下决定悬空引脚的电平状态，约 40kΩ，可软件配置</td>
+</tr>
+<tr>
+<td align="left"><strong>P-MOS</strong></td>
+<td align="left">输出驱动器的上管，导通时将引脚接到 VDD（输出高电平）</td>
+</tr>
+<tr>
+<td align="left"><strong>N-MOS</strong></td>
+<td align="left">输出驱动器的下管，导通时将引脚接到 VSS（输出低电平）</td>
+</tr>
+<tr>
+<td align="left"><strong>输出寄存器</strong></td>
+<td align="left">锁存 CPU 要输出的电平值</td>
+</tr>
+<tr>
+<td align="left"><strong>输入寄存器</strong></td>
+<td align="left">锁存引脚上当前的电平值</td>
+</tr>
+</tbody></table>
+<p>GPIO 内部的工作模式，本质上就是<strong>控制这些开关元件的通断组合</strong>。不同的通断组合 &#x3D; 不同的工作模式。</p>
+<hr>
+<h2 id="输入模式（4种）"><a href="#输入模式（4种）" class="headerlink" title="输入模式（4种）"></a>输入模式（4种）</h2><p>输入模式的核心：<strong>数据从引脚 → 内部总线</strong>（CPU 读取）。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727213728237.png" alt="image-20260727213728237"></p>
+</blockquote>
+<h3 id="1-浮空输入"><a href="#1-浮空输入" class="headerlink" title="1. 浮空输入"></a>1. 浮空输入</h3><p><strong>内部状态：</strong> 上下拉电阻均断开，施密特触发器导通。</p>
+<p><strong>引脚状态：</strong> 完全由外部电路决定。如果引脚什么都不接，电平是不确定的——可能是高、可能是低、甚至可能是中间电平。</p>
+<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>No pull</code></p>
+<p><strong>实际例子：</strong> 按键输入博客里的 <strong>KEY1（PB12）</strong> 用的就是”浮空输入 + 外部上拉电阻”。板子上已经焊了一个上拉电阻把 PB12 拉到 VDD，所以引脚悬空时是确定的——高电平。按下按键接地，读到低电平。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214136258.png" alt="image-20260727214136258"></p>
+</blockquote>
+<h3 id="2-上拉输入"><a href="#2-上拉输入" class="headerlink" title="2. 上拉输入"></a>2. 上拉输入</h3><p><strong>内部状态：</strong> 内部上拉电阻（约 40kΩ）接通到 VDD，施密特触发器导通。</p>
+<p><strong>引脚状态：</strong> 悬空时默认高电平。外部驱动为低电平时，可以读到低电平。</p>
+<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>Pull-up</code></p>
+<p><strong>实际例子：</strong> 按键输入博客里的 <strong>KEY2（PB13）</strong> 用的就是内部上拉。这个引脚板子上没有配外部上拉电阻，所以在 CubeMX 中配置 <code>Pull-up</code>，让芯片内部的电阻来负责拉高。功能和 KEY1 一样，只是上拉电阻的位置不同——一个在芯片外面，一个在芯片里面。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214222002.png" alt="image-20260727214222002"></p>
+</blockquote>
+<h3 id="3-下拉输入"><a href="#3-下拉输入" class="headerlink" title="3. 下拉输入"></a>3. 下拉输入</h3><p><strong>内部状态：</strong> 内部下拉电阻（约 40kΩ）接通到 VSS，施密特触发器导通。</p>
+<p><strong>引脚状态：</strong> 悬空时默认低电平。外部驱动为高电平时，可以读到高电平。</p>
+<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>Pull-down</code></p>
+<p><strong>和上拉输入的关系：</strong> 上拉和下拉是对称的——上拉是电阻接到 VDD（默认高），下拉是电阻接到 VSS（默认低）。</p>
+<h3 id="4-模拟输入"><a href="#4-模拟输入" class="headerlink" title="4. 模拟输入"></a>4. 模拟输入</h3><p><strong>内部状态：</strong> 施密特触发器关闭（数字输入路径断开），引脚直接连接到 ADC 模块的模拟开关。</p>
+<p><strong>引脚状态：</strong> 不读高低电平，读电压模拟量。</p>
+<p><strong>在 CubeMX 中：</strong> 引脚功能选 <code>ADC_INx</code>（比如 ADC1_IN0），或直接选 <code>GPIO_Analog</code></p>
+<p><strong>用途：</strong> ADC 采样。比如读取电位器电压、温度传感器输出等。后续学到 ADC 时会用到。</p>
+<hr>
+<h2 id="输出模式（4种）"><a href="#输出模式（4种）" class="headerlink" title="输出模式（4种）"></a>输出模式（4种）</h2><p>输出模式的核心：<strong>数据从内部总线 → 引脚</strong>（CPU 写值出去），同时也可以回读引脚当前电平。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214346566.png" alt="image-20260727214346566"></p>
+</blockquote>
+<h3 id="5-推挽输出"><a href="#5-推挽输出" class="headerlink" title="5. 推挽输出"></a>5. 推挽输出</h3><p><strong>内部状态：</strong> 输出寄存器控制 P-MOS 和 N-MOS 交替导通：</p>
+<table>
+<thead>
+<tr>
+<th align="center">输出</th>
+<th align="center">P-MOS</th>
+<th align="center">N-MOS</th>
+<th align="center">引脚电平</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="center">导通</td>
+<td align="center">断开</td>
+<td align="center">VDD（高电平）</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">断开</td>
+<td align="center">导通</td>
+<td align="center">VSS（低电平）</td>
+</tr>
+</tbody></table>
+<p><strong>在 CubeMX 中：</strong> <code>GPIO_Output</code> → <code>Output Mode</code> 选 <code>Push-Pull</code></p>
+<p><strong>特点：</strong> 驱动能力强，高电平和低电平都能主动输出。这是最常用的输出模式。</p>
+<p><strong>实际例子：</strong> 前两篇博客所有的 LED 点灯代码全都是<strong>推挽输出</strong>。翻开 CubeMX 配置能看到：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">PA7 Output Mode:  Push-Pull</span><br><span class="line">PA6 Output Mode:  Push-Pull</span><br><span class="line">PB0 Output Mode:  Push-Pull</span><br></pre></td></tr></table></figure>
+
+<p>LED 需要足够的电流才能亮，推挽输出的驱动能力正好满足需求。</p>
+<blockquote>
+<p>下面是推挽输出控制I&#x2F;O口，输出高电平和低电平的电流流通图（假设I&#x2F;O口连接一个小灯，小灯另一端连接GND）</p>
+</blockquote>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214716103.png" alt="image-20260727214716103"></p>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214908086.png" alt="image-20260727214908086"></p>
+</blockquote>
+<h3 id="6-开漏输出"><a href="#6-开漏输出" class="headerlink" title="6. 开漏输出"></a>6. 开漏输出</h3><p><strong>内部状态：</strong> P-MOS 始终断开（不工作），只有 N-MOS 受控：</p>
+<table>
+<thead>
+<tr>
+<th align="center">输出</th>
+<th align="center">P-MOS</th>
+<th align="center">N-MOS</th>
+<th align="center">引脚电平</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="center">断开</td>
+<td align="center">断开</td>
+<td align="center"><strong>高阻态</strong>（引脚浮空）</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">断开</td>
+<td align="center">导通</td>
+<td align="center">VSS（低电平）</td>
+</tr>
+</tbody></table>
+<p><strong>在 CubeMX 中：</strong> <code>GPIO_Output</code> → <code>Output Mode</code> 选 <code>Open-Drain</code></p>
+<p><strong>关键区别：</strong> 推挽能主动输出高电平，开漏不行。开漏输出高电平时引脚处于高阻态——必须靠<strong>外部上拉电阻</strong>才能拉高到想要的电压。</p>
+<blockquote>
+<p>下面是开漏输出控制I&#x2F;O口，输出高电平和低电平的电流流通图（假设I&#x2F;O口连接一个小灯，小灯另一端连接来自外部的5V而非GND）</p>
+<p>注意：此时需要使用5V容忍的I&#x2F;O口，不能用普通的，否则会使上方的保护二极管长期导通，将5V引入电源中，造成损坏。</p>
+</blockquote>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727215442581.png" alt="image-20260727215442581"></p>
+<p><img src="/./../images/gpio_eight_modes/image-20260727215312807.png" alt="image-20260727215312807"></p>
+</blockquote>
+<h3 id="推挽输出-vs-开漏输出-对比"><a href="#推挽输出-vs-开漏输出-对比" class="headerlink" title="推挽输出 vs 开漏输出 对比"></a>推挽输出 vs 开漏输出 对比</h3><table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">推挽输出</th>
+<th align="left">开漏输出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>高电平</strong></td>
+<td align="left">P-MOS 激活 N-MOS 断开，3.3V</td>
+<td align="left">P-MOS 断开 N-MOS 断开，由外部电路决定</td>
+</tr>
+<tr>
+<td align="left"><strong>低电平</strong></td>
+<td align="left">P-MOS 断开 N-MOS 激活，0V</td>
+<td align="left">P-MOS 断开 N-MOS 激活，0V</td>
+</tr>
+<tr>
+<td align="left"><strong>优点</strong></td>
+<td align="left">可以直接输出 3.3V</td>
+<td align="left">配合外部电路更加灵活</td>
+</tr>
+<tr>
+<td align="left"><strong>缺点</strong></td>
+<td align="left">只能输出 3.3V</td>
+<td align="left">高电平实际是高阻态，无法输出电流</td>
+</tr>
+</tbody></table>
+<p><strong>为什么需要开漏输出？两个经典场景：</strong></p>
+<p><strong>场景一：电平转换</strong><br>如果芯片是 3.3V 的，但想驱动一个 5V 的器件——开漏输出 + 外部上拉到 5V 就能实现。推挽输出去接的话，3.3V 的高电平可能不被识别为高电平。</p>
+<p><strong>场景二：I2C 通信的”线与”</strong><br>多个器件共享一根数据线（SDA），任何一个器件都可以把总线拉低。如果其中一个输出高电平，另一个同时输出低电平，用推挽输出的话两个 MOS 管会”打架”（短路风险）。开漏输出+上拉电阻天然支持这种”谁都可以拉低”的结构。</p>
+<h3 id="7-复用推挽输出"><a href="#7-复用推挽输出" class="headerlink" title="7. 复用推挽输出"></a>7. 复用推挽输出</h3><p><strong>内部状态：</strong> 和推挽输出电路完全一样，只不过控制 P-MOS&#x2F;N-MOS 的信号不再是输出寄存器，而是<strong>片上外设</strong>（USART、SPI、定时器等）。</p>
+<p><strong>在 CubeMX 中：</strong> 配置外设时自动设置（比如把 PA9 配成 USART1_TX，CubeMX 自动设为复用推挽）</p>
+<p><strong>实际例子：</strong> 以后配串口时，CubeMX 的提示里多半就是这个。</p>
+<h3 id="8-复用开漏输出"><a href="#8-复用开漏输出" class="headerlink" title="8. 复用开漏输出"></a>8. 复用开漏输出</h3><p><strong>内部状态：</strong> 和开漏输出电路完全一样，只不过控制 N-MOS 的信号来自<strong>片上外设</strong>。</p>
+<p><strong>在 CubeMX 中：</strong> 配置外设时自动设置（比如把 PB6 配成 I2C1_SCL，CubeMX 自动设为复用开漏）</p>
+<p><strong>实际例子：</strong> I2C 通信。如果使用硬件 I2C 外设（而不是软件模拟），SCL 和 SDA 引脚会被配置为复用开漏输出。</p>
+<blockquote>
+<p>下面两张图为普通的输出和复用的输出的电流流经图</p>
+<p><img src="/./../images/gpio_eight_modes/alternate_output.png" alt="alt_output"></p>
+<p><img src="/./../images/gpio_eight_modes/alternate_input.png" alt="alt_input"></p>
+</blockquote>
+<hr>
+<h2 id="为什么没有”复用输入”模式？"><a href="#为什么没有”复用输入”模式？" class="headerlink" title="为什么没有”复用输入”模式？"></a>为什么没有”复用输入”模式？</h2><p>留意到一个问题：输出模式有普通和复用两种，但输入模式只有 4 种，没有”复用输入”这个分类。</p>
+<p>原因是输入模式下，普通输入和复用功能<strong>共用同一路信号</strong>——都通过施密特触发器，送到输入寄存器，同时也送给片上外设。</p>
+<p>所以无论引脚工作在什么模式下（只要不是模拟输入），外设都能读到引脚的值。不需要额外的”复用输入”模式。</p>
+<blockquote>
+<p>有例外：ADC 的模拟输入走的是独立路径（不走施密特触发器），所以模拟输入被划为独立的输入模式。</p>
+</blockquote>
+<hr>
+<h2 id="八大模式速查表"><a href="#八大模式速查表" class="headerlink" title="八大模式速查表"></a>八大模式速查表</h2><table>
+<thead>
+<tr>
+<th align="center">编号</th>
+<th align="left">模式</th>
+<th align="center">方向</th>
+<th align="left">核心特点</th>
+<th align="left">典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left">浮空输入</td>
+<td align="center">输入</td>
+<td align="left">上下拉全关，电平完全由外部决定</td>
+<td align="left">外部已有上下拉电阻的按键</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">上拉输入</td>
+<td align="center">输入</td>
+<td align="left">内部接 VDD，默认高电平</td>
+<td align="left">无外部上拉的按键</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">下拉输入</td>
+<td align="center">输入</td>
+<td align="left">内部接 VSS，默认低电平</td>
+<td align="left">默认需为低电平的输入</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">模拟输入</td>
+<td align="center">输入</td>
+<td align="left">绕开施密特触发器，直通 ADC</td>
+<td align="left">ADC 采样</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="left">推挽输出</td>
+<td align="center">输出</td>
+<td align="left">P&#x2F;N-MOS 交替，可主动输出高低</td>
+<td align="left">驱动 LED、普通数字信号</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="left">开漏输出</td>
+<td align="center">输出</td>
+<td align="left">只有 N-MOS，高阻态需外部上拉</td>
+<td align="left">I2C、电平转换</td>
+</tr>
+<tr>
+<td align="center">7</td>
+<td align="left">复用推挽</td>
+<td align="center">输出</td>
+<td align="left">信号源改由外设控制</td>
+<td align="left">串口 TX、PWM、SPI</td>
+</tr>
+<tr>
+<td align="center">8</td>
+<td align="left">复用开漏</td>
+<td align="center">输出</td>
+<td align="left">外设控制 + 开漏特性</td>
+<td align="left">硬件 I2C</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="从前面三篇博客回看-GPIO-配置"><a href="#从前面三篇博客回看-GPIO-配置" class="headerlink" title="从前面三篇博客回看 GPIO 配置"></a>从前面三篇博客回看 GPIO 配置</h2><h3 id="第一篇：STM32再出发-—-PA7-推挽输出"><a href="#第一篇：STM32再出发-—-PA7-推挽输出" class="headerlink" title="第一篇：STM32再出发 — PA7 推挽输出"></a>第一篇：STM32再出发 — PA7 推挽输出</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// CubeMX 配置：PA7 → GPIO_Output, Push-Pull, No pull, Low speed</span></span><br><span class="line">HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  <span class="comment">// 翻转电平</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);  <span class="comment">// 拉高</span></span><br></pre></td></tr></table></figure>
+
+<p>LED 是纯数字负载，只需要开关两个状态就够。推挽输出的高电平驱动电流足以点亮 LED。</p>
+<h3 id="第二篇：三色LED流水灯-—-三个推挽输出"><a href="#第二篇：三色LED流水灯-—-三个推挽输出" class="headerlink" title="第二篇：三色LED流水灯 — 三个推挽输出"></a>第二篇：三色LED流水灯 — 三个推挽输出</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">PB0 → Push-Pull  (LED_RED)</span><br><span class="line">PA7 → Push-Pull  (LED_GREEN)</span><br><span class="line">PA6 → Push-Pull  (LED_BLUE)</span><br></pre></td></tr></table></figure>
+
+<p>三个 LED 都一样，推挽输出 + 状态机控制亮灭组合。没有特殊情况需要特殊模式。</p>
+<h3 id="第三篇：按键输入-—-KEY1-浮空输入，KEY2-上拉输入"><a href="#第三篇：按键输入-—-KEY1-浮空输入，KEY2-上拉输入" class="headerlink" title="第三篇：按键输入 — KEY1 浮空输入，KEY2 上拉输入"></a>第三篇：按键输入 — KEY1 浮空输入，KEY2 上拉输入</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// KEY1（PB12）：浮空输入，板载外部上拉 → 按下读低电平</span></span><br><span class="line"><span class="comment">// KEY2（PB13）：内部上拉输入，CubeMX 配 Pull-up → 按下读低电平</span></span><br><span class="line"><span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    <span class="comment">// 按键被按下</span></span><br></pre></td></tr></table></figure>
+
+<p>这里就体现了两种输入模式的选择差异——<strong>外部已有上拉电阻的用浮空输入，没有的就用内部上拉。</strong> 同一个功能（按键检测），因为硬件设计不同，选择的 GPIO 模式也不同。</p>
+<hr>
+<h2 id="进阶：一些值得思考的问题"><a href="#进阶：一些值得思考的问题" class="headerlink" title="进阶：一些值得思考的问题"></a>进阶：一些值得思考的问题</h2><h3 id="1-推挽输出能同时输出高和低吗？"><a href="#1-推挽输出能同时输出高和低吗？" class="headerlink" title="1. 推挽输出能同时输出高和低吗？"></a>1. 推挽输出能同时输出高和低吗？</h3><p><strong>不能。</strong> P-MOS 和 N-MOS 是交替工作的，不可能同时导通。如果两者不小心同时导通了（称为”穿通”），VDD 和 VSS 直接短路，电流瞬间增大，芯片会发热甚至烧毁。幸好 CubeMX 和 HAL 库会处理好这些，不需要我们操心。</p>
+<h3 id="2-开漏输出为什么不内置上拉电阻？"><a href="#2-开漏输出为什么不内置上拉电阻？" class="headerlink" title="2. 开漏输出为什么不内置上拉电阻？"></a>2. 开漏输出为什么不内置上拉电阻？</h3><p>因为上拉电阻的值需要根据应用场景决定。I2C 总线通常用 4.7kΩ，高速时会用 1.5kΩ，低功耗场合会用到 10kΩ。ST 不知道你的应用场景，所以把选择权留给了用户。</p>
+<h3 id="3-GPIO-速度（Speed）选-Low-还是-High？"><a href="#3-GPIO-速度（Speed）选-Low-还是-High？" class="headerlink" title="3. GPIO 速度（Speed）选 Low 还是 High？"></a>3. GPIO 速度（Speed）选 Low 还是 High？</h3><p>与 GPIO 模式无关但值得注意。在 CubeMX 配置里有个 <code>Maximum output speed</code> 选项：</p>
+<table>
+<thead>
+<tr>
+<th align="left">速度等级</th>
+<th align="left">适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Low (2MHz)</td>
+<td align="left">LED、按键、普通 GPIO 信号</td>
+</tr>
+<tr>
+<td align="left">Medium (10MHz)</td>
+<td align="left">串口、中等频率信号</td>
+</tr>
+<tr>
+<td align="left">High (50MHz)</td>
+<td align="left">SPI、高速通信</td>
+</tr>
+</tbody></table>
+<p>速度越高，功耗越大、电磁干扰越强。所以对于 LED 这种低速应用，选 Low 就够了，没必要开 High。前两篇博客里选的 <code>Low</code> 是正确的选择。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>学完这 8 种模式再回头看 CubeMX 的引脚配置界面，选项就不再是零散的下拉菜单了——每个选项对应的是内部某条电路的开关状态：</p>
+<ul>
+<li>选 <code>Input</code> 还是 <code>Output</code> → 决定输入驱动还是输出驱动接入引脚</li>
+<li>选 <code>Pull-up/No pull/Pull-down</code> → 决定内部上拉&#x2F;下拉电阻是否接通</li>
+<li>选 <code>Push-Pull/Open-Drain</code> → 决定 P-MOS 是否参与工作</li>
+<li>选 <code>GPIO/Alternate</code> → 决定控制信号来自寄存器还是外设</li>
+</ul>
+<p>理解了内部电路的结构，CubeMX 配置就不再是”乱填的”，而是——<strong>我知道我配置了什么，也知道为什么这么配。</strong></p>
+<p>学完这 8 种模式之后，下一步就可以学习<strong>中断（EXTI）</strong>了——当按键不需要靠 while 循环轮询，而是按下时 CPU 主动响应，就是中断的用武之地。这也是按键输入博客末尾提到的”进阶思路”。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a> — 第5集 GPIO 内部那些事</li>
+<li><a target="_blank" rel="noopener" href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入控制小灯亮灭</a></li>
+<li><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">STM32 再出发：工具链搭建</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.st.com/resource/en/reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">STM32 参考手册 RM0008（STM32F10xxx 参考手册）</a> — GPIO 相关章节</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/GPIO/" rel="tag"># GPIO</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/26/STM32_Key_Input/" rel="prev" title="STM32——按键输入控制小灯亮灭">
+      <i class="fa fa-chevron-left"></i> STM32——按键输入控制小灯亮灭
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GPIO-%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84%E9%80%9F%E8%A7%88"><span class="nav-number">2.</span> <span class="nav-text">GPIO 内部结构速览</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E5%85%83%E4%BB%B6"><span class="nav-number">2.1.</span> <span class="nav-text">关键元件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%85%A5%E6%A8%A1%E5%BC%8F%EF%BC%884%E7%A7%8D%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">输入模式（4种）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E6%B5%AE%E7%A9%BA%E8%BE%93%E5%85%A5"><span class="nav-number">3.1.</span> <span class="nav-text">1. 浮空输入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%8A%E6%8B%89%E8%BE%93%E5%85%A5"><span class="nav-number">3.2.</span> <span class="nav-text">2. 上拉输入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E4%B8%8B%E6%8B%89%E8%BE%93%E5%85%A5"><span class="nav-number">3.3.</span> <span class="nav-text">3. 下拉输入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E6%A8%A1%E6%8B%9F%E8%BE%93%E5%85%A5"><span class="nav-number">3.4.</span> <span class="nav-text">4. 模拟输入</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E6%A8%A1%E5%BC%8F%EF%BC%884%E7%A7%8D%EF%BC%89"><span class="nav-number">4.</span> <span class="nav-text">输出模式（4种）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E6%8E%A8%E6%8C%BD%E8%BE%93%E5%87%BA"><span class="nav-number">4.1.</span> <span class="nav-text">5. 推挽输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-%E5%BC%80%E6%BC%8F%E8%BE%93%E5%87%BA"><span class="nav-number">4.2.</span> <span class="nav-text">6. 开漏输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A8%E6%8C%BD%E8%BE%93%E5%87%BA-vs-%E5%BC%80%E6%BC%8F%E8%BE%93%E5%87%BA-%E5%AF%B9%E6%AF%94"><span class="nav-number">4.3.</span> <span class="nav-text">推挽输出 vs 开漏输出 对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-%E5%A4%8D%E7%94%A8%E6%8E%A8%E6%8C%BD%E8%BE%93%E5%87%BA"><span class="nav-number">4.4.</span> <span class="nav-text">7. 复用推挽输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-%E5%A4%8D%E7%94%A8%E5%BC%80%E6%BC%8F%E8%BE%93%E5%87%BA"><span class="nav-number">4.5.</span> <span class="nav-text">8. 复用开漏输出</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B2%A1%E6%9C%89%E2%80%9D%E5%A4%8D%E7%94%A8%E8%BE%93%E5%85%A5%E2%80%9D%E6%A8%A1%E5%BC%8F%EF%BC%9F"><span class="nav-number">5.</span> <span class="nav-text">为什么没有”复用输入”模式？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E5%A4%A7%E6%A8%A1%E5%BC%8F%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-number">6.</span> <span class="nav-text">八大模式速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E5%89%8D%E9%9D%A2%E4%B8%89%E7%AF%87%E5%8D%9A%E5%AE%A2%E5%9B%9E%E7%9C%8B-GPIO-%E9%85%8D%E7%BD%AE"><span class="nav-number">7.</span> <span class="nav-text">从前面三篇博客回看 GPIO 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E7%AF%87%EF%BC%9ASTM32%E5%86%8D%E5%87%BA%E5%8F%91-%E2%80%94-PA7-%E6%8E%A8%E6%8C%BD%E8%BE%93%E5%87%BA"><span class="nav-number">7.1.</span> <span class="nav-text">第一篇：STM32再出发 — PA7 推挽输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E7%AF%87%EF%BC%9A%E4%B8%89%E8%89%B2LED%E6%B5%81%E6%B0%B4%E7%81%AF-%E2%80%94-%E4%B8%89%E4%B8%AA%E6%8E%A8%E6%8C%BD%E8%BE%93%E5%87%BA"><span class="nav-number">7.2.</span> <span class="nav-text">第二篇：三色LED流水灯 — 三个推挽输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%9A%E6%8C%89%E9%94%AE%E8%BE%93%E5%85%A5-%E2%80%94-KEY1-%E6%B5%AE%E7%A9%BA%E8%BE%93%E5%85%A5%EF%BC%8CKEY2-%E4%B8%8A%E6%8B%89%E8%BE%93%E5%85%A5"><span class="nav-number">7.3.</span> <span class="nav-text">第三篇：按键输入 — KEY1 浮空输入，KEY2 上拉输入</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E9%98%B6%EF%BC%9A%E4%B8%80%E4%BA%9B%E5%80%BC%E5%BE%97%E6%80%9D%E8%80%83%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">8.</span> <span class="nav-text">进阶：一些值得思考的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E6%8E%A8%E6%8C%BD%E8%BE%93%E5%87%BA%E8%83%BD%E5%90%8C%E6%97%B6%E8%BE%93%E5%87%BA%E9%AB%98%E5%92%8C%E4%BD%8E%E5%90%97%EF%BC%9F"><span class="nav-number">8.1.</span> <span class="nav-text">1. 推挽输出能同时输出高和低吗？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E5%BC%80%E6%BC%8F%E8%BE%93%E5%87%BA%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E5%86%85%E7%BD%AE%E4%B8%8A%E6%8B%89%E7%94%B5%E9%98%BB%EF%BC%9F"><span class="nav-number">8.2.</span> <span class="nav-text">2. 开漏输出为什么不内置上拉电阻？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-GPIO-%E9%80%9F%E5%BA%A6%EF%BC%88Speed%EF%BC%89%E9%80%89-Low-%E8%BF%98%E6%98%AF-High%EF%BC%9F"><span class="nav-number">8.3.</span> <span class="nav-text">3. GPIO 速度（Speed）选 Low 还是 High？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">9.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">10.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">25</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">171k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:36</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
