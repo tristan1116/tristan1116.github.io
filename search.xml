@@ -764,6 +764,330 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——红灯持续闪烁，绿灯用外部中断翻转状态</title>
+    <url>/2026/07/28/STM32_EXTI_Interrupt/</url>
+    <content><![CDATA[<h2 id="背景：为什么需要中断？"><a href="#背景：为什么需要中断？" class="headerlink" title="背景：为什么需要中断？"></a>背景：为什么需要中断？</h2><p>在前一篇按键输入博客中，KEY2 的”按一下翻转”功能用了轮询方式：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 轮询：CPU 主动、反复地问&quot;按键被按了吗？&quot;</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (按键被按下) &#123; 处理; &#125;</span><br><span class="line">    <span class="comment">// 还要做其他事...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>轮询的缺点很明显——如果 CPU 正在执行某个耗时操作，按键按下后要等到下一个循环才能被检测到，响应不及时。</p>
+<p><strong>中断</strong>的思路完全不同：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">轮询：   CPU → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;按了！&quot; → 处理</span><br><span class="line">中断：   CPU → 干正事 → 干正事 → 干正事 → （按键按下，打断！）→ 处理按键 → 继续干正事</span><br></pre></td></tr></table></figure>
+
+<p>打个比方：</p>
+<ul>
+<li><strong>轮询</strong> &#x3D; 你在写作业，每 5 秒抬头看一眼有没有人敲门</li>
+<li><strong>中断</strong> &#x3D; 你在写作业，门铃响了（中断信号），你去开门，回来继续写</li>
+</ul>
+<hr>
+<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>硬件与之前博客完全一样——<strong>KEY1（PB12，外部上拉）</strong>控制中断触发，<strong>红灯（PB0）</strong> 和 <strong>绿灯（PA7）</strong> 作为输出，高电平点亮。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110508961.png" alt="image-20260728110508961"></p>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110535256.png" alt="image-20260728110535256"></p>
+</blockquote>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤与之前一样，不重复。</p>
+<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><table>
+<thead>
+<tr>
+<th align="center">引脚</th>
+<th align="center">功能</th>
+<th align="center">User Label</th>
+<th align="left">详细参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">PB0</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_RED</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PA7</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_GREEN</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PB12</td>
+<td align="center"><strong>GPIO_EXTI12</strong></td>
+<td align="center"><code>KEY1</code></td>
+<td align="left">下降沿触发中断、无上下拉（外部已有上拉）</td>
+</tr>
+</tbody></table>
+<p><strong>关键步骤：配置 PB12 的中断模式</strong></p>
+<p>在芯片图上找到 PB12 → 点击 → 选择 <strong>GPIO_EXTI12</strong>，顺便把user label设置成key1</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105816402.png" alt="image-20260728105816402"></p>
+</blockquote>
+<p>然后到左侧 GPIO 设置中，把 PB12 的具体参数配好：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105913502.png" alt="image-20260728105913502"></p>
+</blockquote>
+<p>注意这里选择的是 <strong>External Interrupt Mode with Falling edge trigger detection</strong>（外部中断模式，下降沿触发）——按键按下时电平从高变低，正好产生下降沿，与前面的硬件原理匹配.</p>
+<h3 id="配置-NVIC（中断控制器）"><a href="#配置-NVIC（中断控制器）" class="headerlink" title="配置 NVIC（中断控制器）"></a>配置 NVIC（中断控制器）</h3><p>GPIO 配好后，还需要告诉 NVIC（嵌套向量中断控制器）”我要使用这个中断”。</p>
+<p>切换到 <strong>System Core → NVIC</strong>，找到 <strong>EXTI line[15:10] interrupts</strong>，在旁边那个小方框里打上勾：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110232947.png" alt="image-20260728110232947"></p>
+</blockquote>
+<p>这里有两个参数需要关注：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th align="center">值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Preemption Priority</strong></td>
+<td align="center">15</td>
+<td>抢占优先级（数字越小优先级越高）</td>
+</tr>
+<tr>
+<td><strong>Sub Priority</strong></td>
+<td align="center">0</td>
+<td>子优先级</td>
+</tr>
+</tbody></table>
+<p>关于优先级的具体原理，后面会单独说明。</p>
+<h3 id="配调试接口-生成代码"><a href="#配调试接口-生成代码" class="headerlink" title="配调试接口 &amp; 生成代码"></a>配调试接口 &amp; 生成代码</h3><p>老规矩：<strong>System Core → SYS → Debug → Serial Wire</strong>，防止烧录一次后 SWD 被锁。</p>
+<p><strong>Project Manager</strong> 设置：</p>
+<table>
+<thead>
+<tr>
+<th>设置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project Name</strong></td>
+<td><code>Interrupt</code></td>
+</tr>
+<tr>
+<td><strong>Toolchain &#x2F; IDE</strong></td>
+<td><strong>CMake</strong></td>
+</tr>
+</tbody></table>
+<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
+<hr>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="引脚宏定义（main-h）"><a href="#引脚宏定义（main-h）" class="headerlink" title="引脚宏定义（main.h）"></a>引脚宏定义（main.h）</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 按键 KEY1 — PB12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_Pin GPIO_PIN_12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_GPIO_Port GPIOB</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_EXTI_IRQn EXTI15_10_IRQn   <span class="comment">// 中断号：EXTI 线 15~10</span></span></span><br></pre></td></tr></table></figure>
+
+<h3 id="main-c-——-红灯持续闪烁"><a href="#main-c-——-红灯持续闪烁" class="headerlink" title="main.c —— 红灯持续闪烁"></a>main.c —— 红灯持续闪烁</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();</span><br><span class="line">    SystemClock_Config();</span><br><span class="line">    MX_GPIO_Init();     <span class="comment">// 这里会初始化 GPIO 和 NVIC 中断</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 红灯亮</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 保持 2 秒</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// 红灯灭</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 熄灭 2 秒</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>逻辑很简单：PB0 每 2 秒翻转一次电平，红灯持续闪烁。</p>
+<p>主循环里<strong>无需任何与按键相关的代码</strong>——按键检测完全由中断处理。</p>
+<h3 id="stm32f1xx-it-c-——-外部中断服务函数"><a href="#stm32f1xx-it-c-——-外部中断服务函数" class="headerlink" title="stm32f1xx_it.c —— 外部中断服务函数"></a>stm32f1xx_it.c —— 外部中断服务函数</h3><p>当 KEY1 按下时，EXTI15_10 中断被触发，CPU 跳转到 <code>EXTI15_10_IRQHandler</code> 执行：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">  * @brief This function handles EXTI line[15:10] interrupts.</span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_Delay(<span class="number">10</span>);  <span class="comment">// ① 消抖：等待电平稳定</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ② 确认按键确实被按下（低电平）</span></span><br><span class="line">    <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// ③ 翻转绿灯状态</span></span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_GPIO_EXTI_IRQHandler(KEY1_Pin);  <span class="comment">// ④ 清除中断标志位</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 1 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 1 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>逐行解释：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="center">行号</th>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">①</td>
+<td><code>HAL_Delay(10)</code></td>
+<td>机械按键按下瞬间会有抖动，电平在几毫秒内反复跳变。等 10ms 让电平稳定下来再读</td>
+</tr>
+<tr>
+<td align="center">②</td>
+<td><code>HAL_GPIO_ReadPin(...)</code></td>
+<td>再次读取 KEY1 的电平，确认是真的按下了（低电平）。如果只是噪声干扰，不会误触发</td>
+</tr>
+<tr>
+<td align="center">③</td>
+<td><code>HAL_GPIO_TogglePin(...)</code></td>
+<td>翻转绿灯 PA7 的电平——原来亮就灭，原来灭就亮</td>
+</tr>
+<tr>
+<td align="center">④</td>
+<td><code>HAL_GPIO_EXTI_IRQHandler(KEY1_Pin)</code></td>
+<td><strong>非常重要</strong> 清除 EXTI 的中断挂起标志位。如果不清除，中断会反复触发，程序卡死。函数里本身自带，不能删除。</td>
+</tr>
+</tbody></table>
+<p><strong>⚠️ HAL_GPIO_EXTI_IRQHandler 的两种写法</strong></p>
+<p>上面这个函数内部其实干了三件事：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_IRQHandler</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(GPIO_Pin) != RESET)  <span class="comment">// ① 检查中断标志</span></span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_Pin);           <span class="comment">// ② 清除中断标志</span></span><br><span class="line">        HAL_GPIO_EXTI_Callback(GPIO_Pin);             <span class="comment">// ③ 调用回调函数</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，你<strong>也可以</strong>不在 ISR 里直接写逻辑，而是把逻辑写在 <code>HAL_GPIO_EXTI_Callback</code> 里，CubeMX 会在 <code>main.c</code> 中留出 <code>USER CODE BEGIN 4</code> 给你写回调：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 4 */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_Callback</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (GPIO_Pin == KEY1_Pin)</span><br><span class="line">    &#123;</span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 4 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="MX-GPIO-Init-——-GPIO-与-NVIC-初始化"><a href="#MX-GPIO-Init-——-GPIO-与-NVIC-初始化" class="headerlink" title="MX_GPIO_Init —— GPIO 与 NVIC 初始化"></a>MX_GPIO_Init —— GPIO 与 NVIC 初始化</h3><p><code>MX_GPIO_Init</code> 函数中，CubeMX 不仅配了 GPIO，还配了 NVIC：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始化输出电平 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 KEY1 (PB12) —— 下降沿触发外部中断 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;  <span class="comment">// ← 下降沿触发中断</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;            <span class="comment">// ← 外部已有上拉，内部不配</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* EXTI 中断初始化——使能 NVIC */</span></span><br><span class="line">    HAL_NVIC_SetPriority(EXTI15_10_IRQn, <span class="number">15</span>, <span class="number">0</span>);</span><br><span class="line">    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);            <span class="comment">// ← 使能 NVIC 中断！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键点：</strong></p>
+<ol>
+<li><code>GPIO_MODE_IT_FALLING</code> —— 配置 PB12 为外部中断模式，下降沿触发</li>
+<li><code>GPIO_NOPULL</code> —— 因为板子已经有外部上拉电阻，不需要内部上拉</li>
+<li><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code> —— 使能 NVIC 中的 EXTI15_10 中断通道。<strong>这步非常重要，漏了中断不会触发</strong></li>
+</ol>
+<hr>
+<h2 id="关于中断优先级"><a href="#关于中断优先级" class="headerlink" title="关于中断优先级"></a>关于中断优先级</h2><p>CubeMX 中配置的优先级和实际生效的值之间有一个”编码”过程，理解了这个才能搞清中断嵌套行为。</p>
+<h3 id="优先级分组"><a href="#优先级分组" class="headerlink" title="优先级分组"></a>优先级分组</h3><p>STM32 的 NVIC 支持<strong>优先级分组</strong>，决定了抢占优先级和子优先级各占几位：</p>
+<table>
+<thead>
+<tr>
+<th>分组宏</th>
+<th align="center">抢占优先级</th>
+<th align="center">子优先级</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>NVIC_PRIORITYGROUP_0</code></td>
+<td align="center">0 bit</td>
+<td align="center">4 bits</td>
+<td>所有中断同级，不能嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_1</code></td>
+<td align="center">1 bit</td>
+<td align="center">3 bits</td>
+<td>最多 2 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_2</code></td>
+<td align="center">2 bits</td>
+<td align="center">2 bits</td>
+<td>最多 4 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_3</code></td>
+<td align="center">3 bits</td>
+<td align="center">1 bit</td>
+<td>最多 8 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_4</code></td>
+<td align="center">4 bits</td>
+<td align="center">0 bits</td>
+<td>最多 16 级嵌套（最常用）</td>
+</tr>
+</tbody></table>
+<p>CubeMX 默认使用 <code>NVIC_PRIORITYGROUP_4</code>——4 位全是抢占优先级，没有子优先级。</p>
+<h3 id="本次配置的优先级"><a href="#本次配置的优先级" class="headerlink" title="本次配置的优先级"></a>本次配置的优先级</h3><table>
+<thead>
+<tr>
+<th align="left">中断</th>
+<th align="center">PreemptPriority</th>
+<th align="center">编码值</th>
+<th align="center">实际优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SysTick</td>
+<td align="center">14</td>
+<td align="center">0x00</td>
+<td align="center"><strong>0（最高）</strong></td>
+</tr>
+<tr>
+<td align="left">EXTI15_10</td>
+<td align="center">15</td>
+<td align="center">0x80</td>
+<td align="center"><strong>8</strong></td>
+</tr>
+</tbody></table>
+<p>数值越小优先级越高。SysTick 的优先级高于 EXTI，所以在 EXTI 中断服务函数中调用 <code>HAL_Delay()</code> 是安全的——SysTick 可以抢占 EXTI 来更新 <code>uwTick</code> 变量，不会死锁。</p>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
+<li>连接 ST-Link</li>
+<li>点击 <strong>运行和调试</strong> → 选择 <code>STM32Cube:STM32 Launch STLink GDB Server</code></li>
+<li>点击<strong>继续</strong>按钮，程序开始运行</li>
+</ol>
+<blockquote>
+<p>如果遇到烧录问题，参考上一篇或<a href="https://docs.baud-dance.com/docs/stm32/FAQ/CompilationFailed">波特律动 FAQ</a>。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后：</p>
+<ul>
+<li>🔴 <strong>红灯持续闪烁</strong>——每 2 秒亮灭一次</li>
+<li>按下 <strong>KEY1（PB12）</strong> → 🟢 <strong>绿灯翻转状态</strong>（亮↔灭）</li>
+<li>每次按键，绿灯变化一次，红灯不受影响，继续闪烁</li>
+<li>如果绿灯和红灯一起亮起，则颜色变化成黄色。</li>
+</ul>
+<blockquote>
+<p>效果展示视频：<a href="https://www.bilibili.com/video/BV11e3e6TEGF/">https://www.bilibili.com/video/BV11e3e6TEGF/</a></p>
+</blockquote>
+<hr>
+<h2 id="中断-vs-轮询的对比"><a href="#中断-vs-轮询的对比" class="headerlink" title="中断 vs 轮询的对比"></a>中断 vs 轮询的对比</h2><p>这个 demo 正好可以和上一篇按键博客做一个对比：</p>
+<table>
+<thead>
+<tr>
+<th>对比项</th>
+<th align="center">轮询（上一篇 KEY2）</th>
+<th align="center">中断（本篇）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU 占用</td>
+<td align="center">高（一直在检测）</td>
+<td align="center">低（平时干正事，有事件才处理）</td>
+</tr>
+<tr>
+<td>响应速度</td>
+<td align="center">取决于循环周期</td>
+<td align="center">立即响应</td>
+</tr>
+<tr>
+<td>代码位置</td>
+<td align="center">main 循环里</td>
+<td align="center">中断服务函数中</td>
+</tr>
+<tr>
+<td>主循环复杂度</td>
+<td align="center">按键逻辑和主逻辑混在一起</td>
+<td align="center">主循环只关心本职工作</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td align="center">低频检测、简单系统</td>
+<td align="center">实时性要求高的场景</td>
+</tr>
+</tbody></table>
+<p>当然，中断也有代价——每次进入和退出中断都有<strong>上下文切换开销</strong>（保存现场、恢复现场），并且中断函数要尽量简短，否则会影响其他实时任务的响应。</p>
+<hr>
+<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><h3 id="1-用回调函数分离逻辑"><a href="#1-用回调函数分离逻辑" class="headerlink" title="1. 用回调函数分离逻辑"></a>1. 用回调函数分离逻辑</h3><p>前面提到过，可以把中断处理逻辑写到 <code>HAL_GPIO_EXTI_Callback</code> 里，中断服务函数保持整洁。当项目中多个引脚共用一个 EXTI 中断线时（比如 EXTI15_10 同时服务 PB12 和 PB13），回调函数里用 <code>GPIO_Pin</code> 区分来源，代码结构更清晰。</p>
+<h3 id="2-中断中只设标志位，主循环处理"><a href="#2-中断中只设标志位，主循环处理" class="headerlink" title="2. 中断中只设标志位，主循环处理"></a>2. 中断中只设标志位，主循环处理</h3><p>标准的嵌入式写法——中断里只设一个 <code>volatile</code> 标志位：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">volatile</span> <span class="type">uint8_t</span> key1_flag = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(KEY1_Pin) != RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(KEY1_Pin);</span><br><span class="line">        key1_flag = <span class="number">1</span>;  <span class="comment">// 只设标志，不做复杂操作</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主循环检测到标志位置位后，再执行消抖、翻转等操作。这样 ISR 的执行时间最短，对系统实时性的影响最小。</p>
+<h3 id="3-上升沿-下降沿双触发"><a href="#3-上升沿-下降沿双触发" class="headerlink" title="3. 上升沿 + 下降沿双触发"></a>3. 上升沿 + 下降沿双触发</h3><p>按键按下和松开都产生中断，可以用来检测”长按”和”短按”，或者做更精细的状态控制。</p>
+<h3 id="4-优先级嵌套测试"><a href="#4-优先级嵌套测试" class="headerlink" title="4. 优先级嵌套测试"></a>4. 优先级嵌套测试</h3><p>可以给不同的外设中断配置不同的抢占优先级，观察高优先级中断打断低优先级中断的行为，加深对中断嵌套的理解。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的收获：</p>
+<ol>
+<li><strong>外部中断（EXTI）的基本配置方法</strong>——CubeMX 里配引脚模式 + NVIC 设置</li>
+<li><strong>中断服务函数的写法</strong>——消抖 → 读引脚确认 → 执行逻辑 → 清标志位</li>
+<li><strong>中断优先级</strong>——优先级分组、优先级编码、抢占与嵌套的基本概念</li>
+<li><strong>CMake 生成器的注意事项</strong>——NVIC 配置可能不会自动生成，需要手动检查</li>
+</ol>
+<p>中断是嵌入式开发中非常重要的概念，后面学定时器、UART、I2C、SPI 等外设时都会用到中断机制。理解了这个 demo，后面的路会顺畅很多。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入</a></li>
+<li><a href="/2026/07/26/STM32_RGB_LED/">上一篇：STM32三色LED流水灯</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>EXTI</tag>
+        <tag>中断</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——按键输入控制小灯亮灭</title>
     <url>/2026/07/26/STM32_Key_Input/</url>
     <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="按键电路"><a href="#按键电路" class="headerlink" title="按键电路"></a>按键电路</h3><p>开发板上的两个按键分别连接在以下引脚：</p>
@@ -953,6 +1277,100 @@
 <li><strong>翻转</strong>——确认按下后执行一次 <code>TogglePin</code></li>
 <li><strong>等待松手</strong>——用 while 循环等待按键恢复高电平，防止一次按压被 while 循环反复检测到，造成很短的时间内多次翻转，肉眼看上去效果很差。</li>
 </ol>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-输出与输入引脚的配置"><a href="#解读-MX-GPIO-Init-——-输出与输入引脚的配置" class="headerlink" title="解读 MX_GPIO_Init —— 输出与输入引脚的配置"></a>解读 MX_GPIO_Init —— 输出与输入引脚的配置</h2><p>这个项目有四种引脚（两个输出、两个输入），<code>MX_GPIO_Init()</code> 比前两篇复杂了不少：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始电平：两个 LED 默认熄灭 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* ========== 输出引脚配置（与前两篇相同） ========== */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* ========== 输入引脚配置（新内容） ========== */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* KEY1 (PB12) —— 输入，外部已有上拉，内部不配 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;     <span class="comment">// ← 输入模式</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;          <span class="comment">// ← 外部已有上拉电阻</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* KEY2 (PB13) —— 输入，开启内部上拉 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY2_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;     <span class="comment">// ← 输入模式</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_PULLUP;          <span class="comment">// ← 内部上拉！关键区别</span></span><br><span class="line">    HAL_GPIO_Init(KEY2_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="新知识点：输入模式配置"><a href="#新知识点：输入模式配置" class="headerlink" title="新知识点：输入模式配置"></a>新知识点：输入模式配置</h3><p>输出引脚没什么新内容，重点是两个<strong>输入引脚</strong>的配置：</p>
+<h4 id="GPIO-MODE-INPUT-——-输入模式"><a href="#GPIO-MODE-INPUT-——-输入模式" class="headerlink" title="GPIO_MODE_INPUT —— 输入模式"></a><code>GPIO_MODE_INPUT</code> —— 输入模式</h4><p>之前两篇都是 <code>GPIO_MODE_OUTPUT_PP</code>（输出），这次改成了 <code>GPIO_MODE_INPUT</code>（输入）。输入模式下，GPIO 不再输出电压，而是读取外部信号的电平高低，通过 <code>HAL_GPIO_ReadPin()</code> 获取。</p>
+<h4 id="Pull-参数-——-上下拉电阻的选择"><a href="#Pull-参数-——-上下拉电阻的选择" class="headerlink" title="Pull 参数 —— 上下拉电阻的选择"></a><code>Pull</code> 参数 —— 上下拉电阻的选择</h4><p>这是本次最有价值的部分——<strong>两种按键的上拉电阻配置方式不同</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="left">按键</th>
+<th align="center">Pull 参数</th>
+<th>原理</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>KEY1 (PB12)</strong></td>
+<td align="center"><code>GPIO_NOPULL</code></td>
+<td>板子自带了<strong>外部上拉电阻</strong>，芯片内部不需要再配</td>
+</tr>
+<tr>
+<td align="left"><strong>KEY2 (PB13)</strong></td>
+<td align="center"><code>GPIO_PULLUP</code></td>
+<td>板子没有外部上拉，需要开启芯片<strong>内部上拉电阻</strong></td>
+</tr>
+</tbody></table>
+<p>为什么需要上拉？看按键电路：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">无上拉：  PB12 -------- 按键 ---- GND</span><br><span class="line">          │</span><br><span class="line">          悬空！→ 电平不确定，按下是低电平，松开就不知道了</span><br><span class="line"></span><br><span class="line">有上拉：  VCC 3.3V</span><br><span class="line">          │</span><br><span class="line">         电阻(10kΩ)</span><br><span class="line">          │</span><br><span class="line">          PB12 -------- 按键 ---- GND</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>按键松开</strong>：上拉电阻把电平拉到 3.3V，读到高电平</li>
+<li><strong>按键按下</strong>：引脚直接接 GND，读到低电平（电流经过按键到地，不走电阻）</li>
+</ul>
+<p>如果没有上拉电阻，按键松开时引脚悬空，电平是浮动的，读到的值可能随机变化。</p>
+<h4 id="内部上拉-vs-外部上拉"><a href="#内部上拉-vs-外部上拉" class="headerlink" title="内部上拉 vs 外部上拉"></a>内部上拉 vs 外部上拉</h4><table>
+<thead>
+<tr>
+<th>对比</th>
+<th>外部上拉</th>
+<th>内部上拉</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>实现</td>
+<td>板子上焊接电阻</td>
+<td>芯片内部集成，通过软件配置开启</td>
+</tr>
+<tr>
+<td>阻值</td>
+<td>可按需选择（通常 4.7kΩ~10kΩ）</td>
+<td>固定约 40kΩ（STM32F1）</td>
+</tr>
+<tr>
+<td>优点</td>
+<td>阻值精确、驱动能力强</td>
+<td>省元件、省PCB空间</td>
+</tr>
+<tr>
+<td>缺点</td>
+<td>占PCB空间、增加BOM成本</td>
+<td>阻值偏大、抗干扰稍弱</td>
+</tr>
+</tbody></table>
+<p>KEY1 使用外部上拉是因为外部上拉相比内部上拉能提供更稳定的高电平，而 KEY2 使用内部上拉则是为了节省板子空间和成本。</p>
+<h3 id="GPIO-模式表（更新版）"><a href="#GPIO-模式表（更新版）" class="headerlink" title="GPIO 模式表（更新版）"></a>GPIO 模式表（更新版）</h3><p>加上输入模式后，现在接触到的 GPIO 模式更丰富了：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>含义</th>
+<th align="center">本篇中的用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td>推挽输出</td>
+<td align="center">驱动 LED</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_INPUT</code></td>
+<td>数字输入</td>
+<td align="center">读取按键状态</td>
+</tr>
+<tr>
+<td><code>GPIO_NOPULL</code></td>
+<td>无上下拉</td>
+<td align="center">输出引脚 &#x2F; 外部已有上拉的输入引脚</td>
+</tr>
+<tr>
+<td><code>GPIO_PULLUP</code></td>
+<td>内部上拉</td>
+<td align="center">没有外部上拉的输入引脚</td>
+</tr>
+</tbody></table>
 <hr>
 <h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
 <li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
@@ -1264,6 +1682,61 @@
 <p><strong>逻辑分析：</strong></p>
 <p>每个LED的亮灭由 <code>state</code> 的值决定。<code>state</code> 每300ms加1，到5后归0，形成循环。</p>
 <p>这里每个LED的亮灭条件是用<strong>区间判断</strong>写的，比如绿色LED在 <code>state &gt;= 1 &amp;&amp; state &lt;= 3</code> 时亮。你也可以改成查表法——用一个数组存6种状态，每次读数组取值——逻辑会更清晰，但原理是一样的。</p>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-三个引脚的配置"><a href="#解读-MX-GPIO-Init-——-三个引脚的配置" class="headerlink" title="解读 MX_GPIO_Init —— 三个引脚的配置"></a>解读 MX_GPIO_Init —— 三个引脚的配置</h2><p><code>MX_GPIO_Init()</code> 中配置了三个 GPIO 输出引脚，我们看看代码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始电平：全部低电平→默认熄灭 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;   <span class="comment">// 推挽输出</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;             <span class="comment">// 无上下拉</span></span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;    <span class="comment">// 低速</span></span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 同上 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_BLUE (PA6) —— 同上 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_BLUE_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_BLUE_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="和第一篇的区别"><a href="#和第一篇的区别" class="headerlink" title="和第一篇的区别"></a>和第一篇的区别</h3><p>相比第一篇博客的单引脚配置，这次有三个关键变化：</p>
+<table>
+<thead>
+<tr>
+<th>变化</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>两个时钟使能</strong></td>
+<td><code>__HAL_RCC_GPIOA_CLK_ENABLE()</code> + <code>__HAL_RCC_GPIOB_CLK_ENABLE()</code>，因为三个引脚分布在 GPIOA（PA6、PA7）和 GPIOB（PB0）两个端口</td>
+</tr>
+<tr>
+<td><strong>User Label 替代硬编码</strong></td>
+<td>前一篇直接写 <code>GPIOA</code>、<code>GPIO_PIN_7</code>，这一篇写成 <code>LED_RED_GPIO_Port</code>、<code>LED_RED_Pin</code>——CubeMX 把 User Label 翻译成了宏，代码可读性大大提升</td>
+</tr>
+<tr>
+<td><strong>三个引脚重复配置</strong></td>
+<td>每次配置前重新给 <code>GPIO_InitStruct</code> 赋值，CubeMX 就是按照这个模板批量配置引脚的</td>
+</tr>
+</tbody></table>
+<h3 id="参数回顾"><a href="#参数回顾" class="headerlink" title="参数回顾"></a>参数回顾</h3><p>单个引脚的配置参数和第一篇完全一样，这里汇总一下：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th align="center">值</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Mode</code></td>
+<td align="center"><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td>推挽输出——可以输出高&#x2F;低电平，适合驱动LED</td>
+</tr>
+<tr>
+<td><code>Pull</code></td>
+<td align="center"><code>GPIO_NOPULL</code></td>
+<td>输出引脚不需要上下拉</td>
+</tr>
+<tr>
+<td><code>Speed</code></td>
+<td align="center"><code>GPIO_SPEED_FREQ_LOW</code></td>
+<td>LED 不需要高速翻转，低速省电、抗干扰</td>
+</tr>
+</tbody></table>
+<h3 id="为什么不一次性配置所有引脚？"><a href="#为什么不一次性配置所有引脚？" class="headerlink" title="为什么不一次性配置所有引脚？"></a>为什么不一次性配置所有引脚？</h3><p>你可能会想，既然三个引脚参数都一样，为什么 CubeMX 不把它们放在一个结构体里一次性配置？</p>
+<p>答案是 <code>HAL_GPIO_Init</code> 的 <code>Pin</code> 成员支持<strong>按位或组合</strong>，所以<strong>其实可以一次配多个</strong>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">GPIO_InitStruct.Pin = LED_RED_Pin | LED_GREEN_Pin | LED_BLUE_Pin;</span><br><span class="line">GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);  <span class="comment">// 但这里只能指定一个端口</span></span><br></pre></td></tr></table></figure>
+
+<p>不过引脚分布在不同的端口（PA6、PA7 在 GPIOA，PB0 在 GPIOB），所以至少要用两次 <code>HAL_GPIO_Init</code>。CubeMX 选择分开配置，逻辑更清晰，也更容易针对某个引脚单独修改参数。</p>
 <hr>
 <h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>编译和烧录的步骤和上一篇完全一样，不再重复写一遍了：</p>
 <ol>
@@ -4800,120 +5273,6 @@
       </tags>
   </entry>
   <entry>
-    <title>Markdown 语法规则</title>
-    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
-    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
-<p>这是第二行</p>
-<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
-<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
-<p>效果：</p>
-<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
-</blockquote>
-<blockquote>
-<p>代码和快捷键：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
-<p>效果：</p>
-<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
-<p>效果：只有同一级别</p>
-<ul>
-<li>1</li>
-<li>2</li>
-<li>3</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：-&#x2F;*&#x2F;+ +空格</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
-<p>效果：</p>
-<ol>
-<li>一</li>
-<li>二</li>
-<li>子1</li>
-<li>子2<ol>
-<li>子1-子1</li>
-</ol>
-</li>
-</ol>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<p>数字+.+空格</p>
-<p>缩进用tab,回退shift+tab</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
-<p>效果：</p>
-<ul>
-<li><p><input checked="" disabled="" type="checkbox"> 
-练习markdown语法</p>
-</li>
-<li><p><input disabled="" type="checkbox"> 
-维护网站</p>
-</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
-<p>效果：</p>
-<blockquote>
-<p>这是最外层区块</p>
-<blockquote>
-<p>这是内层</p>
-<blockquote>
-<p>这是更内层</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
-<p>效果：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
-<p>效果：</p>
-<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
-<p>效果：</p>
-<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>Markdown</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>STM32--浅析GPIO八大模式</title>
     <url>/2026/07/27/stm32-gpio-eight-modes/</url>
     <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>回顾前面三篇博客，我们已经接触过几种 GPIO 模式：</p>
@@ -4930,7 +5289,7 @@
 </tr>
 <tr>
 <td align="left"><a href="/2026/07/26/STM32_RGB_LED/">三色LED流水灯</a></td>
-<td align="left"><strong>推挽输出</strong>（三个 LED，状态机控制）</td>
+<td align="left"><strong>推挽输出</strong>（三个 LED）</td>
 </tr>
 <tr>
 <td align="left"><a href="/2026/07/26/STM32_Key_Input/">按键输入</a></td>
@@ -4955,7 +5314,7 @@
 <td align="left">钳位电压：引脚电压 &gt; VDD 时电流引入 VDD，&lt; VSS 时引入 VSS，防止高压损坏芯片</td>
 </tr>
 <tr>
-<td align="left"><strong>施密特触发器</strong></td>
+<td align="left"><strong>施密特触发器（TTL肖密特触发器）</strong></td>
 <td align="left">将模拟电压转换为干净的数字电平，具备滞回特性，有效抗噪声</td>
 </tr>
 <tr>
@@ -5264,6 +5623,120 @@
       </tags>
   </entry>
   <entry>
+    <title>Markdown 语法规则</title>
+    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
+    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
+<p>这是第二行</p>
+<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
+<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
+<p>效果：</p>
+<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>代码和快捷键：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
+<p>效果：</p>
+<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
+<p>效果：只有同一级别</p>
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：-&#x2F;*&#x2F;+ +空格</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
+<p>效果：</p>
+<ol>
+<li>一</li>
+<li>二</li>
+<li>子1</li>
+<li>子2<ol>
+<li>子1-子1</li>
+</ol>
+</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<p>数字+.+空格</p>
+<p>缩进用tab,回退shift+tab</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
+<p>效果：</p>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+练习markdown语法</p>
+</li>
+<li><p><input disabled="" type="checkbox"> 
+维护网站</p>
+</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
+<p>效果：</p>
+<blockquote>
+<p>这是最外层区块</p>
+<blockquote>
+<p>这是内层</p>
+<blockquote>
+<p>这是更内层</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
+<p>效果：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
+<p>效果：</p>
+<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
+<p>效果：</p>
+<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Markdown</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32再出发——从Keil转到VSCode+CubeMX</title>
     <url>/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/</url>
     <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>大一上的时候，我曾短暂学习过 STM32，当时用的是 <strong>Keil + 寄存器</strong> 的开发方式。Keil 的界面老旧、代码补全基本没有、所有内容全靠硬写，或者说硬抄。由于当时面临很多压力，所以我暂时终止了STM32的学习。</p>
@@ -5444,6 +5917,98 @@
 <td>自定义函数</td>
 </tr>
 </tbody></table>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码"><a href="#解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码" class="headerlink" title="解读 MX_GPIO_Init —— CubeMX 生成的初始化代码"></a>解读 MX_GPIO_Init —— CubeMX 生成的初始化代码</h2><p>前面提到，CubeMX 帮我们生成了引脚配置代码。但”能用”和”理解”是两回事，我们来看看 <code>MX_GPIO_Init()</code> 函数里每段代码到底在干什么。</p>
+<h3 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin Output Level */</span></span><br><span class="line">    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin : PA7 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = GPIO_PIN_7;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="逐行解析"><a href="#逐行解析" class="headerlink" title="逐行解析"></a>逐行解析</h3><table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_InitTypeDef GPIO_InitStruct = &#123;0&#125;;</code></td>
+<td>定义一个 GPIO 配置结构体，<code>&#123;0&#125;</code> 把所有成员初始化为 0，避免使用未初始化的值</td>
+</tr>
+<tr>
+<td><code>__HAL_RCC_GPIOA_CLK_ENABLE()</code></td>
+<td><strong>使能 GPIOA 端口的时钟</strong>。STM32 的外设默认时钟是关闭的，使用前必须开启时钟，否则寄存器写不进。这条是一个宏，背后操作的是 RCC 寄存器</td>
+</tr>
+<tr>
+<td><code>HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET)</code></td>
+<td>在配置之前先把引脚输出设为低电平，保证初始时 LED 是灭的，不会出现瞬间闪一下</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Pin = GPIO_PIN_7</code></td>
+<td>指定要配置的引脚是第 7 号引脚（PA7）</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP</code></td>
+<td><strong>输出模式：推挽输出（Push-Pull）</strong>。这是 GPIO 最常用的输出模式——可以输出高&#x2F;低电平，驱动能力强</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Pull = GPIO_NOPULL</code></td>
+<td><strong>上下拉：无</strong>。LED 是输出引脚，不需要上下拉电阻</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW</code></td>
+<td><strong>输出速度：低速</strong>。LED 翻转速度很慢（几百 ms 一次），低速就够用了。速度越快功耗越高、电磁干扰越大</td>
+</tr>
+<tr>
+<td><code>HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct)</code></td>
+<td><strong>将上面配置的结构体写入寄存器</strong>，GPIO 才真正按我们的设置工作。<code>GPIOA</code> 参数表示操作 A 组引脚</td>
+</tr>
+</tbody></table>
+<h3 id="关于-GPIO-模式"><a href="#关于-GPIO-模式" class="headerlink" title="关于 GPIO 模式"></a>关于 GPIO 模式</h3><p><code>GPIO_MODE_OUTPUT_PP</code> 是最常用的输出模式，还有一些其他模式你以后会遇到：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>含义</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td>推挽输出</td>
+<td>驱动 LED、普通数字信号输出</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_OUTPUT_OD</code></td>
+<td>开漏输出</td>
+<td>I2C 通信、电平转换</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_INPUT</code></td>
+<td>浮空输入</td>
+<td>读取按键、传感器信号</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_IT_RISING</code></td>
+<td>上升沿触发中断</td>
+<td>外部中断</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_IT_FALLING</code></td>
+<td>下降沿触发中断</td>
+<td>按键中断</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_AF_PP</code></td>
+<td>复用推挽输出</td>
+<td>UART、SPI 等外设功能引脚</td>
+</tr>
+</tbody></table>
+<p>目前只需掌握前两个输出模式，后续文章中会接触到更多。</p>
+<h3 id="关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX"><a href="#关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX" class="headerlink" title="关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX"></a>关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX</h3><p>CubeMX 帮我们生成了这段代码，我们可以直接拿来用，但这不意味着可以跳过理解。建议的学习路径是：</p>
+<ol>
+<li><strong>先用 CubeMX 生成</strong> —— 快速搭建项目，不纠结寄存器细节</li>
+<li><strong>再解析生成的代码</strong> —— 搞清楚每行配置在做什么</li>
+<li><strong>最后能不用 CubeMX 也写出来</strong> —— 真正掌握后，即使工作中没有 CubeMX 也能手写驱动</li>
+</ol>
+<p>这也是后续所有博客都会保持的风格——不只是展示 CubeMX 的操作步骤，还会解析生成的代码。</p>
 <hr>
 <h2 id="编译"><a href="#编译" class="headerlink" title="编译"></a>编译</h2><p>写好了代码，怎么编译成开发板能运行的机器码？</p>
 <h3 id="通过-VS-Code-编译"><a href="#通过-VS-Code-编译" class="headerlink" title="通过 VS Code 编译"></a>通过 VS Code 编译</h3><p>在 VS Code 底部状态栏，ST 扩展提供了按钮：</p>
@@ -5700,6 +6265,87 @@
       <tags>
         <tag>Hexo</tag>
         <tag>Typora</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>一次成功的Git分支统一实战</title>
+    <url>/2026/07/13/%E4%B8%80%E6%AC%A1%E6%88%90%E5%8A%9F%E7%9A%84Git%E5%88%86%E6%94%AF%E7%BB%9F%E4%B8%80%E5%AE%9E%E6%88%98/</url>
+    <content><![CDATA[<h1 id="一次成功的Git分支统一实战"><a href="#一次成功的Git分支统一实战" class="headerlink" title="一次成功的Git分支统一实战"></a>一次成功的Git分支统一实战</h1><hr>
+<p><strong>我</strong>：我想到之前的那个关于 Git 分支的聊天记录还不完整，最后应该包含我如何解决这个问题的。我希望能把本地和远程仓库统一起来，应该怎么做？</p>
+<p><strong>朋友</strong>：好的！之前我们聊了原理，现在是时候动手把本地和远程仓库统一了。解决这个问题很简单，最干净利落的方法就是<strong>删除旧的部署缓存，让 Hexo 按照你最新的配置重新生成</strong>。</p>
+<p>具体步骤是：</p>
+<ol>
+<li>打开终端，删除旧的 <code>.deploy_git</code> 文件夹。</li>
+<li>执行 <code>hexo clean &amp;&amp; hexo d</code>，根据你 <code>_config.yml</code> 里 <code>branch: main</code> 的配置重新生成并推送。</li>
+<li>验证结果，检查 GitHub 仓库和 VS Code 源代码管理面板。</li>
+</ol>
+<p><strong>我</strong>：好的，我来试试。不过我在终端里执行 <code>rm -rf .deploy_git</code> 的时候报错了，提示 <code>Remove-Item : 找不到与参数名称“rf”匹配的参数。</code> 这是怎么回事？</p>
+<p><strong>朋友</strong>：哈，这是 PowerShell 和 Linux 终端命令的一个小差异。<code>rm -rf</code> 是 Linux（或 Git Bash）里的命令，在 PowerShell 里不通用。</p>
+<p>在 PowerShell 中，删除文件夹要用 <code>Remove-Item</code> 命令。你可以直接输入：</p>
+<p>powershell</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Remove-Item .deploy_git -Recurse -Force</span><br></pre></td></tr></table></figure>
+
+
+
+<p>或者，你也可以在 VSCode 终端里切换成 Git Bash 环境，就能直接用 <code>rm -rf</code> 了。</p>
+<p><strong>我</strong>：好的，我用 Git Bash 试试。</p>
+<p>bash</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">tongshixuan@DESKTOP-T01C4Q7 MINGW64 /d/blog/my-blog01 (main)</span><br><span class="line">$ rm -rf .deploy_git</span><br></pre></td></tr></table></figure>
+
+
+
+<p>成功了！然后我执行 <code>hexo clean &amp;&amp; hexo d</code>，出现了一大堆输出，最后好像成功了。你帮我看看关键的几行？</p>
+<p><strong>朋友</strong>：太棒了！我看到最关键的两行日志是：</p>
+<p>text</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">To https://github.com/tristan1116/tristan1116.github.io.git</span><br><span class="line"> + 4e58c75...f23509b HEAD -&gt; main (forced update)</span><br><span class="line">branch &#x27;master&#x27; set up to track &#x27;https://github.com/tristan1116/tristan1116.github.io.git/main&#x27;.</span><br></pre></td></tr></table></figure>
+
+
+
+<p>这完全验证了成功！</p>
+<ul>
+<li>**<code>HEAD -&gt; main</code>**：说明你本地的当前分支直接推送到了远程仓库的 <code>main</code> 分支。</li>
+<li>**<code>(forced update)</code>**：这是正常的，因为远程 <code>main</code> 分支之前的内容和你本地不同，这次推送是“强制覆盖”了它。</li>
+<li><strong>最后一句</strong>：<code>branch &#39;master&#39; set up to track ... main</code> 明确表示，你本地的 <code>master</code> 分支现在<strong>已经设置为跟踪远程的 <code>main</code> 分支</strong>了。</li>
+</ul>
+<p><strong>我</strong>：还有一件事，我之前在 VS Code 的源代码管理里能看到两个存储库：<code>my-blog01</code> 和 <code>.deploy_git</code>。但现在 <code>.deploy_git</code> 不见了，只剩下 <code>my-blog01</code> 一个了。这是为什么？</p>
+<p><strong>朋友</strong>：你观察得很仔细！这是因为 VS Code 检测到了“嵌套仓库”的结构，为了界面清晰，它智能地将内层的 <code>.deploy_git</code> 隐藏了。</p>
+<p>之前显示两个，是因为外层仓库工作在 <code>main</code> 分支，内层仓库工作在 <code>master</code> 分支，分支不一致，VS Code 认为它们是两个独立的工作区。<br>现在内层仓库（<code>.deploy_git</code>）通过跟踪关系，逻辑上已经和 <code>main</code> 分支绑定在一起了，VS Code 就默认隐藏了它，只展示你最需要操作的主仓库。</p>
+<p>这其实是更好的状态，你的界面更清爽了，<code>.deploy_git</code> 依然存在，只是安静地在后台工作。</p>
+<p><strong>我</strong>：那为什么不能直接让本地仓库也叫 <code>main</code>，为什么还得叫 <code>master</code>？</p>
+<p><strong>朋友</strong>：这个问题问得特别好！这是 Hexo 这个工具“硬编码”决定的，它不随你的配置而改变。</p>
+<p>具体来说：</p>
+<ol>
+<li>Git 本身不关心分支叫什么，<code>master</code> 或 <code>main</code> 都只是标签。</li>
+<li>但 Hexo 在执行 <code>hexo d</code> 时，会在 <code>.deploy_git</code> 里初始化一个全新的 Git 仓库，它使用的是你电脑上 Git 的默认分支名。</li>
+<li>你的 Git 全局配置很可能还保留着旧的默认值 <code>master</code>，所以 Hexo 只是“机械地”创建了一个叫 <code>master</code> 的本地分支。</li>
+</ol>
+<p>不过，Hexo 不在乎本地分支叫啥，它只关心最终能不能推送到你指定的远程分支。只要推送成功，任务就完成了。</p>
+<p><strong>我</strong>：但是现在其实已经没关系了对吧？</p>
+<p><strong>朋友</strong>：<strong>完全正确！</strong> 你现在可以彻底放心了，这个问题已经彻底解决，而且完全不影响你日常的使用。</p>
+<ul>
+<li>你的博客能正常更新。</li>
+<li>VS Code 界面清爽。</li>
+<li>底层逻辑通顺。</li>
+</ul>
+<p>从今以后，你只需要记住一个流程：</p>
+<ol>
+<li>写文章。</li>
+<li>在 <code>my-blog01</code> 仓库执行 hexo clean</li>
+<li><code>git add .</code>、<code>git commit -m &quot;...&quot;</code>和git push</li>
+</ol>
+<p>至于 <code>.deploy_git</code> 里的分支叫什么，你完全可以当它不存在，它只是一个在幕后默默工作的工具人。</p>
+<p><strong>我</strong>：哈哈，我彻底搞懂了！Git 确实很神奇，也好玩！这次经历一定要完整地写进博客里。</p>
+<p><strong>朋友</strong>：哈哈，太好了！你不仅解决了问题，还亲手验证了 Git 分支的底层逻辑。这次完整的学习经历，从“为什么错位”到“如何统一”，绝对是一篇绝佳的 Git 实战案例！祝你写博客愉快！🎉</p>
+<hr>
+<blockquote>
+<p><strong>最终结论</strong>：从最初只会“三板斧”，到发现 <code>master</code> 能推送到 <code>main</code> 的“神奇”现象，再到彻底理解分支是指针而非复制，最后亲手完成了本地与远程仓库的统一。这个过程让我对 Git 的理解上了一个大台阶。记录下来，既是对这段学习经历的纪念，也希望能帮到其他遇到类似困惑的朋友。</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Git</tag>
       </tags>
   </entry>
   <entry>
@@ -6036,87 +6682,6 @@
         <tag>C/C++</tag>
         <tag>编译原理</tag>
         <tag>开发工具</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>一次成功的Git分支统一实战</title>
-    <url>/2026/07/13/%E4%B8%80%E6%AC%A1%E6%88%90%E5%8A%9F%E7%9A%84Git%E5%88%86%E6%94%AF%E7%BB%9F%E4%B8%80%E5%AE%9E%E6%88%98/</url>
-    <content><![CDATA[<h1 id="一次成功的Git分支统一实战"><a href="#一次成功的Git分支统一实战" class="headerlink" title="一次成功的Git分支统一实战"></a>一次成功的Git分支统一实战</h1><hr>
-<p><strong>我</strong>：我想到之前的那个关于 Git 分支的聊天记录还不完整，最后应该包含我如何解决这个问题的。我希望能把本地和远程仓库统一起来，应该怎么做？</p>
-<p><strong>朋友</strong>：好的！之前我们聊了原理，现在是时候动手把本地和远程仓库统一了。解决这个问题很简单，最干净利落的方法就是<strong>删除旧的部署缓存，让 Hexo 按照你最新的配置重新生成</strong>。</p>
-<p>具体步骤是：</p>
-<ol>
-<li>打开终端，删除旧的 <code>.deploy_git</code> 文件夹。</li>
-<li>执行 <code>hexo clean &amp;&amp; hexo d</code>，根据你 <code>_config.yml</code> 里 <code>branch: main</code> 的配置重新生成并推送。</li>
-<li>验证结果，检查 GitHub 仓库和 VS Code 源代码管理面板。</li>
-</ol>
-<p><strong>我</strong>：好的，我来试试。不过我在终端里执行 <code>rm -rf .deploy_git</code> 的时候报错了，提示 <code>Remove-Item : 找不到与参数名称“rf”匹配的参数。</code> 这是怎么回事？</p>
-<p><strong>朋友</strong>：哈，这是 PowerShell 和 Linux 终端命令的一个小差异。<code>rm -rf</code> 是 Linux（或 Git Bash）里的命令，在 PowerShell 里不通用。</p>
-<p>在 PowerShell 中，删除文件夹要用 <code>Remove-Item</code> 命令。你可以直接输入：</p>
-<p>powershell</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Remove-Item .deploy_git -Recurse -Force</span><br></pre></td></tr></table></figure>
-
-
-
-<p>或者，你也可以在 VSCode 终端里切换成 Git Bash 环境，就能直接用 <code>rm -rf</code> 了。</p>
-<p><strong>我</strong>：好的，我用 Git Bash 试试。</p>
-<p>bash</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">tongshixuan@DESKTOP-T01C4Q7 MINGW64 /d/blog/my-blog01 (main)</span><br><span class="line">$ rm -rf .deploy_git</span><br></pre></td></tr></table></figure>
-
-
-
-<p>成功了！然后我执行 <code>hexo clean &amp;&amp; hexo d</code>，出现了一大堆输出，最后好像成功了。你帮我看看关键的几行？</p>
-<p><strong>朋友</strong>：太棒了！我看到最关键的两行日志是：</p>
-<p>text</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">To https://github.com/tristan1116/tristan1116.github.io.git</span><br><span class="line"> + 4e58c75...f23509b HEAD -&gt; main (forced update)</span><br><span class="line">branch &#x27;master&#x27; set up to track &#x27;https://github.com/tristan1116/tristan1116.github.io.git/main&#x27;.</span><br></pre></td></tr></table></figure>
-
-
-
-<p>这完全验证了成功！</p>
-<ul>
-<li>**<code>HEAD -&gt; main</code>**：说明你本地的当前分支直接推送到了远程仓库的 <code>main</code> 分支。</li>
-<li>**<code>(forced update)</code>**：这是正常的，因为远程 <code>main</code> 分支之前的内容和你本地不同，这次推送是“强制覆盖”了它。</li>
-<li><strong>最后一句</strong>：<code>branch &#39;master&#39; set up to track ... main</code> 明确表示，你本地的 <code>master</code> 分支现在<strong>已经设置为跟踪远程的 <code>main</code> 分支</strong>了。</li>
-</ul>
-<p><strong>我</strong>：还有一件事，我之前在 VS Code 的源代码管理里能看到两个存储库：<code>my-blog01</code> 和 <code>.deploy_git</code>。但现在 <code>.deploy_git</code> 不见了，只剩下 <code>my-blog01</code> 一个了。这是为什么？</p>
-<p><strong>朋友</strong>：你观察得很仔细！这是因为 VS Code 检测到了“嵌套仓库”的结构，为了界面清晰，它智能地将内层的 <code>.deploy_git</code> 隐藏了。</p>
-<p>之前显示两个，是因为外层仓库工作在 <code>main</code> 分支，内层仓库工作在 <code>master</code> 分支，分支不一致，VS Code 认为它们是两个独立的工作区。<br>现在内层仓库（<code>.deploy_git</code>）通过跟踪关系，逻辑上已经和 <code>main</code> 分支绑定在一起了，VS Code 就默认隐藏了它，只展示你最需要操作的主仓库。</p>
-<p>这其实是更好的状态，你的界面更清爽了，<code>.deploy_git</code> 依然存在，只是安静地在后台工作。</p>
-<p><strong>我</strong>：那为什么不能直接让本地仓库也叫 <code>main</code>，为什么还得叫 <code>master</code>？</p>
-<p><strong>朋友</strong>：这个问题问得特别好！这是 Hexo 这个工具“硬编码”决定的，它不随你的配置而改变。</p>
-<p>具体来说：</p>
-<ol>
-<li>Git 本身不关心分支叫什么，<code>master</code> 或 <code>main</code> 都只是标签。</li>
-<li>但 Hexo 在执行 <code>hexo d</code> 时，会在 <code>.deploy_git</code> 里初始化一个全新的 Git 仓库，它使用的是你电脑上 Git 的默认分支名。</li>
-<li>你的 Git 全局配置很可能还保留着旧的默认值 <code>master</code>，所以 Hexo 只是“机械地”创建了一个叫 <code>master</code> 的本地分支。</li>
-</ol>
-<p>不过，Hexo 不在乎本地分支叫啥，它只关心最终能不能推送到你指定的远程分支。只要推送成功，任务就完成了。</p>
-<p><strong>我</strong>：但是现在其实已经没关系了对吧？</p>
-<p><strong>朋友</strong>：<strong>完全正确！</strong> 你现在可以彻底放心了，这个问题已经彻底解决，而且完全不影响你日常的使用。</p>
-<ul>
-<li>你的博客能正常更新。</li>
-<li>VS Code 界面清爽。</li>
-<li>底层逻辑通顺。</li>
-</ul>
-<p>从今以后，你只需要记住一个流程：</p>
-<ol>
-<li>写文章。</li>
-<li>在 <code>my-blog01</code> 仓库执行 hexo clean</li>
-<li><code>git add .</code>、<code>git commit -m &quot;...&quot;</code>和git push</li>
-</ol>
-<p>至于 <code>.deploy_git</code> 里的分支叫什么，你完全可以当它不存在，它只是一个在幕后默默工作的工具人。</p>
-<p><strong>我</strong>：哈哈，我彻底搞懂了！Git 确实很神奇，也好玩！这次经历一定要完整地写进博客里。</p>
-<p><strong>朋友</strong>：哈哈，太好了！你不仅解决了问题，还亲手验证了 Git 分支的底层逻辑。这次完整的学习经历，从“为什么错位”到“如何统一”，绝对是一篇绝佳的 Git 实战案例！祝你写博客愉快！🎉</p>
-<hr>
-<blockquote>
-<p><strong>最终结论</strong>：从最初只会“三板斧”，到发现 <code>master</code> 能推送到 <code>main</code> 的“神奇”现象，再到彻底理解分支是指针而非复制，最后亲手完成了本地与远程仓库的统一。这个过程让我对 Git 的理解上了一个大台阶。记录下来，既是对这段学习经历的纪念，也希望能帮到其他遇到类似困惑的朋友。</p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>Git</tag>
       </tags>
   </entry>
   <entry>

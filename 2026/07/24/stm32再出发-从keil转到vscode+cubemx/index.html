@@ -246,14 +246,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>4.9k</span>
+              <span>6.6k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
+              <span>6 分钟</span>
             </span>
             <div class="post-description">从零开始，搭建 VS Code + STM32CubeMX 的嵌入式开发工具链，生成第一段代码，编译烧录，点亮第一盏灯。记录整个过程中遇到的所有坑和解决方法。</div>
 
@@ -444,6 +444,98 @@
 <td>自定义函数</td>
 </tr>
 </tbody></table>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码"><a href="#解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码" class="headerlink" title="解读 MX_GPIO_Init —— CubeMX 生成的初始化代码"></a>解读 MX_GPIO_Init —— CubeMX 生成的初始化代码</h2><p>前面提到，CubeMX 帮我们生成了引脚配置代码。但”能用”和”理解”是两回事，我们来看看 <code>MX_GPIO_Init()</code> 函数里每段代码到底在干什么。</p>
+<h3 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin Output Level */</span></span><br><span class="line">    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin : PA7 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = GPIO_PIN_7;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="逐行解析"><a href="#逐行解析" class="headerlink" title="逐行解析"></a>逐行解析</h3><table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_InitTypeDef GPIO_InitStruct = &#123;0&#125;;</code></td>
+<td>定义一个 GPIO 配置结构体，<code>&#123;0&#125;</code> 把所有成员初始化为 0，避免使用未初始化的值</td>
+</tr>
+<tr>
+<td><code>__HAL_RCC_GPIOA_CLK_ENABLE()</code></td>
+<td><strong>使能 GPIOA 端口的时钟</strong>。STM32 的外设默认时钟是关闭的，使用前必须开启时钟，否则寄存器写不进。这条是一个宏，背后操作的是 RCC 寄存器</td>
+</tr>
+<tr>
+<td><code>HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET)</code></td>
+<td>在配置之前先把引脚输出设为低电平，保证初始时 LED 是灭的，不会出现瞬间闪一下</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Pin = GPIO_PIN_7</code></td>
+<td>指定要配置的引脚是第 7 号引脚（PA7）</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP</code></td>
+<td><strong>输出模式：推挽输出（Push-Pull）</strong>。这是 GPIO 最常用的输出模式——可以输出高&#x2F;低电平，驱动能力强</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Pull = GPIO_NOPULL</code></td>
+<td><strong>上下拉：无</strong>。LED 是输出引脚，不需要上下拉电阻</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW</code></td>
+<td><strong>输出速度：低速</strong>。LED 翻转速度很慢（几百 ms 一次），低速就够用了。速度越快功耗越高、电磁干扰越大</td>
+</tr>
+<tr>
+<td><code>HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct)</code></td>
+<td><strong>将上面配置的结构体写入寄存器</strong>，GPIO 才真正按我们的设置工作。<code>GPIOA</code> 参数表示操作 A 组引脚</td>
+</tr>
+</tbody></table>
+<h3 id="关于-GPIO-模式"><a href="#关于-GPIO-模式" class="headerlink" title="关于 GPIO 模式"></a>关于 GPIO 模式</h3><p><code>GPIO_MODE_OUTPUT_PP</code> 是最常用的输出模式，还有一些其他模式你以后会遇到：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>含义</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td>推挽输出</td>
+<td>驱动 LED、普通数字信号输出</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_OUTPUT_OD</code></td>
+<td>开漏输出</td>
+<td>I2C 通信、电平转换</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_INPUT</code></td>
+<td>浮空输入</td>
+<td>读取按键、传感器信号</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_IT_RISING</code></td>
+<td>上升沿触发中断</td>
+<td>外部中断</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_IT_FALLING</code></td>
+<td>下降沿触发中断</td>
+<td>按键中断</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_AF_PP</code></td>
+<td>复用推挽输出</td>
+<td>UART、SPI 等外设功能引脚</td>
+</tr>
+</tbody></table>
+<p>目前只需掌握前两个输出模式，后续文章中会接触到更多。</p>
+<h3 id="关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX"><a href="#关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX" class="headerlink" title="关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX"></a>关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX</h3><p>CubeMX 帮我们生成了这段代码，我们可以直接拿来用，但这不意味着可以跳过理解。建议的学习路径是：</p>
+<ol>
+<li><strong>先用 CubeMX 生成</strong> —— 快速搭建项目，不纠结寄存器细节</li>
+<li><strong>再解析生成的代码</strong> —— 搞清楚每行配置在做什么</li>
+<li><strong>最后能不用 CubeMX 也写出来</strong> —— 真正掌握后，即使工作中没有 CubeMX 也能手写驱动</li>
+</ol>
+<p>这也是后续所有博客都会保持的风格——不只是展示 CubeMX 的操作步骤，还会解析生成的代码。</p>
 <hr>
 <h2 id="编译"><a href="#编译" class="headerlink" title="编译"></a>编译</h2><p>写好了代码，怎么编译成开发板能运行的机器码？</p>
 <h3 id="通过-VS-Code-编译"><a href="#通过-VS-Code-编译" class="headerlink" title="通过 VS Code 编译"></a>通过 VS Code 编译</h3><p>在 VS Code 底部状态栏，ST 扩展提供了按钮：</p>
@@ -704,7 +796,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%93%BE%E6%A6%82%E8%A7%88"><span class="nav-number">2.</span> <span class="nav-text">工具链概览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%89%E8%A3%85%E6%AD%A5%E9%AA%A4"><span class="nav-number">3.</span> <span class="nav-text">安装步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-STM32CubeMX"><span class="nav-number">3.1.</span> <span class="nav-text">安装 STM32CubeMX</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-VS-Code-%E4%B8%8E-STM32-%E6%89%A9%E5%B1%95"><span class="nav-number">3.2.</span> <span class="nav-text">安装 VS Code 与 STM32 扩展</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-ST-Link-%E9%A9%B1%E5%8A%A8"><span class="nav-number">3.3.</span> <span class="nav-text">安装 ST-Link 驱动</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E7%AC%AC%E4%B8%80%E4%B8%AA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.</span> <span class="nav-text">创建第一个项目</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8-CubeMX-%E4%B8%AD%E6%96%B0%E5%BB%BA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.1.</span> <span class="nav-text">在 CubeMX 中新建项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E5%BC%95%E8%84%9A"><span class="nav-number">4.2.</span> <span class="nav-text">配置引脚</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E8%B0%83%E8%AF%95%E6%8E%A5%E5%8F%A3"><span class="nav-number">4.3.</span> <span class="nav-text">配置调试接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="nav-number">4.4.</span> <span class="nav-text">选择工具链</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%A8-VS-Code-%E4%B8%AD%E7%BC%96%E5%86%99%E4%BB%A3%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">在 VS Code 中编写代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A4%E8%AF%86-main-c"><span class="nav-number">5.1.</span> <span class="nav-text">认识 main.c</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E7%82%B9%E7%81%AF%E4%BB%A3%E7%A0%81"><span class="nav-number">5.2.</span> <span class="nav-text">写点灯代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E-USER-CODE-%E5%8C%BA%E5%9D%97"><span class="nav-number">5.3.</span> <span class="nav-text">关于 USER CODE 区块</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91"><span class="nav-number">6.</span> <span class="nav-text">编译</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E8%BF%87-VS-Code-%E7%BC%96%E8%AF%91"><span class="nav-number">6.1.</span> <span class="nav-text">通过 VS Code 编译</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E7%BC%96%E8%AF%91%E9%94%99%E8%AF%AF"><span class="nav-number">6.2.</span> <span class="nav-text">常见编译错误</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%83%A7%E5%BD%95"><span class="nav-number">7.</span> <span class="nav-text">烧录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5"><span class="nav-number">7.1.</span> <span class="nav-text">硬件连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A9%B1%E5%8A%A8%E9%97%AE%E9%A2%98%E6%8E%92%E5%9D%91"><span class="nav-number">7.2.</span> <span class="nav-text">驱动问题排坑</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%83%A7%E5%BD%95%E5%88%B0%E5%BC%80%E5%8F%91%E6%9D%BF"><span class="nav-number">7.3.</span> <span class="nav-text">烧录到开发板</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E7%A1%AE%E8%AE%A4%E7%83%A7%E5%BD%95%E6%88%90%E5%8A%9F"><span class="nav-number">7.4.</span> <span class="nav-text">如何确认烧录成功</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">8.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E%E4%BC%A0%E7%BB%9F-Keil-%E5%BC%80%E5%8F%91%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">8.1.</span> <span class="nav-text">与传统 Keil 开发的对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E6%B5%81%E6%80%BB%E7%BB%93"><span class="nav-number">8.2.</span> <span class="nav-text">工作流总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8E%E7%BB%AD%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF"><span class="nav-number">8.3.</span> <span class="nav-text">后续学习路线</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">9.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%93%BE%E6%A6%82%E8%A7%88"><span class="nav-number">2.</span> <span class="nav-text">工具链概览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%89%E8%A3%85%E6%AD%A5%E9%AA%A4"><span class="nav-number">3.</span> <span class="nav-text">安装步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-STM32CubeMX"><span class="nav-number">3.1.</span> <span class="nav-text">安装 STM32CubeMX</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-VS-Code-%E4%B8%8E-STM32-%E6%89%A9%E5%B1%95"><span class="nav-number">3.2.</span> <span class="nav-text">安装 VS Code 与 STM32 扩展</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%89%E8%A3%85-ST-Link-%E9%A9%B1%E5%8A%A8"><span class="nav-number">3.3.</span> <span class="nav-text">安装 ST-Link 驱动</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E7%AC%AC%E4%B8%80%E4%B8%AA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.</span> <span class="nav-text">创建第一个项目</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8-CubeMX-%E4%B8%AD%E6%96%B0%E5%BB%BA%E9%A1%B9%E7%9B%AE"><span class="nav-number">4.1.</span> <span class="nav-text">在 CubeMX 中新建项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E5%BC%95%E8%84%9A"><span class="nav-number">4.2.</span> <span class="nav-text">配置引脚</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E8%B0%83%E8%AF%95%E6%8E%A5%E5%8F%A3"><span class="nav-number">4.3.</span> <span class="nav-text">配置调试接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="nav-number">4.4.</span> <span class="nav-text">选择工具链</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%A8-VS-Code-%E4%B8%AD%E7%BC%96%E5%86%99%E4%BB%A3%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">在 VS Code 中编写代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A4%E8%AF%86-main-c"><span class="nav-number">5.1.</span> <span class="nav-text">认识 main.c</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E7%82%B9%E7%81%AF%E4%BB%A3%E7%A0%81"><span class="nav-number">5.2.</span> <span class="nav-text">写点灯代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E-USER-CODE-%E5%8C%BA%E5%9D%97"><span class="nav-number">5.3.</span> <span class="nav-text">关于 USER CODE 区块</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB-MX-GPIO-Init-%E2%80%94%E2%80%94-CubeMX-%E7%94%9F%E6%88%90%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96%E4%BB%A3%E7%A0%81"><span class="nav-number">6.</span> <span class="nav-text">解读 MX_GPIO_Init —— CubeMX 生成的初始化代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E4%BB%A3%E7%A0%81"><span class="nav-number">6.1.</span> <span class="nav-text">完整代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%90%E8%A1%8C%E8%A7%A3%E6%9E%90"><span class="nav-number">6.2.</span> <span class="nav-text">逐行解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E-GPIO-%E6%A8%A1%E5%BC%8F"><span class="nav-number">6.3.</span> <span class="nav-text">关于 GPIO 模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E7%90%86%E5%BF%B5%EF%BC%9ACubeMX-%E7%94%9F%E6%88%90-%E2%86%92-%E8%A7%A3%E6%9E%90%E4%BB%A3%E7%A0%81-%E2%86%92-%E8%84%B1%E7%A6%BB-CubeMX"><span class="nav-number">6.4.</span> <span class="nav-text">关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91"><span class="nav-number">7.</span> <span class="nav-text">编译</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E8%BF%87-VS-Code-%E7%BC%96%E8%AF%91"><span class="nav-number">7.1.</span> <span class="nav-text">通过 VS Code 编译</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E7%BC%96%E8%AF%91%E9%94%99%E8%AF%AF"><span class="nav-number">7.2.</span> <span class="nav-text">常见编译错误</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%83%A7%E5%BD%95"><span class="nav-number">8.</span> <span class="nav-text">烧录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5"><span class="nav-number">8.1.</span> <span class="nav-text">硬件连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A9%B1%E5%8A%A8%E9%97%AE%E9%A2%98%E6%8E%92%E5%9D%91"><span class="nav-number">8.2.</span> <span class="nav-text">驱动问题排坑</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%83%A7%E5%BD%95%E5%88%B0%E5%BC%80%E5%8F%91%E6%9D%BF"><span class="nav-number">8.3.</span> <span class="nav-text">烧录到开发板</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E7%A1%AE%E8%AE%A4%E7%83%A7%E5%BD%95%E6%88%90%E5%8A%9F"><span class="nav-number">8.4.</span> <span class="nav-text">如何确认烧录成功</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">9.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E%E4%BC%A0%E7%BB%9F-Keil-%E5%BC%80%E5%8F%91%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">9.1.</span> <span class="nav-text">与传统 Keil 开发的对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E6%B5%81%E6%80%BB%E7%BB%93"><span class="nav-number">9.2.</span> <span class="nav-text">工作流总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8E%E7%BB%AD%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF"><span class="nav-number">9.3.</span> <span class="nav-text">后续学习路线</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">10.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -718,7 +810,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">25</span>
+          <span class="site-state-item-count">26</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -731,7 +823,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-count">30</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -767,12 +859,12 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">171k</span>
+    <span title="站点总字数">184k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">2:36</span>
+    <span title="站点阅读时长">2:47</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
   </div>
