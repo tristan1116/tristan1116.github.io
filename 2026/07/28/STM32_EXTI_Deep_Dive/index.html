@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="上一篇博客实现了外部中断的功能——红灯闪烁，按键触发中断翻转绿灯。这次从硬件层面深入理解中断的完整信号路径：GPIO输入驱动器 → 边沿检测电路 → EXTI寄存器组 → NVIC中断控制器 → 执行中断服务函数。把CubeMX配置的每个步骤和底层寄存器对应起来，搞懂中断到底是怎么工作的。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——深入外部中断硬件原理">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/28/STM32_EXTI_Deep_Dive/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="上一篇博客实现了外部中断的功能——红灯闪烁，按键触发中断翻转绿灯。这次从硬件层面深入理解中断的完整信号路径：GPIO输入驱动器 → 边沿检测电路 → EXTI寄存器组 → NVIC中断控制器 → 执行中断服务函数。把CubeMX配置的每个步骤和底层寄存器对应起来，搞懂中断到底是怎么工作的。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728220434864.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728220635360.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728220809865.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728220933045.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728221410731.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728221955085.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728222413673.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728222459716.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728222947246.png">
+<meta property="article:published_time" content="2026-07-28T22:10:00.000Z">
+<meta property="article:modified_time" content="2026-07-28T14:33:59.623Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="EXTI">
+<meta property="article:tag" content="中断">
+<meta property="article:tag" content="NVIC">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_EXTI_Deep_Dive/image-20260728220434864.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/28/STM32_EXTI_Deep_Dive/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——深入外部中断硬件原理 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/28/STM32_EXTI_Deep_Dive/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——深入外部中断硬件原理
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-28 22:10:00 / 修改时间：14:33:59" itemprop="dateCreated datePublished" datetime="2026-07-28T22:10:00+00:00">2026-07-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>8.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>7 分钟</span>
+            </span>
+            <div class="post-description">上一篇博客实现了外部中断的功能——红灯闪烁，按键触发中断翻转绿灯。这次从硬件层面深入理解中断的完整信号路径：GPIO输入驱动器 → 边沿检测电路 → EXTI寄存器组 → NVIC中断控制器 → 执行中断服务函数。把CubeMX配置的每个步骤和底层寄存器对应起来，搞懂中断到底是怎么工作的。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从”能用”到”理解”"><a href="#从”能用”到”理解”" class="headerlink" title="从”能用”到”理解”"></a>从”能用”到”理解”</h2><p>上一篇博客中，我们完成了外部中断的功能：红灯闪烁，按下 KEY1 触发中断，翻转绿灯。</p>
+<p>但当时更多的只是照着教程写了代码，对于”为什么这样配置就能触发中断”、”从按键按下到 ISR 执行中间发生了什么”，只有一个模糊的概念。</p>
+<p>这篇就来填补这个空白——沿着信号的路径，从 KEY1 引脚一直追踪到 CPU 执行中断服务函数，搞懂完整的中断触发流程。</p>
+<hr>
+<h2 id="完整信号路径概览"><a href="#完整信号路径概览" class="headerlink" title="完整信号路径概览"></a>完整信号路径概览</h2><p>从 KEY1（PB12）引脚的电平变化到执行中断服务函数，总共经过 5 个阶段：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">GPIO 引脚(PB12)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">① GPIO 输入驱动器    ← 引脚的硬件电路，处理电平信号</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">② 边沿检测电路       ← 检测上升沿/下降沿</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">③ EXTI 寄存器组      ← 请求挂起(PR) + 中断屏蔽(IMR)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">④ NVIC              ← 中断控制器，管理所有中断的优先级和使能</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">⑤ CPU 执行 ISR      ← EXTI15_10_IRQHandler()</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220434864.png" alt="image-20260728220434864"></p>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220635360.png" alt="image-20260728220635360"></p>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220809865.png" alt="image-20260728220809865"></p>
+</blockquote>
+<p>接下来逐一深入每个阶段。</p>
+<hr>
+<h2 id="第一阶段：GPIO-输入驱动器"><a href="#第一阶段：GPIO-输入驱动器" class="headerlink" title="第一阶段：GPIO 输入驱动器"></a>第一阶段：GPIO 输入驱动器</h2><p>信号从 KEY1（PB12）引脚进入芯片，首先经过的是 <strong>GPIO 输入驱动器</strong>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220933045.png" alt="image-20260728220933045"></p>
+</blockquote>
+<h3 id="输入驱动器的结构"><a href="#输入驱动器的结构" class="headerlink" title="输入驱动器的结构"></a>输入驱动器的结构</h3><p>每个 GPIO 引脚内部都有一套输入驱动电路，核心是两个串接的施密特触发器：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">PB12 引脚</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    ┌──────────┐</span><br><span class="line">    │ 施密特   │──→ 到片上外设（如 EXTI）</span><br><span class="line">    │ 触发器   │</span><br><span class="line">    └──────────┘</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    ┌──────────┐</span><br><span class="line">    │ 施密特   │──→ 到 GPIO 输入数据寄存器 (IDR)</span><br><span class="line">    │ 触发器   │</span><br><span class="line">    └──────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>施密特触发器</strong>的作用是<strong>整形</strong>——把缓慢变化或不干净的电平信号转换成干净的数字方波：</p>
+<blockquote>
+<p>想象一下，机械按键按下时电平不是瞬间从高跳到低的，中间会有抖动和毛刺。施密特触发器的作用就是”过滤”这些不稳定的中间态——低于阈值判为 0，高于阈值判为 1，输出一个干净的数字信号。</p>
+</blockquote>
+<h3 id="输入驱动器在做什么"><a href="#输入驱动器在做什么" class="headerlink" title="输入驱动器在做什么"></a>输入驱动器在做什么</h3><p>不管 PB12 配置成普通 GPIO 输入还是 EXTI 中断模式，GPIO 的输入驱动器都在做同一件事——<strong>信号整形</strong>：</p>
+<ol>
+<li>施密特触发器接收引脚上的模拟电平</li>
+<li>将其转换成干净的 0&#x2F;1 数字信号（低于阈值判 0，高于判 1，过滤中间抖动）</li>
+<li>整形后的信号<strong>分两路</strong>输出：一路到 **GPIO 输入数据寄存器 (IDR)**，另一路到 <strong>片上外设</strong>（这里是 EXTI 模块的边沿检测电路）</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">PB12 引脚上的模拟电平（可能带抖动）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">施密特触发器（整形过滤）</span><br><span class="line">    │</span><br><span class="line">    ├──→ GPIO 输入数据寄存器 (IDR)    ← 用 HAL_GPIO_ReadPin() 读的就是它</span><br><span class="line">    │</span><br><span class="line">    └──→ EXTI 边沿检测电路（下一阶段）</span><br></pre></td></tr></table></figure>
+
+<p>这也解释了为什么上一篇中可以在 ISR 里用 <code>HAL_GPIO_ReadPin()</code> 再次确认按键状态——因为有单独一路信号始终通往 IDR，不依赖 EXTI 的工作状态。</p>
+<blockquote>
+<p>注意：<strong>边沿检测</strong>（下降沿&#x2F;上升沿）不在这里发生，那是下一阶段 EXTI 电路的工作。输入驱动器的职责到此为止——只负责整形和转发。</p>
+</blockquote>
+<blockquote>
+<p>关于 GPIO 八大模式的详细解析，参考之前那篇 GPIO 模式的博客。</p>
+</blockquote>
+<hr>
+<h2 id="第二阶段：边沿检测电路"><a href="#第二阶段：边沿检测电路" class="headerlink" title="第二阶段：边沿检测电路"></a>第二阶段：边沿检测电路</h2><p>经过输入驱动器整形后的干净信号，同时送给<strong>上升沿检测</strong>和<strong>下降沿检测</strong>两条路径：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728221410731.png" alt="image-20260728221410731"></p>
+</blockquote>
+<h3 id="两个触发选择寄存器"><a href="#两个触发选择寄存器" class="headerlink" title="两个触发选择寄存器"></a>两个触发选择寄存器</h3><p>EXTI 模块有两个触发选择寄存器，分别控制上升沿和下降沿的使能：</p>
+<table>
+<thead>
+<tr>
+<th align="center">寄存器</th>
+<th align="left">全称</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>EXTI_RTSR</code></td>
+<td align="left">Rising Trigger Selection Register</td>
+<td align="left">对应位写 1 → 使能该线的<strong>上升沿</strong>触发</td>
+</tr>
+<tr>
+<td align="center"><code>EXTI_FTSR</code></td>
+<td align="left">Falling Trigger Selection Register</td>
+<td align="left">对应位写 1 → 使能该线的<strong>下降沿</strong>触发</td>
+</tr>
+</tbody></table>
+<p>每个寄存器都有 20 位（bit 0~19），每 1 位对应一条 EXTI 线。<strong>默认所有位都是 0（不使能），只有我们配置的那一位会被设为 1。</strong></p>
+<p>拿我们的配置举例——选择了下降沿触发，所以<strong>下降沿</strong>寄存器状态是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">EXTI_FTSR 寄存器（20位）:</span><br><span class="line">bit → 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0</span><br><span class="line">      ┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">      │ 0  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0  0  0  0  0 │</span><br><span class="line">      └─────────────────────────────────────────────────────────────┘</span><br><span class="line">                             ▲</span><br><span class="line">                             └── bit12 = 1（使能 EXTI12 下降沿触发）</span><br></pre></td></tr></table></figure>
+
+<p>而 <code>EXTI_RTSR</code> 寄存器则保持全 0，因为我们没有使能上升沿触发。</p>
+<h3 id="我们的配置"><a href="#我们的配置" class="headerlink" title="我们的配置"></a>我们的配置</h3><p>上一篇我们在 CubeMX 中选择了 <strong>Falling edge trigger detection</strong>（下降沿触发），这意味着：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">EXTI_FTSR 的 bit 12 = 1  （使能下降沿检测）</span><br><span class="line">EXTI_RTSR 的 bit 12 = 0  （不检测上升沿）</span><br></pre></td></tr></table></figure>
+
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728221955085.png" alt="image-20260728221955085"></p>
+<p>在生成的代码中，<code>HAL_GPIO_Init()</code> 内部通过位运算来操作这两个寄存器。拿我们的下降沿触发举例，等价于做了这样一件事：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// HAL_GPIO_Init 内部对 FTSR 的操作（以 PB12 为例）</span></span><br><span class="line"><span class="comment">// KEY1_Pin = GPIO_PIN_12 = 0x1000 = 二进制 1 0000 0000 0000</span></span><br><span class="line"><span class="comment">// 把第 12 位置 1，其他位保持不变</span></span><br><span class="line">EXTI-&gt;FTSR |= GPIO_PIN_12;</span><br></pre></td></tr></table></figure>
+
+<p>这行代码的意思是：<strong>读取 FTSR 寄存器的当前值 → 把第 12 位改成 1 → 写回去</strong>。</p>
+<p>操作前后的寄存器变化：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">执行前:  FTSR = 0x0000 0000    (所有位都是 0，所有 EXTI 线都没使能)</span><br><span class="line">                                    │</span><br><span class="line">                                    ▼  EXTI-&gt;FTSR |= GPIO_PIN_12;</span><br><span class="line">                                    │</span><br><span class="line">执行后:  FTSR = 0x0000 1000    (bit12 变成 1，其他位不变)</span><br></pre></td></tr></table></figure>
+
+<p><code>GPIO_PIN_12</code> 的值是 <code>0x1000</code>（即 <code>1 &lt;&lt; 12</code>），这个值与 FTSR 做<strong>按位或</strong>运算，结果就是只把第 12 位设成 1，不影响其他位。</p>
+<p>同理，如果配置的是上升沿触发，操作的就是 RTSR 寄存器：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">EXTI-&gt;RTSR |= GPIO_PIN_12;  <span class="comment">// RTSR 的第 12 位置 1</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="边沿检测电路的工作原理"><a href="#边沿检测电路的工作原理" class="headerlink" title="边沿检测电路的工作原理"></a>边沿检测电路的工作原理</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">当前电平 → 延迟一个时钟周期 → 旧电平</span><br><span class="line">                │</span><br><span class="line">                ▼</span><br><span class="line">    ┌─────────────────────┐</span><br><span class="line">    │ 比较：当前 vs 旧    │</span><br><span class="line">    └─────────────────────┘</span><br><span class="line">        │           │</span><br><span class="line">        ▼           ▼</span><br><span class="line">  上升沿检测     下降沿检测</span><br><span class="line">  (RTSR控制)    (FTSR控制)</span><br><span class="line">        │           │</span><br><span class="line">        ▼           ▼</span><br><span class="line">    ┌──────┐   ┌──────┐</span><br><span class="line">    │与门  │   │与门  │</span><br><span class="line">    └──┬───┘   └──┬───┘</span><br><span class="line">       │          │</span><br><span class="line">       └────┬─────┘</span><br><span class="line">            ▼</span><br><span class="line">          或门 → 输出高电平 → 到 EXTI_PR</span><br></pre></td></tr></table></figure>
+
+<p>具体过程：</p>
+<ol>
+<li><strong>每个时钟周期</strong>，电路比较当前电平和上一周期的电平</li>
+<li>如果当前电平 &gt; 上一周期电平 &#x3D; <strong>上升沿</strong></li>
+<li>如果当前电平 &lt; 上一周期电平 &#x3D; <strong>下降沿</strong></li>
+<li>检测到的边沿再与 <code>RTSR</code> &#x2F; <code>FTSR</code> 对应位做<strong>与运算</strong></li>
+<li>如果该位为 1（使能了对应边沿检测），与门输出 1</li>
+<li>两个与门的输出经过<strong>或门</strong>合并</li>
+</ol>
+<p>所以对于我们的场景：KEY1 按下（高→低），下降沿被检测到，<code>FTSR bit12 = 1</code>，与门输出 1，或门输出 1 → <strong>向后传递一个高电平信号</strong>。</p>
+<hr>
+<h2 id="第三阶段：EXTI-寄存器组"><a href="#第三阶段：EXTI-寄存器组" class="headerlink" title="第三阶段：EXTI 寄存器组"></a>第三阶段：EXTI 寄存器组</h2><p>第二阶段输出的高电平信号到达了 EXTI 的核心寄存器组：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728222413673.png" alt="image-20260728222413673"></p>
+</blockquote>
+<h3 id="请求挂起寄存器-EXTI-PR"><a href="#请求挂起寄存器-EXTI-PR" class="headerlink" title="请求挂起寄存器 (EXTI_PR)"></a>请求挂起寄存器 (EXTI_PR)</h3><p><code>EXTI_PR</code>（Pending Register），也叫<strong>挂起寄存器</strong>或<strong>待决寄存器</strong>。</p>
+<p>当边沿检测电路传来高电平信号时，<code>EXTI_PR</code> 的对应位被置为 <strong>1</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="center">位</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">bit 12 &#x3D; 1</td>
+<td>EXTI12 线有中断请求正在等待处理</td>
+</tr>
+</tbody></table>
+<p><strong>只要 PR 的某一位为 1，就表示该中断线有一个”未处理”的中断请求。</strong></p>
+<p>这个寄存器很关键——<strong>CPU 正是通过查询 PR 知道”谁触发了中断”的</strong>。</p>
+<blockquote>
+<p>这就像外卖到了，门卫（PR）在本子上记下”12 号房有外卖”，然后通知你。</p>
+</blockquote>
+<h3 id="中断屏蔽寄存器-EXTI-IMR"><a href="#中断屏蔽寄存器-EXTI-IMR" class="headerlink" title="中断屏蔽寄存器 (EXTI_IMR)"></a>中断屏蔽寄存器 (EXTI_IMR)</h3><p><code>EXTI_IMR</code>（Interrupt Mask Register），决定是否<strong>允许</strong>某条中断线向 NVIC 发送请求：</p>
+<ul>
+<li><strong>某位 &#x3D; 1</strong>：允许该中断线继续向后传递（放行）</li>
+<li><strong>某位 &#x3D; 0</strong>：屏蔽该中断线（拦截）</li>
+</ul>
+<p>CubeMX 在配置 PB12 为 <code>GPIO_EXTI12</code> 时，会自动把 <code>IMR</code> 的 bit 12 设为 1。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// HAL_GPIO_Init 内部使能 IMR 的底层代码</span></span><br><span class="line">EXTI-&gt;IMR |= iocurrent;  <span class="comment">// IMR 对应位置 1，允许中断通过</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="PR-和-IMR-的与门组合"><a href="#PR-和-IMR-的与门组合" class="headerlink" title="PR 和 IMR 的与门组合"></a>PR 和 IMR 的与门组合</h3><p>PR 的输出和 IMR 的输出经过一个<strong>与门</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">EXTI_PR bit12 = 1  ───┐</span><br><span class="line">                       ├── 与门 ──→ 输出高电平 → 到 NVIC</span><br><span class="line">EXTI_IMR bit12 = 1  ──┘</span><br></pre></td></tr></table></figure>
+
+<p>只有 <strong>两者都是 1</strong> 时，与门才输出 1，中断信号才能到达 NVIC。</p>
+<p>这就是中断屏蔽的原理——把 IMR 的某位设为 0，即使 PR 被置 1，与门也会输出 0，相当于”关掉了”这条中断线。</p>
+<hr>
+<h2 id="第四阶段：NVIC（嵌套向量中断控制器）"><a href="#第四阶段：NVIC（嵌套向量中断控制器）" class="headerlink" title="第四阶段：NVIC（嵌套向量中断控制器）"></a>第四阶段：NVIC（嵌套向量中断控制器）</h2><p>第三阶段输出的信号终于到了中断的”最高层”——<strong>NVIC（Nested Vectored Interrupt Controller）</strong>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728222459716.png" alt="image-20260728222459716"></p>
+</blockquote>
+<h3 id="NVIC-的角色"><a href="#NVIC-的角色" class="headerlink" title="NVIC 的角色"></a>NVIC 的角色</h3><p>先补充一个概念：<strong>Cortex-M3 是什么？</strong></p>
+<p>STM32F103 芯片内部可以分成两层：</p>
+<ul>
+<li><strong>内核（Core）</strong>——ARM 公司设计的 CPU 核心，负责执行指令、处理运算。STM32F103 用的是 <strong>Cortex-M3</strong> 内核，属于 ARM 的”M 系列”（Microcontroller），专门为单片机设计的低功耗、高性能内核</li>
+<li><strong>外设（Peripheral）</strong>——ST 公司在内核周围添加的功能模块，比如 GPIO、EXTI、定时器、UART 等。这些是 ST 自己设计的，不同型号的 STM32 外设各有不同</li>
+</ul>
+<p>打个比方：Cortex-M3 内核就像汽车的<strong>发动机</strong>，外设就像<strong>车轮、方向盘、空调</strong>——发动机决定了这辆车的基础性能，而外设决定了这辆车能干什么。</p>
+<p>NVIC 是 Cortex-M3 内核的一部分，负责：</p>
+<ol>
+<li><strong>管理所有中断的使能和屏蔽</strong></li>
+<li><strong>管理中断优先级</strong>——当多个中断同时触发时决定先处理谁</li>
+<li><strong>找到中断向量</strong>——根据中断号找到对应的中断服务函数地址</li>
+<li><strong>支持中断嵌套</strong>——高优先级中断可以打断低优先级中断</li>
+</ol>
+<h3 id="中断向量"><a href="#中断向量" class="headerlink" title="中断向量"></a>中断向量</h3><p>每个中断源都有一个唯一的中断号，对应中断向量表中的一项。EXTI12 的中断号是 <strong>EXTI15_10_IRQn</strong>（因为 EXTI 线 10~15 共享同一个中断入口）。</p>
+<p>中断向量表存储在各个中断服务函数的地址：</p>
+<table>
+<thead>
+<tr>
+<th align="center">中断号</th>
+<th align="center">中断名</th>
+<th align="center">函数地址</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">23</td>
+<td align="center">EXTI15_10_IRQn</td>
+<td align="center">→ <code>EXTI15_10_IRQHandler()</code></td>
+</tr>
+</tbody></table>
+<p>当 NVIC 检测到 EXTI12 的中断信号时，它取出向量表中 EXTI15_10 对应的地址，然后 CPU 跳转到那里执行。</p>
+<h3 id="NVIC-相关的-CubeMX-配置代码"><a href="#NVIC-相关的-CubeMX-配置代码" class="headerlink" title="NVIC 相关的 CubeMX 配置代码"></a>NVIC 相关的 CubeMX 配置代码</h3><p>在 <code>MX_GPIO_Init()</code> 中，CubeMX 生成了两行关键代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* EXTI interrupt init*/</span></span><br><span class="line">HAL_NVIC_SetPriority(EXTI15_10_IRQn, <span class="number">15</span>, <span class="number">0</span>);  <span class="comment">// 设置优先级</span></span><br><span class="line">HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);            <span class="comment">// 使能中断</span></span><br></pre></td></tr></table></figure>
+
+<p>这两个函数的背后操作：</p>
+<p><strong><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code></strong> 内部操作的是 <code>NVIC_ISER</code>（Interrupt Set Enable Register）寄存器：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 简化版实现</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_NVIC_EnableIRQ</span><span class="params">(IRQn_Type IRQn)</span></span><br><span class="line">&#123;</span><br><span class="line">    NVIC-&gt;ISER[((<span class="type">uint32_t</span>)IRQn) &gt;&gt; <span class="number">5</span>] = (<span class="type">uint32_t</span>)(<span class="number">1</span> &lt;&lt; (((<span class="type">uint32_t</span>)IRQn) &amp; <span class="number">0x1F</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>ISER 寄存器有 3 个（共 96 位），每一位对应一个中断号。EXTI15_10_IRQn 的中断号是 23，所以 <code>ISER[0]</code> 的第 23 位被置 1。</p>
+<blockquote>
+<p>NVIC 总共有三个关键使能寄存器：</p>
+<ul>
+<li><strong>ISER</strong>：Interrupt Set Enable Register——置 1 使能中断</li>
+<li><strong>ICER</strong>：Interrupt Clear Enable Register——置 1 禁能中断</li>
+<li><strong>ISPR&#x2F;ICPR</strong>：中断挂起&#x2F;清除挂起</li>
+</ul>
+</blockquote>
+<p><strong><code>HAL_NVIC_SetPriority(EXTI15_10_IRQn, 15, 0)</code></strong> 设置优先级，后面会展开讲。</p>
+<hr>
+<h2 id="第五阶段：执行-ISR-与清标志位"><a href="#第五阶段：执行-ISR-与清标志位" class="headerlink" title="第五阶段：执行 ISR 与清标志位"></a>第五阶段：执行 ISR 与清标志位</h2><p>NVIC 把中断信号送达 CPU 内核后，CPU 的响应流程：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">NVIC 发出中断请求</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 完成当前指令</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 压栈（保存现场）  ← 自动保存 R0-R3、R12、LR、PC、xPSR</span><br><span class="line">    │</span><br><span class="line">    │   注意：STM32 的中断响应延迟只有 12 个时钟周期</span><br><span class="line">    │   这是 Cortex-M3 核心的优势之一</span><br><span class="line">    ▼</span><br><span class="line">CPU 从向量表取出 EXTI15_10_IRQHandler 的地址</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 跳转到 EXTI15_10_IRQHandler() 执行</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">执行用户编写的 ISR 代码</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">执行 HAL_GPIO_EXTI_IRQHandler() → 清除 EXTI_PR 对应位</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 出栈（恢复现场）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">回到 main loop 被中断的位置继续执行</span><br></pre></td></tr></table></figure>
+
+<h3 id="为什么必须清-PR？"><a href="#为什么必须清-PR？" class="headerlink" title="为什么必须清 PR？"></a>为什么必须清 PR？</h3><p><strong>这是最关键的一步，也是最容易忘的一步。</strong></p>
+<p>EXTI_PR 寄存器的作用是”记住”中断请求。如果不主动清零：</p>
+<ol>
+<li>ISR 执行完毕后，PR bit12 仍然为 1</li>
+<li>与门另一端的 IMR bit12 也为 1（没关中断）</li>
+<li>与门持续输出高电平到 NVIC</li>
+<li>NVIC 认为又有新中断来了</li>
+<li>CPU 再次进入 ISR</li>
+<li>死循环！</li>
+</ol>
+<p>所以在 ISR 末尾必须调用：（当然，好心的cubemx会自动帮我们生成这行代码）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">HAL_GPIO_EXTI_IRQHandler(KEY1_Pin);</span><br></pre></td></tr></table></figure>
+
+<p>这个函数内部会检查 PR 对应位，如果为 1 就将它清零：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_IRQHandler</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(GPIO_Pin) != RESET)  <span class="comment">// 检查 PR 对应位</span></span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_Pin);           <span class="comment">// 清零 PR 对应位</span></span><br><span class="line">        HAL_GPIO_EXTI_Callback(GPIO_Pin);             <span class="comment">// 调用回调函数</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>清零的底层操作：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// __HAL_GPIO_EXTI_CLEAR_IT(KEY1_Pin) 展开后</span></span><br><span class="line">EXTI-&gt;PR = GPIO_PIN_12;  <span class="comment">// 向 PR 寄存器的 bit12 写 1 来清零</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>⚠️ <strong>规律：向 PR 写 1 来清除中断标志位。</strong> 这是 STM32 中常见的寄存器设计——读某位判断状态，写 1 清除该位。不要写成写 0，那不会生效。</p>
+</blockquote>
+<hr>
+<h2 id="深入中断优先级"><a href="#深入中断优先级" class="headerlink" title="深入中断优先级"></a>深入中断优先级</h2><h3 id="4-位优先级的分配"><a href="#4-位优先级的分配" class="headerlink" title="4 位优先级的分配"></a>4 位优先级的分配</h3><p>上一篇博客只提了一句”配置优先级”，现在我们来看看背后发生了什么。</p>
+<p>STM32F1 为每个中断向量分配了 <strong>4 个二进制位</strong>来存储优先级信息：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">NVIC-&gt;IP[IRQn] = [bit7][bit6][bit5][bit4][bit3][bit2][bit1][bit0]</span><br><span class="line">                  ↑ 优先级位占高4位       ↑ 低4位不使用</span><br></pre></td></tr></table></figure>
+
+<p>CubeMX 中的 <strong>优先级分组（Priority Group）</strong> 决定了这 4 位如何分配到抢占优先级和子优先级：</p>
+<table>
+<thead>
+<tr>
+<th align="center">分组</th>
+<th align="center">抢占优先级(bit)</th>
+<th align="center">子优先级(bit)</th>
+<th align="center">抢占级数量</th>
+<th align="center">子优先级数量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">组 0</td>
+<td align="center">0</td>
+<td align="center">4</td>
+<td align="center">1</td>
+<td align="center">16</td>
+</tr>
+<tr>
+<td align="center">组 1</td>
+<td align="center">1</td>
+<td align="center">3</td>
+<td align="center">2</td>
+<td align="center">8</td>
+</tr>
+<tr>
+<td align="center">组 2</td>
+<td align="center">2</td>
+<td align="center">2</td>
+<td align="center">4</td>
+<td align="center">4</td>
+</tr>
+<tr>
+<td align="center">组 3</td>
+<td align="center">3</td>
+<td align="center">1</td>
+<td align="center">8</td>
+<td align="center">2</td>
+</tr>
+<tr>
+<td align="center"><strong>组 4</strong></td>
+<td align="center"><strong>4</strong></td>
+<td align="center"><strong>0</strong></td>
+<td align="center"><strong>16</strong></td>
+<td align="center"><strong>1</strong></td>
+</tr>
+</tbody></table>
+<p>CubeMX 默认使用<strong>组 4</strong>，即全部 4 位用于抢占优先级，没有子优先级。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728222947246.png" alt="image-20260728222947246"></p>
+</blockquote>
+<h3 id="优先级编码"><a href="#优先级编码" class="headerlink" title="优先级编码"></a>优先级编码</h3><p>CubeMX 中配的”Preemption Priority &#x3D; 15”并不是直接写进寄存器的值，中间有一个编码过程。</p>
+<p>以组 4 为例，4 位全部是抢占优先级：</p>
+<table>
+<thead>
+<tr>
+<th align="left">中断</th>
+<th align="center">CubeMX 中配的优先级</th>
+<th align="center">编码到 IP 寄存器高 4 位</th>
+<th align="center">实际优先级值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SysTick</td>
+<td align="center">14</td>
+<td align="center">1110</td>
+<td align="center"><strong>14（最高）</strong></td>
+</tr>
+<tr>
+<td align="left">EXTI15_10</td>
+<td align="center">15</td>
+<td align="center">1111</td>
+<td align="center"><strong>15（最低）</strong></td>
+</tr>
+</tbody></table>
+<p><code>HAL_NVIC_SetPriority</code> 内部做编码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// HAL_NVIC_SetPriority 简化逻辑</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_NVIC_SetPriority</span><span class="params">(IRQn_Type IRQn, <span class="type">uint32_t</span> PreemptPriority, <span class="type">uint32_t</span> SubPriority)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 1. 根据优先级分组计算出编码值</span></span><br><span class="line">    <span class="type">uint32_t</span> prioritygroup = NVIC_GetPriorityGrouping();  <span class="comment">// 默认组 4</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 将 PreemptPriority 和 SubPriority 编码成 4 位值</span></span><br><span class="line">    <span class="type">uint32_t</span> priority = NVIC_EncodePriority(prioritygroup, PreemptPriority, SubPriority);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 写入 NVIC 的优先级寄存器（高 4 位）</span></span><br><span class="line">    NVIC-&gt;IP[IRQn] = (<span class="type">uint8_t</span>)((priority &lt;&lt; <span class="number">4</span>) &amp; <span class="number">0xFF</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="中断嵌套"><a href="#中断嵌套" class="headerlink" title="中断嵌套"></a>中断嵌套</h3><p>如果多个中断被触发，NVIC 根据优先级决定处理顺序：</p>
+<ul>
+<li><strong>数值越小，优先级越高</strong></li>
+<li>高优先级中断可以<strong>打断</strong>低优先级中断（嵌套）</li>
+<li>同优先级中断按<strong>中断号</strong>决定，号小的先执行</li>
+</ul>
+<p>我们配置的优先级关系：</p>
+<table>
+<thead>
+<tr>
+<th align="left">中断</th>
+<th align="center">优先级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SysTick</td>
+<td align="center">14</td>
+<td>最高，可以抢占其他所有中断</td>
+</tr>
+<tr>
+<td align="left">EXTI15_10</td>
+<td align="center">15</td>
+<td>最低</td>
+</tr>
+</tbody></table>
+<p>所以上一篇中在 EXTI 的 ISR 里调用 <code>HAL_Delay(10)</code> 是安全的——SysTick（优先级 14）可以打断 EXTI（优先级 15）来更新 <code>uwTick</code>，不会死锁。</p>
+<hr>
+<h2 id="完整映射：CubeMX-配置-→-底层寄存器"><a href="#完整映射：CubeMX-配置-→-底层寄存器" class="headerlink" title="完整映射：CubeMX 配置 → 底层寄存器"></a>完整映射：CubeMX 配置 → 底层寄存器</h2><p>用一张表把 CubeMX 配置和底层寄存器对应起来：</p>
+<table>
+<thead>
+<tr>
+<th align="left">CubeMX 配置项</th>
+<th align="center">影响的寄存器</th>
+<th align="left">对应代码</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">PB12 → GPIO_EXTI12</td>
+<td align="center">AFIO_EXTICR3（选择 PB12 连接到 EXTI12）</td>
+<td align="left"><code>HAL_GPIO_Init()</code> 内部</td>
+</tr>
+<tr>
+<td align="left">GPIO mode → IT Falling</td>
+<td align="center">EXTI_FTSR bit12 &#x3D; 1</td>
+<td align="left"><code>EXTI-&gt;FTSR |= (1&lt;&lt;12)</code></td>
+</tr>
+<tr>
+<td align="left">EXTI line[15:10] NVIC Enabled</td>
+<td align="center">NVIC_ISER[0] bit23 &#x3D; 1</td>
+<td align="left"><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code></td>
+</tr>
+<tr>
+<td align="left">Preemption Priority &#x3D; 15</td>
+<td align="center">NVIC_IP[23] 高 4 位 &#x3D; 1111</td>
+<td align="left"><code>HAL_NVIC_SetPriority(EXTI15_10_IRQn, 15, 0)</code></td>
+</tr>
+<tr>
+<td align="left">（自动生成）</td>
+<td align="center">EXTI_IMR bit12 &#x3D; 1</td>
+<td align="left"><code>EXTI-&gt;IMR |= (1&lt;&lt;12)</code></td>
+</tr>
+<tr>
+<td align="left">（自动生成）</td>
+<td align="center">EXTI_PR bit12 清 0</td>
+<td align="left"><code>EXTI-&gt;PR = (1&lt;&lt;12)</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="完整信号路径回顾"><a href="#完整信号路径回顾" class="headerlink" title="完整信号路径回顾"></a>完整信号路径回顾</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">KEY1 按下 (PB12 从高到低)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">GPIO 输入驱动器（施密特触发器整形）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">下降沿检测电路 —— FTSR bit12 = 1 使能下降沿检测</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">EXTI_PR bit12 置 1 ← 挂起寄存器&quot;记录&quot;了中断请求</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">与门：PR bit12(1) AND IMR bit12(1) = 1 ← 中断已被使能</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">NVIC 检测到 EXTI12 的中断信号</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">查找向量表 → EXTI15_10_IRQn → 跳转到 EXTI15_10_IRQHandler()</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">用户 ISR：消抖 → 确认 → 翻转绿灯</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">HAL_GPIO_EXTI_IRQHandler() → 清除 EXTI_PR bit12</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 恢复现场，继续执行 main loop</span><br></pre></td></tr></table></figure>
+
+<h3 id="核心要点"><a href="#核心要点" class="headerlink" title="核心要点"></a>核心要点</h3><table>
+<thead>
+<tr>
+<th>要点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>EXTI_PR</strong></td>
+<td>记录中断请求，ISR 中必须清零，否则反复触发</td>
+</tr>
+<tr>
+<td><strong>EXTI_IMR</strong></td>
+<td>中断屏蔽开关，1 &#x3D; 放行，0 &#x3D; 屏蔽</td>
+</tr>
+<tr>
+<td><strong>EXTI_RTSR&#x2F;FTSR</strong></td>
+<td>选择上升沿&#x2F;下降沿触发</td>
+</tr>
+<tr>
+<td><strong>NVIC</strong></td>
+<td>总控制器，管理所有中断的使能和优先级</td>
+</tr>
+<tr>
+<td><strong>优先级组</strong></td>
+<td>决定 4 位中多少位给抢占、多少位给子优先级</td>
+</tr>
+<tr>
+<td><strong>中断嵌套</strong></td>
+<td>高优先级可打断低优先级，SysTick &gt; EXTI</td>
+</tr>
+</tbody></table>
+<h3 id="与其他中断的共性"><a href="#与其他中断的共性" class="headerlink" title="与其他中断的共性"></a>与其他中断的共性</h3><p>虽然这篇以外部中断（EXTI）为例，但所有中断的流程都有类似的框架：</p>
+<ol>
+<li>外设产生中断事件 → 对应<strong>挂起寄存器</strong>置位</li>
+<li>中断<strong>使能&#x2F;屏蔽寄存器</strong>决定是否放行</li>
+<li>信号到达 <strong>NVIC</strong>，根据优先级排队</li>
+<li>NVIC 让 CPU 跳转到对应的<strong>中断服务函数</strong></li>
+<li>ISR 中必须<strong>清除挂起标志</strong></li>
+</ol>
+<p>后续学习定时器、UART、DMA 等外设的中断时，它们的流程都遵循这个模式。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1M24y1473t">keysking STM32 教程（B站）——中断深入视频</a></li>
+<li><a href="/2026/07/28/STM32_EXTI_Interrupt/">上一篇：STM32外部中断入门</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.st.com/resource/en/reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-stmicroelectronics.pdf">STM32 参考手册 —— EXTI 章节</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.amazon.com/Definitive-Guide-ARM-Cortex-M3-Cortex-M4/dp/0124080820">Cortex-M3 权威指南 —— NVIC 章节</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/EXTI/" rel="tag"># EXTI</a>
+              <a href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag"># 中断</a>
+              <a href="/tags/NVIC/" rel="tag"># NVIC</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/28/STM32_EXTI_Interrupt/" rel="prev" title="STM32——红灯持续闪烁，绿灯用外部中断翻转状态">
+      <i class="fa fa-chevron-left"></i> STM32——红灯持续闪烁，绿灯用外部中断翻转状态
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E2%80%9D%E8%83%BD%E7%94%A8%E2%80%9D%E5%88%B0%E2%80%9D%E7%90%86%E8%A7%A3%E2%80%9D"><span class="nav-number">1.</span> <span class="nav-text">从”能用”到”理解”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E4%BF%A1%E5%8F%B7%E8%B7%AF%E5%BE%84%E6%A6%82%E8%A7%88"><span class="nav-number">2.</span> <span class="nav-text">完整信号路径概览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E9%98%B6%E6%AE%B5%EF%BC%9AGPIO-%E8%BE%93%E5%85%A5%E9%A9%B1%E5%8A%A8%E5%99%A8"><span class="nav-number">3.</span> <span class="nav-text">第一阶段：GPIO 输入驱动器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%85%A5%E9%A9%B1%E5%8A%A8%E5%99%A8%E7%9A%84%E7%BB%93%E6%9E%84"><span class="nav-number">3.1.</span> <span class="nav-text">输入驱动器的结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%85%A5%E9%A9%B1%E5%8A%A8%E5%99%A8%E5%9C%A8%E5%81%9A%E4%BB%80%E4%B9%88"><span class="nav-number">3.2.</span> <span class="nav-text">输入驱动器在做什么</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E9%98%B6%E6%AE%B5%EF%BC%9A%E8%BE%B9%E6%B2%BF%E6%A3%80%E6%B5%8B%E7%94%B5%E8%B7%AF"><span class="nav-number">4.</span> <span class="nav-text">第二阶段：边沿检测电路</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%A4%E4%B8%AA%E8%A7%A6%E5%8F%91%E9%80%89%E6%8B%A9%E5%AF%84%E5%AD%98%E5%99%A8"><span class="nav-number">4.1.</span> <span class="nav-text">两个触发选择寄存器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%88%91%E4%BB%AC%E7%9A%84%E9%85%8D%E7%BD%AE"><span class="nav-number">4.2.</span> <span class="nav-text">我们的配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%B9%E6%B2%BF%E6%A3%80%E6%B5%8B%E7%94%B5%E8%B7%AF%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86"><span class="nav-number">4.3.</span> <span class="nav-text">边沿检测电路的工作原理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E9%98%B6%E6%AE%B5%EF%BC%9AEXTI-%E5%AF%84%E5%AD%98%E5%99%A8%E7%BB%84"><span class="nav-number">5.</span> <span class="nav-text">第三阶段：EXTI 寄存器组</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%B7%E6%B1%82%E6%8C%82%E8%B5%B7%E5%AF%84%E5%AD%98%E5%99%A8-EXTI-PR"><span class="nav-number">5.1.</span> <span class="nav-text">请求挂起寄存器 (EXTI_PR)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E5%B1%8F%E8%94%BD%E5%AF%84%E5%AD%98%E5%99%A8-EXTI-IMR"><span class="nav-number">5.2.</span> <span class="nav-text">中断屏蔽寄存器 (EXTI_IMR)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PR-%E5%92%8C-IMR-%E7%9A%84%E4%B8%8E%E9%97%A8%E7%BB%84%E5%90%88"><span class="nav-number">5.3.</span> <span class="nav-text">PR 和 IMR 的与门组合</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E9%98%B6%E6%AE%B5%EF%BC%9ANVIC%EF%BC%88%E5%B5%8C%E5%A5%97%E5%90%91%E9%87%8F%E4%B8%AD%E6%96%AD%E6%8E%A7%E5%88%B6%E5%99%A8%EF%BC%89"><span class="nav-number">6.</span> <span class="nav-text">第四阶段：NVIC（嵌套向量中断控制器）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#NVIC-%E7%9A%84%E8%A7%92%E8%89%B2"><span class="nav-number">6.1.</span> <span class="nav-text">NVIC 的角色</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E5%90%91%E9%87%8F"><span class="nav-number">6.2.</span> <span class="nav-text">中断向量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#NVIC-%E7%9B%B8%E5%85%B3%E7%9A%84-CubeMX-%E9%85%8D%E7%BD%AE%E4%BB%A3%E7%A0%81"><span class="nav-number">6.3.</span> <span class="nav-text">NVIC 相关的 CubeMX 配置代码</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E9%98%B6%E6%AE%B5%EF%BC%9A%E6%89%A7%E8%A1%8C-ISR-%E4%B8%8E%E6%B8%85%E6%A0%87%E5%BF%97%E4%BD%8D"><span class="nav-number">7.</span> <span class="nav-text">第五阶段：执行 ISR 与清标志位</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%85%E9%A1%BB%E6%B8%85-PR%EF%BC%9F"><span class="nav-number">7.1.</span> <span class="nav-text">为什么必须清 PR？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B7%B1%E5%85%A5%E4%B8%AD%E6%96%AD%E4%BC%98%E5%85%88%E7%BA%A7"><span class="nav-number">8.</span> <span class="nav-text">深入中断优先级</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E4%BD%8D%E4%BC%98%E5%85%88%E7%BA%A7%E7%9A%84%E5%88%86%E9%85%8D"><span class="nav-number">8.1.</span> <span class="nav-text">4 位优先级的分配</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%98%E5%85%88%E7%BA%A7%E7%BC%96%E7%A0%81"><span class="nav-number">8.2.</span> <span class="nav-text">优先级编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E5%B5%8C%E5%A5%97"><span class="nav-number">8.3.</span> <span class="nav-text">中断嵌套</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E6%98%A0%E5%B0%84%EF%BC%9ACubeMX-%E9%85%8D%E7%BD%AE-%E2%86%92-%E5%BA%95%E5%B1%82%E5%AF%84%E5%AD%98%E5%99%A8"><span class="nav-number">9.</span> <span class="nav-text">完整映射：CubeMX 配置 → 底层寄存器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E4%BF%A1%E5%8F%B7%E8%B7%AF%E5%BE%84%E5%9B%9E%E9%A1%BE"><span class="nav-number">10.1.</span> <span class="nav-text">完整信号路径回顾</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E8%A6%81%E7%82%B9"><span class="nav-number">10.2.</span> <span class="nav-text">核心要点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E%E5%85%B6%E4%BB%96%E4%B8%AD%E6%96%AD%E7%9A%84%E5%85%B1%E6%80%A7"><span class="nav-number">10.3.</span> <span class="nav-text">与其他中断的共性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">11.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">27</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">192k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">2:55</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

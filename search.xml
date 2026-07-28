@@ -764,6 +764,436 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——深入外部中断硬件原理</title>
+    <url>/2026/07/28/STM32_EXTI_Deep_Dive/</url>
+    <content><![CDATA[<h2 id="从”能用”到”理解”"><a href="#从”能用”到”理解”" class="headerlink" title="从”能用”到”理解”"></a>从”能用”到”理解”</h2><p>上一篇博客中，我们完成了外部中断的功能：红灯闪烁，按下 KEY1 触发中断，翻转绿灯。</p>
+<p>但当时更多的只是照着教程写了代码，对于”为什么这样配置就能触发中断”、”从按键按下到 ISR 执行中间发生了什么”，只有一个模糊的概念。</p>
+<p>这篇就来填补这个空白——沿着信号的路径，从 KEY1 引脚一直追踪到 CPU 执行中断服务函数，搞懂完整的中断触发流程。</p>
+<hr>
+<h2 id="完整信号路径概览"><a href="#完整信号路径概览" class="headerlink" title="完整信号路径概览"></a>完整信号路径概览</h2><p>从 KEY1（PB12）引脚的电平变化到执行中断服务函数，总共经过 5 个阶段：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">GPIO 引脚(PB12)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">① GPIO 输入驱动器    ← 引脚的硬件电路，处理电平信号</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">② 边沿检测电路       ← 检测上升沿/下降沿</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">③ EXTI 寄存器组      ← 请求挂起(PR) + 中断屏蔽(IMR)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">④ NVIC              ← 中断控制器，管理所有中断的优先级和使能</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">⑤ CPU 执行 ISR      ← EXTI15_10_IRQHandler()</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220434864.png" alt="image-20260728220434864"></p>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220635360.png" alt="image-20260728220635360"></p>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220809865.png" alt="image-20260728220809865"></p>
+</blockquote>
+<p>接下来逐一深入每个阶段。</p>
+<hr>
+<h2 id="第一阶段：GPIO-输入驱动器"><a href="#第一阶段：GPIO-输入驱动器" class="headerlink" title="第一阶段：GPIO 输入驱动器"></a>第一阶段：GPIO 输入驱动器</h2><p>信号从 KEY1（PB12）引脚进入芯片，首先经过的是 <strong>GPIO 输入驱动器</strong>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728220933045.png" alt="image-20260728220933045"></p>
+</blockquote>
+<h3 id="输入驱动器的结构"><a href="#输入驱动器的结构" class="headerlink" title="输入驱动器的结构"></a>输入驱动器的结构</h3><p>每个 GPIO 引脚内部都有一套输入驱动电路，核心是两个串接的施密特触发器：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PB12 引脚</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    ┌──────────┐</span><br><span class="line">    │ 施密特   │──→ 到片上外设（如 EXTI）</span><br><span class="line">    │ 触发器   │</span><br><span class="line">    └──────────┘</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    ┌──────────┐</span><br><span class="line">    │ 施密特   │──→ 到 GPIO 输入数据寄存器 (IDR)</span><br><span class="line">    │ 触发器   │</span><br><span class="line">    └──────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>施密特触发器</strong>的作用是<strong>整形</strong>——把缓慢变化或不干净的电平信号转换成干净的数字方波：</p>
+<blockquote>
+<p>想象一下，机械按键按下时电平不是瞬间从高跳到低的，中间会有抖动和毛刺。施密特触发器的作用就是”过滤”这些不稳定的中间态——低于阈值判为 0，高于阈值判为 1，输出一个干净的数字信号。</p>
+</blockquote>
+<h3 id="输入驱动器在做什么"><a href="#输入驱动器在做什么" class="headerlink" title="输入驱动器在做什么"></a>输入驱动器在做什么</h3><p>不管 PB12 配置成普通 GPIO 输入还是 EXTI 中断模式，GPIO 的输入驱动器都在做同一件事——<strong>信号整形</strong>：</p>
+<ol>
+<li>施密特触发器接收引脚上的模拟电平</li>
+<li>将其转换成干净的 0&#x2F;1 数字信号（低于阈值判 0，高于判 1，过滤中间抖动）</li>
+<li>整形后的信号<strong>分两路</strong>输出：一路到 **GPIO 输入数据寄存器 (IDR)**，另一路到 <strong>片上外设</strong>（这里是 EXTI 模块的边沿检测电路）</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PB12 引脚上的模拟电平（可能带抖动）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">施密特触发器（整形过滤）</span><br><span class="line">    │</span><br><span class="line">    ├──→ GPIO 输入数据寄存器 (IDR)    ← 用 HAL_GPIO_ReadPin() 读的就是它</span><br><span class="line">    │</span><br><span class="line">    └──→ EXTI 边沿检测电路（下一阶段）</span><br></pre></td></tr></table></figure>
+
+<p>这也解释了为什么上一篇中可以在 ISR 里用 <code>HAL_GPIO_ReadPin()</code> 再次确认按键状态——因为有单独一路信号始终通往 IDR，不依赖 EXTI 的工作状态。</p>
+<blockquote>
+<p>注意：<strong>边沿检测</strong>（下降沿&#x2F;上升沿）不在这里发生，那是下一阶段 EXTI 电路的工作。输入驱动器的职责到此为止——只负责整形和转发。</p>
+</blockquote>
+<blockquote>
+<p>关于 GPIO 八大模式的详细解析，参考之前那篇 GPIO 模式的博客。</p>
+</blockquote>
+<hr>
+<h2 id="第二阶段：边沿检测电路"><a href="#第二阶段：边沿检测电路" class="headerlink" title="第二阶段：边沿检测电路"></a>第二阶段：边沿检测电路</h2><p>经过输入驱动器整形后的干净信号，同时送给<strong>上升沿检测</strong>和<strong>下降沿检测</strong>两条路径：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728221410731.png" alt="image-20260728221410731"></p>
+</blockquote>
+<h3 id="两个触发选择寄存器"><a href="#两个触发选择寄存器" class="headerlink" title="两个触发选择寄存器"></a>两个触发选择寄存器</h3><p>EXTI 模块有两个触发选择寄存器，分别控制上升沿和下降沿的使能：</p>
+<table>
+<thead>
+<tr>
+<th align="center">寄存器</th>
+<th align="left">全称</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>EXTI_RTSR</code></td>
+<td align="left">Rising Trigger Selection Register</td>
+<td align="left">对应位写 1 → 使能该线的<strong>上升沿</strong>触发</td>
+</tr>
+<tr>
+<td align="center"><code>EXTI_FTSR</code></td>
+<td align="left">Falling Trigger Selection Register</td>
+<td align="left">对应位写 1 → 使能该线的<strong>下降沿</strong>触发</td>
+</tr>
+</tbody></table>
+<p>每个寄存器都有 20 位（bit 0~19），每 1 位对应一条 EXTI 线。<strong>默认所有位都是 0（不使能），只有我们配置的那一位会被设为 1。</strong></p>
+<p>拿我们的配置举例——选择了下降沿触发，所以<strong>下降沿</strong>寄存器状态是：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">EXTI_FTSR 寄存器（20位）:</span><br><span class="line">bit → 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0</span><br><span class="line">      ┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">      │ 0  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0  0  0  0  0 │</span><br><span class="line">      └─────────────────────────────────────────────────────────────┘</span><br><span class="line">                             ▲</span><br><span class="line">                             └── bit12 = 1（使能 EXTI12 下降沿触发）</span><br></pre></td></tr></table></figure>
+
+<p>而 <code>EXTI_RTSR</code> 寄存器则保持全 0，因为我们没有使能上升沿触发。</p>
+<h3 id="我们的配置"><a href="#我们的配置" class="headerlink" title="我们的配置"></a>我们的配置</h3><p>上一篇我们在 CubeMX 中选择了 <strong>Falling edge trigger detection</strong>（下降沿触发），这意味着：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">EXTI_FTSR 的 bit 12 = 1  （使能下降沿检测）</span><br><span class="line">EXTI_RTSR 的 bit 12 = 0  （不检测上升沿）</span><br></pre></td></tr></table></figure>
+
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728221955085.png" alt="image-20260728221955085"></p>
+<p>在生成的代码中，<code>HAL_GPIO_Init()</code> 内部通过位运算来操作这两个寄存器。拿我们的下降沿触发举例，等价于做了这样一件事：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// HAL_GPIO_Init 内部对 FTSR 的操作（以 PB12 为例）</span></span><br><span class="line"><span class="comment">// KEY1_Pin = GPIO_PIN_12 = 0x1000 = 二进制 1 0000 0000 0000</span></span><br><span class="line"><span class="comment">// 把第 12 位置 1，其他位保持不变</span></span><br><span class="line">EXTI-&gt;FTSR |= GPIO_PIN_12;</span><br></pre></td></tr></table></figure>
+
+<p>这行代码的意思是：<strong>读取 FTSR 寄存器的当前值 → 把第 12 位改成 1 → 写回去</strong>。</p>
+<p>操作前后的寄存器变化：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">执行前:  FTSR = 0x0000 0000    (所有位都是 0，所有 EXTI 线都没使能)</span><br><span class="line">                                    │</span><br><span class="line">                                    ▼  EXTI-&gt;FTSR |= GPIO_PIN_12;</span><br><span class="line">                                    │</span><br><span class="line">执行后:  FTSR = 0x0000 1000    (bit12 变成 1，其他位不变)</span><br></pre></td></tr></table></figure>
+
+<p><code>GPIO_PIN_12</code> 的值是 <code>0x1000</code>（即 <code>1 &lt;&lt; 12</code>），这个值与 FTSR 做<strong>按位或</strong>运算，结果就是只把第 12 位设成 1，不影响其他位。</p>
+<p>同理，如果配置的是上升沿触发，操作的就是 RTSR 寄存器：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">EXTI-&gt;RTSR |= GPIO_PIN_12;  <span class="comment">// RTSR 的第 12 位置 1</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="边沿检测电路的工作原理"><a href="#边沿检测电路的工作原理" class="headerlink" title="边沿检测电路的工作原理"></a>边沿检测电路的工作原理</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">当前电平 → 延迟一个时钟周期 → 旧电平</span><br><span class="line">                │</span><br><span class="line">                ▼</span><br><span class="line">    ┌─────────────────────┐</span><br><span class="line">    │ 比较：当前 vs 旧    │</span><br><span class="line">    └─────────────────────┘</span><br><span class="line">        │           │</span><br><span class="line">        ▼           ▼</span><br><span class="line">  上升沿检测     下降沿检测</span><br><span class="line">  (RTSR控制)    (FTSR控制)</span><br><span class="line">        │           │</span><br><span class="line">        ▼           ▼</span><br><span class="line">    ┌──────┐   ┌──────┐</span><br><span class="line">    │与门  │   │与门  │</span><br><span class="line">    └──┬───┘   └──┬───┘</span><br><span class="line">       │          │</span><br><span class="line">       └────┬─────┘</span><br><span class="line">            ▼</span><br><span class="line">          或门 → 输出高电平 → 到 EXTI_PR</span><br></pre></td></tr></table></figure>
+
+<p>具体过程：</p>
+<ol>
+<li><strong>每个时钟周期</strong>，电路比较当前电平和上一周期的电平</li>
+<li>如果当前电平 &gt; 上一周期电平 &#x3D; <strong>上升沿</strong></li>
+<li>如果当前电平 &lt; 上一周期电平 &#x3D; <strong>下降沿</strong></li>
+<li>检测到的边沿再与 <code>RTSR</code> &#x2F; <code>FTSR</code> 对应位做<strong>与运算</strong></li>
+<li>如果该位为 1（使能了对应边沿检测），与门输出 1</li>
+<li>两个与门的输出经过<strong>或门</strong>合并</li>
+</ol>
+<p>所以对于我们的场景：KEY1 按下（高→低），下降沿被检测到，<code>FTSR bit12 = 1</code>，与门输出 1，或门输出 1 → <strong>向后传递一个高电平信号</strong>。</p>
+<hr>
+<h2 id="第三阶段：EXTI-寄存器组"><a href="#第三阶段：EXTI-寄存器组" class="headerlink" title="第三阶段：EXTI 寄存器组"></a>第三阶段：EXTI 寄存器组</h2><p>第二阶段输出的高电平信号到达了 EXTI 的核心寄存器组：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728222413673.png" alt="image-20260728222413673"></p>
+</blockquote>
+<h3 id="请求挂起寄存器-EXTI-PR"><a href="#请求挂起寄存器-EXTI-PR" class="headerlink" title="请求挂起寄存器 (EXTI_PR)"></a>请求挂起寄存器 (EXTI_PR)</h3><p><code>EXTI_PR</code>（Pending Register），也叫<strong>挂起寄存器</strong>或<strong>待决寄存器</strong>。</p>
+<p>当边沿检测电路传来高电平信号时，<code>EXTI_PR</code> 的对应位被置为 <strong>1</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="center">位</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">bit 12 &#x3D; 1</td>
+<td>EXTI12 线有中断请求正在等待处理</td>
+</tr>
+</tbody></table>
+<p><strong>只要 PR 的某一位为 1，就表示该中断线有一个”未处理”的中断请求。</strong></p>
+<p>这个寄存器很关键——<strong>CPU 正是通过查询 PR 知道”谁触发了中断”的</strong>。</p>
+<blockquote>
+<p>这就像外卖到了，门卫（PR）在本子上记下”12 号房有外卖”，然后通知你。</p>
+</blockquote>
+<h3 id="中断屏蔽寄存器-EXTI-IMR"><a href="#中断屏蔽寄存器-EXTI-IMR" class="headerlink" title="中断屏蔽寄存器 (EXTI_IMR)"></a>中断屏蔽寄存器 (EXTI_IMR)</h3><p><code>EXTI_IMR</code>（Interrupt Mask Register），决定是否<strong>允许</strong>某条中断线向 NVIC 发送请求：</p>
+<ul>
+<li><strong>某位 &#x3D; 1</strong>：允许该中断线继续向后传递（放行）</li>
+<li><strong>某位 &#x3D; 0</strong>：屏蔽该中断线（拦截）</li>
+</ul>
+<p>CubeMX 在配置 PB12 为 <code>GPIO_EXTI12</code> 时，会自动把 <code>IMR</code> 的 bit 12 设为 1。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// HAL_GPIO_Init 内部使能 IMR 的底层代码</span></span><br><span class="line">EXTI-&gt;IMR |= iocurrent;  <span class="comment">// IMR 对应位置 1，允许中断通过</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="PR-和-IMR-的与门组合"><a href="#PR-和-IMR-的与门组合" class="headerlink" title="PR 和 IMR 的与门组合"></a>PR 和 IMR 的与门组合</h3><p>PR 的输出和 IMR 的输出经过一个<strong>与门</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">EXTI_PR bit12 = 1  ───┐</span><br><span class="line">                       ├── 与门 ──→ 输出高电平 → 到 NVIC</span><br><span class="line">EXTI_IMR bit12 = 1  ──┘</span><br></pre></td></tr></table></figure>
+
+<p>只有 <strong>两者都是 1</strong> 时，与门才输出 1，中断信号才能到达 NVIC。</p>
+<p>这就是中断屏蔽的原理——把 IMR 的某位设为 0，即使 PR 被置 1，与门也会输出 0，相当于”关掉了”这条中断线。</p>
+<hr>
+<h2 id="第四阶段：NVIC（嵌套向量中断控制器）"><a href="#第四阶段：NVIC（嵌套向量中断控制器）" class="headerlink" title="第四阶段：NVIC（嵌套向量中断控制器）"></a>第四阶段：NVIC（嵌套向量中断控制器）</h2><p>第三阶段输出的信号终于到了中断的”最高层”——<strong>NVIC（Nested Vectored Interrupt Controller）</strong>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728222459716.png" alt="image-20260728222459716"></p>
+</blockquote>
+<h3 id="NVIC-的角色"><a href="#NVIC-的角色" class="headerlink" title="NVIC 的角色"></a>NVIC 的角色</h3><p>先补充一个概念：<strong>Cortex-M3 是什么？</strong></p>
+<p>STM32F103 芯片内部可以分成两层：</p>
+<ul>
+<li><strong>内核（Core）</strong>——ARM 公司设计的 CPU 核心，负责执行指令、处理运算。STM32F103 用的是 <strong>Cortex-M3</strong> 内核，属于 ARM 的”M 系列”（Microcontroller），专门为单片机设计的低功耗、高性能内核</li>
+<li><strong>外设（Peripheral）</strong>——ST 公司在内核周围添加的功能模块，比如 GPIO、EXTI、定时器、UART 等。这些是 ST 自己设计的，不同型号的 STM32 外设各有不同</li>
+</ul>
+<p>打个比方：Cortex-M3 内核就像汽车的<strong>发动机</strong>，外设就像<strong>车轮、方向盘、空调</strong>——发动机决定了这辆车的基础性能，而外设决定了这辆车能干什么。</p>
+<p>NVIC 是 Cortex-M3 内核的一部分，负责：</p>
+<ol>
+<li><strong>管理所有中断的使能和屏蔽</strong></li>
+<li><strong>管理中断优先级</strong>——当多个中断同时触发时决定先处理谁</li>
+<li><strong>找到中断向量</strong>——根据中断号找到对应的中断服务函数地址</li>
+<li><strong>支持中断嵌套</strong>——高优先级中断可以打断低优先级中断</li>
+</ol>
+<h3 id="中断向量"><a href="#中断向量" class="headerlink" title="中断向量"></a>中断向量</h3><p>每个中断源都有一个唯一的中断号，对应中断向量表中的一项。EXTI12 的中断号是 <strong>EXTI15_10_IRQn</strong>（因为 EXTI 线 10~15 共享同一个中断入口）。</p>
+<p>中断向量表存储在各个中断服务函数的地址：</p>
+<table>
+<thead>
+<tr>
+<th align="center">中断号</th>
+<th align="center">中断名</th>
+<th align="center">函数地址</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">23</td>
+<td align="center">EXTI15_10_IRQn</td>
+<td align="center">→ <code>EXTI15_10_IRQHandler()</code></td>
+</tr>
+</tbody></table>
+<p>当 NVIC 检测到 EXTI12 的中断信号时，它取出向量表中 EXTI15_10 对应的地址，然后 CPU 跳转到那里执行。</p>
+<h3 id="NVIC-相关的-CubeMX-配置代码"><a href="#NVIC-相关的-CubeMX-配置代码" class="headerlink" title="NVIC 相关的 CubeMX 配置代码"></a>NVIC 相关的 CubeMX 配置代码</h3><p>在 <code>MX_GPIO_Init()</code> 中，CubeMX 生成了两行关键代码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* EXTI interrupt init*/</span></span><br><span class="line">HAL_NVIC_SetPriority(EXTI15_10_IRQn, <span class="number">15</span>, <span class="number">0</span>);  <span class="comment">// 设置优先级</span></span><br><span class="line">HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);            <span class="comment">// 使能中断</span></span><br></pre></td></tr></table></figure>
+
+<p>这两个函数的背后操作：</p>
+<p><strong><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code></strong> 内部操作的是 <code>NVIC_ISER</code>（Interrupt Set Enable Register）寄存器：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 简化版实现</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_NVIC_EnableIRQ</span><span class="params">(IRQn_Type IRQn)</span></span><br><span class="line">&#123;</span><br><span class="line">    NVIC-&gt;ISER[((<span class="type">uint32_t</span>)IRQn) &gt;&gt; <span class="number">5</span>] = (<span class="type">uint32_t</span>)(<span class="number">1</span> &lt;&lt; (((<span class="type">uint32_t</span>)IRQn) &amp; <span class="number">0x1F</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>ISER 寄存器有 3 个（共 96 位），每一位对应一个中断号。EXTI15_10_IRQn 的中断号是 23，所以 <code>ISER[0]</code> 的第 23 位被置 1。</p>
+<blockquote>
+<p>NVIC 总共有三个关键使能寄存器：</p>
+<ul>
+<li><strong>ISER</strong>：Interrupt Set Enable Register——置 1 使能中断</li>
+<li><strong>ICER</strong>：Interrupt Clear Enable Register——置 1 禁能中断</li>
+<li><strong>ISPR&#x2F;ICPR</strong>：中断挂起&#x2F;清除挂起</li>
+</ul>
+</blockquote>
+<p><strong><code>HAL_NVIC_SetPriority(EXTI15_10_IRQn, 15, 0)</code></strong> 设置优先级，后面会展开讲。</p>
+<hr>
+<h2 id="第五阶段：执行-ISR-与清标志位"><a href="#第五阶段：执行-ISR-与清标志位" class="headerlink" title="第五阶段：执行 ISR 与清标志位"></a>第五阶段：执行 ISR 与清标志位</h2><p>NVIC 把中断信号送达 CPU 内核后，CPU 的响应流程：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">NVIC 发出中断请求</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 完成当前指令</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 压栈（保存现场）  ← 自动保存 R0-R3、R12、LR、PC、xPSR</span><br><span class="line">    │</span><br><span class="line">    │   注意：STM32 的中断响应延迟只有 12 个时钟周期</span><br><span class="line">    │   这是 Cortex-M3 核心的优势之一</span><br><span class="line">    ▼</span><br><span class="line">CPU 从向量表取出 EXTI15_10_IRQHandler 的地址</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 跳转到 EXTI15_10_IRQHandler() 执行</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">执行用户编写的 ISR 代码</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">执行 HAL_GPIO_EXTI_IRQHandler() → 清除 EXTI_PR 对应位</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 出栈（恢复现场）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">回到 main loop 被中断的位置继续执行</span><br></pre></td></tr></table></figure>
+
+<h3 id="为什么必须清-PR？"><a href="#为什么必须清-PR？" class="headerlink" title="为什么必须清 PR？"></a>为什么必须清 PR？</h3><p><strong>这是最关键的一步，也是最容易忘的一步。</strong></p>
+<p>EXTI_PR 寄存器的作用是”记住”中断请求。如果不主动清零：</p>
+<ol>
+<li>ISR 执行完毕后，PR bit12 仍然为 1</li>
+<li>与门另一端的 IMR bit12 也为 1（没关中断）</li>
+<li>与门持续输出高电平到 NVIC</li>
+<li>NVIC 认为又有新中断来了</li>
+<li>CPU 再次进入 ISR</li>
+<li>死循环！</li>
+</ol>
+<p>所以在 ISR 末尾必须调用：（当然，好心的cubemx会自动帮我们生成这行代码）</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">HAL_GPIO_EXTI_IRQHandler(KEY1_Pin);</span><br></pre></td></tr></table></figure>
+
+<p>这个函数内部会检查 PR 对应位，如果为 1 就将它清零：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_IRQHandler</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(GPIO_Pin) != RESET)  <span class="comment">// 检查 PR 对应位</span></span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_Pin);           <span class="comment">// 清零 PR 对应位</span></span><br><span class="line">        HAL_GPIO_EXTI_Callback(GPIO_Pin);             <span class="comment">// 调用回调函数</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>清零的底层操作：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// __HAL_GPIO_EXTI_CLEAR_IT(KEY1_Pin) 展开后</span></span><br><span class="line">EXTI-&gt;PR = GPIO_PIN_12;  <span class="comment">// 向 PR 寄存器的 bit12 写 1 来清零</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>⚠️ <strong>规律：向 PR 写 1 来清除中断标志位。</strong> 这是 STM32 中常见的寄存器设计——读某位判断状态，写 1 清除该位。不要写成写 0，那不会生效。</p>
+</blockquote>
+<hr>
+<h2 id="深入中断优先级"><a href="#深入中断优先级" class="headerlink" title="深入中断优先级"></a>深入中断优先级</h2><h3 id="4-位优先级的分配"><a href="#4-位优先级的分配" class="headerlink" title="4 位优先级的分配"></a>4 位优先级的分配</h3><p>上一篇博客只提了一句”配置优先级”，现在我们来看看背后发生了什么。</p>
+<p>STM32F1 为每个中断向量分配了 <strong>4 个二进制位</strong>来存储优先级信息：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">NVIC-&gt;IP[IRQn] = [bit7][bit6][bit5][bit4][bit3][bit2][bit1][bit0]</span><br><span class="line">                  ↑ 优先级位占高4位       ↑ 低4位不使用</span><br></pre></td></tr></table></figure>
+
+<p>CubeMX 中的 <strong>优先级分组（Priority Group）</strong> 决定了这 4 位如何分配到抢占优先级和子优先级：</p>
+<table>
+<thead>
+<tr>
+<th align="center">分组</th>
+<th align="center">抢占优先级(bit)</th>
+<th align="center">子优先级(bit)</th>
+<th align="center">抢占级数量</th>
+<th align="center">子优先级数量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">组 0</td>
+<td align="center">0</td>
+<td align="center">4</td>
+<td align="center">1</td>
+<td align="center">16</td>
+</tr>
+<tr>
+<td align="center">组 1</td>
+<td align="center">1</td>
+<td align="center">3</td>
+<td align="center">2</td>
+<td align="center">8</td>
+</tr>
+<tr>
+<td align="center">组 2</td>
+<td align="center">2</td>
+<td align="center">2</td>
+<td align="center">4</td>
+<td align="center">4</td>
+</tr>
+<tr>
+<td align="center">组 3</td>
+<td align="center">3</td>
+<td align="center">1</td>
+<td align="center">8</td>
+<td align="center">2</td>
+</tr>
+<tr>
+<td align="center"><strong>组 4</strong></td>
+<td align="center"><strong>4</strong></td>
+<td align="center"><strong>0</strong></td>
+<td align="center"><strong>16</strong></td>
+<td align="center"><strong>1</strong></td>
+</tr>
+</tbody></table>
+<p>CubeMX 默认使用<strong>组 4</strong>，即全部 4 位用于抢占优先级，没有子优先级。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Deep_Dive/image-20260728222947246.png" alt="image-20260728222947246"></p>
+</blockquote>
+<h3 id="优先级编码"><a href="#优先级编码" class="headerlink" title="优先级编码"></a>优先级编码</h3><p>CubeMX 中配的”Preemption Priority &#x3D; 15”并不是直接写进寄存器的值，中间有一个编码过程。</p>
+<p>以组 4 为例，4 位全部是抢占优先级：</p>
+<table>
+<thead>
+<tr>
+<th align="left">中断</th>
+<th align="center">CubeMX 中配的优先级</th>
+<th align="center">编码到 IP 寄存器高 4 位</th>
+<th align="center">实际优先级值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SysTick</td>
+<td align="center">14</td>
+<td align="center">1110</td>
+<td align="center"><strong>14（最高）</strong></td>
+</tr>
+<tr>
+<td align="left">EXTI15_10</td>
+<td align="center">15</td>
+<td align="center">1111</td>
+<td align="center"><strong>15（最低）</strong></td>
+</tr>
+</tbody></table>
+<p><code>HAL_NVIC_SetPriority</code> 内部做编码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// HAL_NVIC_SetPriority 简化逻辑</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_NVIC_SetPriority</span><span class="params">(IRQn_Type IRQn, <span class="type">uint32_t</span> PreemptPriority, <span class="type">uint32_t</span> SubPriority)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 1. 根据优先级分组计算出编码值</span></span><br><span class="line">    <span class="type">uint32_t</span> prioritygroup = NVIC_GetPriorityGrouping();  <span class="comment">// 默认组 4</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 将 PreemptPriority 和 SubPriority 编码成 4 位值</span></span><br><span class="line">    <span class="type">uint32_t</span> priority = NVIC_EncodePriority(prioritygroup, PreemptPriority, SubPriority);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 写入 NVIC 的优先级寄存器（高 4 位）</span></span><br><span class="line">    NVIC-&gt;IP[IRQn] = (<span class="type">uint8_t</span>)((priority &lt;&lt; <span class="number">4</span>) &amp; <span class="number">0xFF</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="中断嵌套"><a href="#中断嵌套" class="headerlink" title="中断嵌套"></a>中断嵌套</h3><p>如果多个中断被触发，NVIC 根据优先级决定处理顺序：</p>
+<ul>
+<li><strong>数值越小，优先级越高</strong></li>
+<li>高优先级中断可以<strong>打断</strong>低优先级中断（嵌套）</li>
+<li>同优先级中断按<strong>中断号</strong>决定，号小的先执行</li>
+</ul>
+<p>我们配置的优先级关系：</p>
+<table>
+<thead>
+<tr>
+<th align="left">中断</th>
+<th align="center">优先级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SysTick</td>
+<td align="center">14</td>
+<td>最高，可以抢占其他所有中断</td>
+</tr>
+<tr>
+<td align="left">EXTI15_10</td>
+<td align="center">15</td>
+<td>最低</td>
+</tr>
+</tbody></table>
+<p>所以上一篇中在 EXTI 的 ISR 里调用 <code>HAL_Delay(10)</code> 是安全的——SysTick（优先级 14）可以打断 EXTI（优先级 15）来更新 <code>uwTick</code>，不会死锁。</p>
+<hr>
+<h2 id="完整映射：CubeMX-配置-→-底层寄存器"><a href="#完整映射：CubeMX-配置-→-底层寄存器" class="headerlink" title="完整映射：CubeMX 配置 → 底层寄存器"></a>完整映射：CubeMX 配置 → 底层寄存器</h2><p>用一张表把 CubeMX 配置和底层寄存器对应起来：</p>
+<table>
+<thead>
+<tr>
+<th align="left">CubeMX 配置项</th>
+<th align="center">影响的寄存器</th>
+<th align="left">对应代码</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">PB12 → GPIO_EXTI12</td>
+<td align="center">AFIO_EXTICR3（选择 PB12 连接到 EXTI12）</td>
+<td align="left"><code>HAL_GPIO_Init()</code> 内部</td>
+</tr>
+<tr>
+<td align="left">GPIO mode → IT Falling</td>
+<td align="center">EXTI_FTSR bit12 &#x3D; 1</td>
+<td align="left"><code>EXTI-&gt;FTSR |= (1&lt;&lt;12)</code></td>
+</tr>
+<tr>
+<td align="left">EXTI line[15:10] NVIC Enabled</td>
+<td align="center">NVIC_ISER[0] bit23 &#x3D; 1</td>
+<td align="left"><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code></td>
+</tr>
+<tr>
+<td align="left">Preemption Priority &#x3D; 15</td>
+<td align="center">NVIC_IP[23] 高 4 位 &#x3D; 1111</td>
+<td align="left"><code>HAL_NVIC_SetPriority(EXTI15_10_IRQn, 15, 0)</code></td>
+</tr>
+<tr>
+<td align="left">（自动生成）</td>
+<td align="center">EXTI_IMR bit12 &#x3D; 1</td>
+<td align="left"><code>EXTI-&gt;IMR |= (1&lt;&lt;12)</code></td>
+</tr>
+<tr>
+<td align="left">（自动生成）</td>
+<td align="center">EXTI_PR bit12 清 0</td>
+<td align="left"><code>EXTI-&gt;PR = (1&lt;&lt;12)</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="完整信号路径回顾"><a href="#完整信号路径回顾" class="headerlink" title="完整信号路径回顾"></a>完整信号路径回顾</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">KEY1 按下 (PB12 从高到低)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">GPIO 输入驱动器（施密特触发器整形）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">下降沿检测电路 —— FTSR bit12 = 1 使能下降沿检测</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">EXTI_PR bit12 置 1 ← 挂起寄存器&quot;记录&quot;了中断请求</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">与门：PR bit12(1) AND IMR bit12(1) = 1 ← 中断已被使能</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">NVIC 检测到 EXTI12 的中断信号</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">查找向量表 → EXTI15_10_IRQn → 跳转到 EXTI15_10_IRQHandler()</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">用户 ISR：消抖 → 确认 → 翻转绿灯</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">HAL_GPIO_EXTI_IRQHandler() → 清除 EXTI_PR bit12</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">CPU 恢复现场，继续执行 main loop</span><br></pre></td></tr></table></figure>
+
+<h3 id="核心要点"><a href="#核心要点" class="headerlink" title="核心要点"></a>核心要点</h3><table>
+<thead>
+<tr>
+<th>要点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>EXTI_PR</strong></td>
+<td>记录中断请求，ISR 中必须清零，否则反复触发</td>
+</tr>
+<tr>
+<td><strong>EXTI_IMR</strong></td>
+<td>中断屏蔽开关，1 &#x3D; 放行，0 &#x3D; 屏蔽</td>
+</tr>
+<tr>
+<td><strong>EXTI_RTSR&#x2F;FTSR</strong></td>
+<td>选择上升沿&#x2F;下降沿触发</td>
+</tr>
+<tr>
+<td><strong>NVIC</strong></td>
+<td>总控制器，管理所有中断的使能和优先级</td>
+</tr>
+<tr>
+<td><strong>优先级组</strong></td>
+<td>决定 4 位中多少位给抢占、多少位给子优先级</td>
+</tr>
+<tr>
+<td><strong>中断嵌套</strong></td>
+<td>高优先级可打断低优先级，SysTick &gt; EXTI</td>
+</tr>
+</tbody></table>
+<h3 id="与其他中断的共性"><a href="#与其他中断的共性" class="headerlink" title="与其他中断的共性"></a>与其他中断的共性</h3><p>虽然这篇以外部中断（EXTI）为例，但所有中断的流程都有类似的框架：</p>
+<ol>
+<li>外设产生中断事件 → 对应<strong>挂起寄存器</strong>置位</li>
+<li>中断<strong>使能&#x2F;屏蔽寄存器</strong>决定是否放行</li>
+<li>信号到达 <strong>NVIC</strong>，根据优先级排队</li>
+<li>NVIC 让 CPU 跳转到对应的<strong>中断服务函数</strong></li>
+<li>ISR 中必须<strong>清除挂起标志</strong></li>
+</ol>
+<p>后续学习定时器、UART、DMA 等外设的中断时，它们的流程都遵循这个模式。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV1M24y1473t">keysking STM32 教程（B站）——中断深入视频</a></li>
+<li><a href="/2026/07/28/STM32_EXTI_Interrupt/">上一篇：STM32外部中断入门</a></li>
+<li><a href="https://www.st.com/resource/en/reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-stmicroelectronics.pdf">STM32 参考手册 —— EXTI 章节</a></li>
+<li><a href="https://www.amazon.com/Definitive-Guide-ARM-Cortex-M3-Cortex-M4/dp/0124080820">Cortex-M3 权威指南 —— NVIC 章节</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>EXTI</tag>
+        <tag>中断</tag>
+        <tag>NVIC</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——红灯持续闪烁，绿灯用外部中断翻转状态</title>
     <url>/2026/07/28/STM32_EXTI_Interrupt/</url>
     <content><![CDATA[<h2 id="背景：为什么需要中断？"><a href="#背景：为什么需要中断？" class="headerlink" title="背景：为什么需要中断？"></a>背景：为什么需要中断？</h2><p>在前一篇按键输入博客中，KEY2 的”按一下翻转”功能用了轮询方式：</p>
@@ -1082,9 +1512,9 @@
       <tags>
         <tag>STM32</tag>
         <tag>嵌入式</tag>
-        <tag>CubeMX</tag>
         <tag>EXTI</tag>
         <tag>中断</tag>
+        <tag>CubeMX</tag>
       </tags>
   </entry>
   <entry>
@@ -5273,6 +5703,120 @@
       </tags>
   </entry>
   <entry>
+    <title>Markdown 语法规则</title>
+    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
+    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
+<p>这是第二行</p>
+<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
+<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
+<p>效果：</p>
+<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>代码和快捷键：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
+<p>效果：</p>
+<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
+<p>效果：只有同一级别</p>
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：-&#x2F;*&#x2F;+ +空格</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
+<p>效果：</p>
+<ol>
+<li>一</li>
+<li>二</li>
+<li>子1</li>
+<li>子2<ol>
+<li>子1-子1</li>
+</ol>
+</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<p>数字+.+空格</p>
+<p>缩进用tab,回退shift+tab</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
+<p>效果：</p>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+练习markdown语法</p>
+</li>
+<li><p><input disabled="" type="checkbox"> 
+维护网站</p>
+</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
+<p>效果：</p>
+<blockquote>
+<p>这是最外层区块</p>
+<blockquote>
+<p>这是内层</p>
+<blockquote>
+<p>这是更内层</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
+<p>效果：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
+<p>效果：</p>
+<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
+<p>效果：</p>
+<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Markdown</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32--浅析GPIO八大模式</title>
     <url>/2026/07/27/stm32-gpio-eight-modes/</url>
     <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>回顾前面三篇博客，我们已经接触过几种 GPIO 模式：</p>
@@ -5620,120 +6164,6 @@
         <tag>嵌入式</tag>
         <tag>CubeMX</tag>
         <tag>GPIO</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Markdown 语法规则</title>
-    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
-    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
-<p>这是第二行</p>
-<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
-<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
-<p>效果：</p>
-<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
-</blockquote>
-<blockquote>
-<p>代码和快捷键：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
-<p>效果：</p>
-<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
-<p>效果：只有同一级别</p>
-<ul>
-<li>1</li>
-<li>2</li>
-<li>3</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：-&#x2F;*&#x2F;+ +空格</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
-<p>效果：</p>
-<ol>
-<li>一</li>
-<li>二</li>
-<li>子1</li>
-<li>子2<ol>
-<li>子1-子1</li>
-</ol>
-</li>
-</ol>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<p>数字+.+空格</p>
-<p>缩进用tab,回退shift+tab</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
-<p>效果：</p>
-<ul>
-<li><p><input checked="" disabled="" type="checkbox"> 
-练习markdown语法</p>
-</li>
-<li><p><input disabled="" type="checkbox"> 
-维护网站</p>
-</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
-<p>效果：</p>
-<blockquote>
-<p>这是最外层区块</p>
-<blockquote>
-<p>这是内层</p>
-<blockquote>
-<p>这是更内层</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
-<p>效果：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
-<p>效果：</p>
-<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
-<p>效果：</p>
-<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>Markdown</tag>
       </tags>
   </entry>
   <entry>
@@ -6192,79 +6622,6 @@
         <tag>嵌入式</tag>
         <tag>CubeMX</tag>
         <tag>GPIO</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>typora和hexo格式冲突的问题汇总和解决方案</title>
-    <url>/2026/07/13/typora%E5%92%8Chexo%E6%A0%BC%E5%BC%8F%E5%86%B2%E7%AA%81%E7%9A%84%E9%97%AE%E9%A2%98%E5%92%8C%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/</url>
-    <content><![CDATA[<h1 id="typora和hexo格式冲突的问题汇总和解决方案"><a href="#typora和hexo格式冲突的问题汇总和解决方案" class="headerlink" title="typora和hexo格式冲突的问题汇总和解决方案"></a>typora和hexo格式冲突的问题汇总和解决方案</h1><h2 id="问题一：渲染图片时引用路径的冲突"><a href="#问题一：渲染图片时引用路径的冲突" class="headerlink" title="问题一：渲染图片时引用路径的冲突"></a>问题一：渲染图片时引用路径的冲突</h2><h3 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述"></a>问题描述</h3><p>在typora里写文章时插入图片，我本来设置的是保存在与文章同级的目录里面，这是网上大部分教程推荐的做法。</p>
-<p>比如说我放在我的hexo博客下面的文章，路径是D:\blog\my-blog01\source_posts，那么当我在这个路径里写文章插入图片时，typora会自动在这个路径里创建一个media文件夹，然后把图片放进去。</p>
-<p>这样做本来是没问题的，但是当我把文章上传到hexo博客网站上时，问题就出现了：网站上没法显示正确的图片，只能显示图片所在的路径。</p>
-<h3 id="问题原因"><a href="#问题原因" class="headerlink" title="问题原因"></a>问题原因</h3><p>我发现这和hexo generate的执行逻辑有关</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">hexo generate 执行过程（简化版）</span><br><span class="line">│</span><br><span class="line">├── 扫描 source/ 下所有内容</span><br><span class="line">│   │</span><br><span class="line">│   ├── 如果是 _posts/ 目录</span><br><span class="line">│   │   ├── .md 文件 → 渲染成 HTML → 输出到 public/（保持原有目录结构）</span><br><span class="line">│   │   └── 其他文件（图片、视频等）→ 直接忽略（不复制）</span><br><span class="line">│   │</span><br><span class="line">│   └── 如果是其他目录（images/、css/、js/ 等）</span><br><span class="line">│       └── 全部原样复制到 public/（保持原有目录结构）</span><br><span class="line">│</span><br><span class="line">└── 生成完成，public/ 即为最终可部署的静态网站</span><br></pre></td></tr></table></figure>
-
-
-
-<h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>根据这个逻辑，之前的设置是行不通的，因为post下面的图片文件会被hexo忽略，所以我修改了我的typora偏好设置：</p>
-<p><img src="/./../images/typora%E5%92%8Chexo%E6%A0%BC%E5%BC%8F%E5%86%B2%E7%AA%81%E7%9A%84%E9%97%AE%E9%A2%98%E5%92%8C%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/image-20260713110021243.png" alt="image-20260713110021243"></p>
-<table>
-<thead>
-<tr>
-<th align="left">工具</th>
-<th align="left">解析基准</th>
-<th align="left">实际指向位置</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>Typora</strong></td>
-<td align="left">以 <code>source/_posts/</code> 为基准</td>
-<td align="left"><code>./</code> 当前目录 → <code>../</code> 退回上级 <code>source/</code> → 进入 <code>images/</code> → 找到图片</td>
-</tr>
-<tr>
-<td align="left"><strong>Hexo</strong></td>
-<td align="left">以 <code>source/</code> 为基准（路径不变）</td>
-<td align="left"><code>./../</code> 在生成后映射为 <code>public/images/</code> → 找到图片</td>
-</tr>
-</tbody></table>
-<h4 id="1-我告诉它的指令"><a href="#1-我告诉它的指令" class="headerlink" title="1. 我告诉它的指令"></a>1. 我告诉它的指令</h4><p><code>![](./../images/xxx.png)</code></p>
-<p>这个路径翻译成人话就是：<strong>“从我现在的位置，先往后退一步，再进到 images 文件夹里，找到 xxx.png 这张图。”</strong></p>
-<h4 id="2-Typora-是怎么听的"><a href="#2-Typora-是怎么听的" class="headerlink" title="2. Typora 是怎么听的"></a>2. Typora 是怎么听的</h4><p>Typora 打开文章时，它的“现在的位置”是：<code>D:/blog/my-blog01/source/_posts/</code></p>
-<p>于是它照做：</p>
-<ul>
-<li><code>./</code> &#x3D; 我现在就在 <code>source/_posts/</code></li>
-<li><code>../</code> &#x3D; 往后退一步，到 <code>source/</code></li>
-<li><code>images/</code> &#x3D; 进入 <code>source/images/</code></li>
-<li>找到 <code>xxx.png</code></li>
-</ul>
-<p>所以 Typora 能找到并显示图片</p>
-<h4 id="3-hexo是怎么做的"><a href="#3-hexo是怎么做的" class="headerlink" title="3.hexo是怎么做的"></a>3.hexo是怎么做的</h4><p><strong>只要图片放在 <code>source/</code> 下的任意位置（除了 <code>_posts/</code> 内部），Hexo 都会把它复制到 <code>public/</code> 里。我文章里写的相对路径只要能正确指向这个位置，浏览器就能加载到。</strong></p>
-<h4 id="具体的例子"><a href="#具体的例子" class="headerlink" title="具体的例子"></a>具体的例子</h4><ul>
-<li>图片放在 <code>source/images/xxx.png</code> → Hexo 复制到 <code>public/images/xxx.png</code></li>
-<li>文章里写 <code>../images/xxx.png</code> → 浏览器从当前位置退到上一级（<code>source/</code> 对应 <code>public/</code>），找到 <code>public/images/xxx.png</code></li>
-</ul>
-<h3 id="缺陷"><a href="#缺陷" class="headerlink" title="缺陷"></a>缺陷</h3><p>这样设置有一个很明显的缺陷，就是我的typora以后想要写带图片的文章，只能在这个目录下写。</p>
-<p>但是考虑到以后我会把我的这个hexo博客网站作为我主要的记录、输出内容的阵地，这个缺陷目前是可以接受的。</p>
-<h2 id="问题二：LaTex数学公式的代码无法渲染在hexo上"><a href="#问题二：LaTex数学公式的代码无法渲染在hexo上" class="headerlink" title="问题二：LaTex数学公式的代码无法渲染在hexo上"></a>问题二：LaTex数学公式的代码无法渲染在hexo上</h2><h3 id="问题描述-1"><a href="#问题描述-1" class="headerlink" title="问题描述"></a>问题描述</h3><p>我发现之前上传的洛谷P1003题解无法正确加载LaTex数学公式，显示在typora上是好的，但在hexo博客网站上不行。会显示下面的代码。</p>
-<p>对于 $30%$ 的数据，有 $n \le 2$。 </p>
-<p>对于 $50%$ 的数据，$0 \le a, b, g, k \le 100$。 </p>
-<p>对于 $100%$ 的数据，有 $0 \le n \le 10^4$, $0 \le a, b, g, k \le {10}^5$​。 </p>
-<h3 id="问题原因-1"><a href="#问题原因-1" class="headerlink" title="问题原因"></a>问题原因</h3><p>Typora 默认支持 LaTeX 渲染，所以显示正常。但 <strong>Hexo 默认不会渲染 LaTeX</strong>，需要额外安装插件，否则 <code>$</code> 符号会原样显示在网页上</p>
-<h3 id="解决方案-1"><a href="#解决方案-1" class="headerlink" title="解决方案"></a>解决方案</h3><h4 id="安装-LaTeX-渲染插件"><a href="#安装-LaTeX-渲染插件" class="headerlink" title="安装 LaTeX 渲染插件"></a>安装 LaTeX 渲染插件</h4><p>在博客根目录执行：</p>
-<p>bash</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">npm install hexo-filter-mathjax --save</span><br></pre></td></tr></table></figure>
-
-<h4 id="配置插件"><a href="#配置插件" class="headerlink" title="配置插件"></a>配置插件</h4><p>在 <code>_config.yml</code> 中添加：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mathjax:</span><br><span class="line">  enable: true</span><br><span class="line">  per_page: true</span><br></pre></td></tr></table></figure>
-
-<h4 id="在文章的-Front-matter-中开启"><a href="#在文章的-Front-matter-中开启" class="headerlink" title="在文章的 Front-matter 中开启"></a>在文章的 Front-matter 中开启</h4><p>在需要使用数学公式的文章头部添加：</p>
-<p>yaml</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">---</span><br><span class="line">title: 洛谷P1003题-铺地毯-题解</span><br><span class="line">mathjax: true</span><br><span class="line">---</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>前端</category>
-      </categories>
-      <tags>
-        <tag>Hexo</tag>
-        <tag>Typora</tag>
       </tags>
   </entry>
   <entry>
@@ -8932,6 +9289,79 @@
       </tags>
   </entry>
   <entry>
+    <title>typora和hexo格式冲突的问题汇总和解决方案</title>
+    <url>/2026/07/13/typora%E5%92%8Chexo%E6%A0%BC%E5%BC%8F%E5%86%B2%E7%AA%81%E7%9A%84%E9%97%AE%E9%A2%98%E5%92%8C%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/</url>
+    <content><![CDATA[<h1 id="typora和hexo格式冲突的问题汇总和解决方案"><a href="#typora和hexo格式冲突的问题汇总和解决方案" class="headerlink" title="typora和hexo格式冲突的问题汇总和解决方案"></a>typora和hexo格式冲突的问题汇总和解决方案</h1><h2 id="问题一：渲染图片时引用路径的冲突"><a href="#问题一：渲染图片时引用路径的冲突" class="headerlink" title="问题一：渲染图片时引用路径的冲突"></a>问题一：渲染图片时引用路径的冲突</h2><h3 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述"></a>问题描述</h3><p>在typora里写文章时插入图片，我本来设置的是保存在与文章同级的目录里面，这是网上大部分教程推荐的做法。</p>
+<p>比如说我放在我的hexo博客下面的文章，路径是D:\blog\my-blog01\source_posts，那么当我在这个路径里写文章插入图片时，typora会自动在这个路径里创建一个media文件夹，然后把图片放进去。</p>
+<p>这样做本来是没问题的，但是当我把文章上传到hexo博客网站上时，问题就出现了：网站上没法显示正确的图片，只能显示图片所在的路径。</p>
+<h3 id="问题原因"><a href="#问题原因" class="headerlink" title="问题原因"></a>问题原因</h3><p>我发现这和hexo generate的执行逻辑有关</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">hexo generate 执行过程（简化版）</span><br><span class="line">│</span><br><span class="line">├── 扫描 source/ 下所有内容</span><br><span class="line">│   │</span><br><span class="line">│   ├── 如果是 _posts/ 目录</span><br><span class="line">│   │   ├── .md 文件 → 渲染成 HTML → 输出到 public/（保持原有目录结构）</span><br><span class="line">│   │   └── 其他文件（图片、视频等）→ 直接忽略（不复制）</span><br><span class="line">│   │</span><br><span class="line">│   └── 如果是其他目录（images/、css/、js/ 等）</span><br><span class="line">│       └── 全部原样复制到 public/（保持原有目录结构）</span><br><span class="line">│</span><br><span class="line">└── 生成完成，public/ 即为最终可部署的静态网站</span><br></pre></td></tr></table></figure>
+
+
+
+<h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>根据这个逻辑，之前的设置是行不通的，因为post下面的图片文件会被hexo忽略，所以我修改了我的typora偏好设置：</p>
+<p><img src="/./../images/typora%E5%92%8Chexo%E6%A0%BC%E5%BC%8F%E5%86%B2%E7%AA%81%E7%9A%84%E9%97%AE%E9%A2%98%E5%92%8C%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/image-20260713110021243.png" alt="image-20260713110021243"></p>
+<table>
+<thead>
+<tr>
+<th align="left">工具</th>
+<th align="left">解析基准</th>
+<th align="left">实际指向位置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Typora</strong></td>
+<td align="left">以 <code>source/_posts/</code> 为基准</td>
+<td align="left"><code>./</code> 当前目录 → <code>../</code> 退回上级 <code>source/</code> → 进入 <code>images/</code> → 找到图片</td>
+</tr>
+<tr>
+<td align="left"><strong>Hexo</strong></td>
+<td align="left">以 <code>source/</code> 为基准（路径不变）</td>
+<td align="left"><code>./../</code> 在生成后映射为 <code>public/images/</code> → 找到图片</td>
+</tr>
+</tbody></table>
+<h4 id="1-我告诉它的指令"><a href="#1-我告诉它的指令" class="headerlink" title="1. 我告诉它的指令"></a>1. 我告诉它的指令</h4><p><code>![](./../images/xxx.png)</code></p>
+<p>这个路径翻译成人话就是：<strong>“从我现在的位置，先往后退一步，再进到 images 文件夹里，找到 xxx.png 这张图。”</strong></p>
+<h4 id="2-Typora-是怎么听的"><a href="#2-Typora-是怎么听的" class="headerlink" title="2. Typora 是怎么听的"></a>2. Typora 是怎么听的</h4><p>Typora 打开文章时，它的“现在的位置”是：<code>D:/blog/my-blog01/source/_posts/</code></p>
+<p>于是它照做：</p>
+<ul>
+<li><code>./</code> &#x3D; 我现在就在 <code>source/_posts/</code></li>
+<li><code>../</code> &#x3D; 往后退一步，到 <code>source/</code></li>
+<li><code>images/</code> &#x3D; 进入 <code>source/images/</code></li>
+<li>找到 <code>xxx.png</code></li>
+</ul>
+<p>所以 Typora 能找到并显示图片</p>
+<h4 id="3-hexo是怎么做的"><a href="#3-hexo是怎么做的" class="headerlink" title="3.hexo是怎么做的"></a>3.hexo是怎么做的</h4><p><strong>只要图片放在 <code>source/</code> 下的任意位置（除了 <code>_posts/</code> 内部），Hexo 都会把它复制到 <code>public/</code> 里。我文章里写的相对路径只要能正确指向这个位置，浏览器就能加载到。</strong></p>
+<h4 id="具体的例子"><a href="#具体的例子" class="headerlink" title="具体的例子"></a>具体的例子</h4><ul>
+<li>图片放在 <code>source/images/xxx.png</code> → Hexo 复制到 <code>public/images/xxx.png</code></li>
+<li>文章里写 <code>../images/xxx.png</code> → 浏览器从当前位置退到上一级（<code>source/</code> 对应 <code>public/</code>），找到 <code>public/images/xxx.png</code></li>
+</ul>
+<h3 id="缺陷"><a href="#缺陷" class="headerlink" title="缺陷"></a>缺陷</h3><p>这样设置有一个很明显的缺陷，就是我的typora以后想要写带图片的文章，只能在这个目录下写。</p>
+<p>但是考虑到以后我会把我的这个hexo博客网站作为我主要的记录、输出内容的阵地，这个缺陷目前是可以接受的。</p>
+<h2 id="问题二：LaTex数学公式的代码无法渲染在hexo上"><a href="#问题二：LaTex数学公式的代码无法渲染在hexo上" class="headerlink" title="问题二：LaTex数学公式的代码无法渲染在hexo上"></a>问题二：LaTex数学公式的代码无法渲染在hexo上</h2><h3 id="问题描述-1"><a href="#问题描述-1" class="headerlink" title="问题描述"></a>问题描述</h3><p>我发现之前上传的洛谷P1003题解无法正确加载LaTex数学公式，显示在typora上是好的，但在hexo博客网站上不行。会显示下面的代码。</p>
+<p>对于 $30%$ 的数据，有 $n \le 2$。 </p>
+<p>对于 $50%$ 的数据，$0 \le a, b, g, k \le 100$。 </p>
+<p>对于 $100%$ 的数据，有 $0 \le n \le 10^4$, $0 \le a, b, g, k \le {10}^5$​。 </p>
+<h3 id="问题原因-1"><a href="#问题原因-1" class="headerlink" title="问题原因"></a>问题原因</h3><p>Typora 默认支持 LaTeX 渲染，所以显示正常。但 <strong>Hexo 默认不会渲染 LaTeX</strong>，需要额外安装插件，否则 <code>$</code> 符号会原样显示在网页上</p>
+<h3 id="解决方案-1"><a href="#解决方案-1" class="headerlink" title="解决方案"></a>解决方案</h3><h4 id="安装-LaTeX-渲染插件"><a href="#安装-LaTeX-渲染插件" class="headerlink" title="安装 LaTeX 渲染插件"></a>安装 LaTeX 渲染插件</h4><p>在博客根目录执行：</p>
+<p>bash</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">npm install hexo-filter-mathjax --save</span><br></pre></td></tr></table></figure>
+
+<h4 id="配置插件"><a href="#配置插件" class="headerlink" title="配置插件"></a>配置插件</h4><p>在 <code>_config.yml</code> 中添加：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mathjax:</span><br><span class="line">  enable: true</span><br><span class="line">  per_page: true</span><br></pre></td></tr></table></figure>
+
+<h4 id="在文章的-Front-matter-中开启"><a href="#在文章的-Front-matter-中开启" class="headerlink" title="在文章的 Front-matter 中开启"></a>在文章的 Front-matter 中开启</h4><p>在需要使用数学公式的文章头部添加：</p>
+<p>yaml</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">---</span><br><span class="line">title: 洛谷P1003题-铺地毯-题解</span><br><span class="line">mathjax: true</span><br><span class="line">---</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>前端</category>
+      </categories>
+      <tags>
+        <tag>Hexo</tag>
+        <tag>Typora</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>我们是如何创建这个博客网站的</title>
     <url>/2026/07/07/%E6%88%91%E4%BB%AC%E6%98%AF%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%BD%91%E7%AB%99%E7%9A%84/</url>
     <content><![CDATA[<h1 id="《软件开发工具实践》实验手册"><a href="#《软件开发工具实践》实验手册" class="headerlink" title="《软件开发工具实践》实验手册"></a>《软件开发工具实践》实验手册</h1><h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><p><strong><a href="#%E5%AE%9E%E9%AA%8C%E4%BA%8C-web%E8%BD%AF%E4%BB%B6%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83">实验二 Web软件开发环境</a></strong> …………………… 5</p>
@@ -10053,11 +10483,6 @@
       </tags>
   </entry>
   <entry>
-    <title>我的第一篇hexo博客！</title>
-    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
-    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
-  </entry>
-  <entry>
     <title>数据结构 —— 顺序表</title>
     <url>/2026/07/17/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%20%E2%80%94%E2%80%94%20%E9%A1%BA%E5%BA%8F%E8%A1%A8/</url>
     <content><![CDATA[<h1 id="数据结构-——-顺序表"><a href="#数据结构-——-顺序表" class="headerlink" title="数据结构 —— 顺序表"></a>数据结构 —— 顺序表</h1><h2 id="什么是顺序表"><a href="#什么是顺序表" class="headerlink" title="什么是顺序表"></a>什么是顺序表</h2><p><strong>顺序表</strong>是线性表的一种存储方式。它的底层就是<strong>数组</strong>——在内存中申请一段连续的空间，依次存放数据元素。</p>
@@ -10188,6 +10613,11 @@
         <tag>顺序表</tag>
         <tag>数据结构</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>我的第一篇hexo博客！</title>
+    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
+    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>数据结构学习随记</title>
