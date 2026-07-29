@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="上一篇博客用轮询模式实现了串口通信——电脑发指令，STM32控制LED。但轮询模式有个大问题：CPU一直在while循环里&quot;傻等&quot;，除了接收信息，啥也干不了。这篇用中断模式解决它：开启串口中断后，CPU该干嘛干嘛，数据到了自动触发中断处理，省心又高效。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——串口中断模式通信，让CPU不再&quot;傻等&quot;">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/29/STM32_USART_Interrupt_Mode/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="上一篇博客用轮询模式实现了串口通信——电脑发指令，STM32控制LED。但轮询模式有个大问题：CPU一直在while循环里&quot;傻等&quot;，除了接收信息，啥也干不了。这篇用中断模式解决它：开启串口中断后，CPU该干嘛干嘛，数据到了自动触发中断处理，省心又高效。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_USART_Interrupt_Mode/image-20260729221641615.png">
+<meta property="article:published_time" content="2026-07-29T22:20:00.000Z">
+<meta property="article:modified_time" content="2026-07-29T14:30:19.275Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="中断">
+<meta property="article:tag" content="NVIC">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="USART">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_USART_Interrupt_Mode/image-20260729221641615.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/29/STM32_USART_Interrupt_Mode/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——串口中断模式通信，让CPU不再"傻等" | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/29/STM32_USART_Interrupt_Mode/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——串口中断模式通信，让CPU不再"傻等"
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-29 22:20:00 / 修改时间：14:30:19" itemprop="dateCreated datePublished" datetime="2026-07-29T22:20:00+00:00">2026-07-29</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>9.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+            <div class="post-description">上一篇博客用轮询模式实现了串口通信——电脑发指令，STM32控制LED。但轮询模式有个大问题：CPU一直在while循环里"傻等"，除了接收信息，啥也干不了。这篇用中断模式解决它：开启串口中断后，CPU该干嘛干嘛，数据到了自动触发中断处理，省心又高效。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从轮询到中断"><a href="#从轮询到中断" class="headerlink" title="从轮询到中断"></a>从轮询到中断</h2><p>上篇博客，我们用串口的<strong>轮询模式</strong>实现了电脑控制 LED。当时的代码长这样：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    HAL_UART_Receive(&amp;huart2, receiveData, <span class="number">2</span>, HAL_MAX_DELAY);  <span class="comment">// 卡在这里等</span></span><br><span class="line">    <span class="comment">// 等收到数据后才能继续往下执行……</span></span><br><span class="line">    HAL_UART_Transmit(&amp;huart2, receiveData, <span class="number">2</span>, <span class="number">100</span>);</span><br><span class="line">    <span class="comment">// 控制 LED……</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里存在一个问题：<strong>在 <code>HAL_UART_Receive</code> 等数据的时候，CPU 在干什么？</strong></p>
+<p>答案是——<strong>在空转查询</strong>，一直在问”数据到了吗？到了吗？到了吗？”</p>
+<p>这就好比你等外卖：</p>
+<ul>
+<li><strong>轮询模式</strong>：每5秒跑去门口看一眼，啥也干不了，饭来了才回去吃</li>
+<li><strong>中断模式</strong>：装个门铃，该干嘛干嘛，门铃响了再去拿</li>
+</ul>
+<p>显然，中断模式高效得多。这篇就来把上一版的轮询代码改成中断模式。</p>
+<hr>
+<h2 id="轮询模式的底层机制（为什么它”堵”）"><a href="#轮询模式的底层机制（为什么它”堵”）" class="headerlink" title="轮询模式的底层机制（为什么它”堵”）"></a>轮询模式的底层机制（为什么它”堵”）</h2><p>先看看轮询模式底层是怎么工作的，理解清楚了才知道中断模式解决了什么问题。</p>
+<p>每个 STM32 串口内部都有这么几个核心部件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────┐</span><br><span class="line">│   发送数据寄存器   │ ← CPU 把要发的数据放这里</span><br><span class="line">└────────┬─────────┘</span><br><span class="line">         │ 数据移过去</span><br><span class="line">         ▼</span><br><span class="line">┌──────────────────┐</span><br><span class="line">│   发送移位寄存器   │ ← 按波特率转成高低电平，从 TX 脚输出</span><br><span class="line">└──────────────────┘</span><br><span class="line"></span><br><span class="line">┌──────────────────┐</span><br><span class="line">│   接收数据寄存器   │ → CPU 从这里读取收到的数据</span><br><span class="line">└────────┬─────────┘</span><br><span class="line">         ↑ 数据移过来</span><br><span class="line">         │</span><br><span class="line">┌──────────────────┐</span><br><span class="line">│   接收移位寄存器   │ ← 从 RX 脚收到的电平信号，转成数据</span><br><span class="line">└──────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="轮询发送的过程"><a href="#轮询发送的过程" class="headerlink" title="轮询发送的过程"></a>轮询发送的过程</h3><p>调用 <code>HAL_UART_Transmit</code> 后：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">1. CPU 把第一个字节写入&quot;发送数据寄存器&quot;</span><br><span class="line">2. 数据自动移到&quot;发送移位寄存器&quot;</span><br><span class="line">3. 移位寄存器按波特率把数据转成高低电平，从 TX 脚发出去</span><br><span class="line">4. CPU 不断查询：&quot;发送数据寄存器空了吗？下一个字节能塞进去了吗？&quot;</span><br><span class="line">    ─ 空了 → 塞下一个字节</span><br><span class="line">    ─ 没空 → 继续查</span><br><span class="line">5. 重复直到所有字节发完，或超时</span><br></pre></td></tr></table></figure>
+
+<h3 id="轮询接收的过程"><a href="#轮询接收的过程" class="headerlink" title="轮询接收的过程"></a>轮询接收的过程</h3><p>调用 <code>HAL_UART_Receive</code> 后：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">1. RX 脚收到电平信号，存入&quot;接收移位寄存器&quot;</span><br><span class="line">2. 每收完一帧（8位），数据移到&quot;接收数据寄存器&quot;</span><br><span class="line">3. CPU 不断查询：&quot;接收数据寄存器有数据吗？&quot;</span><br><span class="line">    ─ 有 → 读出来存到变量里</span><br><span class="line">    ─ 没有 → 继续查</span><br><span class="line">4. 重复直到收满指定字节数，或超时</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键问题</strong>：不管是发送还是接收，CPU 全程都在<strong>主动查询</strong>，一圈一圈地轮询寄存器状态。这段时间里 CPU 被完全占用了，干不了别的事。这就是<strong>阻塞</strong>（Blocking）。</p>
+<hr>
+<h2 id="中断模式：让”门铃”代替”傻等”"><a href="#中断模式：让”门铃”代替”傻等”" class="headerlink" title="中断模式：让”门铃”代替”傻等”"></a>中断模式：让”门铃”代替”傻等”</h2><p>中断模式的思路完全不同：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">轮询模式：</span><br><span class="line">    CPU：数据到了吗？到了吗？到了吗？到了吗？……（一直在问）</span><br><span class="line"></span><br><span class="line">中断模式：</span><br><span class="line">    CPU：好，我开启中断接收，去忙别的了。</span><br><span class="line">    ─ 时间流逝 ─</span><br><span class="line">    串口硬件：数据到齐了！触发中断！</span><br><span class="line">    CPU：收到！暂停手头的事，去处理数据。</span><br><span class="line">    CPU：处理完了，继续忙刚才的事。</span><br></pre></td></tr></table></figure>
+
+<p>区别在哪？<strong>CPU 不再主动查询，而是由硬件在数据就绪时通知 CPU。</strong> 这个”通知”就是<strong>中断</strong>。</p>
+<p>具体来说，中断模式下，每发送完一个字节或每接收到一个字节，串口硬件都会触发一次中断，把 CPU “叫回来”处理下一个字节。HAL 库在中断处理函数里把这些事都做好了，我们只需要：</p>
+<ol>
+<li>在 CubeMX 中<strong>开启串口中断</strong></li>
+<li>把 <code>HAL_UART_Receive</code> 换成 <code>HAL_UART_Receive_IT</code></li>
+<li>把 <code>HAL_UART_Transmit</code> 换成 <code>HAL_UART_Transmit_IT</code></li>
+<li>把处理数据的逻辑写到<strong>回调函数</strong> <code>HAL_UART_RxCpltCallback</code> 里</li>
+</ol>
+<hr>
+<h2 id="CubeMX-配置变化"><a href="#CubeMX-配置变化" class="headerlink" title="CubeMX 配置变化"></a>CubeMX 配置变化</h2><p>相比上一篇的 CubeMX 配置，只多了一步：</p>
+<h3 id="开启-USART2-中断"><a href="#开启-USART2-中断" class="headerlink" title="开启 USART2 中断"></a>开启 USART2 中断</h3><p>在 <strong>NVIC Settings</strong> 标签页中，勾选 <strong>USART2 global interrupt</strong> 的 Enabled 复选框：</p>
+<blockquote>
+<p><img src="/./../images/STM32_USART_Interrupt_Mode/image-20260729221641615.png" alt="image-20260729221641615"></p>
+</blockquote>
+<p>其他所有配置（波特率、引脚、LED 等）和上一篇完全一样，不需要改动。</p>
+<p>这一步告诉 NVIC（嵌套向量中断控制器）：”当 USART2 触发中断时，CPU 要去响应它。”</p>
+<p>保存并重新生成代码。你会发现 CubeMX 自动做了几件事：</p>
+<ul>
+<li>在 <code>stm32f1xx_it.c</code> 中生成 <code>USART2_IRQHandler()</code> 函数</li>
+<li>在 <code>stm32f1xx_hal_msp.c</code> 中添加 <code>HAL_NVIC_SetPriority</code> 和 <code>HAL_NVIC_EnableIRQ</code></li>
+<li>这些不需要手动写，CubeMX 全包了</li>
+</ul>
+<hr>
+<h2 id="VS-Code-中修改核心代码"><a href="#VS-Code-中修改核心代码" class="headerlink" title="VS Code 中修改核心代码"></a>VS Code 中修改核心代码</h2><p>和上一篇的代码相比，改动集中在四个方面。</p>
+<h3 id="改动一：接收数组变成全局变量"><a href="#改动一：接收数组变成全局变量" class="headerlink" title="改动一：接收数组变成全局变量"></a>改动一：接收数组变成全局变量</h3><p>原来的 <code>receiveData</code> 定义在 <code>main()</code> 内部（局部变量），现在要提到外面变成<strong>全局变量</strong>，因为回调函数里也要用它。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN PV */</span></span><br><span class="line"><span class="comment">// 存放STM32接收内容的数组——提升为全局变量，供回调函数使用</span></span><br><span class="line"><span class="type">uint8_t</span> receiveData[<span class="number">2</span>];</span><br><span class="line"><span class="comment">/* USER CODE END PV */</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><strong>为什么？</strong> 局部变量只在 <code>main()</code> 函数内有效，而回调函数 <code>HAL_UART_RxCpltCallback</code> 在 <code>main()</code> 外部，访问不到 <code>main()</code> 里的局部变量。提升为全局变量后，整个文件都能访问它。</p>
+</blockquote>
+<h3 id="改动二：main-中只需启动一次中断接收"><a href="#改动二：main-中只需启动一次中断接收" class="headerlink" title="改动二：main() 中只需启动一次中断接收"></a>改动二：main() 中只需启动一次中断接收</h3><p><code>main()</code> 的初始化部分（<code>USER CODE BEGIN 2</code>）中，原来的局部变量定义被替换为启动中断接收：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"><span class="comment">// 启动串口中断接收——只执行一次，之后由中断驱动</span></span><br><span class="line">HAL_UART_Receive_IT(&amp;huart2, receiveData, <span class="number">2</span>);</span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
+
+<p>注意这里和轮询模式的区别：</p>
+<table>
+<thead>
+<tr>
+<th align="left">对比</th>
+<th align="left">轮询模式</th>
+<th align="left">中断模式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">函数</td>
+<td align="left"><code>HAL_UART_Receive</code></td>
+<td align="left"><code>HAL_UART_Receive_IT</code></td>
+</tr>
+<tr>
+<td align="left">放在哪</td>
+<td align="left"><code>while(1)</code> 循环里</td>
+<td align="left">放在循环<strong>前面</strong>，只执行一次</td>
+</tr>
+<tr>
+<td align="left">超时参数</td>
+<td align="left">有（第4个参数）</td>
+<td align="left"><strong>不需要</strong>（中断模式不阻塞）</td>
+</tr>
+</tbody></table>
+<h3 id="改动三：while-1-循环变空了"><a href="#改动三：while-1-循环变空了" class="headerlink" title="改动三：while(1) 循环变空了"></a>改动三：while(1) 循环变空了</h3><p>原来的 while 循环里塞满了接收、发送、控制 LED 的代码，现在全部清空：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 用中断处理串口收发，while里不需要放任何代码</span></span><br><span class="line">    <span class="comment">// 所有串口相关逻辑都在回调函数中处理</span></span><br><span class="line">    <span class="comment">// 这里可以放其他不紧急的任务……</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END WHILE */</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>轮询模式</strong>：while 循环是”主动干活”的地方，不停地接收→处理→发送。</p>
+<p><strong>中断模式</strong>：while 循环变成了”后台”，可以放一些不紧急的任务。串口数据到了，中断自然会打断 while 循环，处理完再回来。</p>
+<h3 id="改动四：核心逻辑移到回调函数"><a href="#改动四：核心逻辑移到回调函数" class="headerlink" title="改动四：核心逻辑移到回调函数"></a>改动四：核心逻辑移到回调函数</h3><p>真正的变化在这里——所有串口数据的处理逻辑，从 while 循环搬到了<strong>回调函数</strong>中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 0 */</span></span><br><span class="line"><span class="comment">// 串口接收完成回调函数——当收到2字节数据时自动调用</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_UART_RxCpltCallback</span><span class="params">(UART_HandleTypeDef *huart)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 1. 用中断模式将收到的数据发回电脑（回显）</span></span><br><span class="line">    HAL_UART_Transmit_IT(&amp;huart2, receiveData, <span class="number">2</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 设置小灯亮灭状态</span></span><br><span class="line">    GPIO_PinState state = GPIO_PIN_SET;</span><br><span class="line">    <span class="keyword">if</span> (receiveData[<span class="number">1</span>] == <span class="string">&#x27;0&#x27;</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        state = GPIO_PIN_RESET;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 根据第一字节控制对应小灯</span></span><br><span class="line">    <span class="keyword">switch</span> (receiveData[<span class="number">0</span>])</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;R&#x27;</span>:</span><br><span class="line">            HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;G&#x27;</span>:</span><br><span class="line">            HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, state);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;B&#x27;</span>:</span><br><span class="line">            HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, state);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 4. 重新启动中断接收，准备接收下一条指令！</span></span><br><span class="line">    HAL_UART_Receive_IT(&amp;huart2, receiveData, <span class="number">2</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 0 */</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>第4步非常关键</strong>——为什么要在回调函数末尾再次调用 <code>HAL_UART_Receive_IT</code>？</p>
+<p>中断接收是”一锤子买卖”：调用一次 <code>HAL_UART_Receive_IT</code>，它接收完指定长度的数据后，就会停下来。如果不再次调用，下一次串口发数据来，就没人在乎了。</p>
+<p>这就好比你按了一次门铃——门铃是一次性的。如果下次来人，找不到门铃可以通知你，你就不知道。</p>
+<p>所以在回调函数的最后，必须**重新”装好门铃”**：调用 <code>HAL_UART_Receive_IT</code> 启动下一次中断接收。</p>
+<h3 id="函数对比总结"><a href="#函数对比总结" class="headerlink" title="函数对比总结"></a>函数对比总结</h3><table>
+<thead>
+<tr>
+<th align="left">功能</th>
+<th align="left">轮询模式</th>
+<th align="left">中断模式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">发送</td>
+<td align="left"><code>HAL_UART_Transmit(&amp;huart2, buf, len, timeout)</code></td>
+<td align="left"><code>HAL_UART_Transmit_IT(&amp;huart2, buf, len)</code></td>
+</tr>
+<tr>
+<td align="left">接收</td>
+<td align="left"><code>HAL_UART_Receive(&amp;huart2, buf, len, timeout)</code></td>
+<td align="left"><code>HAL_UART_Receive_IT(&amp;huart2, buf, len)</code></td>
+</tr>
+<tr>
+<td align="left">超时参数</td>
+<td align="left">✅ 有</td>
+<td align="left">❌ 不需要</td>
+</tr>
+<tr>
+<td align="left">CPU 占用</td>
+<td align="left">一直占用，直到完成</td>
+<td align="left">仅中断时短暂占用</td>
+</tr>
+<tr>
+<td align="left">数据在哪处理</td>
+<td align="left">while 循环中</td>
+<td align="left">回调函数中</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="补充：什么是回调函数？"><a href="#补充：什么是回调函数？" class="headerlink" title="补充：什么是回调函数？"></a>补充：什么是回调函数？</h2><p>“回调函数”这个名字听起来挺唬人，但本质上就是个<strong>普通的函数</strong>。它特殊的地方在于——<strong>不是你在代码里主动调用的，而是 HAL 库在特定事件发生时自动帮你调用的。</strong></p>
+<h3 id="一个生活中的例子"><a href="#一个生活中的例子" class="headerlink" title="一个生活中的例子"></a>一个生活中的例子</h3><p>你去4S店修车：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">你：师傅，车修好了打电话给我。（留下电话号码）</span><br><span class="line">   ─ 你回家该干嘛干嘛 ─</span><br><span class="line">4S店：车修好了，打电话通知你。</span><br><span class="line">你：接到电话，来取车。</span><br></pre></td></tr></table></figure>
+
+<p>这里的”打电话”就是<strong>回调</strong>——你把电话号码留给4S店，4S店在车修好时主动打给你。</p>
+<p>对应到代码里：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">你：HAL_UART_Receive_IT(&amp;huart2, ...)  ← &quot;数据收到了叫我&quot;</span><br><span class="line">   ─ CPU 该干嘛干嘛 ─</span><br><span class="line">HAL库：数据收到了！调用 HAL_UART_RxCpltCallback()</span><br><span class="line">你的回调函数：处理数据  ← 就像&quot;接到电话去取车&quot;</span><br></pre></td></tr></table></figure>
+
+<h3 id="关键点"><a href="#关键点" class="headerlink" title="关键点"></a>关键点</h3><table>
+<thead>
+<tr>
+<th align="left">概念</th>
+<th align="left">解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>你把函数地址告诉 HAL 库</strong></td>
+<td align="left">你定义了 <code>HAL_UART_RxCpltCallback</code> 这个函数（相当于留了电话号码）</td>
+</tr>
+<tr>
+<td align="left"><strong>HAL 库在适当时机调用它</strong></td>
+<td align="left">收到指定字节数后，HAL 库自动调你这个函数（相当于4S店打电话给你）</td>
+</tr>
+<tr>
+<td align="left"><strong>你不需要知道它何时被调用</strong></td>
+<td align="left">你只需要把”收到数据后要做什么”写在回调函数里就行</td>
+</tr>
+</tbody></table>
+<h3 id="和轮询模式的对比"><a href="#和轮询模式的对比" class="headerlink" title="和轮询模式的对比"></a>和轮询模式的对比</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 轮询模式：你主动去查</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">    HAL_UART_Receive(...);     <span class="comment">// &quot;有数据了吗？有数据了吗？……&quot;（不断查）</span></span><br><span class="line">    处理数据;                   <span class="comment">// 查到后才能处理</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 中断模式：人家通知你</span></span><br><span class="line">HAL_UART_Receive_IT(...);     <span class="comment">// &quot;有数据了叫我&quot;（只设一次）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// —— 时间流逝，CPU 在干别的事 ——</span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_UART_RxCpltCallback</span><span class="params">()</span> <span class="comment">// HAL库自动调用</span></span><br><span class="line">&#123;</span><br><span class="line">    处理数据;                   <span class="comment">// 数据到了才处理</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>轮询模式是你<strong>主动去问</strong>，中断模式是你<strong>留下联系方式等着被通知</strong>。回调函数就是那个”联系方式”。</p>
+<hr>
+<h2 id="解读新增的初始化代码-——-NVIC-与中断向量"><a href="#解读新增的初始化代码-——-NVIC-与中断向量" class="headerlink" title="解读新增的初始化代码 —— NVIC 与中断向量"></a>解读新增的初始化代码 —— NVIC 与中断向量</h2><p>CubeMX 开启 USART2 中断后，生成了三段和中断相关的代码。</p>
+<h3 id="1-stm32f1xx-it-c-——-中断服务函数"><a href="#1-stm32f1xx-it-c-——-中断服务函数" class="headerlink" title="1. stm32f1xx_it.c —— 中断服务函数"></a>1. stm32f1xx_it.c —— 中断服务函数</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">USART2_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_UART_IRQHandler(&amp;huart2);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个函数是<strong>中断向量表中 USART2 对应的中断服务函数</strong>。当串口触发中断时，CPU 暂停当前任务，跳到这里执行。</p>
+<p>函数体只有一行：调用了 <code>HAL_UART_IRQHandler(&amp;huart2)</code>。这是 HAL 库提供的中断分发函数，它的内部做了判断逻辑，然后把不同的情况分发给对应的回调函数。</p>
+<p><strong>关键问题是：它怎么知道我收到几个字节了？又是什么时候调用的回调函数？</strong></p>
+<p>要回答这个问题，得翻开 HAL 库源码看看。在vscode中，把鼠标停在 <code>HAL_UART_IRQHandler</code> 上按右键，找到定义栏，点进去，就能看到它的实现（下面放了简化版）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_UART_IRQHandler</span><span class="params">(UART_HandleTypeDef *huart)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 读取状态寄存器(SR)和控制寄存器(CR1)</span></span><br><span class="line">    <span class="type">uint32_t</span> isrflags = READ_REG(huart-&gt;Instance-&gt;SR);</span><br><span class="line">    <span class="type">uint32_t</span> cr1its   = READ_REG(huart-&gt;Instance-&gt;CR1);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 判断：如果&quot;接收数据寄存器非空(RXNE)&quot; 且 &quot;RXNE中断已使能&quot;</span></span><br><span class="line">    <span class="keyword">if</span> (((isrflags &amp; USART_SR_RXNE) != RESET) &amp;&amp;</span><br><span class="line">        ((cr1its &amp; USART_CR1_RXNEIE) != RESET))</span><br><span class="line">    &#123;</span><br><span class="line">        UART_Receive_IT(huart);   <span class="comment">// 交给底层接收函数处理</span></span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 其他判断：错误中断、发送完成中断等等……</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里的关键是它检查了<strong>两个条件</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="left">条件</th>
+<th align="left">含义</th>
+<th align="left">谁设置的</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>USART_SR_RXNE</code></td>
+<td align="left">状态寄存器中的”接收数据寄存器非空”标志——串口硬件收到一个字节后自动置1</td>
+<td align="left">✅ 硬件自动</td>
+</tr>
+<tr>
+<td align="left"><code>USART_CR1_RXNEIE</code></td>
+<td align="left">控制寄存器中的”RXNE中断使能”位——我们调用 <code>HAL_UART_Receive_IT</code> 时由 HAL 库开启</td>
+<td align="left">✅ <code>HAL_UART_Receive_IT</code> 设置的</td>
+</tr>
+</tbody></table>
+<p>两个条件都满足时，调用 <code>UART_Receive_IT(huart)</code>，把收到的这个字节读走。</p>
+<p><strong>那什么时候才调用回调函数呢？</strong> 这就进到 <code>UART_Receive_IT</code> 里面看了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> HAL_StatusTypeDef <span class="title function_">UART_Receive_IT</span><span class="params">(UART_HandleTypeDef *huart)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 1. 从接收数据寄存器(DR)中读取收到的字节</span></span><br><span class="line">    *huart-&gt;pRxBuffPtr = (<span class="type">uint8_t</span>)(huart-&gt;Instance-&gt;DR &amp; <span class="number">0x00FF</span>);</span><br><span class="line">    huart-&gt;pRxBuffPtr++;       <span class="comment">// 缓冲区指针后移</span></span><br><span class="line">    huart-&gt;RxXferCount--;      <span class="comment">// 待接收字节数减1</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 如果待接收字节数减到了0 —— 说明收完了！</span></span><br><span class="line">    <span class="keyword">if</span> (huart-&gt;RxXferCount == <span class="number">0U</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 关闭RXNE中断（不再接收）</span></span><br><span class="line">        __HAL_UART_DISABLE_IT(huart, UART_IT_RXNE);</span><br><span class="line">        <span class="comment">// 恢复串口状态为&quot;就绪&quot;</span></span><br><span class="line">        huart-&gt;RxState = HAL_UART_STATE_READY;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// ★ 关键：调用回调函数！</span></span><br><span class="line">        HAL_UART_RxCpltCallback(huart);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> HAL_OK;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 还没收完，直接返回，等下次中断再收下一个字节</span></span><br><span class="line">    <span class="keyword">return</span> HAL_OK;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>重点全在这个 <code>RxXferCount</code> 上。</p>
+<p>回顾我们调用的 <code>HAL_UART_Receive_IT(&amp;huart2, receiveData, 2)</code>——第三个参数填的是 <strong>2</strong>。HAL 库会把 2 存到 <code>huart-&gt;RxXferCount</code> 里：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">RxXferCount = 2  →  收到第1个字节，减为1  →  收到第2个字节，减为0  →  回调！</span><br></pre></td></tr></table></figure>
+
+<p>所以整个过程的时间线是这样的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">main() 中:</span><br><span class="line">    HAL_UART_Receive_IT(&amp;huart2, receiveData, 2)</span><br><span class="line">        ↓ 内部设置 RxXferCount = 2，开启 RXNE 中断</span><br><span class="line">        ↓ 函数返回，main() 继续执行 while 循环里的其他代码</span><br><span class="line"></span><br><span class="line">串口收到第1个字节时:</span><br><span class="line">    ┌─ 硬件触发中断 → USART2_IRQHandler()</span><br><span class="line">    │   → HAL_UART_IRQHandler() 检查 RXNE 标志</span><br><span class="line">    │   → UART_Receive_IT() 读走字节，RxXferCount 从 2 减为 1</span><br><span class="line">    │   → 返回，CPU 继续执行 while 循环</span><br><span class="line">    └────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">串口收到第2个字节时:</span><br><span class="line">    ┌─ 硬件触发中断 → USART2_IRQHandler()</span><br><span class="line">    │   → UART_Receive_IT() 读走字节，RxXferCount 从 1 减为 0</span><br><span class="line">    │   → ★ RxXferCount == 0！关闭中断，调用回调函数！</span><br><span class="line">    │   → 回调函数中：回显数据、控制 LED、重新开启中断接收</span><br><span class="line">    └────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>这就是”中断模式下，收到指定字节数后才触发回调”的完整链路：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">USART2_IRQHandler()          ← 中断向量，硬件触发</span><br><span class="line">    ↓</span><br><span class="line">HAL_UART_IRQHandler()        ← 读寄存器，判断中断类型</span><br><span class="line">    ↓ (RXNE标志=1 → 收到数据)</span><br><span class="line">UART_Receive_IT()            ← 读走1字节，RxXferCount自减</span><br><span class="line">    ↓ (RxXferCount == 0 → 收完了)</span><br><span class="line">HAL_UART_RxCpltCallback()    ← ★ 你的代码在这里执行！</span><br></pre></td></tr></table></figure>
+
+<p>和之前学的外部中断做个对比，路径非常相似：</p>
+<table>
+<thead>
+<tr>
+<th align="left">外部中断</th>
+<th align="left">串口中断</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>EXTI15_10_IRQHandler()</code></td>
+<td align="left"><code>USART2_IRQHandler()</code></td>
+</tr>
+<tr>
+<td align="left"><code>HAL_GPIO_EXTI_IRQHandler()</code></td>
+<td align="left"><code>HAL_UART_IRQHandler()</code></td>
+</tr>
+<tr>
+<td align="left"><code>HAL_GPIO_EXTI_Callback()</code></td>
+<td align="left"><strong><code>HAL_UART_RxCpltCallback()</code></strong> ← 你的代码</td>
+</tr>
+</tbody></table>
+<h3 id="2-stm32f1xx-hal-msp-c-——-NVIC-配置"><a href="#2-stm32f1xx-hal-msp-c-——-NVIC-配置" class="headerlink" title="2. stm32f1xx_hal_msp.c —— NVIC 配置"></a>2. stm32f1xx_hal_msp.c —— NVIC 配置</h3><p>CubeMX 在 <code>HAL_UART_MspInit</code> 中添加了两行新代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USART2 interrupt Init */</span></span><br><span class="line">HAL_NVIC_SetPriority(USART2_IRQn, <span class="number">0</span>, <span class="number">0</span>);    <span class="comment">// 设置中断优先级（抢占优先级0，子优先级0）</span></span><br><span class="line">HAL_NVIC_EnableIRQ(USART2_IRQn);             <span class="comment">// 使能 USART2 的中断</span></span><br></pre></td></tr></table></figure>
+
+<p>这两行的作用：</p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_NVIC_SetPriority(中断号, 抢占优先级, 子优先级)</code></td>
+<td align="left">设置这个中断的优先级。数字越小优先级越高。<code>0, 0</code> 就是最高优先级</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_NVIC_EnableIRQ(中断号)</code></td>
+<td align="left"><strong>使能中断</strong>——告诉 NVIC，这个外设的中断请求可以被响应了</td>
+</tr>
+</tbody></table>
+<p>如果不调用 <code>HAL_NVIC_EnableIRQ</code>，即使外设触发了中断，NVIC 也不会把它发给 CPU——中断就被”屏蔽”了。</p>
+<h3 id="3-回调函数的-weak-弱定义"><a href="#3-回调函数的-weak-弱定义" class="headerlink" title="3. 回调函数的 __weak 弱定义"></a>3. 回调函数的 <code>__weak</code> 弱定义</h3><p>如果你在 HAL 库源码里搜索 <code>HAL_UART_RxCpltCallback</code>，会看到这样的定义：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">__weak <span class="type">void</span> <span class="title function_">HAL_UART_RxCpltCallback</span><span class="params">(UART_HandleTypeDef *huart)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* <span class="doctag">NOTE:</span> This function should not be modified, when the callback is needed,</span></span><br><span class="line"><span class="comment">             the HAL_UART_RxCpltCallback could be implemented in the user file */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>__weak</code> 是<strong>弱定义</strong>——它像一个”占位符”。编译器看到弱定义后，如果在其他地方找到了<strong>同名但非弱定义的函数</strong>，就会用那个新函数覆盖掉弱定义。</p>
+<p>所以，只需要在 <code>main.c</code> 中定义一个同名的 <code>HAL_UART_RxCpltCallback</code>，编译器就会自动使用我们的版本，HAL 库的中断分发逻辑就会在接收到数据时调用我们的函数。</p>
+<blockquote>
+<p>如果你不在 main.c 里定义这个函数，HAL 库的弱定义版本就会被使用——它啥也不干，所以数据收到了也没反应。</p>
+</blockquote>
+<hr>
+<h2 id="编译-烧录-测试"><a href="#编译-烧录-测试" class="headerlink" title="编译 &amp; 烧录 &amp; 测试"></a>编译 &amp; 烧录 &amp; 测试</h2><ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 编译</li>
+<li>连接 ST-Link，点击<strong>运行和调试</strong> → 选择 STM32Cube:STM32 Launch STLink GDB Server</li>
+<li>点击<strong>继续</strong>按钮</li>
+</ol>
+<p>用串口助手测试，功能完全一样：</p>
+<table>
+<thead>
+<tr>
+<th align="center">发送</th>
+<th align="center">效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>R1</code></td>
+<td align="center">🔴 红色灯亮，收到回显 <code>R1</code></td>
+</tr>
+<tr>
+<td align="center"><code>R0</code></td>
+<td align="center">🔴 红色灯灭</td>
+</tr>
+<tr>
+<td align="center"><code>G1</code></td>
+<td align="center">🟢 绿色灯亮</td>
+</tr>
+<tr>
+<td align="center"><code>B1</code></td>
+<td align="center">🔵 蓝色灯亮</td>
+</tr>
+</tbody></table>
+<p><strong>但背后的机制完全不同了</strong>——发 <code>R1</code> 后，CPU 不再是傻等着下一条指令，而是可以去做其他事了。下次数据到了，中断会把它叫回来。</p>
+<blockquote>
+<p>由于此处效果和上一篇完全一样，此处就放上之前的那个视频链接</p>
+<p><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1NV3y6YEYv/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1NV3y6YEYv/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+</blockquote>
+<hr>
+<h2 id="轮询模式与中断模式对比"><a href="#轮询模式与中断模式对比" class="headerlink" title="轮询模式与中断模式对比"></a>轮询模式与中断模式对比</h2><table>
+<thead>
+<tr>
+<th align="left">对比维度</th>
+<th align="left">轮询模式</th>
+<th align="left">中断模式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>CPU 利用率</strong></td>
+<td align="left">❌ 低——一直在查询，浪费 CPU</td>
+<td align="left">✅ 高——只在数据到达时短暂处理</td>
+</tr>
+<tr>
+<td align="left"><strong>代码位置</strong></td>
+<td align="left">while 循环中，顺序执行</td>
+<td align="left">回调函数中，事件驱动</td>
+</tr>
+<tr>
+<td align="left"><strong>多任务能力</strong></td>
+<td align="left">❌ 差——被串口阻塞时啥也干不了</td>
+<td align="left">✅ 好——while 里可以做其他事</td>
+</tr>
+<tr>
+<td align="left"><strong>代码复杂度</strong></td>
+<td align="left">✅ 简单直观</td>
+<td align="left">❌ 稍复杂（需理解中断和回调）</td>
+</tr>
+<tr>
+<td align="left"><strong>适用场景</strong></td>
+<td align="left">简单 demo、只有串口任务的项目</td>
+<td align="left">多任务、需要高效利用 CPU 的项目</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="完整代码结构"><a href="#完整代码结构" class="headerlink" title="完整代码结构"></a>完整代码结构</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">全局变量区：</span><br><span class="line">    receiveData[2]          ← 接收缓冲区（全局，供回调函数使用）</span><br><span class="line"></span><br><span class="line">main():</span><br><span class="line">    HAL_Init()</span><br><span class="line">    SystemClock_Config()</span><br><span class="line">    MX_GPIO_Init()</span><br><span class="line">    MX_USART2_UART_Init()</span><br><span class="line">    HAL_UART_Receive_IT()   ← 启动中断接收（只执行一次）</span><br><span class="line">    while (1) &#123;</span><br><span class="line">        // 空的！可以做其他事</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">回调函数：</span><br><span class="line">    HAL_UART_RxCpltCallback:</span><br><span class="line">        HAL_UART_Transmit_IT()  ← 回显</span><br><span class="line">        控制 LED</span><br><span class="line">        HAL_UART_Receive_IT()  ← 重新开启接收（关键！）</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这篇博客的核心变化是：</p>
+<p><strong>把代码从 while 循环搬到回调函数，把 <code>HAL_UART_Receive</code> 换成 <code>HAL_UART_Receive_IT</code>。</strong></p>
+<p>学了这篇，STM32 就具备了”事件驱动”的能力——外设不再需要 CPU 不停地轮询，而是在需要的时候主动通知 CPU。这是从简单裸机编程走向复杂嵌入式开发的必经之路。</p>
+<p>下一篇将学习如何<strong>接收不定长度的数据</strong>，以及如何使用 <strong>DMA</strong> 进一步解放 CPU——让数据搬运也不占用 CPU 时间。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/29/STM32_USART_Serial_Communication/">上一篇：STM32串口通信——用电脑控制三色LED</a></li>
+<li><a href="/2026/07/28/STM32_EXTI_Deep_Dive/">STM32外部中断深入理解</a>（回调函数机制与中断优先级的概念相通）</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag"># 中断</a>
+              <a href="/tags/NVIC/" rel="tag"># NVIC</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/USART/" rel="tag"># USART</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/29/STM32_USART_Serial_Communication/" rel="prev" title="STM32——串口通信，用电脑控制三色LED">
+      <i class="fa fa-chevron-left"></i> STM32——串口通信，用电脑控制三色LED
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E8%BD%AE%E8%AF%A2%E5%88%B0%E4%B8%AD%E6%96%AD"><span class="nav-number">1.</span> <span class="nav-text">从轮询到中断</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BD%AE%E8%AF%A2%E6%A8%A1%E5%BC%8F%E7%9A%84%E5%BA%95%E5%B1%82%E6%9C%BA%E5%88%B6%EF%BC%88%E4%B8%BA%E4%BB%80%E4%B9%88%E5%AE%83%E2%80%9D%E5%A0%B5%E2%80%9D%EF%BC%89"><span class="nav-number">2.</span> <span class="nav-text">轮询模式的底层机制（为什么它”堵”）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AE%E8%AF%A2%E5%8F%91%E9%80%81%E7%9A%84%E8%BF%87%E7%A8%8B"><span class="nav-number">2.1.</span> <span class="nav-text">轮询发送的过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AE%E8%AF%A2%E6%8E%A5%E6%94%B6%E7%9A%84%E8%BF%87%E7%A8%8B"><span class="nav-number">2.2.</span> <span class="nav-text">轮询接收的过程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E6%A8%A1%E5%BC%8F%EF%BC%9A%E8%AE%A9%E2%80%9D%E9%97%A8%E9%93%83%E2%80%9D%E4%BB%A3%E6%9B%BF%E2%80%9D%E5%82%BB%E7%AD%89%E2%80%9D"><span class="nav-number">3.</span> <span class="nav-text">中断模式：让”门铃”代替”傻等”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E9%85%8D%E7%BD%AE%E5%8F%98%E5%8C%96"><span class="nav-number">4.</span> <span class="nav-text">CubeMX 配置变化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%80%E5%90%AF-USART2-%E4%B8%AD%E6%96%AD"><span class="nav-number">4.1.</span> <span class="nav-text">开启 USART2 中断</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VS-Code-%E4%B8%AD%E4%BF%AE%E6%94%B9%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">VS Code 中修改核心代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%94%B9%E5%8A%A8%E4%B8%80%EF%BC%9A%E6%8E%A5%E6%94%B6%E6%95%B0%E7%BB%84%E5%8F%98%E6%88%90%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F"><span class="nav-number">5.1.</span> <span class="nav-text">改动一：接收数组变成全局变量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%94%B9%E5%8A%A8%E4%BA%8C%EF%BC%9Amain-%E4%B8%AD%E5%8F%AA%E9%9C%80%E5%90%AF%E5%8A%A8%E4%B8%80%E6%AC%A1%E4%B8%AD%E6%96%AD%E6%8E%A5%E6%94%B6"><span class="nav-number">5.2.</span> <span class="nav-text">改动二：main() 中只需启动一次中断接收</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%94%B9%E5%8A%A8%E4%B8%89%EF%BC%9Awhile-1-%E5%BE%AA%E7%8E%AF%E5%8F%98%E7%A9%BA%E4%BA%86"><span class="nav-number">5.3.</span> <span class="nav-text">改动三：while(1) 循环变空了</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%94%B9%E5%8A%A8%E5%9B%9B%EF%BC%9A%E6%A0%B8%E5%BF%83%E9%80%BB%E8%BE%91%E7%A7%BB%E5%88%B0%E5%9B%9E%E8%B0%83%E5%87%BD%E6%95%B0"><span class="nav-number">5.4.</span> <span class="nav-text">改动四：核心逻辑移到回调函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E5%AF%B9%E6%AF%94%E6%80%BB%E7%BB%93"><span class="nav-number">5.5.</span> <span class="nav-text">函数对比总结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%A5%E5%85%85%EF%BC%9A%E4%BB%80%E4%B9%88%E6%98%AF%E5%9B%9E%E8%B0%83%E5%87%BD%E6%95%B0%EF%BC%9F"><span class="nav-number">6.</span> <span class="nav-text">补充：什么是回调函数？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E4%B8%AA%E7%94%9F%E6%B4%BB%E4%B8%AD%E7%9A%84%E4%BE%8B%E5%AD%90"><span class="nav-number">6.1.</span> <span class="nav-text">一个生活中的例子</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E7%82%B9"><span class="nav-number">6.2.</span> <span class="nav-text">关键点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%92%8C%E8%BD%AE%E8%AF%A2%E6%A8%A1%E5%BC%8F%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">6.3.</span> <span class="nav-text">和轮询模式的对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB%E6%96%B0%E5%A2%9E%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96%E4%BB%A3%E7%A0%81-%E2%80%94%E2%80%94-NVIC-%E4%B8%8E%E4%B8%AD%E6%96%AD%E5%90%91%E9%87%8F"><span class="nav-number">7.</span> <span class="nav-text">解读新增的初始化代码 —— NVIC 与中断向量</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-stm32f1xx-it-c-%E2%80%94%E2%80%94-%E4%B8%AD%E6%96%AD%E6%9C%8D%E5%8A%A1%E5%87%BD%E6%95%B0"><span class="nav-number">7.1.</span> <span class="nav-text">1. stm32f1xx_it.c —— 中断服务函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-stm32f1xx-hal-msp-c-%E2%80%94%E2%80%94-NVIC-%E9%85%8D%E7%BD%AE"><span class="nav-number">7.2.</span> <span class="nav-text">2. stm32f1xx_hal_msp.c —— NVIC 配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E5%9B%9E%E8%B0%83%E5%87%BD%E6%95%B0%E7%9A%84-weak-%E5%BC%B1%E5%AE%9A%E4%B9%89"><span class="nav-number">7.3.</span> <span class="nav-text">3. 回调函数的 __weak 弱定义</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91-%E7%83%A7%E5%BD%95-%E6%B5%8B%E8%AF%95"><span class="nav-number">8.</span> <span class="nav-text">编译 &amp; 烧录 &amp; 测试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BD%AE%E8%AF%A2%E6%A8%A1%E5%BC%8F%E4%B8%8E%E4%B8%AD%E6%96%AD%E6%A8%A1%E5%BC%8F%E5%AF%B9%E6%AF%94"><span class="nav-number">9.</span> <span class="nav-text">轮询模式与中断模式对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E4%BB%A3%E7%A0%81%E7%BB%93%E6%9E%84"><span class="nav-number">10.</span> <span class="nav-text">完整代码结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">11.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">12.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">29</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">33</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">213k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">3:14</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
