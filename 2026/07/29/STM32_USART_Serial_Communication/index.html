@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="前几篇博客学习了GPIO和中断，这篇开始学习串口，通过串口让电脑和STM32&quot;对话&quot;。用电脑串口助手发送指令，控制开发板上红绿蓝三个小灯的亮灭，并且STM32会把收到的指令原样回复回来。这是嵌入式开发中最常用的调试手段，也是理解&quot;人机交互&quot;的第一步。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——串口通信，用电脑控制三色LED">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/29/STM32_USART_Serial_Communication/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="前几篇博客学习了GPIO和中断，这篇开始学习串口，通过串口让电脑和STM32&quot;对话&quot;。用电脑串口助手发送指令，控制开发板上红绿蓝三个小灯的亮灭，并且STM32会把收到的指令原样回复回来。这是嵌入式开发中最常用的调试手段，也是理解&quot;人机交互&quot;的第一步。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_USART_Serial_Communication/image-20260729131113313.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_USART_Serial_Communication/image-20260729135232431.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_USART_Serial_Communication/image-20260729132825021.png">
+<meta property="article:published_time" content="2026-07-29T13:30:00.000Z">
+<meta property="article:modified_time" content="2026-07-29T05:56:51.033Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="USART">
+<meta property="article:tag" content="串口">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_USART_Serial_Communication/image-20260729131113313.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/29/STM32_USART_Serial_Communication/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——串口通信，用电脑控制三色LED | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/29/STM32_USART_Serial_Communication/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——串口通信，用电脑控制三色LED
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-29 13:30:00 / 修改时间：05:56:51" itemprop="dateCreated datePublished" datetime="2026-07-29T13:30:00+00:00">2026-07-29</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>12k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+            <div class="post-description">前几篇博客学习了GPIO和中断，这篇开始学习串口，通过串口让电脑和STM32"对话"。用电脑串口助手发送指令，控制开发板上红绿蓝三个小灯的亮灭，并且STM32会把收到的指令原样回复回来。这是嵌入式开发中最常用的调试手段，也是理解"人机交互"的第一步。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="串口通信基础"><a href="#串口通信基础" class="headerlink" title="串口通信基础"></a>串口通信基础</h3><p>串口（UART，Universal Asynchronous Receiver&#x2F;Transmitter）是嵌入式领域最常用的通信方式之一。它的原理其实很简单——<strong>用两根数据线就能实现两个设备之间的双向通信</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">设备A               设备B</span><br><span class="line"> TX ──────────────── RX</span><br><span class="line"> RX ──────────────── TX</span><br><span class="line"> GND ─────────────── GND</span><br></pre></td></tr></table></figure>
+
+<p>串口通信的几个关键点：</p>
+<table>
+<thead>
+<tr>
+<th align="left">概念</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>TX &#x2F; RX</strong></td>
+<td align="left">发送引脚（Transmit）和接收引脚（Receive），<strong>交叉连接</strong>——A的TX接B的RX，A的RX接B的TX</td>
+</tr>
+<tr>
+<td align="left"><strong>共地（GND）</strong></td>
+<td align="left">两设备的参考地要连在一起，否则电平基准不同，无法正常通信</td>
+</tr>
+<tr>
+<td align="left"><strong>波特率</strong></td>
+<td align="left">每秒传输的比特数，两设备必须设置相同的波特率才能通信，常用值有 9600、115200</td>
+</tr>
+<tr>
+<td align="left"><strong>数据帧</strong></td>
+<td align="left">通常由 1位起始位 + 8位数据位 + 1位停止位 组成，所以每传1字节实际需要10个比特</td>
+</tr>
+</tbody></table>
+<h3 id="开发板硬件连接"><a href="#开发板硬件连接" class="headerlink" title="开发板硬件连接"></a>开发板硬件连接</h3><p>我的 keysking 开发板上，串口转USB芯片（CH340）已经连接到了 USART2，并引出一个 Type-C 口。只需一根 Type-C 数据线（就是手机充电线）插到电脑上，就能同时给板子供电和进行串口通信。</p>
+<p>三个 LED 的连接和之前一样：</p>
+<table>
+<thead>
+<tr>
+<th align="left">LED</th>
+<th align="center">引脚</th>
+<th align="center">控制信号</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">🔴 红色</td>
+<td align="center">PB0</td>
+<td align="center">GPIO 高电平亮</td>
+</tr>
+<tr>
+<td align="left">🟢 绿色</td>
+<td align="center">PA7</td>
+<td align="center">GPIO 高电平亮</td>
+</tr>
+<tr>
+<td align="left">🔵 蓝色</td>
+<td align="center">PA6</td>
+<td align="center">GPIO 高电平亮</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤和前几篇一样，略。</p>
+<h3 id="起手式：配置调试接口"><a href="#起手式：配置调试接口" class="headerlink" title="起手式：配置调试接口"></a>起手式：配置调试接口</h3><p>在 <strong>System Core → SYS</strong> 中，将 <strong>Debug</strong> 设为 <strong>Serial Wire</strong>。</p>
+<h3 id="配置-USART2"><a href="#配置-USART2" class="headerlink" title="配置 USART2"></a>配置 USART2</h3><p>前几篇的工程主要和 GPIO 打交道，这次接触了一个新外设——<strong>USART</strong>（Universal Synchronous&#x2F;Asynchronous Receiver Transmitter，通用同步&#x2F;异步收发器）。</p>
+<p>在 <strong>Connectivity → USART2</strong> 中，将模式设为 <strong>Asynchronous</strong>（异步通信）：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="center">值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Mode</strong></td>
+<td align="center">Asynchronous</td>
+</tr>
+<tr>
+<td align="left"><strong>Baud Rate</strong></td>
+<td align="center">115200</td>
+</tr>
+<tr>
+<td align="left"><strong>Word Length</strong></td>
+<td align="center">8 Bits（含 Parity）</td>
+</tr>
+<tr>
+<td align="left"><strong>Parity</strong></td>
+<td align="center">None</td>
+</tr>
+<tr>
+<td align="left"><strong>Stop Bits</strong></td>
+<td align="center">1</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><img src="/./../images/STM32_USART_Serial_Communication/image-20260729131113313.png" alt="image-20260729131113313"></p>
+</blockquote>
+<p><strong>波特率（Baud Rate）</strong> 是串口通信最关键的参数，它定义了<strong>每秒钟传输多少个比特（bit）</strong>。</p>
+<h3 id="波特率必须一致，否则无法通信"><a href="#波特率必须一致，否则无法通信" class="headerlink" title="波特率必须一致，否则无法通信"></a>波特率必须一致，否则无法通信</h3><p>串口通信是<strong>异步</strong>的——TX 和 RX 之间没有独立的时钟线来同步节奏。那两边怎么对齐”一个比特”的时间长度呢？</p>
+<p>答案就是<strong>波特率</strong>。</p>
+<p>发送端和接收端各自按事先约定好的波特率来”打拍子”：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">发送端（115200波特率）：|   8.68μs   |   8.68μs   |   8.68μs   |   ...</span><br><span class="line">                      比特0   比特1   比特2</span><br><span class="line"></span><br><span class="line">接收端（115200波特率）：|   8.68μs   |   8.68μs   |   8.68μs   |   ...</span><br><span class="line">                      比特0   比特1   比特2</span><br></pre></td></tr></table></figure>
+
+<p>两边都以 115200 的速率采样，就能把每个比特正确解码。</p>
+<p><strong>那如果波特率不一致呢？</strong> 比如发送端是 115200，接收端误设成了 9600：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">发送端（115200）：比特0  比特1  比特2  比特3  比特4  比特5  比特6  比特7</span><br><span class="line">                 | 8.7μs| 8.7μs| 8.7μs| 8.7μs| 8.7μs| 8.7μs| 8.7μs| 8.7μs|</span><br><span class="line">接收端（9600）：  |       104μs       |</span><br></pre></td></tr></table></figure>
+
+<p>接收端一个比特的时间窗口（104μs）比发送端实际发送一个比特的时间（8.7μs）长得多，结果就是——<strong>一个波特率采样周期里吞进了多个比特，解码出来的数据全是乱的</strong>。</p>
+<blockquote>
+<p>实际调试中也很容易遇到这个问题。第一次打开串口助手时，如果收到的不是可读的文字，而是一堆乱七八糟的符号，<strong>先检查波特率是不是设对了</strong>——这是最常犯的错误。</p>
+</blockquote>
+<h3 id="数据帧结构与实际传输速率"><a href="#数据帧结构与实际传输速率" class="headerlink" title="数据帧结构与实际传输速率"></a>数据帧结构与实际传输速率</h3><p>串口传输 1 个字节（8 位数据），实际发出去的并不只是 8 个比特，而是这样的一个<strong>数据帧</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">  起始位        8位数据（从低位到高位）         停止位</span><br><span class="line">     |                                       |</span><br><span class="line">     ↓                                       ↓</span><br><span class="line">  ┌────┬──┬──┬──┬──┬──┬──┬──┬──┬──┬────┐</span><br><span class="line">  │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 1 │</span><br><span class="line">  └────┴──┴──┴──┴──┴──┴──┴──┴──┴──┴────┘</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="left">组成</th>
+<th align="center">长度</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>起始位</strong></td>
+<td align="center">1 bit</td>
+<td align="left">拉低电平，告诉接收端”要开始发了”</td>
+</tr>
+<tr>
+<td align="left"><strong>数据位</strong></td>
+<td align="center">8 bit</td>
+<td align="left">真正的数据（从最低位开始传）</td>
+</tr>
+<tr>
+<td align="left"><strong>停止位</strong></td>
+<td align="center">1 bit</td>
+<td align="left">拉高电平，告诉接收端”这一帧结束了”</td>
+</tr>
+</tbody></table>
+<p>传 1 字节实际需要发 <strong>10 个比特</strong>（1起始 + 8数据 + 1停止）。</p>
+<p>所以 115200 波特率下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">115200 ÷ 10 = 11520 字节/秒</span><br></pre></td></tr></table></figure>
+
+<p>一秒大约能传 1 万多个字节，对于发送几个字节的指令来说绰绰有余。</p>
+<h3 id="常见的波特率"><a href="#常见的波特率" class="headerlink" title="常见的波特率"></a>常见的波特率</h3><table>
+<thead>
+<tr>
+<th align="center">波特率</th>
+<th align="center">每秒理论传输字节数</th>
+<th align="left">适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">9600</td>
+<td align="center">960 字节</td>
+<td align="left">长距离通信、低速设备（GPS模块等）</td>
+</tr>
+<tr>
+<td align="center">38400</td>
+<td align="center">3840 字节</td>
+<td align="left">一般传感器通信</td>
+</tr>
+<tr>
+<td align="center"><strong>115200</strong></td>
+<td align="center">11520 字节</td>
+<td align="left"><strong>最常用</strong>，STM32 调试默认值</td>
+</tr>
+<tr>
+<td align="center">921600</td>
+<td align="center">92160 字节</td>
+<td align="left">高速通信（需短线、低干扰环境）</td>
+</tr>
+</tbody></table>
+<p>115200 是 STM32 学习中最常用的波特率，它足够快，又不会因为线太长或干扰而出错。</p>
+<p>配置完成后，可以看到 PA2（TX）和 PA3（RX）被自动设置为 USART2 的收发引脚。</p>
+<h3 id="配置-LED-引脚（GPIO-输出）"><a href="#配置-LED-引脚（GPIO-输出）" class="headerlink" title="配置 LED 引脚（GPIO 输出）"></a>配置 LED 引脚（GPIO 输出）</h3><p>三个 LED 的 GPIO 配置和之前完全一样：</p>
+<table>
+<thead>
+<tr>
+<th align="center">引脚</th>
+<th align="center">功能</th>
+<th align="center">User Label</th>
+<th align="left">其他参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">PB0</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_RED</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PA7</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_GREEN</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PA6</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_BLUE</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+</tbody></table>
+<h3 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h3><p><strong>Project Manager</strong> 设置：</p>
+<table>
+<thead>
+<tr>
+<th align="left">设置项</th>
+<th align="center">值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Project Name</strong></td>
+<td align="center"><code>Serial</code></td>
+</tr>
+<tr>
+<td align="left"><strong>Toolchain &#x2F; IDE</strong></td>
+<td align="center"><strong>CMake</strong></td>
+</tr>
+</tbody></table>
+<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
+<hr>
+<h2 id="VS-Code-中编写核心代码"><a href="#VS-Code-中编写核心代码" class="headerlink" title="VS Code 中编写核心代码"></a>VS Code 中编写核心代码</h2><h3 id="main-h-中的宏定义"><a href="#main-h-中的宏定义" class="headerlink" title="main.h 中的宏定义"></a>main.h 中的宏定义</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// LED 引脚定义</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_Pin GPIO_PIN_6</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_GPIO_Port GPIOA</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="通信协议设计"><a href="#通信协议设计" class="headerlink" title="通信协议设计"></a>通信协议设计</h3><p>电脑和 STM32 要”聊天”，得先约定好<strong>聊天的格式</strong>——这就是<strong>通信协议</strong>。</p>
+<p>打个比方：你和朋友约好，每次发消息都用 <strong>“人名 + 动作”</strong> 的格式。</p>
+<ul>
+<li><code>张三 去开门</code> → 张三去开门</li>
+<li><code>李四 坐下</code> → 李四坐下</li>
+</ul>
+<p>谁要是发 <code>今天天气真好</code>，对方就听不懂了——因为不符合约定的格式。</p>
+<p>串口通信也是一样的道理。串口只负责把字节从 A 传到 B，它不管这些字节是什么意思。<strong>意思是我们自己约定的。</strong></p>
+<p>这个项目中，我规定电脑发给 STM32 的每条指令都是 <strong>2个字节</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="center">字节顺序</th>
+<th align="left">含义</th>
+<th align="center">取值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><strong>第1个字节</strong></td>
+<td align="left">选择哪个小灯</td>
+<td align="center"><code>R</code>（红色）、<code>G</code>（绿色）、<code>B</code>（蓝色）</td>
+</tr>
+<tr>
+<td align="center"><strong>第2个字节</strong></td>
+<td align="left">开还是关</td>
+<td align="center"><code>0</code>（关闭）、<code>1</code>（打开）</td>
+</tr>
+</tbody></table>
+<p>例如：</p>
+<ul>
+<li>发 <code>R1</code> → STM32 拆开看：第1字节是 <code>R</code>（红色灯），第2字节是 <code>1</code>（打开）→ 红色灯亮</li>
+<li>发 <code>G0</code> → 第1字节是 <code>G</code>（绿色灯），第2字节是 <code>0</code>（关闭）→ 绿色灯灭</li>
+<li>发 <code>B1</code> → 蓝色灯亮</li>
+</ul>
+<p><strong>同时，STM32 收到指令后，会把收到的 2 个字节原样发回电脑</strong>，作为”我收到了”的确认。</p>
+<blockquote>
+<p><code>receiveData</code> 数组设成 <code>uint8_t receiveData[2]</code>，就是因为协议规定一条指令刚好 2 个字节，多一个少一个都不行。</p>
+</blockquote>
+<h3 id="main-c-核心代码"><a href="#main-c-核心代码" class="headerlink" title="main.c 核心代码"></a>main.c 核心代码</h3><p>打开 <code>main.c</code>，在 <code>USER CODE BEGIN 2</code> 中定义接收缓冲区：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"><span class="comment">// 存放接收数据的数组（协议规定指令长度为2字节）</span></span><br><span class="line"><span class="type">uint8_t</span> receiveData[<span class="number">2</span>];</span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
+
+<p>然后在 <code>while(1)</code> 中编写主逻辑：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">// 1. 等待接收2字节指令（阻塞模式）</span></span><br><span class="line">  HAL_UART_Receive(&amp;huart2, receiveData, <span class="number">2</span>, HAL_MAX_DELAY);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 2. 将收到的指令原样回复给电脑</span></span><br><span class="line">  HAL_UART_Transmit(&amp;huart2, receiveData, <span class="number">2</span>, <span class="number">100</span>);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 3. 设置小灯亮灭状态变量</span></span><br><span class="line">  GPIO_PinState state = GPIO_PIN_SET;           <span class="comment">// 默认高电平（亮）</span></span><br><span class="line">  <span class="keyword">if</span> (receiveData[<span class="number">1</span>] == <span class="string">&#x27;0&#x27;</span>)                    <span class="comment">// 如果第二字节是&#x27;0&#x27;</span></span><br><span class="line">  &#123;</span><br><span class="line">      state = GPIO_PIN_RESET;                   <span class="comment">// 改为低电平（灭）</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 4. 根据第一字节选择控制哪个小灯</span></span><br><span class="line">  <span class="keyword">switch</span> (receiveData[<span class="number">0</span>])</span><br><span class="line">  &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;R&#x27;</span>:</span><br><span class="line">          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;G&#x27;</span>:</span><br><span class="line">          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, state);</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;B&#x27;</span>:</span><br><span class="line">          HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, state);</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 3 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h3><p><strong>用到的HAL函数：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_UART_Receive(&amp;huart2, buffer, size, timeout)</code></td>
+<td align="left">STM32从串口2接收指定字节数的数据</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_UART_Transmit(&amp;huart2, buffer, size, timeout)</code></td>
+<td align="left">STM32从串口2发送指定字节数的数据</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_GPIO_WritePin(port, pin, state)</code></td>
+<td align="left">老朋友了，设置GPIO输出电平</td>
+</tr>
+</tbody></table>
+<p><strong>四个参数的详解（以 <code>HAL_UART_Receive</code> 为例）：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="center">本项目中填的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>串口句柄指针</strong></td>
+<td align="left">操作哪个串口</td>
+<td align="center"><code>&amp;huart2</code>（USART2的地址，取地址符不能忘）</td>
+</tr>
+<tr>
+<td align="left"><strong>数据缓冲区指针</strong></td>
+<td align="left">接收到的数据存到哪里</td>
+<td align="center"><code>receiveData</code>（数组名本身就是指针）</td>
+</tr>
+<tr>
+<td align="left"><strong>接收长度</strong></td>
+<td align="left">要接收多少个字节</td>
+<td align="center"><code>2</code>（我们规定一条指令就是2字节，所以只收2个）</td>
+</tr>
+<tr>
+<td align="left"><strong>超时时间</strong></td>
+<td align="left">等多久没收到就放弃</td>
+<td align="center"><code>HAL_MAX_DELAY</code>（无限等待，直到收到数据）</td>
+</tr>
+</tbody></table>
+<p><strong>核心逻辑：</strong></p>
+<ol>
+<li><p><strong>阻塞接收</strong>——<code>HAL_UART_Receive</code> 会一直等待，直到收到2字节数据才往下执行。这是串口的<strong>轮询模式</strong>（也叫阻塞模式），代码简单直接，但缺点是一旦收不到数据，程序就卡在这了。</p>
+</li>
+<li><p><strong>数据回显</strong>——收到后立刻用 <code>HAL_UART_Transmit</code> 发回电脑。这在调试时非常有用——看到回声，就说明通信链路是通的。</p>
+</li>
+<li><p><strong>指令解析</strong>——判断第二字节 <code>receiveData[1]</code> 是 <code>&#39;0&#39;</code> 还是 <code>&#39;1&#39;</code>，来决定 <code>state</code> 是 <code>GPIO_PIN_RESET</code> 还是 <code>GPIO_PIN_SET</code>。</p>
+</li>
+<li><p><strong>开关控制</strong>——用 <code>switch</code> 根据第一字节决定控制哪个引脚，把 <code>state</code> 写进去。</p>
+</li>
+</ol>
+<hr>
+<h2 id="解读-MX-USART2-UART-Init-——-USART-的配置代码"><a href="#解读-MX-USART2-UART-Init-——-USART-的配置代码" class="headerlink" title="解读 MX_USART2_UART_Init —— USART 的配置代码"></a>解读 MX_USART2_UART_Init —— USART 的配置代码</h2><p>回到 CubeMX 生成的代码，看看 USART2 到底是怎么被初始化的。这个函数在 <code>main.c</code> 中，<code>main()</code> 里调用 <code>MX_USART2_UART_Init()</code> 完成串口配置。</p>
+<p>来看它的实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_USART2_UART_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    huart2.Instance = USART2;                              <span class="comment">// (1)</span></span><br><span class="line">    huart2.Init.BaudRate = <span class="number">115200</span>;                         <span class="comment">// (2)</span></span><br><span class="line">    huart2.Init.WordLength = UART_WORDLENGTH_8B;           <span class="comment">// (3)</span></span><br><span class="line">    huart2.Init.StopBits = UART_STOPBITS_1;                <span class="comment">// (4)</span></span><br><span class="line">    huart2.Init.Parity = UART_PARITY_NONE;                 <span class="comment">// (5)</span></span><br><span class="line">    huart2.Init.Mode = UART_MODE_TX_RX;                    <span class="comment">// (6)</span></span><br><span class="line">    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;           <span class="comment">// (7)</span></span><br><span class="line">    huart2.Init.OverSampling = UART_OVERSAMPLING_16;       <span class="comment">// (8)</span></span><br><span class="line">    <span class="keyword">if</span> (HAL_UART_Init(&amp;huart2) != HAL_OK)</span><br><span class="line">    &#123;</span><br><span class="line">        Error_Handler();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>先认识一个重要的结构体：<code>huart2</code></strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">UART_HandleTypeDef huart2;</span><br></pre></td></tr></table></figure>
+
+<p><code>huart2</code> 是一个<strong>串口句柄（Handle）</strong>，可以理解为 USART2 这个外设的”身份证”。</p>
+<p>它身上挂了一堆信息：</p>
+<ul>
+<li><strong>是哪个串口</strong>（<code>Instance</code> 指向 USART2 的寄存器基地址）</li>
+<li><strong>配置参数</strong>（波特率、数据格式等都在 <code>Init</code> 结构体里）</li>
+<li><strong>运行状态</strong>（发送&#x2F;接收过程中用到的缓存、标志位等）</li>
+</ul>
+<p>后面所有操作 USART2 的 HAL 函数，第一个参数都要传 <code>&amp;huart2</code>——就是要这张”身份证”来告诉函数”你操作的是 USART2”。</p>
+<p><strong>逐行解析：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="center">行</th>
+<th align="left">代码</th>
+<th align="center">对应 CubeMX 配置</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">(1)</td>
+<td align="left"><code>.Instance = USART2</code></td>
+<td align="center">（自动）</td>
+<td align="left">告诉 HAL 库要操作的是 USART2 这个外设，不是 USART1 或 USART3。<code>Instance</code> 指向 USART2 的寄存器基地址（<code>0x40004400</code>）</td>
+</tr>
+<tr>
+<td align="center">(2)</td>
+<td align="left"><code>.BaudRate = 115200</code></td>
+<td align="center">Baud Rate 下拉框</td>
+<td align="left">设置波特率。CubeMX 会根据你选的数值算出分频系数，写入串口的波特率寄存器（USART_BRR）。我们在前面花了大篇幅讲波特率，这里就是把这个数值落实到代码里</td>
+</tr>
+<tr>
+<td align="center">(3)</td>
+<td align="left"><code>.WordLength = UART_WORDLENGTH_8B</code></td>
+<td align="center">Word Length 下拉框</td>
+<td align="left">一帧数据中<strong>数据位</strong>的长度。<code>UART_WORDLENGTH_8B</code> 表示 8 位数据。还有 <code>UART_WORDLENGTH_9B</code>（9位），但 8 位最常用</td>
+</tr>
+<tr>
+<td align="center">(4)</td>
+<td align="left"><code>.StopBits = UART_STOPBITS_1</code></td>
+<td align="center">Stop Bits 下拉框</td>
+<td align="left">停止位长度。<code>UART_STOPBITS_1</code> &#x3D; 1 位停止位。还有 0.5 位、2 位等选项，但标准 UART 通信通常就是 1 位</td>
+</tr>
+<tr>
+<td align="center">(5)</td>
+<td align="left"><code>.Parity = UART_PARITY_NONE</code></td>
+<td align="center">Parity 下拉框</td>
+<td align="left">校验位——用于检测数据传输是否出错。<code>NONE</code> 表示不启用校验。还有 <code>UART_PARITY_EVEN</code>（偶校验）和 <code>UART_PARITY_ODD</code>（奇校验）</td>
+</tr>
+<tr>
+<td align="center">(6)</td>
+<td align="left"><code>.Mode = UART_MODE_TX_RX</code></td>
+<td align="center">（自动）</td>
+<td align="left">开启收发双工。<code>UART_MODE_TX_RX</code> &#x3D; 同时支持发送和接收。如果只发不收，可以设 <code>UART_MODE_TX</code></td>
+</tr>
+<tr>
+<td align="center">(7)</td>
+<td align="left"><code>.HwFlowCtl = UART_HWCONTROL_NONE</code></td>
+<td align="center">（默认）</td>
+<td align="left">硬件流控制——是否额外用 RTS&#x2F;CTS 引脚来控制数据流。简单的 TTL 串口不需要，设为 <code>NONE</code></td>
+</tr>
+<tr>
+<td align="center">(8)</td>
+<td align="left"><code>.OverSampling = UART_OVERSAMPLING_16</code></td>
+<td align="center">（默认）</td>
+<td align="left">过采样率——接收端用多快的频率去采样 RX 引脚上的电平。16 倍过采样意味着每个比特采 16 次，抗干扰能力强</td>
+</tr>
+</tbody></table>
+<p><strong>（3）（4）（5）合起来构成了数据帧格式</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">起始位(1) + 数据位(8) + 校验位(无) + 停止位(1) = 一帧共10比特</span><br></pre></td></tr></table></figure>
+
+<p>这就是我们之前在”数据帧结构”部分讲到的 UART 帧格式——CubeMX 里的取值，最终通过这里写进了代码。</p>
+<p><strong><code>HAL_UART_Init</code> 内部做了什么？</strong></p>
+<p><code>HAL_UART_Init</code> 拿到 <code>huart2</code> 结构体后，会做三件核心的事：</p>
+<ol>
+<li><strong>复位 USART2</strong>——把 USART2 的寄存器恢复到默认状态</li>
+<li><strong>配置 USART2 的寄存器</strong>——根据 <code>huart2.Init</code> 里的参数，计算对应的分频系数、帧格式等，写入 USART2 的寄存器（<code>USART_BRR</code>、<code>USART_CR1</code>、<code>USART_CR2</code>、<code>USART_CR3</code>）</li>
+<li><strong>开启 USART2</strong>——使能 USART2 外设，让它开始工作</li>
+</ol>
+<blockquote>
+<p>如果以后想脱离 CubeMX 手写串口配置，本质上就是把上面那 8 行初始化代码，直接翻译成寄存器的读写操作。</p>
+</blockquote>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-引脚配置与复用功能"><a href="#解读-MX-GPIO-Init-——-引脚配置与复用功能" class="headerlink" title="解读 MX_GPIO_Init —— 引脚配置与复用功能"></a>解读 MX_GPIO_Init —— 引脚配置与复用功能</h2><p><code>MX_GPIO_Init()</code> 不只配置了三个 LED 引脚，还配置了 USART2 的 TX&#x2F;RX 引脚（PA2、PA3）。不过 TX&#x2F;RX 的配置不是在 GPIO_Init 里显式写的，而是由 <code>HAL_UART_Init</code> 内部自动完成的——这是因为 USART2 的 TX&#x2F;RX 引脚是<strong>复用功能（Alternate Function）</strong>，不是普通的 GPIO。</p>
+<h3 id="先看-LED-引脚的配置"><a href="#先看-LED-引脚的配置" class="headerlink" title="先看 LED 引脚的配置"></a>先看 LED 引脚的配置</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable — 打开 GPIO 时钟 */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();       <span class="comment">// 给 GPIOA 供时钟（PA6、PA7、PA2、PA3）</span></span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();       <span class="comment">// 给 GPIOB 供时钟（PB0）</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始电平：LED 全部默认熄灭 */</span></span><br><span class="line">    HAL_GPIO_WritePin(GPIOA, LED_BLUE_Pin | LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_BLUE + LED_GREEN（都在 GPIOA 上，可以一次配置） */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_BLUE_Pin | LED_GREEN_Pin;   <span class="comment">// PA6 | PA7</span></span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;             <span class="comment">// 推挽输出</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;                     <span class="comment">// 无上下拉</span></span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;            <span class="comment">// 低速</span></span><br><span class="line">    HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED（在 GPIOB 上，要分开配置） */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;                      <span class="comment">// PB0</span></span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这部分和之前流水灯博客里的 GPIO 配置完全一样，不再重复解释。值得注意的新东西只有两个：</p>
+<p><strong>为什么 GPIOA 上的两个 LED 可以一次配完？</strong></p>
+<p><code>HAL_GPIO_Init</code> 的 <code>Pin</code> 成员支持<strong>按位或组合</strong>多个引脚：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GPIO_InitStruct.Pin = LED_BLUE_Pin | LED_GREEN_Pin;  <span class="comment">// = GPIO_PIN_6 | GPIO_PIN_7</span></span><br></pre></td></tr></table></figure>
+
+<p>因为 <code>GPIO_PIN_6</code> 是 <code>0x0040</code>，<code>GPIO_PIN_7</code> 是 <code>0x0080</code>，按位或后得到 <code>0x00C0</code>。<code>HAL_GPIO_Init</code> 内部会逐个检查这些位，把所有对应的引脚都配成同样的参数。</p>
+<p>但如果引脚分布在不同的 GPIO 端口（比如 PA6 在 GPIOA，PB0 在 GPIOB），就必须分开配置，因为每次调用 <code>HAL_GPIO_Init</code> 的第二个参数是指定端口的。</p>
+<h3 id="USART2-的-TX-RX-引脚是怎么配置的？"><a href="#USART2-的-TX-RX-引脚是怎么配置的？" class="headerlink" title="USART2 的 TX&#x2F;RX 引脚是怎么配置的？"></a>USART2 的 TX&#x2F;RX 引脚是怎么配置的？</h3><p>观察芯片原理图会发现，USART2 的 TX 和 RX 分别占用 <strong>PA2</strong> 和 <strong>PA3</strong>。<img src="/./../images/STM32_USART_Serial_Communication/image-20260729135232431.png" alt="image-20260729135232431"></p>
+<p>但在 <code>MX_GPIO_Init</code> 里，并没有看到配置 PA2 和 PA3 的代码。那它们是怎么变成串口引脚的呢？</p>
+<p>关键在 <code>HAL_UART_Init(&amp;huart2)</code> 内部——它调用了一个更底层的函数 <code>HAL_UART_MspInit()</code>（MSP &#x3D; MCU Support Package），这个函数在 <code>stm32f1xx_hal_msp.c</code> 中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_UART_MspInit</span><span class="params">(UART_HandleTypeDef* huart)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (huart-&gt;Instance == USART2) &#123;</span><br><span class="line">        <span class="comment">/* 使能 USART2 时钟 */</span></span><br><span class="line">        __HAL_RCC_USART2_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 配置 PA2(TX) 为复用推挽输出 */</span></span><br><span class="line">        GPIO_InitStruct.Pin = GPIO_PIN_2;</span><br><span class="line">        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;       <span class="comment">// ← 复用推挽输出</span></span><br><span class="line">        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;</span><br><span class="line">        HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 配置 PA3(RX) 为复用浮空输入 */</span></span><br><span class="line">        GPIO_InitStruct.Pin = GPIO_PIN_3;</span><br><span class="line">        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;        <span class="comment">// ← 浮空输入</span></span><br><span class="line">        GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">        HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码会在 <code>HAL_UART_Init</code> 中被自动调用。这里出现了前几篇没见过的新模式——**<code>GPIO_MODE_AF_PP</code>（复用推挽输出）**。</p>
+<table>
+<thead>
+<tr>
+<th align="left">模式</th>
+<th align="left">含义</th>
+<th align="left">什么时候用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td align="left">普通推挽输出</td>
+<td align="left">直接控制 LED 这类外设</td>
+</tr>
+<tr>
+<td align="left"><code>GPIO_MODE_AF_PP</code></td>
+<td align="left"><strong>复用功能</strong>推挽输出</td>
+<td align="left">引脚的<strong>控制权交给片上外设</strong>（如 USART 的 TX 引脚）</td>
+</tr>
+<tr>
+<td align="left"><code>GPIO_MODE_INPUT</code></td>
+<td align="left">普通浮空输入</td>
+<td align="left">读取外部信号（如按键、USART 的 RX 引脚）</td>
+</tr>
+</tbody></table>
+<p>普通输出和复用输出的区别：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">普通输出（OUTPUT_PP）：</span><br><span class="line">    CPU → GPIO 输出数据寄存器 → 引脚</span><br><span class="line">         你可以用 WritePin 直接控制</span><br><span class="line"></span><br><span class="line">复用输出（AF_PP）：</span><br><span class="line">    CPU → USART 发送寄存器 → USART 硬件自动控制 → 引脚</span><br><span class="line">         引脚交给 USART 外设管理，不需要你手动 WritePin</span><br></pre></td></tr></table></figure>
+
+<p>对于 USART2 的 TX 引脚（PA2），它发送数据的时机和数据内容都是由 USART 外设硬件决定的，不是由 CPU 用 <code>HAL_GPIO_WritePin</code> 控制的。所以必须配成 <code>AF_PP</code>，把引脚的控制权”让渡”给 USART 外设。</p>
+<p>RX 引脚（PA3）同理——它负责接收外部信号到 USART 接收寄存器，所以配成普通的输入模式，让 USART 可以读取引脚电平。</p>
+<blockquote>
+<p><strong>这就是 GPIO 的复用功能（Alternate Function）</strong>——同一个引脚，在不同配置下可以属于不同的片上外设。配成普通 GPIO 时，你可以用 WritePin&#x2F;ReadPin 控制它；配成 AF 时，它归某个外设管。这也是为什么从这篇开始，CubeMX 需要配置 Debug 模式为 Serial Wire——因为一旦开启了 USART 的复用功能，就会影响到 SWD 调试引脚的相关配置。</p>
+</blockquote>
+<h3 id="配置参数的对应关系总结"><a href="#配置参数的对应关系总结" class="headerlink" title="配置参数的对应关系总结"></a>配置参数的对应关系总结</h3><p>把 CubeMX 里的配置和生成的代码对应起来：</p>
+<table>
+<thead>
+<tr>
+<th align="left">CubeMX 设置</th>
+<th align="left">出现在哪个函数</th>
+<th align="left">底层操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">USART2 Mode &#x3D; Asynchronous</td>
+<td align="left"><code>MX_USART2_UART_Init</code></td>
+<td align="left">USART_CR1 寄存器的 UE、TE、RE 位</td>
+</tr>
+<tr>
+<td align="left">Baud Rate &#x3D; 115200</td>
+<td align="left"><code>MX_USART2_UART_Init</code></td>
+<td align="left">计算分频系数 → 写入 USART_BRR 寄存器</td>
+</tr>
+<tr>
+<td align="left">PA2 (TX)</td>
+<td align="left"><code>HAL_UART_MspInit</code></td>
+<td align="left">GPIOA_CRL 寄存器，配置为 AF_PP</td>
+</tr>
+<tr>
+<td align="left">PA3 (RX)</td>
+<td align="left"><code>HAL_UART_MspInit</code></td>
+<td align="left">GPIOA_CRL 寄存器，配置为 输入模式</td>
+</tr>
+<tr>
+<td align="left">LED_RED (PB0)</td>
+<td align="left"><code>MX_GPIO_Init</code></td>
+<td align="left">GPIOB_CRL 寄存器，配置为 推挽输出 50MHz</td>
+</tr>
+</tbody></table>
+<p>这就是上面”三步学习路径”中的第二步——<strong>解析 CubeMX 生成的代码，理解每个配置对应到代码里的什么位置、写到了什么寄存器</strong>。走完这一步，即使哪天没有 CubeMX，你也能手写这些初始化代码。</p>
+<hr>
+<h3 id="常见编译警告及处理"><a href="#常见编译警告及处理" class="headerlink" title="常见编译警告及处理"></a>常见编译警告及处理</h3><p>如果你直接编译，可能会遇到几个警告，这是 CubeMX 生成代码时常见的情况：</p>
+<p><strong>警告1：<code>strlen</code> 未声明</strong></p>
+<p>如果你在测试发送功能时写了类似 <code>strlen(message)</code> 的代码，编译器会提示 <code>strlen</code> 未声明。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span>   <span class="comment">// strlen 在这个头文件中</span></span></span><br></pre></td></tr></table></figure>
+
+<p><strong>警告2：类型不匹配</strong></p>
+<p><code>HAL_UART_Transmit</code> 的第二个参数要求 <code>uint8_t*</code> 类型，但如果你传了一个 <code>char*</code> 数组，会有类型不匹配的警告：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 错误写法</span></span><br><span class="line"><span class="type">char</span> message[] = <span class="string">&quot;Hello World&quot;</span>;</span><br><span class="line">HAL_UART_Transmit(&amp;huart2, message, <span class="built_in">strlen</span>(message), <span class="number">100</span>);  <span class="comment">// 类型警告</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 正确写法：强转</span></span><br><span class="line">HAL_UART_Transmit(&amp;huart2, (<span class="type">uint8_t</span>*)message, <span class="built_in">strlen</span>(message), <span class="number">100</span>);</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>实际上 char 和 uint8_t 在底层都是 8 位数据，类型不同只是因为语义不同——不转换也能运行，但编译器会警告。养成强转的习惯，对代码严谨性有好处。</p>
+</blockquote>
+<h3 id="硬件连接"><a href="#硬件连接" class="headerlink" title="硬件连接"></a>硬件连接</h3><p>代码写完后，还需要把 STM32 和电脑连接起来。</p>
+<p>keysking 学习板已经集成了串口转 USB 芯片（CH340），连接到了 USART2，并引出了一个 Type-C 接口。所以只需要：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">开发板 Type-C 口  ←→  电脑 USB 口（用手机数据线）</span><br></pre></td></tr></table></figure>
+
+<p>如果是使用其他开发板（比如最小系统板），则需要额外的 <strong>USB转TTL模块</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">STM32 TX (PA2)  ←→  模块 RX</span><br><span class="line">STM32 RX (PA3)  ←→  模块 TX</span><br><span class="line">STM32 GND       ←→  模块 GND</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="串口助手的使用"><a href="#串口助手的使用" class="headerlink" title="串口助手的使用"></a>串口助手的使用</h2><p>要让电脑和 STM32 通信，还需要一个<strong>串口调试助手</strong>。这里使用的是 keysking 开发的<a target="_blank" rel="noopener" href="https://carea.keysking.com/">波特律动串口助手</a>（网页版，免安装，非常方便）。</p>
+<p>连接步骤：</p>
+<ol>
+<li><p><strong>选择串口</strong>——在串口助手中点击”选择串口”，找到对应的 COM 口</p>
+<ul>
+<li>学习板用户选择 <code>USB Serial</code>（CH340）</li>
+<li>不确定是哪个的话，可以插拔数据线，看哪个选项随之出现&#x2F;消失</li>
+</ul>
+</li>
+<li><p><strong>设置波特率</strong>——设为 <strong>115200</strong>（与代码中的设置一致）</p>
+</li>
+<li><p><strong>设置显示模式</strong>——将接收显示模式设为 <strong>ASK</strong>（文本模式），否则默认的 Hex 模式会显示一堆十六进制数</p>
+</li>
+</ol>
+<blockquote>
+<p>如果找不到串口，说明需要安装相关的串口驱动。</p>
+<p>可以在波特律动串口助手界面左下角，点击三横线的按钮，找到常见驱动下载</p>
+<p><img src="/./../images/STM32_USART_Serial_Communication/image-20260729132825021.png" alt="image-20260729132825021"></p>
+</blockquote>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
+<li>连接 ST-Link，点击<strong>运行和调试</strong> → 选择 STM32Cube:STM32 Launch STLink GDB Server</li>
+<li>点击<strong>继续</strong>按钮，程序开始运行</li>
+</ol>
+<blockquote>
+<p>如果遇到烧录问题，检查 Debug 模式是否设为了 Serial Wire。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后，在串口助手的发送区输入：</p>
+<table>
+<thead>
+<tr>
+<th align="center">发送内容</th>
+<th align="center">效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>R1</code></td>
+<td align="center">🔴 红色小灯亮起</td>
+</tr>
+<tr>
+<td align="center"><code>R0</code></td>
+<td align="center">🔴 红色小灯熄灭</td>
+</tr>
+<tr>
+<td align="center"><code>G1</code></td>
+<td align="center">🟢 绿色小灯亮起</td>
+</tr>
+<tr>
+<td align="center"><code>G0</code></td>
+<td align="center">🟢 绿色小灯熄灭</td>
+</tr>
+<tr>
+<td align="center"><code>B1</code></td>
+<td align="center">🔵 蓝色小灯亮起</td>
+</tr>
+<tr>
+<td align="center"><code>B0</code></td>
+<td align="center">🔵 蓝色小灯熄灭</td>
+</tr>
+</tbody></table>
+<p>同时，串口助手的接收区会显示 STM32 返回的指令内容（回显）。</p>
+<blockquote>
+<p>效果展示视频：</p>
+<p><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1NV3y6YEYv/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1NV3y6YEYv/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+</blockquote>
+<hr>
+<h2 id="轮询模式的局限性"><a href="#轮询模式的局限性" class="headerlink" title="轮询模式的局限性"></a>轮询模式的局限性</h2><p>当前代码使用的是串口的<strong>轮询模式</strong>（阻塞模式），这种模式有明显的缺点：</p>
+<ol>
+<li><strong><code>HAL_UART_Receive</code> 会卡住程序</strong>——在收到数据之前，main loop 里后面的代码全都不执行</li>
+<li><strong>接收固定长度</strong>——必须收到恰好 2 字节才能继续，如果电脑发了 3 个字节，第三个字节就留在缓冲区里了</li>
+<li><strong>无法处理多任务</strong>——如果还想同时做其他事（比如检测按键），就做不到了</li>
+</ol>
+<p>解决方法——<strong>中断模式</strong>和 <strong>DMA 模式</strong>，会在后面的博客中学习。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次项目是 STM32 学习路上的一个重要里程碑——从”板子自己玩”进步到”板子和电脑对话”。</p>
+<table>
+<thead>
+<tr>
+<th align="left">新知识点</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>USART 外设配置</strong></td>
+<td align="left">CubeMX 中配置串口的波特率、数据格式等参数</td>
+</tr>
+<tr>
+<td align="left"><strong><code>HAL_UART_Receive</code> &#x2F; <code>HAL_UART_Transmit</code></strong></td>
+<td align="left">串口收发的 HAL 函数，阻塞模式</td>
+</tr>
+<tr>
+<td align="left"><strong>通信协议设计</strong></td>
+<td align="left">定义 PC 和 STM32 之间的指令格式</td>
+</tr>
+<tr>
+<td align="left"><strong>串口助手</strong></td>
+<td align="left">调试串口通信的必备工具</td>
+</tr>
+<tr>
+<td align="left"><strong>回显机制</strong></td>
+<td align="left">收到数据立即发回，确认通信正常</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a target="_blank" rel="noopener" href="https://carea.keysking.com/">波特律动串口助手</a></li>
+<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入控制小灯亮灭</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/USART/" rel="tag"># USART</a>
+              <a href="/tags/%E4%B8%B2%E5%8F%A3/" rel="tag"># 串口</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/28/STM32_EXTI_Deep_Dive/" rel="prev" title="STM32——深入外部中断硬件原理">
+      <i class="fa fa-chevron-left"></i> STM32——深入外部中断硬件原理
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E5%8E%9F%E7%90%86"><span class="nav-number">1.</span> <span class="nav-text">硬件原理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%B2%E5%8F%A3%E9%80%9A%E4%BF%A1%E5%9F%BA%E7%A1%80"><span class="nav-number">1.1.</span> <span class="nav-text">串口通信基础</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%80%E5%8F%91%E6%9D%BF%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5"><span class="nav-number">1.2.</span> <span class="nav-text">开发板硬件连接</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E9%85%8D%E7%BD%AE"><span class="nav-number">2.</span> <span class="nav-text">CubeMX 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E5%BB%BA%E9%A1%B9%E7%9B%AE"><span class="nav-number">2.1.</span> <span class="nav-text">新建项目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B5%B7%E6%89%8B%E5%BC%8F%EF%BC%9A%E9%85%8D%E7%BD%AE%E8%B0%83%E8%AF%95%E6%8E%A5%E5%8F%A3"><span class="nav-number">2.2.</span> <span class="nav-text">起手式：配置调试接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-USART2"><span class="nav-number">2.3.</span> <span class="nav-text">配置 USART2</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B3%A2%E7%89%B9%E7%8E%87%E5%BF%85%E9%A1%BB%E4%B8%80%E8%87%B4%EF%BC%8C%E5%90%A6%E5%88%99%E6%97%A0%E6%B3%95%E9%80%9A%E4%BF%A1"><span class="nav-number">2.4.</span> <span class="nav-text">波特率必须一致，否则无法通信</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%B8%A7%E7%BB%93%E6%9E%84%E4%B8%8E%E5%AE%9E%E9%99%85%E4%BC%A0%E8%BE%93%E9%80%9F%E7%8E%87"><span class="nav-number">2.5.</span> <span class="nav-text">数据帧结构与实际传输速率</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E7%9A%84%E6%B3%A2%E7%89%B9%E7%8E%87"><span class="nav-number">2.6.</span> <span class="nav-text">常见的波特率</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-LED-%E5%BC%95%E8%84%9A%EF%BC%88GPIO-%E8%BE%93%E5%87%BA%EF%BC%89"><span class="nav-number">2.7.</span> <span class="nav-text">配置 LED 引脚（GPIO 输出）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%9F%E6%88%90%E4%BB%A3%E7%A0%81"><span class="nav-number">2.8.</span> <span class="nav-text">生成代码</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VS-Code-%E4%B8%AD%E7%BC%96%E5%86%99%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">3.</span> <span class="nav-text">VS Code 中编写核心代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#main-h-%E4%B8%AD%E7%9A%84%E5%AE%8F%E5%AE%9A%E4%B9%89"><span class="nav-number">3.1.</span> <span class="nav-text">main.h 中的宏定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE%E8%AE%BE%E8%AE%A1"><span class="nav-number">3.2.</span> <span class="nav-text">通信协议设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#main-c-%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">3.3.</span> <span class="nav-text">main.c 核心代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E8%AE%B2%E8%A7%A3"><span class="nav-number">3.4.</span> <span class="nav-text">代码讲解</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB-MX-USART2-UART-Init-%E2%80%94%E2%80%94-USART-%E7%9A%84%E9%85%8D%E7%BD%AE%E4%BB%A3%E7%A0%81"><span class="nav-number">4.</span> <span class="nav-text">解读 MX_USART2_UART_Init —— USART 的配置代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB-MX-GPIO-Init-%E2%80%94%E2%80%94-%E5%BC%95%E8%84%9A%E9%85%8D%E7%BD%AE%E4%B8%8E%E5%A4%8D%E7%94%A8%E5%8A%9F%E8%83%BD"><span class="nav-number">5.</span> <span class="nav-text">解读 MX_GPIO_Init —— 引脚配置与复用功能</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%88%E7%9C%8B-LED-%E5%BC%95%E8%84%9A%E7%9A%84%E9%85%8D%E7%BD%AE"><span class="nav-number">5.1.</span> <span class="nav-text">先看 LED 引脚的配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#USART2-%E7%9A%84-TX-RX-%E5%BC%95%E8%84%9A%E6%98%AF%E6%80%8E%E4%B9%88%E9%85%8D%E7%BD%AE%E7%9A%84%EF%BC%9F"><span class="nav-number">5.2.</span> <span class="nav-text">USART2 的 TX&#x2F;RX 引脚是怎么配置的？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E5%8F%82%E6%95%B0%E7%9A%84%E5%AF%B9%E5%BA%94%E5%85%B3%E7%B3%BB%E6%80%BB%E7%BB%93"><span class="nav-number">5.3.</span> <span class="nav-text">配置参数的对应关系总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E7%BC%96%E8%AF%91%E8%AD%A6%E5%91%8A%E5%8F%8A%E5%A4%84%E7%90%86"><span class="nav-number">5.4.</span> <span class="nav-text">常见编译警告及处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5"><span class="nav-number">5.5.</span> <span class="nav-text">硬件连接</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%B2%E5%8F%A3%E5%8A%A9%E6%89%8B%E7%9A%84%E4%BD%BF%E7%94%A8"><span class="nav-number">6.</span> <span class="nav-text">串口助手的使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91-%E7%83%A7%E5%BD%95"><span class="nav-number">7.</span> <span class="nav-text">编译 &amp; 烧录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E5%B1%95%E7%A4%BA"><span class="nav-number">8.</span> <span class="nav-text">效果展示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BD%AE%E8%AF%A2%E6%A8%A1%E5%BC%8F%E7%9A%84%E5%B1%80%E9%99%90%E6%80%A7"><span class="nav-number">9.</span> <span class="nav-text">轮询模式的局限性</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">11.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">28</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">33</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">204k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">3:05</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
