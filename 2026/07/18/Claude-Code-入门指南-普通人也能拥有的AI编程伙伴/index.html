@@ -22,12 +22,12 @@
     var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="最近 Kimi 新出的 K3 模型很火，也很强。我研究之后发现，虽然它确实很强，但它很昂贵，很慢。在它开源降价提速前，我认为，对大多数人来说，它暂时还不是一个非常实用的选择。所以我认为Claude Code + DeepSeek V4是目前性价比最高、大部分人真正需要且能用上的组合：速度快（Flash 模型基本秒回），价格便宜（充十块钱能用很久），而且人人都能轻松上手。在这篇文章里，我尝试教你如何">
+  <meta name="description" content="最近 Kimi 新出的 K3 模型很火。我研究之后发现，它确实很强，但它很昂贵，很慢。在它开源降价提速前，对大多数人来说，它可能暂时还不是一个非常实用的选择。所以我认为Claude Code + DeepSeek V4是目前性价比最高、大部分人真正需要且能用上的组合：速度快，Flash 模型基本秒回，价格便宜，充十块钱能用很久，而且人人都能轻松上手。在这篇文章里，我会尝试教你如何从零开始，一步一步">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Claude Code 入门指南 —— 普通人也能拥有的 AI 伙伴">
 <meta property="og:url" content="http://tristan1116.github.io/2026/07/18/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/index.html">
 <meta property="og:site_name" content="童诗轩的博客网站">
-<meta property="og:description" content="最近 Kimi 新出的 K3 模型很火，也很强。我研究之后发现，虽然它确实很强，但它很昂贵，很慢。在它开源降价提速前，我认为，对大多数人来说，它暂时还不是一个非常实用的选择。所以我认为Claude Code + DeepSeek V4是目前性价比最高、大部分人真正需要且能用上的组合：速度快（Flash 模型基本秒回），价格便宜（充十块钱能用很久），而且人人都能轻松上手。在这篇文章里，我尝试教你如何">
+<meta property="og:description" content="最近 Kimi 新出的 K3 模型很火。我研究之后发现，它确实很强，但它很昂贵，很慢。在它开源降价提速前，对大多数人来说，它可能暂时还不是一个非常实用的选择。所以我认为Claude Code + DeepSeek V4是目前性价比最高、大部分人真正需要且能用上的组合：速度快，Flash 模型基本秒回，价格便宜，充十块钱能用很久，而且人人都能轻松上手。在这篇文章里，我会尝试教你如何从零开始，一步一步">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://tristan1116.github.io/images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722191348760.png">
 <meta property="og:image" content="http://tristan1116.github.io/images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722191558318.png">
@@ -264,7 +264,7 @@
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
               <span>12 分钟</span>
             </span>
-            <div class="post-description">最近 Kimi 新出的 K3 模型很火，也很强。我研究之后发现，虽然它确实很强，但它很昂贵，很慢。在它开源降价提速前，我认为，对大多数人来说，它暂时还不是一个非常实用的选择。所以我认为Claude Code + DeepSeek V4是目前性价比最高、大部分人真正需要且能用上的组合：速度快（Flash 模型基本秒回），价格便宜（充十块钱能用很久），而且人人都能轻松上手。在这篇文章里，我尝试教你如何从零开始，一步一步配置和使用claude code，这个目前极为先进的agent工具。</div>
+            <div class="post-description">最近 Kimi 新出的 K3 模型很火。我研究之后发现，它确实很强，但它很昂贵，很慢。在它开源降价提速前，对大多数人来说，它可能暂时还不是一个非常实用的选择。所以我认为Claude Code + DeepSeek V4是目前性价比最高、大部分人真正需要且能用上的组合：速度快，Flash 模型基本秒回，价格便宜，充十块钱能用很久，而且人人都能轻松上手。在这篇文章里，我会尝试教你如何从零开始，一步一步配置和使用claude code，这个目前极为先进的agent工具。</div>
 
         </div>
       </header>
