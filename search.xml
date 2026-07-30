@@ -764,6 +764,330 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——红灯持续闪烁，绿灯用外部中断翻转状态</title>
+    <url>/2026/07/28/STM32_EXTI_Interrupt/</url>
+    <content><![CDATA[<h2 id="背景：为什么需要中断？"><a href="#背景：为什么需要中断？" class="headerlink" title="背景：为什么需要中断？"></a>背景：为什么需要中断？</h2><p>在前一篇按键输入博客中，KEY2 的”按一下翻转”功能用了轮询方式：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 轮询：CPU 主动、反复地问&quot;按键被按了吗？&quot;</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (按键被按下) &#123; 处理; &#125;</span><br><span class="line">    <span class="comment">// 还要做其他事...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>轮询的缺点很明显——如果 CPU 正在执行某个耗时操作，按键按下后要等到下一个循环才能被检测到，响应不及时。</p>
+<p><strong>中断</strong>的思路完全不同：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">轮询：   CPU → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;按了！&quot; → 处理</span><br><span class="line">中断：   CPU → 干正事 → 干正事 → 干正事 → （按键按下，打断！）→ 处理按键 → 继续干正事</span><br></pre></td></tr></table></figure>
+
+<p>打个比方：</p>
+<ul>
+<li><strong>轮询</strong> &#x3D; 你在写作业，每 5 秒抬头看一眼有没有人敲门</li>
+<li><strong>中断</strong> &#x3D; 你在写作业，门铃响了（中断信号），你去开门，回来继续写</li>
+</ul>
+<hr>
+<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>硬件与之前博客完全一样——<strong>KEY1（PB12，外部上拉）</strong>控制中断触发，<strong>红灯（PB0）</strong> 和 <strong>绿灯（PA7）</strong> 作为输出，高电平点亮。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110508961.png" alt="image-20260728110508961"></p>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110535256.png" alt="image-20260728110535256"></p>
+</blockquote>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤与之前一样，不重复。</p>
+<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><table>
+<thead>
+<tr>
+<th align="center">引脚</th>
+<th align="center">功能</th>
+<th align="center">User Label</th>
+<th align="left">详细参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">PB0</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_RED</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PA7</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_GREEN</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PB12</td>
+<td align="center"><strong>GPIO_EXTI12</strong></td>
+<td align="center"><code>KEY1</code></td>
+<td align="left">下降沿触发中断、无上下拉（外部已有上拉）</td>
+</tr>
+</tbody></table>
+<p><strong>关键步骤：配置 PB12 的中断模式</strong></p>
+<p>在芯片图上找到 PB12 → 点击 → 选择 <strong>GPIO_EXTI12</strong>，顺便把user label设置成key1</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105816402.png" alt="image-20260728105816402"></p>
+</blockquote>
+<p>然后到左侧 GPIO 设置中，把 PB12 的具体参数配好：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105913502.png" alt="image-20260728105913502"></p>
+</blockquote>
+<p>注意这里选择的是 <strong>External Interrupt Mode with Falling edge trigger detection</strong>（外部中断模式，下降沿触发）——按键按下时电平从高变低，正好产生下降沿，与前面的硬件原理匹配.</p>
+<h3 id="配置-NVIC（中断控制器）"><a href="#配置-NVIC（中断控制器）" class="headerlink" title="配置 NVIC（中断控制器）"></a>配置 NVIC（中断控制器）</h3><p>GPIO 配好后，还需要告诉 NVIC（嵌套向量中断控制器）”我要使用这个中断”。</p>
+<p>切换到 <strong>System Core → NVIC</strong>，找到 <strong>EXTI line[15:10] interrupts</strong>，在旁边那个小方框里打上勾：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110232947.png" alt="image-20260728110232947"></p>
+</blockquote>
+<p>这里有两个参数需要关注：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th align="center">值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Preemption Priority</strong></td>
+<td align="center">15</td>
+<td>抢占优先级（数字越小优先级越高）</td>
+</tr>
+<tr>
+<td><strong>Sub Priority</strong></td>
+<td align="center">0</td>
+<td>子优先级</td>
+</tr>
+</tbody></table>
+<p>关于优先级的具体原理，后面会单独说明。</p>
+<h3 id="配调试接口-生成代码"><a href="#配调试接口-生成代码" class="headerlink" title="配调试接口 &amp; 生成代码"></a>配调试接口 &amp; 生成代码</h3><p>老规矩：<strong>System Core → SYS → Debug → Serial Wire</strong>，防止烧录一次后 SWD 被锁。</p>
+<p><strong>Project Manager</strong> 设置：</p>
+<table>
+<thead>
+<tr>
+<th>设置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project Name</strong></td>
+<td><code>Interrupt</code></td>
+</tr>
+<tr>
+<td><strong>Toolchain &#x2F; IDE</strong></td>
+<td><strong>CMake</strong></td>
+</tr>
+</tbody></table>
+<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
+<hr>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="引脚宏定义（main-h）"><a href="#引脚宏定义（main-h）" class="headerlink" title="引脚宏定义（main.h）"></a>引脚宏定义（main.h）</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 按键 KEY1 — PB12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_Pin GPIO_PIN_12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_GPIO_Port GPIOB</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_EXTI_IRQn EXTI15_10_IRQn   <span class="comment">// 中断号：EXTI 线 15~10</span></span></span><br></pre></td></tr></table></figure>
+
+<h3 id="main-c-——-红灯持续闪烁"><a href="#main-c-——-红灯持续闪烁" class="headerlink" title="main.c —— 红灯持续闪烁"></a>main.c —— 红灯持续闪烁</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();</span><br><span class="line">    SystemClock_Config();</span><br><span class="line">    MX_GPIO_Init();     <span class="comment">// 这里会初始化 GPIO 和 NVIC 中断</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 红灯亮</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 保持 2 秒</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// 红灯灭</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 熄灭 2 秒</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>逻辑很简单：PB0 每 2 秒翻转一次电平，红灯持续闪烁。</p>
+<p>主循环里<strong>无需任何与按键相关的代码</strong>——按键检测完全由中断处理。</p>
+<h3 id="stm32f1xx-it-c-——-外部中断服务函数"><a href="#stm32f1xx-it-c-——-外部中断服务函数" class="headerlink" title="stm32f1xx_it.c —— 外部中断服务函数"></a>stm32f1xx_it.c —— 外部中断服务函数</h3><p>当 KEY1 按下时，EXTI15_10 中断被触发，CPU 跳转到 <code>EXTI15_10_IRQHandler</code> 执行：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">  * @brief This function handles EXTI line[15:10] interrupts.</span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_Delay(<span class="number">10</span>);  <span class="comment">// ① 消抖：等待电平稳定</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ② 确认按键确实被按下（低电平）</span></span><br><span class="line">    <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// ③ 翻转绿灯状态</span></span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_GPIO_EXTI_IRQHandler(KEY1_Pin);  <span class="comment">// ④ 清除中断标志位</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 1 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 1 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>逐行解释：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="center">行号</th>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">①</td>
+<td><code>HAL_Delay(10)</code></td>
+<td>机械按键按下瞬间会有抖动，电平在几毫秒内反复跳变。等 10ms 让电平稳定下来再读</td>
+</tr>
+<tr>
+<td align="center">②</td>
+<td><code>HAL_GPIO_ReadPin(...)</code></td>
+<td>再次读取 KEY1 的电平，确认是真的按下了（低电平）。如果只是噪声干扰，不会误触发</td>
+</tr>
+<tr>
+<td align="center">③</td>
+<td><code>HAL_GPIO_TogglePin(...)</code></td>
+<td>翻转绿灯 PA7 的电平——原来亮就灭，原来灭就亮</td>
+</tr>
+<tr>
+<td align="center">④</td>
+<td><code>HAL_GPIO_EXTI_IRQHandler(KEY1_Pin)</code></td>
+<td><strong>非常重要</strong> 清除 EXTI 的中断挂起标志位。如果不清除，中断会反复触发，程序卡死。函数里本身自带，不能删除。</td>
+</tr>
+</tbody></table>
+<p><strong>⚠️ HAL_GPIO_EXTI_IRQHandler 的两种写法</strong></p>
+<p>上面这个函数内部其实干了三件事：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_IRQHandler</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(GPIO_Pin) != RESET)  <span class="comment">// ① 检查中断标志</span></span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_Pin);           <span class="comment">// ② 清除中断标志</span></span><br><span class="line">        HAL_GPIO_EXTI_Callback(GPIO_Pin);             <span class="comment">// ③ 调用回调函数</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，你<strong>也可以</strong>不在 ISR 里直接写逻辑，而是把逻辑写在 <code>HAL_GPIO_EXTI_Callback</code> 里，CubeMX 会在 <code>main.c</code> 中留出 <code>USER CODE BEGIN 4</code> 给你写回调：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 4 */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_Callback</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (GPIO_Pin == KEY1_Pin)</span><br><span class="line">    &#123;</span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 4 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="MX-GPIO-Init-——-GPIO-与-NVIC-初始化"><a href="#MX-GPIO-Init-——-GPIO-与-NVIC-初始化" class="headerlink" title="MX_GPIO_Init —— GPIO 与 NVIC 初始化"></a>MX_GPIO_Init —— GPIO 与 NVIC 初始化</h3><p><code>MX_GPIO_Init</code> 函数中，CubeMX 不仅配了 GPIO，还配了 NVIC：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始化输出电平 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 KEY1 (PB12) —— 下降沿触发外部中断 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;  <span class="comment">// ← 下降沿触发中断</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;            <span class="comment">// ← 外部已有上拉，内部不配</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* EXTI 中断初始化——使能 NVIC */</span></span><br><span class="line">    HAL_NVIC_SetPriority(EXTI15_10_IRQn, <span class="number">15</span>, <span class="number">0</span>);</span><br><span class="line">    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);            <span class="comment">// ← 使能 NVIC 中断！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键点：</strong></p>
+<ol>
+<li><code>GPIO_MODE_IT_FALLING</code> —— 配置 PB12 为外部中断模式，下降沿触发</li>
+<li><code>GPIO_NOPULL</code> —— 因为板子已经有外部上拉电阻，不需要内部上拉</li>
+<li><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code> —— 使能 NVIC 中的 EXTI15_10 中断通道。<strong>这步非常重要，漏了中断不会触发</strong></li>
+</ol>
+<hr>
+<h2 id="关于中断优先级"><a href="#关于中断优先级" class="headerlink" title="关于中断优先级"></a>关于中断优先级</h2><p>CubeMX 中配置的优先级和实际生效的值之间有一个”编码”过程，理解了这个才能搞清中断嵌套行为。</p>
+<h3 id="优先级分组"><a href="#优先级分组" class="headerlink" title="优先级分组"></a>优先级分组</h3><p>STM32 的 NVIC 支持<strong>优先级分组</strong>，决定了抢占优先级和子优先级各占几位：</p>
+<table>
+<thead>
+<tr>
+<th>分组宏</th>
+<th align="center">抢占优先级</th>
+<th align="center">子优先级</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>NVIC_PRIORITYGROUP_0</code></td>
+<td align="center">0 bit</td>
+<td align="center">4 bits</td>
+<td>所有中断同级，不能嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_1</code></td>
+<td align="center">1 bit</td>
+<td align="center">3 bits</td>
+<td>最多 2 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_2</code></td>
+<td align="center">2 bits</td>
+<td align="center">2 bits</td>
+<td>最多 4 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_3</code></td>
+<td align="center">3 bits</td>
+<td align="center">1 bit</td>
+<td>最多 8 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_4</code></td>
+<td align="center">4 bits</td>
+<td align="center">0 bits</td>
+<td>最多 16 级嵌套（最常用）</td>
+</tr>
+</tbody></table>
+<p>CubeMX 默认使用 <code>NVIC_PRIORITYGROUP_4</code>——4 位全是抢占优先级，没有子优先级。</p>
+<h3 id="本次配置的优先级"><a href="#本次配置的优先级" class="headerlink" title="本次配置的优先级"></a>本次配置的优先级</h3><table>
+<thead>
+<tr>
+<th align="left">中断</th>
+<th align="center">PreemptPriority</th>
+<th align="center">编码值</th>
+<th align="center">实际优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SysTick</td>
+<td align="center">14</td>
+<td align="center">0x00</td>
+<td align="center"><strong>0（最高）</strong></td>
+</tr>
+<tr>
+<td align="left">EXTI15_10</td>
+<td align="center">15</td>
+<td align="center">0x80</td>
+<td align="center"><strong>8</strong></td>
+</tr>
+</tbody></table>
+<p>数值越小优先级越高。SysTick 的优先级高于 EXTI，所以在 EXTI 中断服务函数中调用 <code>HAL_Delay()</code> 是安全的——SysTick 可以抢占 EXTI 来更新 <code>uwTick</code> 变量，不会死锁。</p>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
+<li>连接 ST-Link</li>
+<li>点击 <strong>运行和调试</strong> → 选择 <code>STM32Cube:STM32 Launch STLink GDB Server</code></li>
+<li>点击<strong>继续</strong>按钮，程序开始运行</li>
+</ol>
+<blockquote>
+<p>如果遇到烧录问题，参考上一篇或<a href="https://docs.baud-dance.com/docs/stm32/FAQ/CompilationFailed">波特律动 FAQ</a>。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后：</p>
+<ul>
+<li>🔴 <strong>红灯持续闪烁</strong>——每 2 秒亮灭一次</li>
+<li>按下 <strong>KEY1（PB12）</strong> → 🟢 <strong>绿灯翻转状态</strong>（亮↔灭）</li>
+<li>每次按键，绿灯变化一次，红灯不受影响，继续闪烁</li>
+<li>如果绿灯和红灯一起亮起，则颜色变化成黄色。</li>
+</ul>
+<blockquote>
+<p>效果展示视频：<a href="https://www.bilibili.com/video/BV11e3e6TEGF/">https://www.bilibili.com/video/BV11e3e6TEGF/</a></p>
+</blockquote>
+<hr>
+<h2 id="中断-vs-轮询的对比"><a href="#中断-vs-轮询的对比" class="headerlink" title="中断 vs 轮询的对比"></a>中断 vs 轮询的对比</h2><p>这个 demo 正好可以和上一篇按键博客做一个对比：</p>
+<table>
+<thead>
+<tr>
+<th>对比项</th>
+<th align="center">轮询（上一篇 KEY2）</th>
+<th align="center">中断（本篇）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU 占用</td>
+<td align="center">高（一直在检测）</td>
+<td align="center">低（平时干正事，有事件才处理）</td>
+</tr>
+<tr>
+<td>响应速度</td>
+<td align="center">取决于循环周期</td>
+<td align="center">立即响应</td>
+</tr>
+<tr>
+<td>代码位置</td>
+<td align="center">main 循环里</td>
+<td align="center">中断服务函数中</td>
+</tr>
+<tr>
+<td>主循环复杂度</td>
+<td align="center">按键逻辑和主逻辑混在一起</td>
+<td align="center">主循环只关心本职工作</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td align="center">低频检测、简单系统</td>
+<td align="center">实时性要求高的场景</td>
+</tr>
+</tbody></table>
+<p>当然，中断也有代价——每次进入和退出中断都有<strong>上下文切换开销</strong>（保存现场、恢复现场），并且中断函数要尽量简短，否则会影响其他实时任务的响应。</p>
+<hr>
+<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><h3 id="1-用回调函数分离逻辑"><a href="#1-用回调函数分离逻辑" class="headerlink" title="1. 用回调函数分离逻辑"></a>1. 用回调函数分离逻辑</h3><p>前面提到过，可以把中断处理逻辑写到 <code>HAL_GPIO_EXTI_Callback</code> 里，中断服务函数保持整洁。当项目中多个引脚共用一个 EXTI 中断线时（比如 EXTI15_10 同时服务 PB12 和 PB13），回调函数里用 <code>GPIO_Pin</code> 区分来源，代码结构更清晰。</p>
+<h3 id="2-中断中只设标志位，主循环处理"><a href="#2-中断中只设标志位，主循环处理" class="headerlink" title="2. 中断中只设标志位，主循环处理"></a>2. 中断中只设标志位，主循环处理</h3><p>标准的嵌入式写法——中断里只设一个 <code>volatile</code> 标志位：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">volatile</span> <span class="type">uint8_t</span> key1_flag = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(KEY1_Pin) != RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(KEY1_Pin);</span><br><span class="line">        key1_flag = <span class="number">1</span>;  <span class="comment">// 只设标志，不做复杂操作</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主循环检测到标志位置位后，再执行消抖、翻转等操作。这样 ISR 的执行时间最短，对系统实时性的影响最小。</p>
+<h3 id="3-上升沿-下降沿双触发"><a href="#3-上升沿-下降沿双触发" class="headerlink" title="3. 上升沿 + 下降沿双触发"></a>3. 上升沿 + 下降沿双触发</h3><p>按键按下和松开都产生中断，可以用来检测”长按”和”短按”，或者做更精细的状态控制。</p>
+<h3 id="4-优先级嵌套测试"><a href="#4-优先级嵌套测试" class="headerlink" title="4. 优先级嵌套测试"></a>4. 优先级嵌套测试</h3><p>可以给不同的外设中断配置不同的抢占优先级，观察高优先级中断打断低优先级中断的行为，加深对中断嵌套的理解。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的收获：</p>
+<ol>
+<li><strong>外部中断（EXTI）的基本配置方法</strong>——CubeMX 里配引脚模式 + NVIC 设置</li>
+<li><strong>中断服务函数的写法</strong>——消抖 → 读引脚确认 → 执行逻辑 → 清标志位</li>
+<li><strong>中断优先级</strong>——优先级分组、优先级编码、抢占与嵌套的基本概念</li>
+<li><strong>CMake 生成器的注意事项</strong>——NVIC 配置可能不会自动生成，需要手动检查</li>
+</ol>
+<p>中断是嵌入式开发中非常重要的概念，后面学定时器、UART、I2C、SPI 等外设时都会用到中断机制。理解了这个 demo，后面的路会顺畅很多。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入</a></li>
+<li><a href="/2026/07/26/STM32_RGB_LED/">上一篇：STM32三色LED流水灯</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>EXTI</tag>
+        <tag>中断</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——深入外部中断硬件原理</title>
     <url>/2026/07/28/STM32_EXTI_Deep_Dive/</url>
     <content><![CDATA[<h2 id="从”能用”到”理解”"><a href="#从”能用”到”理解”" class="headerlink" title="从”能用”到”理解”"></a>从”能用”到”理解”</h2><p>上一篇博客中，我们完成了外部中断的功能：红灯闪烁，按下 KEY1 触发中断，翻转绿灯。</p>
@@ -1191,330 +1515,6 @@
         <tag>EXTI</tag>
         <tag>中断</tag>
         <tag>NVIC</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>STM32——红灯持续闪烁，绿灯用外部中断翻转状态</title>
-    <url>/2026/07/28/STM32_EXTI_Interrupt/</url>
-    <content><![CDATA[<h2 id="背景：为什么需要中断？"><a href="#背景：为什么需要中断？" class="headerlink" title="背景：为什么需要中断？"></a>背景：为什么需要中断？</h2><p>在前一篇按键输入博客中，KEY2 的”按一下翻转”功能用了轮询方式：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 轮询：CPU 主动、反复地问&quot;按键被按了吗？&quot;</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (按键被按下) &#123; 处理; &#125;</span><br><span class="line">    <span class="comment">// 还要做其他事...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>轮询的缺点很明显——如果 CPU 正在执行某个耗时操作，按键按下后要等到下一个循环才能被检测到，响应不及时。</p>
-<p><strong>中断</strong>的思路完全不同：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">轮询：   CPU → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;按了！&quot; → 处理</span><br><span class="line">中断：   CPU → 干正事 → 干正事 → 干正事 → （按键按下，打断！）→ 处理按键 → 继续干正事</span><br></pre></td></tr></table></figure>
-
-<p>打个比方：</p>
-<ul>
-<li><strong>轮询</strong> &#x3D; 你在写作业，每 5 秒抬头看一眼有没有人敲门</li>
-<li><strong>中断</strong> &#x3D; 你在写作业，门铃响了（中断信号），你去开门，回来继续写</li>
-</ul>
-<hr>
-<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>硬件与之前博客完全一样——<strong>KEY1（PB12，外部上拉）</strong>控制中断触发，<strong>红灯（PB0）</strong> 和 <strong>绿灯（PA7）</strong> 作为输出，高电平点亮。</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110508961.png" alt="image-20260728110508961"></p>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110535256.png" alt="image-20260728110535256"></p>
-</blockquote>
-<hr>
-<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤与之前一样，不重复。</p>
-<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><table>
-<thead>
-<tr>
-<th align="center">引脚</th>
-<th align="center">功能</th>
-<th align="center">User Label</th>
-<th align="left">详细参数</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">PB0</td>
-<td align="center">GPIO_Output</td>
-<td align="center"><code>LED_RED</code></td>
-<td align="left">推挽输出、无上下拉、低速</td>
-</tr>
-<tr>
-<td align="center">PA7</td>
-<td align="center">GPIO_Output</td>
-<td align="center"><code>LED_GREEN</code></td>
-<td align="left">推挽输出、无上下拉、低速</td>
-</tr>
-<tr>
-<td align="center">PB12</td>
-<td align="center"><strong>GPIO_EXTI12</strong></td>
-<td align="center"><code>KEY1</code></td>
-<td align="left">下降沿触发中断、无上下拉（外部已有上拉）</td>
-</tr>
-</tbody></table>
-<p><strong>关键步骤：配置 PB12 的中断模式</strong></p>
-<p>在芯片图上找到 PB12 → 点击 → 选择 <strong>GPIO_EXTI12</strong>，顺便把user label设置成key1</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105816402.png" alt="image-20260728105816402"></p>
-</blockquote>
-<p>然后到左侧 GPIO 设置中，把 PB12 的具体参数配好：</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105913502.png" alt="image-20260728105913502"></p>
-</blockquote>
-<p>注意这里选择的是 <strong>External Interrupt Mode with Falling edge trigger detection</strong>（外部中断模式，下降沿触发）——按键按下时电平从高变低，正好产生下降沿，与前面的硬件原理匹配.</p>
-<h3 id="配置-NVIC（中断控制器）"><a href="#配置-NVIC（中断控制器）" class="headerlink" title="配置 NVIC（中断控制器）"></a>配置 NVIC（中断控制器）</h3><p>GPIO 配好后，还需要告诉 NVIC（嵌套向量中断控制器）”我要使用这个中断”。</p>
-<p>切换到 <strong>System Core → NVIC</strong>，找到 <strong>EXTI line[15:10] interrupts</strong>，在旁边那个小方框里打上勾：</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110232947.png" alt="image-20260728110232947"></p>
-</blockquote>
-<p>这里有两个参数需要关注：</p>
-<table>
-<thead>
-<tr>
-<th>参数</th>
-<th align="center">值</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Preemption Priority</strong></td>
-<td align="center">15</td>
-<td>抢占优先级（数字越小优先级越高）</td>
-</tr>
-<tr>
-<td><strong>Sub Priority</strong></td>
-<td align="center">0</td>
-<td>子优先级</td>
-</tr>
-</tbody></table>
-<p>关于优先级的具体原理，后面会单独说明。</p>
-<h3 id="配调试接口-生成代码"><a href="#配调试接口-生成代码" class="headerlink" title="配调试接口 &amp; 生成代码"></a>配调试接口 &amp; 生成代码</h3><p>老规矩：<strong>System Core → SYS → Debug → Serial Wire</strong>，防止烧录一次后 SWD 被锁。</p>
-<p><strong>Project Manager</strong> 设置：</p>
-<table>
-<thead>
-<tr>
-<th>设置项</th>
-<th>值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Project Name</strong></td>
-<td><code>Interrupt</code></td>
-</tr>
-<tr>
-<td><strong>Toolchain &#x2F; IDE</strong></td>
-<td><strong>CMake</strong></td>
-</tr>
-</tbody></table>
-<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
-<hr>
-<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="引脚宏定义（main-h）"><a href="#引脚宏定义（main-h）" class="headerlink" title="引脚宏定义（main.h）"></a>引脚宏定义（main.h）</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 按键 KEY1 — PB12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_Pin GPIO_PIN_12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_GPIO_Port GPIOB</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_EXTI_IRQn EXTI15_10_IRQn   <span class="comment">// 中断号：EXTI 线 15~10</span></span></span><br></pre></td></tr></table></figure>
-
-<h3 id="main-c-——-红灯持续闪烁"><a href="#main-c-——-红灯持续闪烁" class="headerlink" title="main.c —— 红灯持续闪烁"></a>main.c —— 红灯持续闪烁</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();</span><br><span class="line">    SystemClock_Config();</span><br><span class="line">    MX_GPIO_Init();     <span class="comment">// 这里会初始化 GPIO 和 NVIC 中断</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 红灯亮</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 保持 2 秒</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// 红灯灭</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 熄灭 2 秒</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>逻辑很简单：PB0 每 2 秒翻转一次电平，红灯持续闪烁。</p>
-<p>主循环里<strong>无需任何与按键相关的代码</strong>——按键检测完全由中断处理。</p>
-<h3 id="stm32f1xx-it-c-——-外部中断服务函数"><a href="#stm32f1xx-it-c-——-外部中断服务函数" class="headerlink" title="stm32f1xx_it.c —— 外部中断服务函数"></a>stm32f1xx_it.c —— 外部中断服务函数</h3><p>当 KEY1 按下时，EXTI15_10 中断被触发，CPU 跳转到 <code>EXTI15_10_IRQHandler</code> 执行：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">  * @brief This function handles EXTI line[15:10] interrupts.</span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_Delay(<span class="number">10</span>);  <span class="comment">// ① 消抖：等待电平稳定</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ② 确认按键确实被按下（低电平）</span></span><br><span class="line">    <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// ③ 翻转绿灯状态</span></span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_GPIO_EXTI_IRQHandler(KEY1_Pin);  <span class="comment">// ④ 清除中断标志位</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 1 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 1 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>逐行解释：</strong></p>
-<table>
-<thead>
-<tr>
-<th align="center">行号</th>
-<th>代码</th>
-<th>作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">①</td>
-<td><code>HAL_Delay(10)</code></td>
-<td>机械按键按下瞬间会有抖动，电平在几毫秒内反复跳变。等 10ms 让电平稳定下来再读</td>
-</tr>
-<tr>
-<td align="center">②</td>
-<td><code>HAL_GPIO_ReadPin(...)</code></td>
-<td>再次读取 KEY1 的电平，确认是真的按下了（低电平）。如果只是噪声干扰，不会误触发</td>
-</tr>
-<tr>
-<td align="center">③</td>
-<td><code>HAL_GPIO_TogglePin(...)</code></td>
-<td>翻转绿灯 PA7 的电平——原来亮就灭，原来灭就亮</td>
-</tr>
-<tr>
-<td align="center">④</td>
-<td><code>HAL_GPIO_EXTI_IRQHandler(KEY1_Pin)</code></td>
-<td><strong>非常重要</strong> 清除 EXTI 的中断挂起标志位。如果不清除，中断会反复触发，程序卡死。函数里本身自带，不能删除。</td>
-</tr>
-</tbody></table>
-<p><strong>⚠️ HAL_GPIO_EXTI_IRQHandler 的两种写法</strong></p>
-<p>上面这个函数内部其实干了三件事：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_IRQHandler</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(GPIO_Pin) != RESET)  <span class="comment">// ① 检查中断标志</span></span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_Pin);           <span class="comment">// ② 清除中断标志</span></span><br><span class="line">        HAL_GPIO_EXTI_Callback(GPIO_Pin);             <span class="comment">// ③ 调用回调函数</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>也就是说，你<strong>也可以</strong>不在 ISR 里直接写逻辑，而是把逻辑写在 <code>HAL_GPIO_EXTI_Callback</code> 里，CubeMX 会在 <code>main.c</code> 中留出 <code>USER CODE BEGIN 4</code> 给你写回调：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 4 */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_Callback</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (GPIO_Pin == KEY1_Pin)</span><br><span class="line">    &#123;</span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 4 */</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="MX-GPIO-Init-——-GPIO-与-NVIC-初始化"><a href="#MX-GPIO-Init-——-GPIO-与-NVIC-初始化" class="headerlink" title="MX_GPIO_Init —— GPIO 与 NVIC 初始化"></a>MX_GPIO_Init —— GPIO 与 NVIC 初始化</h3><p><code>MX_GPIO_Init</code> 函数中，CubeMX 不仅配了 GPIO，还配了 NVIC：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始化输出电平 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 KEY1 (PB12) —— 下降沿触发外部中断 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;  <span class="comment">// ← 下降沿触发中断</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;            <span class="comment">// ← 外部已有上拉，内部不配</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* EXTI 中断初始化——使能 NVIC */</span></span><br><span class="line">    HAL_NVIC_SetPriority(EXTI15_10_IRQn, <span class="number">15</span>, <span class="number">0</span>);</span><br><span class="line">    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);            <span class="comment">// ← 使能 NVIC 中断！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>关键点：</strong></p>
-<ol>
-<li><code>GPIO_MODE_IT_FALLING</code> —— 配置 PB12 为外部中断模式，下降沿触发</li>
-<li><code>GPIO_NOPULL</code> —— 因为板子已经有外部上拉电阻，不需要内部上拉</li>
-<li><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code> —— 使能 NVIC 中的 EXTI15_10 中断通道。<strong>这步非常重要，漏了中断不会触发</strong></li>
-</ol>
-<hr>
-<h2 id="关于中断优先级"><a href="#关于中断优先级" class="headerlink" title="关于中断优先级"></a>关于中断优先级</h2><p>CubeMX 中配置的优先级和实际生效的值之间有一个”编码”过程，理解了这个才能搞清中断嵌套行为。</p>
-<h3 id="优先级分组"><a href="#优先级分组" class="headerlink" title="优先级分组"></a>优先级分组</h3><p>STM32 的 NVIC 支持<strong>优先级分组</strong>，决定了抢占优先级和子优先级各占几位：</p>
-<table>
-<thead>
-<tr>
-<th>分组宏</th>
-<th align="center">抢占优先级</th>
-<th align="center">子优先级</th>
-<th>适用场景</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>NVIC_PRIORITYGROUP_0</code></td>
-<td align="center">0 bit</td>
-<td align="center">4 bits</td>
-<td>所有中断同级，不能嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_1</code></td>
-<td align="center">1 bit</td>
-<td align="center">3 bits</td>
-<td>最多 2 级嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_2</code></td>
-<td align="center">2 bits</td>
-<td align="center">2 bits</td>
-<td>最多 4 级嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_3</code></td>
-<td align="center">3 bits</td>
-<td align="center">1 bit</td>
-<td>最多 8 级嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_4</code></td>
-<td align="center">4 bits</td>
-<td align="center">0 bits</td>
-<td>最多 16 级嵌套（最常用）</td>
-</tr>
-</tbody></table>
-<p>CubeMX 默认使用 <code>NVIC_PRIORITYGROUP_4</code>——4 位全是抢占优先级，没有子优先级。</p>
-<h3 id="本次配置的优先级"><a href="#本次配置的优先级" class="headerlink" title="本次配置的优先级"></a>本次配置的优先级</h3><table>
-<thead>
-<tr>
-<th align="left">中断</th>
-<th align="center">PreemptPriority</th>
-<th align="center">编码值</th>
-<th align="center">实际优先级</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">SysTick</td>
-<td align="center">14</td>
-<td align="center">0x00</td>
-<td align="center"><strong>0（最高）</strong></td>
-</tr>
-<tr>
-<td align="left">EXTI15_10</td>
-<td align="center">15</td>
-<td align="center">0x80</td>
-<td align="center"><strong>8</strong></td>
-</tr>
-</tbody></table>
-<p>数值越小优先级越高。SysTick 的优先级高于 EXTI，所以在 EXTI 中断服务函数中调用 <code>HAL_Delay()</code> 是安全的——SysTick 可以抢占 EXTI 来更新 <code>uwTick</code> 变量，不会死锁。</p>
-<hr>
-<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
-<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
-<li>连接 ST-Link</li>
-<li>点击 <strong>运行和调试</strong> → 选择 <code>STM32Cube:STM32 Launch STLink GDB Server</code></li>
-<li>点击<strong>继续</strong>按钮，程序开始运行</li>
-</ol>
-<blockquote>
-<p>如果遇到烧录问题，参考上一篇或<a href="https://docs.baud-dance.com/docs/stm32/FAQ/CompilationFailed">波特律动 FAQ</a>。</p>
-</blockquote>
-<hr>
-<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后：</p>
-<ul>
-<li>🔴 <strong>红灯持续闪烁</strong>——每 2 秒亮灭一次</li>
-<li>按下 <strong>KEY1（PB12）</strong> → 🟢 <strong>绿灯翻转状态</strong>（亮↔灭）</li>
-<li>每次按键，绿灯变化一次，红灯不受影响，继续闪烁</li>
-<li>如果绿灯和红灯一起亮起，则颜色变化成黄色。</li>
-</ul>
-<blockquote>
-<p>效果展示视频：<a href="https://www.bilibili.com/video/BV11e3e6TEGF/">https://www.bilibili.com/video/BV11e3e6TEGF/</a></p>
-</blockquote>
-<hr>
-<h2 id="中断-vs-轮询的对比"><a href="#中断-vs-轮询的对比" class="headerlink" title="中断 vs 轮询的对比"></a>中断 vs 轮询的对比</h2><p>这个 demo 正好可以和上一篇按键博客做一个对比：</p>
-<table>
-<thead>
-<tr>
-<th>对比项</th>
-<th align="center">轮询（上一篇 KEY2）</th>
-<th align="center">中断（本篇）</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>CPU 占用</td>
-<td align="center">高（一直在检测）</td>
-<td align="center">低（平时干正事，有事件才处理）</td>
-</tr>
-<tr>
-<td>响应速度</td>
-<td align="center">取决于循环周期</td>
-<td align="center">立即响应</td>
-</tr>
-<tr>
-<td>代码位置</td>
-<td align="center">main 循环里</td>
-<td align="center">中断服务函数中</td>
-</tr>
-<tr>
-<td>主循环复杂度</td>
-<td align="center">按键逻辑和主逻辑混在一起</td>
-<td align="center">主循环只关心本职工作</td>
-</tr>
-<tr>
-<td>适用场景</td>
-<td align="center">低频检测、简单系统</td>
-<td align="center">实时性要求高的场景</td>
-</tr>
-</tbody></table>
-<p>当然，中断也有代价——每次进入和退出中断都有<strong>上下文切换开销</strong>（保存现场、恢复现场），并且中断函数要尽量简短，否则会影响其他实时任务的响应。</p>
-<hr>
-<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><h3 id="1-用回调函数分离逻辑"><a href="#1-用回调函数分离逻辑" class="headerlink" title="1. 用回调函数分离逻辑"></a>1. 用回调函数分离逻辑</h3><p>前面提到过，可以把中断处理逻辑写到 <code>HAL_GPIO_EXTI_Callback</code> 里，中断服务函数保持整洁。当项目中多个引脚共用一个 EXTI 中断线时（比如 EXTI15_10 同时服务 PB12 和 PB13），回调函数里用 <code>GPIO_Pin</code> 区分来源，代码结构更清晰。</p>
-<h3 id="2-中断中只设标志位，主循环处理"><a href="#2-中断中只设标志位，主循环处理" class="headerlink" title="2. 中断中只设标志位，主循环处理"></a>2. 中断中只设标志位，主循环处理</h3><p>标准的嵌入式写法——中断里只设一个 <code>volatile</code> 标志位：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">volatile</span> <span class="type">uint8_t</span> key1_flag = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(KEY1_Pin) != RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(KEY1_Pin);</span><br><span class="line">        key1_flag = <span class="number">1</span>;  <span class="comment">// 只设标志，不做复杂操作</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>主循环检测到标志位置位后，再执行消抖、翻转等操作。这样 ISR 的执行时间最短，对系统实时性的影响最小。</p>
-<h3 id="3-上升沿-下降沿双触发"><a href="#3-上升沿-下降沿双触发" class="headerlink" title="3. 上升沿 + 下降沿双触发"></a>3. 上升沿 + 下降沿双触发</h3><p>按键按下和松开都产生中断，可以用来检测”长按”和”短按”，或者做更精细的状态控制。</p>
-<h3 id="4-优先级嵌套测试"><a href="#4-优先级嵌套测试" class="headerlink" title="4. 优先级嵌套测试"></a>4. 优先级嵌套测试</h3><p>可以给不同的外设中断配置不同的抢占优先级，观察高优先级中断打断低优先级中断的行为，加深对中断嵌套的理解。</p>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的收获：</p>
-<ol>
-<li><strong>外部中断（EXTI）的基本配置方法</strong>——CubeMX 里配引脚模式 + NVIC 设置</li>
-<li><strong>中断服务函数的写法</strong>——消抖 → 读引脚确认 → 执行逻辑 → 清标志位</li>
-<li><strong>中断优先级</strong>——优先级分组、优先级编码、抢占与嵌套的基本概念</li>
-<li><strong>CMake 生成器的注意事项</strong>——NVIC 配置可能不会自动生成，需要手动检查</li>
-</ol>
-<p>中断是嵌入式开发中非常重要的概念，后面学定时器、UART、I2C、SPI 等外设时都会用到中断机制。理解了这个 demo，后面的路会顺畅很多。</p>
-<hr>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
-<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
-<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入</a></li>
-<li><a href="/2026/07/26/STM32_RGB_LED/">上一篇：STM32三色LED流水灯</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>STM32</tag>
-        <tag>嵌入式</tag>
-        <tag>EXTI</tag>
-        <tag>中断</tag>
-        <tag>CubeMX</tag>
       </tags>
   </entry>
   <entry>
@@ -2832,9 +2832,9 @@
       <tags>
         <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
         <tag>中断</tag>
         <tag>NVIC</tag>
-        <tag>CubeMX</tag>
         <tag>USART</tag>
         <tag>DMA</tag>
       </tags>
@@ -3192,11 +3192,29 @@
       <tags>
         <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
         <tag>中断</tag>
         <tag>NVIC</tag>
-        <tag>CubeMX</tag>
         <tag>USART</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>Hello World</title>
+    <url>/2026/07/06/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
   </entry>
   <entry>
     <title>STM32——串口通信，用电脑控制三色LED</title>
@@ -3842,24 +3860,6 @@
         <tag>USART</tag>
         <tag>串口</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>Hello World</title>
-    <url>/2026/07/06/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
   </entry>
   <entry>
     <title>hexo博客静态网站项目总结回顾深挖</title>
@@ -8760,33 +8760,6 @@
       </tags>
   </entry>
   <entry>
-    <title>力扣59题-螺旋矩阵-题解</title>
-    <url>/2026/07/12/%E5%8A%9B%E6%89%A3%2059%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/</url>
-    <content><![CDATA[<h1 id="力扣59题-螺旋矩阵-题解"><a href="#力扣59题-螺旋矩阵-题解" class="headerlink" title="力扣59题-螺旋矩阵-题解"></a>力扣59题-螺旋矩阵-题解</h1><h2 id="题目描述"><a href="#题目描述" class="headerlink" title="题目描述"></a>题目描述</h2><p>给你一个正整数 <code>n</code> ，生成一个包含 <code>1</code> 到 n^2^ 所有元素，且元素按顺时针顺序螺旋排列的 <code>n x n</code> 正方形矩阵 <code>matrix</code> 。</p>
-<p><strong>示例 1：</strong></p>
-<p><img src="/./../images/%E5%8A%9B%E6%89%A359%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/spiraln.jpg" alt="img"></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 3</span><br><span class="line">输出：[[1,2,3],[8,9,4],[7,6,5]]</span><br></pre></td></tr></table></figure>
-
-<p><strong>示例 2：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 1</span><br><span class="line">输出：[[1]]</span><br></pre></td></tr></table></figure>
-
-<p><strong>提示：</strong></p>
-<ul>
-<li><code>1 &lt;= n &lt;= 20</code></li>
-</ul>
-<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p>破解本题的关键在于设计四个变量，分别表示矩阵的上、下、左、右， 四个动态更新的边界.</p>
-<p>num从1开始，通过从左到右、从上到下、从右到左、从下到上的顺序不断循环填入num，同时更新边界，直到num&gt;n^2^。</p>
-<h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;vector&gt;</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">generateMatrix</span>(<span class="type">int</span> n) &#123;</span><br><span class="line">        <span class="type">int</span> top = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> bottom = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> left = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> right = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> num = <span class="number">1</span>;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">matrix</span>(n, <span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;(n, <span class="number">0</span>));</span><br><span class="line">        <span class="keyword">while</span> (num &lt;= n * n)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="comment">//从左到右</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = left; i &lt;= right; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[top][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新top</span></span><br><span class="line">            top++;</span><br><span class="line">            <span class="comment">//从上到下</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = top; i &lt;= bottom; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][right] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新right</span></span><br><span class="line">            right--;</span><br><span class="line">            <span class="comment">//从右到左</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = right; i &gt;= left; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[bottom][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新bottom</span></span><br><span class="line">            bottom--;</span><br><span class="line">            <span class="comment">//从下到上</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = bottom; i &gt;= top; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][left] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新left</span></span><br><span class="line">            left++;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> matrix;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> n;</span><br><span class="line">    <span class="built_in">scanf</span>(<span class="string">&quot;%d&quot;</span>, &amp;n);</span><br><span class="line">    Solution s;</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; matrix= s.<span class="built_in">generateMatrix</span>(n);</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; n; j++)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d\t&quot;</span>, matrix[i][j]);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-]]></content>
-      <categories>
-        <category>算法</category>
-      </categories>
-      <tags>
-        <tag>暴力&amp;枚举</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>前缀和与差分 —— 从概念到公式</title>
     <url>/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/</url>
     <content><![CDATA[<h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
@@ -9024,6 +8997,33 @@
       </categories>
       <tags>
         <tag>前缀和&amp;差分</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>力扣59题-螺旋矩阵-题解</title>
+    <url>/2026/07/12/%E5%8A%9B%E6%89%A3%2059%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/</url>
+    <content><![CDATA[<h1 id="力扣59题-螺旋矩阵-题解"><a href="#力扣59题-螺旋矩阵-题解" class="headerlink" title="力扣59题-螺旋矩阵-题解"></a>力扣59题-螺旋矩阵-题解</h1><h2 id="题目描述"><a href="#题目描述" class="headerlink" title="题目描述"></a>题目描述</h2><p>给你一个正整数 <code>n</code> ，生成一个包含 <code>1</code> 到 n^2^ 所有元素，且元素按顺时针顺序螺旋排列的 <code>n x n</code> 正方形矩阵 <code>matrix</code> 。</p>
+<p><strong>示例 1：</strong></p>
+<p><img src="/./../images/%E5%8A%9B%E6%89%A359%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/spiraln.jpg" alt="img"></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 3</span><br><span class="line">输出：[[1,2,3],[8,9,4],[7,6,5]]</span><br></pre></td></tr></table></figure>
+
+<p><strong>示例 2：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 1</span><br><span class="line">输出：[[1]]</span><br></pre></td></tr></table></figure>
+
+<p><strong>提示：</strong></p>
+<ul>
+<li><code>1 &lt;= n &lt;= 20</code></li>
+</ul>
+<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p>破解本题的关键在于设计四个变量，分别表示矩阵的上、下、左、右， 四个动态更新的边界.</p>
+<p>num从1开始，通过从左到右、从上到下、从右到左、从下到上的顺序不断循环填入num，同时更新边界，直到num&gt;n^2^。</p>
+<h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;vector&gt;</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">generateMatrix</span>(<span class="type">int</span> n) &#123;</span><br><span class="line">        <span class="type">int</span> top = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> bottom = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> left = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> right = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> num = <span class="number">1</span>;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">matrix</span>(n, <span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;(n, <span class="number">0</span>));</span><br><span class="line">        <span class="keyword">while</span> (num &lt;= n * n)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="comment">//从左到右</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = left; i &lt;= right; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[top][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新top</span></span><br><span class="line">            top++;</span><br><span class="line">            <span class="comment">//从上到下</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = top; i &lt;= bottom; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][right] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新right</span></span><br><span class="line">            right--;</span><br><span class="line">            <span class="comment">//从右到左</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = right; i &gt;= left; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[bottom][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新bottom</span></span><br><span class="line">            bottom--;</span><br><span class="line">            <span class="comment">//从下到上</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = bottom; i &gt;= top; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][left] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新left</span></span><br><span class="line">            left++;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> matrix;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> n;</span><br><span class="line">    <span class="built_in">scanf</span>(<span class="string">&quot;%d&quot;</span>, &amp;n);</span><br><span class="line">    Solution s;</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; matrix= s.<span class="built_in">generateMatrix</span>(n);</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; n; j++)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d\t&quot;</span>, matrix[i][j]);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>算法</category>
+      </categories>
+      <tags>
+        <tag>暴力&amp;枚举</tag>
       </tags>
   </entry>
   <entry>
@@ -12133,6 +12133,44 @@
     <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
+    <title>数据结构学习随记</title>
+    <url>/2026/07/13/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%AD%A6%E4%B9%A0%E9%9A%8F%E8%AE%B0/</url>
+    <content><![CDATA[<h1 id="链表"><a href="#链表" class="headerlink" title="链表"></a>链表</h1><h2 id="单向链表"><a href="#单向链表" class="headerlink" title="单向链表"></a>单向链表</h2><h3 id="插入、删除的统一逻辑"><a href="#插入、删除的统一逻辑" class="headerlink" title="插入、删除的统一逻辑"></a>插入、删除的统一逻辑</h3><ul>
+<li><p>1.申请空间</p>
+</li>
+<li><p>2.找到待操作的前一个节点</p>
+</li>
+<li><p>3.先处理新节点</p>
+</li>
+<li><p>4.再处理老节点</p>
+</li>
+</ul>
+<h3 id="插入核心思想–找前置节点"><a href="#插入核心思想–找前置节点" class="headerlink" title="插入核心思想–找前置节点"></a>插入核心思想–找前置节点</h3><h3 id="删除核心思想–备份待删除的节点"><a href="#删除核心思想–备份待删除的节点" class="headerlink" title="删除核心思想–备份待删除的节点"></a>删除核心思想–备份待删除的节点</h3><ul>
+<li><p>备份-要删谁就备份谁</p>
+</li>
+<li><p>tmp=p-&gt;next</p>
+</li>
+<li><p>p-&gt;next=temp-&gt;next</p>
+</li>
+<li><p>free(tmp)</p>
+</li>
+</ul>
+<h3 id="概念图"><a href="#概念图" class="headerlink" title="概念图"></a>概念图</h3><ul>
+<li><p>有表头<img src="/./../images/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/image-20260713222951697.png" alt="image-20260713222951697"></p>
+</li>
+<li><p>带上尾指针–实现高效尾插法正序<img src="/./../images/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/image-20260713223011826.png" alt="image-20260713223011826"></p>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>数据结构</category>
+      </categories>
+      <tags>
+        <tag>C/C++</tag>
+        <tag>链表</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>数据结构 —— 顺序表</title>
     <url>/2026/07/17/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%20%E2%80%94%E2%80%94%20%E9%A1%BA%E5%BA%8F%E8%A1%A8/</url>
     <content><![CDATA[<h1 id="数据结构-——-顺序表"><a href="#数据结构-——-顺序表" class="headerlink" title="数据结构 —— 顺序表"></a>数据结构 —— 顺序表</h1><h2 id="什么是顺序表"><a href="#什么是顺序表" class="headerlink" title="什么是顺序表"></a>什么是顺序表</h2><p><strong>顺序表</strong>是线性表的一种存储方式。它的底层就是<strong>数组</strong>——在内存中申请一段连续的空间，依次存放数据元素。</p>
@@ -12262,44 +12300,6 @@
         <tag>C/C++</tag>
         <tag>顺序表</tag>
         <tag>数据结构</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>数据结构学习随记</title>
-    <url>/2026/07/13/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%AD%A6%E4%B9%A0%E9%9A%8F%E8%AE%B0/</url>
-    <content><![CDATA[<h1 id="链表"><a href="#链表" class="headerlink" title="链表"></a>链表</h1><h2 id="单向链表"><a href="#单向链表" class="headerlink" title="单向链表"></a>单向链表</h2><h3 id="插入、删除的统一逻辑"><a href="#插入、删除的统一逻辑" class="headerlink" title="插入、删除的统一逻辑"></a>插入、删除的统一逻辑</h3><ul>
-<li><p>1.申请空间</p>
-</li>
-<li><p>2.找到待操作的前一个节点</p>
-</li>
-<li><p>3.先处理新节点</p>
-</li>
-<li><p>4.再处理老节点</p>
-</li>
-</ul>
-<h3 id="插入核心思想–找前置节点"><a href="#插入核心思想–找前置节点" class="headerlink" title="插入核心思想–找前置节点"></a>插入核心思想–找前置节点</h3><h3 id="删除核心思想–备份待删除的节点"><a href="#删除核心思想–备份待删除的节点" class="headerlink" title="删除核心思想–备份待删除的节点"></a>删除核心思想–备份待删除的节点</h3><ul>
-<li><p>备份-要删谁就备份谁</p>
-</li>
-<li><p>tmp=p-&gt;next</p>
-</li>
-<li><p>p-&gt;next=temp-&gt;next</p>
-</li>
-<li><p>free(tmp)</p>
-</li>
-</ul>
-<h3 id="概念图"><a href="#概念图" class="headerlink" title="概念图"></a>概念图</h3><ul>
-<li><p>有表头<img src="/./../images/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/image-20260713222951697.png" alt="image-20260713222951697"></p>
-</li>
-<li><p>带上尾指针–实现高效尾插法正序<img src="/./../images/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/image-20260713223011826.png" alt="image-20260713223011826"></p>
-</li>
-</ul>
-]]></content>
-      <categories>
-        <category>数据结构</category>
-      </categories>
-      <tags>
-        <tag>C/C++</tag>
-        <tag>链表</tag>
       </tags>
   </entry>
   <entry>
