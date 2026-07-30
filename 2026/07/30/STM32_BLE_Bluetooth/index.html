@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="前几篇博客我们把串口通信玩明白了——轮询、中断、DMA、不定长接收，但一直是有线连接。这篇引入蓝牙模块，把串口数据通过BLE无线传输到手机上，实现用手机app无线控制开发板上的三色LED。同时还实现一个带包头+长度+校验和的完整数据包协议，为后续复杂通信打基础。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——蓝牙BLE通信，用蓝牙无线控制小灯">
+<meta property="og:url" content="http://tristan1116.github.io/2026/07/30/STM32_BLE_Bluetooth/index.html">
+<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:description" content="前几篇博客我们把串口通信玩明白了——轮询、中断、DMA、不定长接收，但一直是有线连接。这篇引入蓝牙模块，把串口数据通过BLE无线传输到手机上，实现用手机app无线控制开发板上的三色LED。同时还实现一个带包头+长度+校验和的完整数据包协议，为后续复杂通信打基础。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_BLE_Bluetooth/image-20260730220537770.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_BLE_Bluetooth/image-20260730220606895.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_BLE_Bluetooth/image-20260730220624044.png">
+<meta property="article:published_time" content="2026-07-30T22:10:00.000Z">
+<meta property="article:modified_time" content="2026-07-30T14:11:06.320Z">
+<meta property="article:author" content="童诗轩">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="USART">
+<meta property="article:tag" content="蓝牙">
+<meta property="article:tag" content="BLE">
+<meta property="article:tag" content="DMA">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_BLE_Bluetooth/image-20260730220537770.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/07/30/STM32_BLE_Bluetooth/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——蓝牙BLE通信，用蓝牙无线控制小灯 | 童诗轩的博客网站</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">童诗轩的博客网站</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/07/30/STM32_BLE_Bluetooth/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="童诗轩的博客网站">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——蓝牙BLE通信，用蓝牙无线控制小灯
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-30 22:10:00 / 修改时间：14:11:06" itemprop="dateCreated datePublished" datetime="2026-07-30T22:10:00+00:00">2026-07-30</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>9.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+            <div class="post-description">前几篇博客我们把串口通信玩明白了——轮询、中断、DMA、不定长接收，但一直是有线连接。这篇引入蓝牙模块，把串口数据通过BLE无线传输到手机上，实现用手机app无线控制开发板上的三色LED。同时还实现一个带包头+长度+校验和的完整数据包协议，为后续复杂通信打基础。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从有线到无线——蓝牙来了"><a href="#从有线到无线——蓝牙来了" class="headerlink" title="从有线到无线——蓝牙来了"></a>从有线到无线——蓝牙来了</h2><p>上篇博客我们学完了 DMA + 空闲中断，串口收发效率达到了极致。但一直是有线连接</p>
+<p>这篇，我们把线拔掉——<strong>用蓝牙实现无线通信</strong>。</p>
+<p>先回顾一下过去几篇的通信方式演进：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">串口轮询:  STM32 ←──USB线──→ 电脑串口助手   CPU全程搬运</span><br><span class="line">串口中断:  STM32 ←──USB线──→ 电脑串口助手   CPU收到中断才处理</span><br><span class="line">DMA+空闲: STM32 ←──USB线──→ 电脑串口助手   DMA自动搬运，CPU彻底解放</span><br><span class="line">第1蓝牙BLE:  STM32 ←→ 蓝牙模块 ～～无线～～ 手机/电脑   本篇！</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="蓝牙基础"><a href="#蓝牙基础" class="headerlink" title="蓝牙基础"></a>蓝牙基础</h2><h3 id="经典蓝牙-vs-BLE"><a href="#经典蓝牙-vs-BLE" class="headerlink" title="经典蓝牙 vs BLE"></a>经典蓝牙 vs BLE</h3><p>蓝牙分为两种：</p>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">经典蓝牙 (Classic)</th>
+<th align="left">低功耗蓝牙 (BLE)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>典型设备</strong></td>
+<td align="left">蓝牙耳机、音箱</td>
+<td align="left">运动手环、体测设备</td>
+</tr>
+<tr>
+<td align="left"><strong>数据传输方式</strong></td>
+<td align="left">持续传输（音频流）</td>
+<td align="left">间歇性同步（传感器数据）</td>
+</tr>
+<tr>
+<td align="left"><strong>功耗</strong></td>
+<td align="left">较高</td>
+<td align="left">极低（纽扣电池可用数月）</td>
+</tr>
+<tr>
+<td align="left"><strong>我们的模块</strong></td>
+<td align="left">—</td>
+<td align="left"><strong>BT24（BLE串口透传模块）</strong></td>
+</tr>
+</tbody></table>
+<h3 id="主机与从机"><a href="#主机与从机" class="headerlink" title="主机与从机"></a>主机与从机</h3><p>蓝牙通信分两端：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────┐         ┌─────────────────┐</span><br><span class="line">│  主机 (Master) │ ←扫描─→ │  从机 (Slave)    │</span><br><span class="line">│  手机/电脑     │ ←连接─→ │  STM32 + BT24    │</span><br><span class="line">│              │ ←数据─→ │  广播自己的信息    │</span><br><span class="line">└─────────────┘         └─────────────────┘</span><br><span class="line"></span><br><span class="line">建立连接过程：</span><br><span class="line">  1. 从机向外广播（Advertising）：&quot;我是BT24，我可以串口透传&quot;</span><br><span class="line">  2. 主机扫描附近蓝牙设备</span><br><span class="line">  3. 主机发起连接请求</span><br><span class="line">  4. 连接建立 → 双方通过约定协议通信</span><br></pre></td></tr></table></figure>
+
+<h3 id="蓝牙串口透传模块——BT24"><a href="#蓝牙串口透传模块——BT24" class="headerlink" title="蓝牙串口透传模块——BT24"></a>蓝牙串口透传模块——BT24</h3><p>蓝牙协议本身很复杂（GAP 广播、GATT 服务、Service&#x2F;Characteristic 等），但keysking的学习套件里有一枚 <strong>BT24 蓝牙串口透传模块</strong>。</p>
+<p><strong>“透传”</strong> 的意思很简单：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">手机 app 发送 &quot;R1&quot;</span><br><span class="line">       │</span><br><span class="line">       ▼ (蓝牙无线)</span><br><span class="line">  BT24 模块 收到 &quot;R1&quot;</span><br><span class="line">       │</span><br><span class="line">       ▼ (串口 TX → STM32 RX)</span><br><span class="line">  STM32 USART3 收到 &quot;R1&quot;  ← 原封不动！</span><br><span class="line"></span><br><span class="line">反过来也一样：</span><br><span class="line">  STM32 发送 &quot;OK&quot;</span><br><span class="line">       │</span><br><span class="line">       ▼ (串口 TX → BT24 RX)</span><br><span class="line">  BT24 模块 收到 &quot;OK&quot;</span><br><span class="line">       │</span><br><span class="line">       ▼ (蓝牙无线)</span><br><span class="line">  手机 app 收到 &quot;OK&quot;  ← 原封不动！</span><br></pre></td></tr></table></figure>
+
+<p>模块把复杂的蓝牙协议全部封装起来，对外只暴露一个<strong>串口</strong>。对 STM32 来说，<strong>操作蓝牙模块 &#x3D; 操作串口</strong>——前面学的所有串口知识（轮询、中断、DMA、不定长接收）全部可以直接复用。</p>
+<hr>
+<h2 id="硬件连接"><a href="#硬件连接" class="headerlink" title="硬件连接"></a>硬件连接</h2><p>学习板上专门为蓝牙模块引出了 USART3 的接口：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">学习板                       BT24 蓝牙模块</span><br><span class="line">  ┌──────┐                   ┌──────┐</span><br><span class="line">  │ 5V   ├───────────────────┤ VCC  │</span><br><span class="line">  │ GND  ├───────────────────┤ GND  │</span><br><span class="line">  │ TX   ├───────────────────┤ RX   │</span><br><span class="line">  │ RX   ├───────────────────┤ TX   │</span><br><span class="line">  └──────┘                   └──────┘</span><br><span class="line">     ▲                           ▲</span><br><span class="line">     └─ TX/RX 交叉连接 ──────────┘</span><br><span class="line">     └─ 5V供电 + 共地</span><br></pre></td></tr></table></figure>
+
+<p>使用学习套件附赠的 <strong>4pin 杜邦线</strong>，一端接学习板的 USART3 接口，另一端接蓝牙模块。<strong>务必注意线序：VCC ↔ 5V，GND ↔ GND，TX ↔ RX（交叉），RX ↔ TX（交叉）。</strong></p>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="新建工程"><a href="#新建工程" class="headerlink" title="新建工程"></a>新建工程</h3><p>芯片选 <strong>STM32F103C8T6</strong>，工程名设为 <code>Ble</code>。</p>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p><strong>System Core → SYS → Debug: Serial Wire</strong>（老规矩）。</p>
+<h3 id="配置-USART3——蓝牙通信通道"><a href="#配置-USART3——蓝牙通信通道" class="headerlink" title="配置 USART3——蓝牙通信通道"></a>配置 USART3——蓝牙通信通道</h3><p>在 <strong>Connectivity → USART3</strong> 中，Mode 设为 <strong>Asynchronous</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="center">值</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Baud Rate</strong></td>
+<td align="center"><strong>9600</strong></td>
+<td align="left">⚠️ BT24 模块默认波特率是 9600，不是 115200！</td>
+</tr>
+<tr>
+<td align="left">Word Length</td>
+<td align="center">8 Bits</td>
+<td align="left">标准配置</td>
+</tr>
+<tr>
+<td align="left">Parity</td>
+<td align="center">None</td>
+<td align="left">无校验</td>
+</tr>
+<tr>
+<td align="left">Stop Bits</td>
+<td align="center">1</td>
+<td align="left">1位停止位</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><img src="/./../images/STM32_BLE_Bluetooth/image-20260730220537770.png" alt="image-20260730220537770"></p>
+<p><strong>为什么是 9600 而不是 115200？</strong> BT24 蓝牙模块出厂默认波特率是 9600。蓝牙无线传输速率有限，9600 已经足够。如果设成 115200，模块和 STM32 的波特率不匹配，收到的将全是乱码。</p>
+</blockquote>
+<h3 id="开启-USART3-中断-DMA"><a href="#开启-USART3-中断-DMA" class="headerlink" title="开启 USART3 中断 + DMA"></a>开启 USART3 中断 + DMA</h3><p>在 <strong>NVIC Settings</strong> 中勾选 <strong>USART3 global interrupt</strong>。<img src="/./../images/STM32_BLE_Bluetooth/image-20260730220606895.png" alt="image-20260730220606895"></p>
+<p>在 <strong>DMA Settings</strong> 中，点击 <strong>Add</strong> 添加两个 DMA 通道：<img src="/./../images/STM32_BLE_Bluetooth/image-20260730220624044.png" alt="image-20260730220624044"></p>
+<p><strong>USART3_TX（发送）：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="center">值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Direction</td>
+<td align="center">Memory To Peripheral</td>
+</tr>
+<tr>
+<td align="left">Priority</td>
+<td align="center">Low</td>
+</tr>
+<tr>
+<td align="left">Mode</td>
+<td align="center">Normal</td>
+</tr>
+<tr>
+<td align="left">Data Width</td>
+<td align="center">Byte</td>
+</tr>
+</tbody></table>
+<p><strong>USART3_RX（接收）：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="center">值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Direction</td>
+<td align="center">Peripheral To Memory</td>
+</tr>
+<tr>
+<td align="left">Priority</td>
+<td align="center">Low</td>
+</tr>
+<tr>
+<td align="left">Mode</td>
+<td align="center">Normal</td>
+</tr>
+<tr>
+<td align="left">Data Width</td>
+<td align="center">Byte</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>CubeMX 会自动分配 DMA1 的通道 2 给 USART3_RX，通道 3 给 USART3_TX。</p>
+</blockquote>
+<h3 id="配置-LED-引脚"><a href="#配置-LED-引脚" class="headerlink" title="配置 LED 引脚"></a>配置 LED 引脚</h3><p>三个 LED 和之前完全一样：</p>
+<table>
+<thead>
+<tr>
+<th align="center">引脚</th>
+<th align="center">User Label</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">PB0</td>
+<td align="center"><code>LED_RED</code></td>
+</tr>
+<tr>
+<td align="center">PA7</td>
+<td align="center"><code>LED_GREEN</code></td>
+</tr>
+<tr>
+<td align="center">PA6</td>
+<td align="center"><code>LED_BLUE</code></td>
+</tr>
+</tbody></table>
+<p>均设为 <strong>GPIO_Output</strong>（推挽输出、无上下拉、低速）。</p>
+<h3 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h3><p><strong>Project Manager</strong> 中 Toolchain 选 <strong>CMake</strong>，点击 <strong>Generate Code</strong>。</p>
+<hr>
+<h2 id="VS-Code-中编写核心代码"><a href="#VS-Code-中编写核心代码" class="headerlink" title="VS Code 中编写核心代码"></a>VS Code 中编写核心代码</h2><h3 id="和上篇（DMA-空闲中断）代码的对比"><a href="#和上篇（DMA-空闲中断）代码的对比" class="headerlink" title="和上篇（DMA+空闲中断）代码的对比"></a>和上篇（DMA+空闲中断）代码的对比</h3><p>这篇的代码和上篇很多一样——只是串口从 USART2 换成了 USART3，波特率从 115200 换成了 9600，然后再加上了数据包解析逻辑。</p>
+<table>
+<thead>
+<tr>
+<th align="left">变化点</th>
+<th align="left">第10集 (DMA串口)</th>
+<th align="left">本篇 (蓝牙)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>使用的串口</strong></td>
+<td align="left">USART2</td>
+<td align="left"><strong>USART3</strong></td>
+</tr>
+<tr>
+<td align="left"><strong>波特率</strong></td>
+<td align="left">115200</td>
+<td align="left"><strong>9600</strong>（BT24 默认）</td>
+</tr>
+<tr>
+<td align="left"><strong>接收函数</strong></td>
+<td align="left"><code>HAL_UARTEx_ReceiveToIdle_DMA</code></td>
+<td align="left">相同</td>
+</tr>
+<tr>
+<td align="left"><strong>回调函数</strong></td>
+<td align="left"><code>HAL_UARTEx_RxEventCallback</code></td>
+<td align="left">相同</td>
+</tr>
+<tr>
+<td align="left"><strong>新增</strong></td>
+<td align="left">—</td>
+<td align="left"><strong>数据包解析</strong>（包头+长度+校验和）</td>
+</tr>
+</tbody></table>
+<h3 id="main-c-完整代码"><a href="#main-c-完整代码" class="headerlink" title="main.c 完整代码"></a>main.c 完整代码</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN PV */</span></span><br><span class="line"><span class="comment">// 存放蓝牙接收数据的数组——向上篇一样设为50字节，给不定长数据留足空间</span></span><br><span class="line"><span class="type">uint8_t</span> receiveData[<span class="number">50</span>];</span><br><span class="line"><span class="comment">/* USER CODE END PV */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN 0 */</span></span><br><span class="line"><span class="comment">// 串口空闲中断回调函数——蓝牙数据到了自动调用</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_UARTEx_RxEventCallback</span><span class="params">(UART_HandleTypeDef *huart, <span class="type">uint16_t</span> Size)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span>(huart==&amp;huart3)                                  <span class="comment">// ① 判断是USART3（蓝牙）</span></span><br><span class="line">    &#123;</span><br><span class="line">        HAL_UART_Transmit_DMA(&amp;huart3, receiveData, Size); <span class="comment">// ② 回显收到的数据</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// ③ 验证数据包：包头必须是 0xAA</span></span><br><span class="line">        <span class="comment">//              数据包长度位必须等于实际接收长度</span></span><br><span class="line">        <span class="keyword">if</span>(receiveData[<span class="number">0</span>]==<span class="number">0xAA</span> &amp;&amp; receiveData[<span class="number">1</span>]==Size)</span><br><span class="line">        &#123;</span><br><span class="line">          <span class="type">uint8_t</span> sum=<span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">          <span class="comment">// ④ 计算校验和：把包头到数据最后一位之前的所有字节相加</span></span><br><span class="line">          <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;Size<span class="number">-1</span>;i++)</span><br><span class="line">            sum+=receiveData[i];</span><br><span class="line"></span><br><span class="line">          <span class="comment">// ⑤ 验证校验和：计算出来的和 == 数据包最后一位？</span></span><br><span class="line">          <span class="keyword">if</span>(sum==receiveData[Size<span class="number">-1</span>])</span><br><span class="line">          &#123;</span><br><span class="line">              <span class="comment">// ⑥ 解析数据内容：从第2字节开始，每2个字节为一组</span></span><br><span class="line">              <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">2</span>;i&lt;Size<span class="number">-1</span>;i+=<span class="number">2</span>)</span><br><span class="line">            &#123;</span><br><span class="line">              GPIO_PinState state = GPIO_PIN_SET;         <span class="comment">// 默认亮</span></span><br><span class="line">              <span class="keyword">if</span> (receiveData[i+<span class="number">1</span>] == <span class="number">0x00</span>)               <span class="comment">// 每组的第2字节是0x00→灭</span></span><br><span class="line">                  state = GPIO_PIN_RESET;</span><br><span class="line"></span><br><span class="line">              <span class="comment">// ⑦ 每组的第1字节决定控制哪个灯</span></span><br><span class="line">              <span class="keyword">switch</span> (receiveData[i])</span><br><span class="line">              &#123;</span><br><span class="line">                  <span class="keyword">case</span> <span class="number">0x01</span>:                              <span class="comment">// 0x01 = 红色</span></span><br><span class="line">                      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);</span><br><span class="line">                      <span class="keyword">break</span>;</span><br><span class="line">                  <span class="keyword">case</span> <span class="number">0x02</span>:                              <span class="comment">// 0x02 = 绿色</span></span><br><span class="line">                      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, state);</span><br><span class="line">                      <span class="keyword">break</span>;</span><br><span class="line">                  <span class="keyword">case</span> <span class="number">0x03</span>:                              <span class="comment">// 0x03 = 蓝色</span></span><br><span class="line">                      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, state);</span><br><span class="line">                      <span class="keyword">break</span>;</span><br><span class="line">              &#125;</span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// ⑧ 重新启动接收 + 关闭DMA过半中断（和上篇一样）</span></span><br><span class="line">        HAL_UARTEx_ReceiveToIdle_DMA(&amp;huart3, receiveData, <span class="keyword">sizeof</span>(receiveData));</span><br><span class="line">        __HAL_DMA_DISABLE_IT(&amp;hdma_usart3_rx, DMA_IT_HT);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 0 */</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// …… HAL_Init / SystemClock_Config / MX_GPIO_Init / MX_DMA_Init / MX_USART3_UART_Init ……</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">    <span class="comment">// 启动蓝牙串口不定长DMA接收</span></span><br><span class="line">    HAL_UARTEx_ReceiveToIdle_DMA(&amp;huart3, receiveData, <span class="keyword">sizeof</span>(receiveData));</span><br><span class="line">    __HAL_DMA_DISABLE_IT(&amp;hdma_usart3_rx, DMA_IT_HT);</span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 空的——蓝牙数据由中断+DMA驱动</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h3><p><strong>用到的 HAL 函数：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_UARTEx_ReceiveToIdle_DMA(&amp;huart3, buf, maxlen)</code></td>
+<td align="left">启动 USART3 的不定长 DMA 接收（空闲中断触发回调）</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_UART_Transmit_DMA(&amp;huart3, buf, len)</code></td>
+<td align="left">用 DMA 从 USART3 发送数据（回显给蓝牙模块）</td>
+</tr>
+<tr>
+<td align="left"><code>__HAL_DMA_DISABLE_IT(&amp;hdma_usart3_rx, DMA_IT_HT)</code></td>
+<td align="left">关闭 DMA 接收过半中断（防重复回调）</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_GPIO_WritePin(...)</code></td>
+<td align="left">老朋友——控制 LED</td>
+</tr>
+</tbody></table>
+<p><strong>逻辑流程（按回调函数中的执行顺序）：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">蓝牙数据到达 USART3</span><br><span class="line">       │</span><br><span class="line">       ▼</span><br><span class="line">① 判断是 huart3（蓝牙串口）触发的</span><br><span class="line">       │</span><br><span class="line">       ▼</span><br><span class="line">② 回显收到的数据（发回蓝牙模块→手机上看到回显）</span><br><span class="line">       │</span><br><span class="line">       ▼</span><br><span class="line">③ 验证包头：receiveData[0] 是否为 0xAA？</span><br><span class="line">   验证长度：receiveData[1] 是否等于 Size？</span><br><span class="line">       │  ✅ 通过</span><br><span class="line">       ▼</span><br><span class="line">④ 计算校验和：把前 Size-1 个字节累加</span><br><span class="line">       │</span><br><span class="line">       ▼</span><br><span class="line">⑤ 比对校验和：sum == receiveData[Size-1]？</span><br><span class="line">       │  ✅ 通过</span><br><span class="line">       ▼</span><br><span class="line">⑥ 解析数据：从 receiveData[2] 开始，</span><br><span class="line">   每2字节一组的格式是 [灯号, 状态]</span><br><span class="line">       │</span><br><span class="line">       ▼</span><br><span class="line">⑦ 控制LED：0x01→红 / 0x02→绿 / 0x03→蓝</span><br><span class="line">                   0xFF→亮 / 0x00→灭</span><br><span class="line">       │</span><br><span class="line">       ▼</span><br><span class="line">⑧ 重新启动接收 + 关闭过半中断</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="通信协议设计"><a href="#通信协议设计" class="headerlink" title="通信协议设计"></a>通信协议设计</h2><p>本次的数据包格式比之前（”R1、G0”文本协议）更正规——采用了<strong>十六进制二进制协议</strong>：</p>
+<h3 id="数据包结构"><a href="#数据包结构" class="headerlink" title="数据包结构"></a>数据包结构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">┌────────┬────────┬──────────┬──···──┬────────┐</span><br><span class="line">│ 包头    │ 长度    │  数据段          │ 校验和  │</span><br><span class="line">│ 0xAA   │ N      │  (N-3)字节      │ 1字节   │</span><br><span class="line">│ 1字节   │ 1字节   │  变长            │ 累加取低8位│</span><br><span class="line">└────────┴────────┴──────────┴──···──┴────────┘</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="left">位置</th>
+<th align="left">字段</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>receiveData[0]</code></td>
+<td align="left"><strong>包头 (Header)</strong></td>
+<td align="left">固定 <code>0xAA</code>，标识一帧数据的开始</td>
+</tr>
+<tr>
+<td align="left"><code>receiveData[1]</code></td>
+<td align="left"><strong>数据包长度</strong></td>
+<td align="left">包括包头、长度位、数据和校验和的<strong>总字节数</strong></td>
+</tr>
+<tr>
+<td align="left"><code>receiveData[2] ~ [Size-2]</code></td>
+<td align="left"><strong>数据段 (Payload)</strong></td>
+<td align="left">每2字节一组：<code>[灯号, 状态]</code>，可有多组</td>
+</tr>
+<tr>
+<td align="left"><code>receiveData[Size-1]</code></td>
+<td align="left"><strong>校验和 (Checksum)</strong></td>
+<td align="left">前 <code>Size-1</code> 字节的累加和，取低8位</td>
+</tr>
+</tbody></table>
+<h3 id="数据段编码"><a href="#数据段编码" class="headerlink" title="数据段编码"></a>数据段编码</h3><table>
+<thead>
+<tr>
+<th align="center">灯号</th>
+<th align="left">含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>0x01</code></td>
+<td align="left">🔴 红色 LED</td>
+</tr>
+<tr>
+<td align="center"><code>0x02</code></td>
+<td align="left">🟢 绿色 LED</td>
+</tr>
+<tr>
+<td align="center"><code>0x03</code></td>
+<td align="left">🔵 蓝色 LED</td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th align="center">状态</th>
+<th align="left">含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>0xFF</code></td>
+<td align="left">亮起</td>
+</tr>
+<tr>
+<td align="center"><code>0x00</code></td>
+<td align="left">熄灭</td>
+</tr>
+</tbody></table>
+<h3 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h3><p><strong>让红灯亮起：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">0xAA  0x05  0x01  0xFF  0xAF</span><br><span class="line">包头   长度=5 红灯   亮    校验和(=0xAA+0x05+0x01+0xFF 的低8位)</span><br></pre></td></tr></table></figure>
+
+<p><strong>让红灯熄灭、绿灯亮起：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">0xAA  0x07  0x01  0x00  0x02  0xFF  0x9D</span><br><span class="line">包头   长度=7 红灯   灭    绿灯   亮    校验和</span><br></pre></td></tr></table></figure>
+
+<p><strong>同时控制红蓝两灯（红灯亮、蓝灯灭）：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">0xAA  0x07  0x01  0xFF  0x03  0x00  0xAD</span><br><span class="line">包头   长度=7 红灯   亮    蓝灯   灭    校验和</span><br></pre></td></tr></table></figure>
+
+<h3 id="校验和（Checksum）的原理"><a href="#校验和（Checksum）的原理" class="headerlink" title="校验和（Checksum）的原理"></a>校验和（Checksum）的原理</h3><p>“校验和”是一种最简单也最常用的数据完整性校验方法：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">发送方：</span><br><span class="line">  0xAA + 0x05 + 0x01 + 0xFF = 0x1AF</span><br><span class="line">  取低8位 → 0xAF  ← 填入数据包最后一位</span><br><span class="line"></span><br><span class="line">接收方（STM32）：</span><br><span class="line">  收到 [0xAA, 0x05, 0x01, 0xFF, 0xAF]</span><br><span class="line">  重新计算：0xAA+0x05+0x01+0xFF = 0x1AF → 低8位 = 0xAF</span><br><span class="line">  比对：收到的 0xAF == 计算的 0xAF ✅ 数据正确！</span><br><span class="line"></span><br><span class="line">如果传输中某一位出错，比如 0x01 变成了 0x02：</span><br><span class="line">  重新计算：0xAA+0x05+0x02+0xFF = 0x1B0 → 低8位 = 0xB0</span><br><span class="line">  比对：收到的 0xAF ≠ 计算的 0xB0 ❌ 数据错误→丢弃此包</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="蓝牙调试——波特律动串口助手的蓝牙模式"><a href="#蓝牙调试——波特律动串口助手的蓝牙模式" class="headerlink" title="蓝牙调试——波特律动串口助手的蓝牙模式"></a>蓝牙调试——波特律动串口助手的蓝牙模式</h2><p>这次不用插 USB 线了！</p>
+<h3 id="电脑端（蓝牙串口助手）"><a href="#电脑端（蓝牙串口助手）" class="headerlink" title="电脑端（蓝牙串口助手）"></a>电脑端（蓝牙串口助手）</h3><p>keysking 在波特律动串口助手上专门添加了蓝牙调试功能：</p>
+<ol>
+<li><strong>确保电脑蓝牙已开启</strong></li>
+<li>打开<a target="_blank" rel="noopener" href="https://carea.keysking.com/">波特律动串口助手</a></li>
+<li>点击蓝牙图标 → 从普通串口模式切换为<strong>蓝牙串口模式</strong></li>
+<li>点击<strong>选择蓝牙</strong> → 扫描附近蓝牙设备</li>
+<li>找到 <strong>BT24</strong> → 点击<strong>配对</strong></li>
+<li>配对成功后，就可以像用普通串口一样收发数据了！</li>
+</ol>
+<blockquote>
+<p>如果扫描不到 BT24，可以按一下蓝牙模块上的复位按钮再试。</p>
+</blockquote>
+<h3 id="自动计算校验和"><a href="#自动计算校验和" class="headerlink" title="自动计算校验和"></a>自动计算校验和</h3><p>手动算校验和太痛苦。波特律动串口助手支持<strong>自动计算校验和</strong>：</p>
+<ul>
+<li>点击校验算法选择 → 选择 <strong>校验和 (Checksum)</strong></li>
+<li>每次发送数据时自动计算并附加校验字节</li>
+<li>再也不用打开计算器了！</li>
+</ul>
+<h3 id="手机端（蓝牙调试助手）"><a href="#手机端（蓝牙调试助手）" class="headerlink" title="手机端（蓝牙调试助手）"></a>手机端（蓝牙调试助手）</h3><p>也可以用手机上的 BLE 调试 app：</p>
+<ol>
+<li>先在电脑端断开蓝牙连接（或按模块复位键）</li>
+<li>手机开启蓝牙 + 授予 app 精确定位权限</li>
+<li>配套资料包中找到 <code>BT24 蓝牙调试助手.apk</code></li>
+<li>安装后选择<strong>透传模式</strong> → 搜索 BLE → 找到 BT24 → 连接</li>
+<li>输入十六进制数据即可发送</li>
+</ol>
+<hr>
+<h2 id="效果测试"><a href="#效果测试" class="headerlink" title="效果测试"></a>效果测试</h2><h3 id="测试1：电脑蓝牙-→-让红灯亮起"><a href="#测试1：电脑蓝牙-→-让红灯亮起" class="headerlink" title="测试1：电脑蓝牙 → 让红灯亮起"></a>测试1：电脑蓝牙 → 让红灯亮起</h3><p>在波特律动串口助手（蓝牙模式）的发送区输入 Hex：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AA 05 01 FF AF</span><br></pre></td></tr></table></figure>
+<p>点击发送 → 🔴 红灯亮起！同时收到回显 <code>AA 05 01 FF AF</code>。</p>
+<h3 id="测试2：自动校验和-→-红灯灭-绿灯亮"><a href="#测试2：自动校验和-→-红灯灭-绿灯亮" class="headerlink" title="测试2：自动校验和 → 红灯灭 + 绿灯亮"></a>测试2：自动校验和 → 红灯灭 + 绿灯亮</h3><p>输入 Hex（注意长度改为 7）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AA 07 01 00 02 FF</span><br></pre></td></tr></table></figure>
+<p>选择校验和算法后，助手自动在末尾补上 <code>9D</code> → 发送 → 🔴 红灯灭，🟢 绿灯亮！</p>
+<h3 id="测试3：手机蓝牙-→-全灯控制"><a href="#测试3：手机蓝牙-→-全灯控制" class="headerlink" title="测试3：手机蓝牙 → 全灯控制"></a>测试3：手机蓝牙 → 全灯控制</h3><p>手机上输入 Hex <code>AA 07 01 FF 02 FF 03 FF</code> + 自动校验和 → 三灯全亮！✅</p>
+<table>
+<thead>
+<tr>
+<th align="left">发送内容</th>
+<th align="left">效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>AA 05 01 FF</code> + 校验和</td>
+<td align="left">🔴 红灯亮</td>
+</tr>
+<tr>
+<td align="left"><code>AA 05 01 00</code> + 校验和</td>
+<td align="left">🔴 红灯灭</td>
+</tr>
+<tr>
+<td align="left"><code>AA 05 02 FF</code> + 校验和</td>
+<td align="left">🟢 绿灯亮</td>
+</tr>
+<tr>
+<td align="left"><code>AA 05 03 FF</code> + 校验和</td>
+<td align="left">🔵 蓝灯亮</td>
+</tr>
+<tr>
+<td align="left"><code>AA 07 01 FF 02 00</code> + 校验和</td>
+<td align="left">🔴 红灯亮 + 🟢 绿灯灭</td>
+</tr>
+<tr>
+<td align="left"><code>AA 07 01 FF 02 FF 03 FF</code> + 校验和</td>
+<td align="left">三灯全亮</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>效果展示视频：</p>
+<p><strong>链接占位——待录制后替换</strong></p>
+</blockquote>
+<hr>
+<h2 id="解读初始化代码"><a href="#解读初始化代码" class="headerlink" title="解读初始化代码"></a>解读初始化代码</h2><h3 id="MX-USART3-UART-Init-——-蓝牙串口初始化"><a href="#MX-USART3-UART-Init-——-蓝牙串口初始化" class="headerlink" title="MX_USART3_UART_Init —— 蓝牙串口初始化"></a>MX_USART3_UART_Init —— 蓝牙串口初始化</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_USART3_UART_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    huart3.Instance = USART3;                              <span class="comment">// (1) 使用USART3（不是USART2）</span></span><br><span class="line">    huart3.Init.BaudRate = <span class="number">9600</span>;                           <span class="comment">// (2) ⚠️ 波特率9600，不是115200！</span></span><br><span class="line">    huart3.Init.WordLength = UART_WORDLENGTH_8B;</span><br><span class="line">    huart3.Init.StopBits = UART_STOPBITS_1;</span><br><span class="line">    huart3.Init.Parity = UART_PARITY_NONE;</span><br><span class="line">    huart3.Init.Mode = UART_MODE_TX_RX;</span><br><span class="line">    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;</span><br><span class="line">    huart3.Init.OverSampling = UART_OVERSAMPLING_16;</span><br><span class="line">    <span class="keyword">if</span> (HAL_UART_Init(&amp;huart3) != HAL_OK)</span><br><span class="line">        Error_Handler();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="center">行</th>
+<th align="left">代码</th>
+<th align="left">和上篇的区别</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">(1)</td>
+<td align="left"><code>.Instance = USART3</code></td>
+<td align="left">🔴 <strong>USART2 → USART3</strong>（蓝牙模块接在 USART3 上）</td>
+</tr>
+<tr>
+<td align="center">(2)</td>
+<td align="left"><code>.BaudRate = 9600</code></td>
+<td align="left">🔴 <strong>115200 → 9600</strong>（BT24 模块默认波特率）</td>
+</tr>
+<tr>
+<td align="center">其余</td>
+<td align="left">数据位8、停止位1、无校验……</td>
+<td align="left">✅ 与之前完全相同</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>⚠️ <strong>波特率必须匹配</strong>——BT24 默认 9600，如果把 STM32 的 USART3 设成 115200，两边波特率不同，通信会完全失败。</p>
+</blockquote>
+<h3 id="MX-DMA-Init-——-DMA-初始化"><a href="#MX-DMA-Init-——-DMA-初始化" class="headerlink" title="MX_DMA_Init —— DMA 初始化"></a>MX_DMA_Init —— DMA 初始化</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_DMA_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    __HAL_RCC_DMA1_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* DMA1_Channel2_IRQn → USART3_RX */</span></span><br><span class="line">    HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, <span class="number">0</span>, <span class="number">0</span>);</span><br><span class="line">    HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* DMA1_Channel3_IRQn → USART3_TX */</span></span><br><span class="line">    HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, <span class="number">0</span>, <span class="number">0</span>);</span><br><span class="line">    HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="left">对比</th>
+<th align="left">上篇（USART2）</th>
+<th align="left">本篇（USART3）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>RX 通道</strong></td>
+<td align="left">DMA1_Channel<strong>6</strong></td>
+<td align="left">DMA1_Channel<strong>2</strong></td>
+</tr>
+<tr>
+<td align="left"><strong>TX 通道</strong></td>
+<td align="left">DMA1_Channel<strong>7</strong></td>
+<td align="left">DMA1_Channel<strong>3</strong></td>
+</tr>
+</tbody></table>
+<p>每个 USART 外设的 DMA 请求绑定到不同的 DMA 通道。USART3_RX 对应 DMA1 的通道 2，USART3_TX 对应通道 3——这是 STM32 硬件设计固定的。</p>
+<h3 id="USART3-的引脚映射"><a href="#USART3-的引脚映射" class="headerlink" title="USART3 的引脚映射"></a>USART3 的引脚映射</h3><p>USART3 的 TX 和 RX 分别使用 <strong>PB10</strong> 和 <strong>PB11</strong>（不像 USART2 用 PA2&#x2F;PA3）。在 <code>HAL_UART_MspInit</code> 中可以看到：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 在 stm32f1xx_hal_msp.c 中</span></span><br><span class="line">GPIO_InitStruct.Pin = GPIO_PIN_10;       <span class="comment">// PB10 → USART3_TX</span></span><br><span class="line">GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;  <span class="comment">// 复用推挽输出</span></span><br><span class="line">HAL_GPIO_Init(GPIOB, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">GPIO_InitStruct.Pin = GPIO_PIN_11;       <span class="comment">// PB11 → USART3_RX</span></span><br><span class="line">GPIO_InitStruct.Mode = GPIO_MODE_INPUT;   <span class="comment">// 浮空输入</span></span><br><span class="line">HAL_GPIO_Init(GPIOB, &amp;GPIO_InitStruct);</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="代码结构总览"><a href="#代码结构总览" class="headerlink" title="代码结构总览"></a>代码结构总览</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">全局变量区：</span><br><span class="line">    receiveData[50]              ← 蓝牙接收缓冲区</span><br><span class="line">    huart3                       ← USART3 句柄（蓝牙通道）</span><br><span class="line">    hdma_usart3_rx / _tx         ← DMA 通道句柄</span><br><span class="line"></span><br><span class="line">main():</span><br><span class="line">    HAL_Init()</span><br><span class="line">    SystemClock_Config()</span><br><span class="line">    MX_GPIO_Init()               ← LED 引脚配置</span><br><span class="line">    MX_DMA_Init()                ← DMA 通道2/3 初始化</span><br><span class="line">    MX_USART3_UART_Init()        ← USART3 9600波特率</span><br><span class="line">    HAL_UARTEx_ReceiveToIdle_DMA() ← 启动蓝牙接收</span><br><span class="line">    __HAL_DMA_DISABLE_IT(HT)       ← 关闭过半中断</span><br><span class="line">    while(1) &#123; &#125;                   ← 空的！蓝牙由中断驱动</span><br><span class="line"></span><br><span class="line">回调函数：</span><br><span class="line">    HAL_UARTEx_RxEventCallback:</span><br><span class="line">        ├ 验证包头 0xAA + 长度</span><br><span class="line">        ├ 计算校验和</span><br><span class="line">        ├ 比对校验和</span><br><span class="line">        ├ 解析每2字节：[灯号,状态]</span><br><span class="line">        ├ 控制LED (0x01/0x02/0x03 + 0xFF/0x00)</span><br><span class="line">        ├ 重启接收 (ReceiveToIdle_DMA)</span><br><span class="line">        └ 关闭过半中断 (__HAL_DMA_DISABLE_IT)</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="和上一篇代码的三大变化"><a href="#和上一篇代码的三大变化" class="headerlink" title="和上一篇代码的三大变化"></a>和上一篇代码的三大变化</h2><table>
+<thead>
+<tr>
+<th align="left">#</th>
+<th align="left">变化</th>
+<th align="left">第10集</th>
+<th align="left">本篇</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left"><strong>串口号</strong></td>
+<td align="left">USART2</td>
+<td align="left"><strong>USART3</strong>（蓝牙模块接在这里）</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left"><strong>波特率</strong></td>
+<td align="left">115200</td>
+<td align="left"><strong>9600</strong>（BT24 模块默认）</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left"><strong>数据解析</strong></td>
+<td align="left">无（直接回显）</td>
+<td align="left"><strong>新增</strong>：包头验证 + 长度验证 + <strong>校验和</strong> + 多组指令解析</td>
+</tr>
+</tbody></table>
+<p>核心的 DMA+空闲中断接收机制 —— <code>HAL_UARTEx_ReceiveToIdle_DMA</code> + <code>HAL_UARTEx_RxEventCallback</code> —— <strong>完全一样</strong>。这说明<strong>一通百通</strong>，掌握了串口通信的底层机制后，换一个外设（蓝牙模块）只是换一个串口号和波特率而已。</p>
+<hr>
+<h2 id="关于数据包解析的补充说明"><a href="#关于数据包解析的补充说明" class="headerlink" title="关于数据包解析的补充说明"></a>关于数据包解析的补充说明</h2><p>本篇把数据包的解析直接放在了<strong>中断回调函数</strong>里。这种方式简单直接，适合以下场景：</p>
+<ul>
+<li>数据包发送频率不高</li>
+<li>每包数据量不大</li>
+<li>没有复杂的粘包&#x2F;拆包问题</li>
+</ul>
+<p>但如果数据包发送很快、两包间隔极短，或者在实际产品中需要处理更复杂的情况，就需要：</p>
+<ul>
+<li>建立<strong>循环缓冲区</strong>（Ring Buffer）缓存收到的数据</li>
+<li>把数据解析逻辑<strong>搬到 <code>main()</code> 的 while 循环中</strong></li>
+<li>考虑粘包（多包粘在一起）、断包（一包分两次收到）等情况</li>
+</ul>
+<p>keysking 提到了配套资料包中的 <code>UART_Command</code> 例程展示了这种更健壮的做法，有详细注释，需要的小伙伴可以参考。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这篇博客实现了<strong>三个跨越</strong>：</p>
+<ol>
+<li><strong>从有线到无线</strong> —— 通过 BT24 蓝牙透传模块，STM32 可以和手机&#x2F;电脑无线通信</li>
+<li><strong>从文本协议到二进制协议</strong> —— 从 “R1”, “G0” 字符串进化为 <code>0xAA + 长度 + 数据 + 校验和</code> 的正规二进制协议</li>
+<li><strong>从简单到健壮</strong> —— 增加了包头验证、长度验证、校验和验证三重数据完整性保障</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th align="left">新知识点</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>蓝牙基础</strong></td>
+<td align="left">经典蓝牙 vs BLE、主机&#x2F;从机、广播&#x2F;扫描&#x2F;连接</td>
+</tr>
+<tr>
+<td align="left"><strong>蓝牙串口透传</strong></td>
+<td align="left">BT24 模块将蓝牙协议封装为串口，STM32 操作串口&#x3D;操作蓝牙</td>
+</tr>
+<tr>
+<td align="left"><strong>USART3 配置</strong></td>
+<td align="left">学习板第三个串口，PB10(TX)&#x2F;PB11(RX)，9600波特率</td>
+</tr>
+<tr>
+<td align="left"><strong>二进制通信协议</strong></td>
+<td align="left">包头(0xAA) + 长度 + 变长数据段 + 校验和</td>
+</tr>
+<tr>
+<td align="left"><strong>校验和 (Checksum)</strong></td>
+<td align="left">累加取低8位，发送方&#x2F;接收方各自计算后比对</td>
+</tr>
+<tr>
+<td align="left"><strong>波特律动蓝牙模式</strong></td>
+<td align="left">串口助手可直接连蓝牙模块，支持自动校验和</td>
+</tr>
+<tr>
+<td align="left"><strong>中断回调中解析数据</strong></td>
+<td align="left">简易方案，适合教学场景；生产环境建议用循环缓冲区</td>
+</tr>
+</tbody></table>
+<p><strong>和上一篇的关系</strong>：除了串口号从 USART2 变成 USART3、波特率从 115200 变成 9600、以及新增了数据包解析逻辑外，<strong>DMA+空闲中断的核心机制完全一样</strong>。这说明真正掌握了前面的知识后，新外设的接入变得非常简单。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1114y1D7a4/">keysking STM32 教程第11集（B站）</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a target="_blank" rel="noopener" href="https://carea.keysking.com/">波特律动串口助手（支持蓝牙模式）</a></li>
+<li><a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/">上一篇：STM32串口DMA模式收发与不定长数据接收</a></li>
+<li><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">上上一篇：STM32串口中断模式通信</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/USART/" rel="tag"># USART</a>
+              <a href="/tags/%E8%93%9D%E7%89%99/" rel="tag"># 蓝牙</a>
+              <a href="/tags/BLE/" rel="tag"># BLE</a>
+              <a href="/tags/DMA/" rel="tag"># DMA</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/" rel="prev" title="STM32——串口DMA模式收发，与不定长数据接收">
+      <i class="fa fa-chevron-left"></i> STM32——串口DMA模式收发，与不定长数据接收
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E6%9C%89%E7%BA%BF%E5%88%B0%E6%97%A0%E7%BA%BF%E2%80%94%E2%80%94%E8%93%9D%E7%89%99%E6%9D%A5%E4%BA%86"><span class="nav-number">1.</span> <span class="nav-text">从有线到无线——蓝牙来了</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%93%9D%E7%89%99%E5%9F%BA%E7%A1%80"><span class="nav-number">2.</span> <span class="nav-text">蓝牙基础</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%8F%E5%85%B8%E8%93%9D%E7%89%99-vs-BLE"><span class="nav-number">2.1.</span> <span class="nav-text">经典蓝牙 vs BLE</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BB%E6%9C%BA%E4%B8%8E%E4%BB%8E%E6%9C%BA"><span class="nav-number">2.2.</span> <span class="nav-text">主机与从机</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%93%9D%E7%89%99%E4%B8%B2%E5%8F%A3%E9%80%8F%E4%BC%A0%E6%A8%A1%E5%9D%97%E2%80%94%E2%80%94BT24"><span class="nav-number">2.3.</span> <span class="nav-text">蓝牙串口透传模块——BT24</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5"><span class="nav-number">3.</span> <span class="nav-text">硬件连接</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E9%85%8D%E7%BD%AE"><span class="nav-number">4.</span> <span class="nav-text">CubeMX 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E5%BB%BA%E5%B7%A5%E7%A8%8B"><span class="nav-number">4.1.</span> <span class="nav-text">新建工程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E8%B0%83%E8%AF%95%E6%8E%A5%E5%8F%A3"><span class="nav-number">4.2.</span> <span class="nav-text">配置调试接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-USART3%E2%80%94%E2%80%94%E8%93%9D%E7%89%99%E9%80%9A%E4%BF%A1%E9%80%9A%E9%81%93"><span class="nav-number">4.3.</span> <span class="nav-text">配置 USART3——蓝牙通信通道</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%80%E5%90%AF-USART3-%E4%B8%AD%E6%96%AD-DMA"><span class="nav-number">4.4.</span> <span class="nav-text">开启 USART3 中断 + DMA</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-LED-%E5%BC%95%E8%84%9A"><span class="nav-number">4.5.</span> <span class="nav-text">配置 LED 引脚</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%9F%E6%88%90%E4%BB%A3%E7%A0%81"><span class="nav-number">4.6.</span> <span class="nav-text">生成代码</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VS-Code-%E4%B8%AD%E7%BC%96%E5%86%99%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">VS Code 中编写核心代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%92%8C%E4%B8%8A%E7%AF%87%EF%BC%88DMA-%E7%A9%BA%E9%97%B2%E4%B8%AD%E6%96%AD%EF%BC%89%E4%BB%A3%E7%A0%81%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">5.1.</span> <span class="nav-text">和上篇（DMA+空闲中断）代码的对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#main-c-%E5%AE%8C%E6%95%B4%E4%BB%A3%E7%A0%81"><span class="nav-number">5.2.</span> <span class="nav-text">main.c 完整代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E8%AE%B2%E8%A7%A3"><span class="nav-number">5.3.</span> <span class="nav-text">代码讲解</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE%E8%AE%BE%E8%AE%A1"><span class="nav-number">6.</span> <span class="nav-text">通信协议设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%8C%85%E7%BB%93%E6%9E%84"><span class="nav-number">6.1.</span> <span class="nav-text">数据包结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%AE%B5%E7%BC%96%E7%A0%81"><span class="nav-number">6.2.</span> <span class="nav-text">数据段编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A4%BA%E4%BE%8B"><span class="nav-number">6.3.</span> <span class="nav-text">示例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A0%A1%E9%AA%8C%E5%92%8C%EF%BC%88Checksum%EF%BC%89%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">6.4.</span> <span class="nav-text">校验和（Checksum）的原理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%93%9D%E7%89%99%E8%B0%83%E8%AF%95%E2%80%94%E2%80%94%E6%B3%A2%E7%89%B9%E5%BE%8B%E5%8A%A8%E4%B8%B2%E5%8F%A3%E5%8A%A9%E6%89%8B%E7%9A%84%E8%93%9D%E7%89%99%E6%A8%A1%E5%BC%8F"><span class="nav-number">7.</span> <span class="nav-text">蓝牙调试——波特律动串口助手的蓝牙模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%B5%E8%84%91%E7%AB%AF%EF%BC%88%E8%93%9D%E7%89%99%E4%B8%B2%E5%8F%A3%E5%8A%A9%E6%89%8B%EF%BC%89"><span class="nav-number">7.1.</span> <span class="nav-text">电脑端（蓝牙串口助手）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E8%AE%A1%E7%AE%97%E6%A0%A1%E9%AA%8C%E5%92%8C"><span class="nav-number">7.2.</span> <span class="nav-text">自动计算校验和</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%8B%E6%9C%BA%E7%AB%AF%EF%BC%88%E8%93%9D%E7%89%99%E8%B0%83%E8%AF%95%E5%8A%A9%E6%89%8B%EF%BC%89"><span class="nav-number">7.3.</span> <span class="nav-text">手机端（蓝牙调试助手）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E6%B5%8B%E8%AF%95"><span class="nav-number">8.</span> <span class="nav-text">效果测试</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%951%EF%BC%9A%E7%94%B5%E8%84%91%E8%93%9D%E7%89%99-%E2%86%92-%E8%AE%A9%E7%BA%A2%E7%81%AF%E4%BA%AE%E8%B5%B7"><span class="nav-number">8.1.</span> <span class="nav-text">测试1：电脑蓝牙 → 让红灯亮起</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%952%EF%BC%9A%E8%87%AA%E5%8A%A8%E6%A0%A1%E9%AA%8C%E5%92%8C-%E2%86%92-%E7%BA%A2%E7%81%AF%E7%81%AD-%E7%BB%BF%E7%81%AF%E4%BA%AE"><span class="nav-number">8.2.</span> <span class="nav-text">测试2：自动校验和 → 红灯灭 + 绿灯亮</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%953%EF%BC%9A%E6%89%8B%E6%9C%BA%E8%93%9D%E7%89%99-%E2%86%92-%E5%85%A8%E7%81%AF%E6%8E%A7%E5%88%B6"><span class="nav-number">8.3.</span> <span class="nav-text">测试3：手机蓝牙 → 全灯控制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB%E5%88%9D%E5%A7%8B%E5%8C%96%E4%BB%A3%E7%A0%81"><span class="nav-number">9.</span> <span class="nav-text">解读初始化代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#MX-USART3-UART-Init-%E2%80%94%E2%80%94-%E8%93%9D%E7%89%99%E4%B8%B2%E5%8F%A3%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">9.1.</span> <span class="nav-text">MX_USART3_UART_Init —— 蓝牙串口初始化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MX-DMA-Init-%E2%80%94%E2%80%94-DMA-%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">9.2.</span> <span class="nav-text">MX_DMA_Init —— DMA 初始化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#USART3-%E7%9A%84%E5%BC%95%E8%84%9A%E6%98%A0%E5%B0%84"><span class="nav-number">9.3.</span> <span class="nav-text">USART3 的引脚映射</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E7%BB%93%E6%9E%84%E6%80%BB%E8%A7%88"><span class="nav-number">10.</span> <span class="nav-text">代码结构总览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%92%8C%E4%B8%8A%E4%B8%80%E7%AF%87%E4%BB%A3%E7%A0%81%E7%9A%84%E4%B8%89%E5%A4%A7%E5%8F%98%E5%8C%96"><span class="nav-number">11.</span> <span class="nav-text">和上一篇代码的三大变化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E%E6%95%B0%E6%8D%AE%E5%8C%85%E8%A7%A3%E6%9E%90%E7%9A%84%E8%A1%A5%E5%85%85%E8%AF%B4%E6%98%8E"><span class="nav-number">12.</span> <span class="nav-text">关于数据包解析的补充说明</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">13.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">14.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="童诗轩"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">31</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">36</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">236k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">3:35</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
