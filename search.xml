@@ -1147,7 +1147,7 @@
 </tbody></table>
 <blockquote>
 <p>效果展示视频：</p>
-<p><strong>链接占位——待录制后替换</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1gaGc6WEYQ/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1gaGc6WEYQ/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
 </blockquote>
 <hr>
 <h2 id="解读初始化代码"><a href="#解读初始化代码" class="headerlink" title="解读初始化代码"></a>解读初始化代码</h2><h3 id="MX-USART3-UART-Init-——-蓝牙串口初始化"><a href="#MX-USART3-UART-Init-——-蓝牙串口初始化" class="headerlink" title="MX_USART3_UART_Init —— 蓝牙串口初始化"></a>MX_USART3_UART_Init —— 蓝牙串口初始化</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_USART3_UART_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    huart3.Instance = USART3;                              <span class="comment">// (1) 使用USART3（不是USART2）</span></span><br><span class="line">    huart3.Init.BaudRate = <span class="number">9600</span>;                           <span class="comment">// (2) ⚠️ 波特率9600，不是115200！</span></span><br><span class="line">    huart3.Init.WordLength = UART_WORDLENGTH_8B;</span><br><span class="line">    huart3.Init.StopBits = UART_STOPBITS_1;</span><br><span class="line">    huart3.Init.Parity = UART_PARITY_NONE;</span><br><span class="line">    huart3.Init.Mode = UART_MODE_TX_RX;</span><br><span class="line">    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;</span><br><span class="line">    huart3.Init.OverSampling = UART_OVERSAMPLING_16;</span><br><span class="line">    <span class="keyword">if</span> (HAL_UART_Init(&amp;huart3) != HAL_OK)</span><br><span class="line">        Error_Handler();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -1315,6 +1315,330 @@
         <tag>蓝牙</tag>
         <tag>BLE</tag>
         <tag>DMA</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>STM32——红灯持续闪烁，绿灯用外部中断翻转状态</title>
+    <url>/2026/07/28/STM32_EXTI_Interrupt/</url>
+    <content><![CDATA[<h2 id="背景：为什么需要中断？"><a href="#背景：为什么需要中断？" class="headerlink" title="背景：为什么需要中断？"></a>背景：为什么需要中断？</h2><p>在前一篇按键输入博客中，KEY2 的”按一下翻转”功能用了轮询方式：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 轮询：CPU 主动、反复地问&quot;按键被按了吗？&quot;</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (按键被按下) &#123; 处理; &#125;</span><br><span class="line">    <span class="comment">// 还要做其他事...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>轮询的缺点很明显——如果 CPU 正在执行某个耗时操作，按键按下后要等到下一个循环才能被检测到，响应不及时。</p>
+<p><strong>中断</strong>的思路完全不同：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">轮询：   CPU → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;按了！&quot; → 处理</span><br><span class="line">中断：   CPU → 干正事 → 干正事 → 干正事 → （按键按下，打断！）→ 处理按键 → 继续干正事</span><br></pre></td></tr></table></figure>
+
+<p>打个比方：</p>
+<ul>
+<li><strong>轮询</strong> &#x3D; 你在写作业，每 5 秒抬头看一眼有没有人敲门</li>
+<li><strong>中断</strong> &#x3D; 你在写作业，门铃响了（中断信号），你去开门，回来继续写</li>
+</ul>
+<hr>
+<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>硬件与之前博客完全一样——<strong>KEY1（PB12，外部上拉）</strong>控制中断触发，<strong>红灯（PB0）</strong> 和 <strong>绿灯（PA7）</strong> 作为输出，高电平点亮。</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110508961.png" alt="image-20260728110508961"></p>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110535256.png" alt="image-20260728110535256"></p>
+</blockquote>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤与之前一样，不重复。</p>
+<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><table>
+<thead>
+<tr>
+<th align="center">引脚</th>
+<th align="center">功能</th>
+<th align="center">User Label</th>
+<th align="left">详细参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">PB0</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_RED</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PA7</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_GREEN</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PB12</td>
+<td align="center"><strong>GPIO_EXTI12</strong></td>
+<td align="center"><code>KEY1</code></td>
+<td align="left">下降沿触发中断、无上下拉（外部已有上拉）</td>
+</tr>
+</tbody></table>
+<p><strong>关键步骤：配置 PB12 的中断模式</strong></p>
+<p>在芯片图上找到 PB12 → 点击 → 选择 <strong>GPIO_EXTI12</strong>，顺便把user label设置成key1</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105816402.png" alt="image-20260728105816402"></p>
+</blockquote>
+<p>然后到左侧 GPIO 设置中，把 PB12 的具体参数配好：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105913502.png" alt="image-20260728105913502"></p>
+</blockquote>
+<p>注意这里选择的是 <strong>External Interrupt Mode with Falling edge trigger detection</strong>（外部中断模式，下降沿触发）——按键按下时电平从高变低，正好产生下降沿，与前面的硬件原理匹配.</p>
+<h3 id="配置-NVIC（中断控制器）"><a href="#配置-NVIC（中断控制器）" class="headerlink" title="配置 NVIC（中断控制器）"></a>配置 NVIC（中断控制器）</h3><p>GPIO 配好后，还需要告诉 NVIC（嵌套向量中断控制器）”我要使用这个中断”。</p>
+<p>切换到 <strong>System Core → NVIC</strong>，找到 <strong>EXTI line[15:10] interrupts</strong>，在旁边那个小方框里打上勾：</p>
+<blockquote>
+<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110232947.png" alt="image-20260728110232947"></p>
+</blockquote>
+<p>这里有两个参数需要关注：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th align="center">值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Preemption Priority</strong></td>
+<td align="center">15</td>
+<td>抢占优先级（数字越小优先级越高）</td>
+</tr>
+<tr>
+<td><strong>Sub Priority</strong></td>
+<td align="center">0</td>
+<td>子优先级</td>
+</tr>
+</tbody></table>
+<p>关于优先级的具体原理，后面会单独说明。</p>
+<h3 id="配调试接口-生成代码"><a href="#配调试接口-生成代码" class="headerlink" title="配调试接口 &amp; 生成代码"></a>配调试接口 &amp; 生成代码</h3><p>老规矩：<strong>System Core → SYS → Debug → Serial Wire</strong>，防止烧录一次后 SWD 被锁。</p>
+<p><strong>Project Manager</strong> 设置：</p>
+<table>
+<thead>
+<tr>
+<th>设置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project Name</strong></td>
+<td><code>Interrupt</code></td>
+</tr>
+<tr>
+<td><strong>Toolchain &#x2F; IDE</strong></td>
+<td><strong>CMake</strong></td>
+</tr>
+</tbody></table>
+<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
+<hr>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="引脚宏定义（main-h）"><a href="#引脚宏定义（main-h）" class="headerlink" title="引脚宏定义（main.h）"></a>引脚宏定义（main.h）</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 按键 KEY1 — PB12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_Pin GPIO_PIN_12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_GPIO_Port GPIOB</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_EXTI_IRQn EXTI15_10_IRQn   <span class="comment">// 中断号：EXTI 线 15~10</span></span></span><br></pre></td></tr></table></figure>
+
+<h3 id="main-c-——-红灯持续闪烁"><a href="#main-c-——-红灯持续闪烁" class="headerlink" title="main.c —— 红灯持续闪烁"></a>main.c —— 红灯持续闪烁</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();</span><br><span class="line">    SystemClock_Config();</span><br><span class="line">    MX_GPIO_Init();     <span class="comment">// 这里会初始化 GPIO 和 NVIC 中断</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 红灯亮</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 保持 2 秒</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// 红灯灭</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 熄灭 2 秒</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>逻辑很简单：PB0 每 2 秒翻转一次电平，红灯持续闪烁。</p>
+<p>主循环里<strong>无需任何与按键相关的代码</strong>——按键检测完全由中断处理。</p>
+<h3 id="stm32f1xx-it-c-——-外部中断服务函数"><a href="#stm32f1xx-it-c-——-外部中断服务函数" class="headerlink" title="stm32f1xx_it.c —— 外部中断服务函数"></a>stm32f1xx_it.c —— 外部中断服务函数</h3><p>当 KEY1 按下时，EXTI15_10 中断被触发，CPU 跳转到 <code>EXTI15_10_IRQHandler</code> 执行：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">  * @brief This function handles EXTI line[15:10] interrupts.</span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_Delay(<span class="number">10</span>);  <span class="comment">// ① 消抖：等待电平稳定</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ② 确认按键确实被按下（低电平）</span></span><br><span class="line">    <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// ③ 翻转绿灯状态</span></span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_GPIO_EXTI_IRQHandler(KEY1_Pin);  <span class="comment">// ④ 清除中断标志位</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 1 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 1 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>逐行解释：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="center">行号</th>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">①</td>
+<td><code>HAL_Delay(10)</code></td>
+<td>机械按键按下瞬间会有抖动，电平在几毫秒内反复跳变。等 10ms 让电平稳定下来再读</td>
+</tr>
+<tr>
+<td align="center">②</td>
+<td><code>HAL_GPIO_ReadPin(...)</code></td>
+<td>再次读取 KEY1 的电平，确认是真的按下了（低电平）。如果只是噪声干扰，不会误触发</td>
+</tr>
+<tr>
+<td align="center">③</td>
+<td><code>HAL_GPIO_TogglePin(...)</code></td>
+<td>翻转绿灯 PA7 的电平——原来亮就灭，原来灭就亮</td>
+</tr>
+<tr>
+<td align="center">④</td>
+<td><code>HAL_GPIO_EXTI_IRQHandler(KEY1_Pin)</code></td>
+<td><strong>非常重要</strong> 清除 EXTI 的中断挂起标志位。如果不清除，中断会反复触发，程序卡死。函数里本身自带，不能删除。</td>
+</tr>
+</tbody></table>
+<p><strong>⚠️ HAL_GPIO_EXTI_IRQHandler 的两种写法</strong></p>
+<p>上面这个函数内部其实干了三件事：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_IRQHandler</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(GPIO_Pin) != RESET)  <span class="comment">// ① 检查中断标志</span></span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_Pin);           <span class="comment">// ② 清除中断标志</span></span><br><span class="line">        HAL_GPIO_EXTI_Callback(GPIO_Pin);             <span class="comment">// ③ 调用回调函数</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，你<strong>也可以</strong>不在 ISR 里直接写逻辑，而是把逻辑写在 <code>HAL_GPIO_EXTI_Callback</code> 里，CubeMX 会在 <code>main.c</code> 中留出 <code>USER CODE BEGIN 4</code> 给你写回调：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 4 */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_Callback</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (GPIO_Pin == KEY1_Pin)</span><br><span class="line">    &#123;</span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 4 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="MX-GPIO-Init-——-GPIO-与-NVIC-初始化"><a href="#MX-GPIO-Init-——-GPIO-与-NVIC-初始化" class="headerlink" title="MX_GPIO_Init —— GPIO 与 NVIC 初始化"></a>MX_GPIO_Init —— GPIO 与 NVIC 初始化</h3><p><code>MX_GPIO_Init</code> 函数中，CubeMX 不仅配了 GPIO，还配了 NVIC：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始化输出电平 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 KEY1 (PB12) —— 下降沿触发外部中断 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;  <span class="comment">// ← 下降沿触发中断</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;            <span class="comment">// ← 外部已有上拉，内部不配</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* EXTI 中断初始化——使能 NVIC */</span></span><br><span class="line">    HAL_NVIC_SetPriority(EXTI15_10_IRQn, <span class="number">15</span>, <span class="number">0</span>);</span><br><span class="line">    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);            <span class="comment">// ← 使能 NVIC 中断！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键点：</strong></p>
+<ol>
+<li><code>GPIO_MODE_IT_FALLING</code> —— 配置 PB12 为外部中断模式，下降沿触发</li>
+<li><code>GPIO_NOPULL</code> —— 因为板子已经有外部上拉电阻，不需要内部上拉</li>
+<li><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code> —— 使能 NVIC 中的 EXTI15_10 中断通道。<strong>这步非常重要，漏了中断不会触发</strong></li>
+</ol>
+<hr>
+<h2 id="关于中断优先级"><a href="#关于中断优先级" class="headerlink" title="关于中断优先级"></a>关于中断优先级</h2><p>CubeMX 中配置的优先级和实际生效的值之间有一个”编码”过程，理解了这个才能搞清中断嵌套行为。</p>
+<h3 id="优先级分组"><a href="#优先级分组" class="headerlink" title="优先级分组"></a>优先级分组</h3><p>STM32 的 NVIC 支持<strong>优先级分组</strong>，决定了抢占优先级和子优先级各占几位：</p>
+<table>
+<thead>
+<tr>
+<th>分组宏</th>
+<th align="center">抢占优先级</th>
+<th align="center">子优先级</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>NVIC_PRIORITYGROUP_0</code></td>
+<td align="center">0 bit</td>
+<td align="center">4 bits</td>
+<td>所有中断同级，不能嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_1</code></td>
+<td align="center">1 bit</td>
+<td align="center">3 bits</td>
+<td>最多 2 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_2</code></td>
+<td align="center">2 bits</td>
+<td align="center">2 bits</td>
+<td>最多 4 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_3</code></td>
+<td align="center">3 bits</td>
+<td align="center">1 bit</td>
+<td>最多 8 级嵌套</td>
+</tr>
+<tr>
+<td><code>NVIC_PRIORITYGROUP_4</code></td>
+<td align="center">4 bits</td>
+<td align="center">0 bits</td>
+<td>最多 16 级嵌套（最常用）</td>
+</tr>
+</tbody></table>
+<p>CubeMX 默认使用 <code>NVIC_PRIORITYGROUP_4</code>——4 位全是抢占优先级，没有子优先级。</p>
+<h3 id="本次配置的优先级"><a href="#本次配置的优先级" class="headerlink" title="本次配置的优先级"></a>本次配置的优先级</h3><table>
+<thead>
+<tr>
+<th align="left">中断</th>
+<th align="center">PreemptPriority</th>
+<th align="center">编码值</th>
+<th align="center">实际优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SysTick</td>
+<td align="center">14</td>
+<td align="center">0x00</td>
+<td align="center"><strong>0（最高）</strong></td>
+</tr>
+<tr>
+<td align="left">EXTI15_10</td>
+<td align="center">15</td>
+<td align="center">0x80</td>
+<td align="center"><strong>8</strong></td>
+</tr>
+</tbody></table>
+<p>数值越小优先级越高。SysTick 的优先级高于 EXTI，所以在 EXTI 中断服务函数中调用 <code>HAL_Delay()</code> 是安全的——SysTick 可以抢占 EXTI 来更新 <code>uwTick</code> 变量，不会死锁。</p>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
+<li>连接 ST-Link</li>
+<li>点击 <strong>运行和调试</strong> → 选择 <code>STM32Cube:STM32 Launch STLink GDB Server</code></li>
+<li>点击<strong>继续</strong>按钮，程序开始运行</li>
+</ol>
+<blockquote>
+<p>如果遇到烧录问题，参考上一篇或<a href="https://docs.baud-dance.com/docs/stm32/FAQ/CompilationFailed">波特律动 FAQ</a>。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后：</p>
+<ul>
+<li>🔴 <strong>红灯持续闪烁</strong>——每 2 秒亮灭一次</li>
+<li>按下 <strong>KEY1（PB12）</strong> → 🟢 <strong>绿灯翻转状态</strong>（亮↔灭）</li>
+<li>每次按键，绿灯变化一次，红灯不受影响，继续闪烁</li>
+<li>如果绿灯和红灯一起亮起，则颜色变化成黄色。</li>
+</ul>
+<blockquote>
+<p>效果展示视频：<a href="https://www.bilibili.com/video/BV11e3e6TEGF/">https://www.bilibili.com/video/BV11e3e6TEGF/</a></p>
+</blockquote>
+<hr>
+<h2 id="中断-vs-轮询的对比"><a href="#中断-vs-轮询的对比" class="headerlink" title="中断 vs 轮询的对比"></a>中断 vs 轮询的对比</h2><p>这个 demo 正好可以和上一篇按键博客做一个对比：</p>
+<table>
+<thead>
+<tr>
+<th>对比项</th>
+<th align="center">轮询（上一篇 KEY2）</th>
+<th align="center">中断（本篇）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU 占用</td>
+<td align="center">高（一直在检测）</td>
+<td align="center">低（平时干正事，有事件才处理）</td>
+</tr>
+<tr>
+<td>响应速度</td>
+<td align="center">取决于循环周期</td>
+<td align="center">立即响应</td>
+</tr>
+<tr>
+<td>代码位置</td>
+<td align="center">main 循环里</td>
+<td align="center">中断服务函数中</td>
+</tr>
+<tr>
+<td>主循环复杂度</td>
+<td align="center">按键逻辑和主逻辑混在一起</td>
+<td align="center">主循环只关心本职工作</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td align="center">低频检测、简单系统</td>
+<td align="center">实时性要求高的场景</td>
+</tr>
+</tbody></table>
+<p>当然，中断也有代价——每次进入和退出中断都有<strong>上下文切换开销</strong>（保存现场、恢复现场），并且中断函数要尽量简短，否则会影响其他实时任务的响应。</p>
+<hr>
+<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><h3 id="1-用回调函数分离逻辑"><a href="#1-用回调函数分离逻辑" class="headerlink" title="1. 用回调函数分离逻辑"></a>1. 用回调函数分离逻辑</h3><p>前面提到过，可以把中断处理逻辑写到 <code>HAL_GPIO_EXTI_Callback</code> 里，中断服务函数保持整洁。当项目中多个引脚共用一个 EXTI 中断线时（比如 EXTI15_10 同时服务 PB12 和 PB13），回调函数里用 <code>GPIO_Pin</code> 区分来源，代码结构更清晰。</p>
+<h3 id="2-中断中只设标志位，主循环处理"><a href="#2-中断中只设标志位，主循环处理" class="headerlink" title="2. 中断中只设标志位，主循环处理"></a>2. 中断中只设标志位，主循环处理</h3><p>标准的嵌入式写法——中断里只设一个 <code>volatile</code> 标志位：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">volatile</span> <span class="type">uint8_t</span> key1_flag = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(KEY1_Pin) != RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(KEY1_Pin);</span><br><span class="line">        key1_flag = <span class="number">1</span>;  <span class="comment">// 只设标志，不做复杂操作</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主循环检测到标志位置位后，再执行消抖、翻转等操作。这样 ISR 的执行时间最短，对系统实时性的影响最小。</p>
+<h3 id="3-上升沿-下降沿双触发"><a href="#3-上升沿-下降沿双触发" class="headerlink" title="3. 上升沿 + 下降沿双触发"></a>3. 上升沿 + 下降沿双触发</h3><p>按键按下和松开都产生中断，可以用来检测”长按”和”短按”，或者做更精细的状态控制。</p>
+<h3 id="4-优先级嵌套测试"><a href="#4-优先级嵌套测试" class="headerlink" title="4. 优先级嵌套测试"></a>4. 优先级嵌套测试</h3><p>可以给不同的外设中断配置不同的抢占优先级，观察高优先级中断打断低优先级中断的行为，加深对中断嵌套的理解。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的收获：</p>
+<ol>
+<li><strong>外部中断（EXTI）的基本配置方法</strong>——CubeMX 里配引脚模式 + NVIC 设置</li>
+<li><strong>中断服务函数的写法</strong>——消抖 → 读引脚确认 → 执行逻辑 → 清标志位</li>
+<li><strong>中断优先级</strong>——优先级分组、优先级编码、抢占与嵌套的基本概念</li>
+<li><strong>CMake 生成器的注意事项</strong>——NVIC 配置可能不会自动生成，需要手动检查</li>
+</ol>
+<p>中断是嵌入式开发中非常重要的概念，后面学定时器、UART、I2C、SPI 等外设时都会用到中断机制。理解了这个 demo，后面的路会顺畅很多。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入</a></li>
+<li><a href="/2026/07/26/STM32_RGB_LED/">上一篇：STM32三色LED流水灯</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>EXTI</tag>
+        <tag>中断</tag>
       </tags>
   </entry>
   <entry>
@@ -1745,330 +2069,6 @@
         <tag>EXTI</tag>
         <tag>中断</tag>
         <tag>NVIC</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>STM32——红灯持续闪烁，绿灯用外部中断翻转状态</title>
-    <url>/2026/07/28/STM32_EXTI_Interrupt/</url>
-    <content><![CDATA[<h2 id="背景：为什么需要中断？"><a href="#背景：为什么需要中断？" class="headerlink" title="背景：为什么需要中断？"></a>背景：为什么需要中断？</h2><p>在前一篇按键输入博客中，KEY2 的”按一下翻转”功能用了轮询方式：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 轮询：CPU 主动、反复地问&quot;按键被按了吗？&quot;</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (按键被按下) &#123; 处理; &#125;</span><br><span class="line">    <span class="comment">// 还要做其他事...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>轮询的缺点很明显——如果 CPU 正在执行某个耗时操作，按键按下后要等到下一个循环才能被检测到，响应不及时。</p>
-<p><strong>中断</strong>的思路完全不同：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">轮询：   CPU → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;没按&quot; → &quot;按了吗？&quot; → &quot;按了！&quot; → 处理</span><br><span class="line">中断：   CPU → 干正事 → 干正事 → 干正事 → （按键按下，打断！）→ 处理按键 → 继续干正事</span><br></pre></td></tr></table></figure>
-
-<p>打个比方：</p>
-<ul>
-<li><strong>轮询</strong> &#x3D; 你在写作业，每 5 秒抬头看一眼有没有人敲门</li>
-<li><strong>中断</strong> &#x3D; 你在写作业，门铃响了（中断信号），你去开门，回来继续写</li>
-</ul>
-<hr>
-<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>硬件与之前博客完全一样——<strong>KEY1（PB12，外部上拉）</strong>控制中断触发，<strong>红灯（PB0）</strong> 和 <strong>绿灯（PA7）</strong> 作为输出，高电平点亮。</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110508961.png" alt="image-20260728110508961"></p>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110535256.png" alt="image-20260728110535256"></p>
-</blockquote>
-<hr>
-<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤与之前一样，不重复。</p>
-<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><table>
-<thead>
-<tr>
-<th align="center">引脚</th>
-<th align="center">功能</th>
-<th align="center">User Label</th>
-<th align="left">详细参数</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">PB0</td>
-<td align="center">GPIO_Output</td>
-<td align="center"><code>LED_RED</code></td>
-<td align="left">推挽输出、无上下拉、低速</td>
-</tr>
-<tr>
-<td align="center">PA7</td>
-<td align="center">GPIO_Output</td>
-<td align="center"><code>LED_GREEN</code></td>
-<td align="left">推挽输出、无上下拉、低速</td>
-</tr>
-<tr>
-<td align="center">PB12</td>
-<td align="center"><strong>GPIO_EXTI12</strong></td>
-<td align="center"><code>KEY1</code></td>
-<td align="left">下降沿触发中断、无上下拉（外部已有上拉）</td>
-</tr>
-</tbody></table>
-<p><strong>关键步骤：配置 PB12 的中断模式</strong></p>
-<p>在芯片图上找到 PB12 → 点击 → 选择 <strong>GPIO_EXTI12</strong>，顺便把user label设置成key1</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105816402.png" alt="image-20260728105816402"></p>
-</blockquote>
-<p>然后到左侧 GPIO 设置中，把 PB12 的具体参数配好：</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728105913502.png" alt="image-20260728105913502"></p>
-</blockquote>
-<p>注意这里选择的是 <strong>External Interrupt Mode with Falling edge trigger detection</strong>（外部中断模式，下降沿触发）——按键按下时电平从高变低，正好产生下降沿，与前面的硬件原理匹配.</p>
-<h3 id="配置-NVIC（中断控制器）"><a href="#配置-NVIC（中断控制器）" class="headerlink" title="配置 NVIC（中断控制器）"></a>配置 NVIC（中断控制器）</h3><p>GPIO 配好后，还需要告诉 NVIC（嵌套向量中断控制器）”我要使用这个中断”。</p>
-<p>切换到 <strong>System Core → NVIC</strong>，找到 <strong>EXTI line[15:10] interrupts</strong>，在旁边那个小方框里打上勾：</p>
-<blockquote>
-<p><img src="/./../images/STM32_EXTI_Interrupt/image-20260728110232947.png" alt="image-20260728110232947"></p>
-</blockquote>
-<p>这里有两个参数需要关注：</p>
-<table>
-<thead>
-<tr>
-<th>参数</th>
-<th align="center">值</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Preemption Priority</strong></td>
-<td align="center">15</td>
-<td>抢占优先级（数字越小优先级越高）</td>
-</tr>
-<tr>
-<td><strong>Sub Priority</strong></td>
-<td align="center">0</td>
-<td>子优先级</td>
-</tr>
-</tbody></table>
-<p>关于优先级的具体原理，后面会单独说明。</p>
-<h3 id="配调试接口-生成代码"><a href="#配调试接口-生成代码" class="headerlink" title="配调试接口 &amp; 生成代码"></a>配调试接口 &amp; 生成代码</h3><p>老规矩：<strong>System Core → SYS → Debug → Serial Wire</strong>，防止烧录一次后 SWD 被锁。</p>
-<p><strong>Project Manager</strong> 设置：</p>
-<table>
-<thead>
-<tr>
-<th>设置项</th>
-<th>值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Project Name</strong></td>
-<td><code>Interrupt</code></td>
-</tr>
-<tr>
-<td><strong>Toolchain &#x2F; IDE</strong></td>
-<td><strong>CMake</strong></td>
-</tr>
-</tbody></table>
-<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
-<hr>
-<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="引脚宏定义（main-h）"><a href="#引脚宏定义（main-h）" class="headerlink" title="引脚宏定义（main.h）"></a>引脚宏定义（main.h）</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 按键 KEY1 — PB12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_Pin GPIO_PIN_12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_GPIO_Port GPIOB</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_EXTI_IRQn EXTI15_10_IRQn   <span class="comment">// 中断号：EXTI 线 15~10</span></span></span><br></pre></td></tr></table></figure>
-
-<h3 id="main-c-——-红灯持续闪烁"><a href="#main-c-——-红灯持续闪烁" class="headerlink" title="main.c —— 红灯持续闪烁"></a>main.c —— 红灯持续闪烁</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();</span><br><span class="line">    SystemClock_Config();</span><br><span class="line">    MX_GPIO_Init();     <span class="comment">// 这里会初始化 GPIO 和 NVIC 中断</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 红灯亮</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 保持 2 秒</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// 红灯灭</span></span><br><span class="line">        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">        HAL_Delay(<span class="number">2000</span>);   <span class="comment">// 熄灭 2 秒</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>逻辑很简单：PB0 每 2 秒翻转一次电平，红灯持续闪烁。</p>
-<p>主循环里<strong>无需任何与按键相关的代码</strong>——按键检测完全由中断处理。</p>
-<h3 id="stm32f1xx-it-c-——-外部中断服务函数"><a href="#stm32f1xx-it-c-——-外部中断服务函数" class="headerlink" title="stm32f1xx_it.c —— 外部中断服务函数"></a>stm32f1xx_it.c —— 外部中断服务函数</h3><p>当 KEY1 按下时，EXTI15_10 中断被触发，CPU 跳转到 <code>EXTI15_10_IRQHandler</code> 执行：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">  * @brief This function handles EXTI line[15:10] interrupts.</span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_Delay(<span class="number">10</span>);  <span class="comment">// ① 消抖：等待电平稳定</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ② 确认按键确实被按下（低电平）</span></span><br><span class="line">    <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// ③ 翻转绿灯状态</span></span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 0 */</span></span><br><span class="line"></span><br><span class="line">    HAL_GPIO_EXTI_IRQHandler(KEY1_Pin);  <span class="comment">// ④ 清除中断标志位</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN EXTI15_10_IRQn 1 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE END EXTI15_10_IRQn 1 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>逐行解释：</strong></p>
-<table>
-<thead>
-<tr>
-<th align="center">行号</th>
-<th>代码</th>
-<th>作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">①</td>
-<td><code>HAL_Delay(10)</code></td>
-<td>机械按键按下瞬间会有抖动，电平在几毫秒内反复跳变。等 10ms 让电平稳定下来再读</td>
-</tr>
-<tr>
-<td align="center">②</td>
-<td><code>HAL_GPIO_ReadPin(...)</code></td>
-<td>再次读取 KEY1 的电平，确认是真的按下了（低电平）。如果只是噪声干扰，不会误触发</td>
-</tr>
-<tr>
-<td align="center">③</td>
-<td><code>HAL_GPIO_TogglePin(...)</code></td>
-<td>翻转绿灯 PA7 的电平——原来亮就灭，原来灭就亮</td>
-</tr>
-<tr>
-<td align="center">④</td>
-<td><code>HAL_GPIO_EXTI_IRQHandler(KEY1_Pin)</code></td>
-<td><strong>非常重要</strong> 清除 EXTI 的中断挂起标志位。如果不清除，中断会反复触发，程序卡死。函数里本身自带，不能删除。</td>
-</tr>
-</tbody></table>
-<p><strong>⚠️ HAL_GPIO_EXTI_IRQHandler 的两种写法</strong></p>
-<p>上面这个函数内部其实干了三件事：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_IRQHandler</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(GPIO_Pin) != RESET)  <span class="comment">// ① 检查中断标志</span></span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_Pin);           <span class="comment">// ② 清除中断标志</span></span><br><span class="line">        HAL_GPIO_EXTI_Callback(GPIO_Pin);             <span class="comment">// ③ 调用回调函数</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>也就是说，你<strong>也可以</strong>不在 ISR 里直接写逻辑，而是把逻辑写在 <code>HAL_GPIO_EXTI_Callback</code> 里，CubeMX 会在 <code>main.c</code> 中留出 <code>USER CODE BEGIN 4</code> 给你写回调：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 4 */</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_GPIO_EXTI_Callback</span><span class="params">(<span class="type">uint16_t</span> GPIO_Pin)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (GPIO_Pin == KEY1_Pin)</span><br><span class="line">    &#123;</span><br><span class="line">        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 4 */</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="MX-GPIO-Init-——-GPIO-与-NVIC-初始化"><a href="#MX-GPIO-Init-——-GPIO-与-NVIC-初始化" class="headerlink" title="MX_GPIO_Init —— GPIO 与 NVIC 初始化"></a>MX_GPIO_Init —— GPIO 与 NVIC 初始化</h3><p><code>MX_GPIO_Init</code> 函数中，CubeMX 不仅配了 GPIO，还配了 NVIC：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始化输出电平 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 KEY1 (PB12) —— 下降沿触发外部中断 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;  <span class="comment">// ← 下降沿触发中断</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;            <span class="comment">// ← 外部已有上拉，内部不配</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* EXTI 中断初始化——使能 NVIC */</span></span><br><span class="line">    HAL_NVIC_SetPriority(EXTI15_10_IRQn, <span class="number">15</span>, <span class="number">0</span>);</span><br><span class="line">    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);            <span class="comment">// ← 使能 NVIC 中断！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>关键点：</strong></p>
-<ol>
-<li><code>GPIO_MODE_IT_FALLING</code> —— 配置 PB12 为外部中断模式，下降沿触发</li>
-<li><code>GPIO_NOPULL</code> —— 因为板子已经有外部上拉电阻，不需要内部上拉</li>
-<li><code>HAL_NVIC_EnableIRQ(EXTI15_10_IRQn)</code> —— 使能 NVIC 中的 EXTI15_10 中断通道。<strong>这步非常重要，漏了中断不会触发</strong></li>
-</ol>
-<hr>
-<h2 id="关于中断优先级"><a href="#关于中断优先级" class="headerlink" title="关于中断优先级"></a>关于中断优先级</h2><p>CubeMX 中配置的优先级和实际生效的值之间有一个”编码”过程，理解了这个才能搞清中断嵌套行为。</p>
-<h3 id="优先级分组"><a href="#优先级分组" class="headerlink" title="优先级分组"></a>优先级分组</h3><p>STM32 的 NVIC 支持<strong>优先级分组</strong>，决定了抢占优先级和子优先级各占几位：</p>
-<table>
-<thead>
-<tr>
-<th>分组宏</th>
-<th align="center">抢占优先级</th>
-<th align="center">子优先级</th>
-<th>适用场景</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>NVIC_PRIORITYGROUP_0</code></td>
-<td align="center">0 bit</td>
-<td align="center">4 bits</td>
-<td>所有中断同级，不能嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_1</code></td>
-<td align="center">1 bit</td>
-<td align="center">3 bits</td>
-<td>最多 2 级嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_2</code></td>
-<td align="center">2 bits</td>
-<td align="center">2 bits</td>
-<td>最多 4 级嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_3</code></td>
-<td align="center">3 bits</td>
-<td align="center">1 bit</td>
-<td>最多 8 级嵌套</td>
-</tr>
-<tr>
-<td><code>NVIC_PRIORITYGROUP_4</code></td>
-<td align="center">4 bits</td>
-<td align="center">0 bits</td>
-<td>最多 16 级嵌套（最常用）</td>
-</tr>
-</tbody></table>
-<p>CubeMX 默认使用 <code>NVIC_PRIORITYGROUP_4</code>——4 位全是抢占优先级，没有子优先级。</p>
-<h3 id="本次配置的优先级"><a href="#本次配置的优先级" class="headerlink" title="本次配置的优先级"></a>本次配置的优先级</h3><table>
-<thead>
-<tr>
-<th align="left">中断</th>
-<th align="center">PreemptPriority</th>
-<th align="center">编码值</th>
-<th align="center">实际优先级</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">SysTick</td>
-<td align="center">14</td>
-<td align="center">0x00</td>
-<td align="center"><strong>0（最高）</strong></td>
-</tr>
-<tr>
-<td align="left">EXTI15_10</td>
-<td align="center">15</td>
-<td align="center">0x80</td>
-<td align="center"><strong>8</strong></td>
-</tr>
-</tbody></table>
-<p>数值越小优先级越高。SysTick 的优先级高于 EXTI，所以在 EXTI 中断服务函数中调用 <code>HAL_Delay()</code> 是安全的——SysTick 可以抢占 EXTI 来更新 <code>uwTick</code> 变量，不会死锁。</p>
-<hr>
-<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
-<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
-<li>连接 ST-Link</li>
-<li>点击 <strong>运行和调试</strong> → 选择 <code>STM32Cube:STM32 Launch STLink GDB Server</code></li>
-<li>点击<strong>继续</strong>按钮，程序开始运行</li>
-</ol>
-<blockquote>
-<p>如果遇到烧录问题，参考上一篇或<a href="https://docs.baud-dance.com/docs/stm32/FAQ/CompilationFailed">波特律动 FAQ</a>。</p>
-</blockquote>
-<hr>
-<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后：</p>
-<ul>
-<li>🔴 <strong>红灯持续闪烁</strong>——每 2 秒亮灭一次</li>
-<li>按下 <strong>KEY1（PB12）</strong> → 🟢 <strong>绿灯翻转状态</strong>（亮↔灭）</li>
-<li>每次按键，绿灯变化一次，红灯不受影响，继续闪烁</li>
-<li>如果绿灯和红灯一起亮起，则颜色变化成黄色。</li>
-</ul>
-<blockquote>
-<p>效果展示视频：<a href="https://www.bilibili.com/video/BV11e3e6TEGF/">https://www.bilibili.com/video/BV11e3e6TEGF/</a></p>
-</blockquote>
-<hr>
-<h2 id="中断-vs-轮询的对比"><a href="#中断-vs-轮询的对比" class="headerlink" title="中断 vs 轮询的对比"></a>中断 vs 轮询的对比</h2><p>这个 demo 正好可以和上一篇按键博客做一个对比：</p>
-<table>
-<thead>
-<tr>
-<th>对比项</th>
-<th align="center">轮询（上一篇 KEY2）</th>
-<th align="center">中断（本篇）</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>CPU 占用</td>
-<td align="center">高（一直在检测）</td>
-<td align="center">低（平时干正事，有事件才处理）</td>
-</tr>
-<tr>
-<td>响应速度</td>
-<td align="center">取决于循环周期</td>
-<td align="center">立即响应</td>
-</tr>
-<tr>
-<td>代码位置</td>
-<td align="center">main 循环里</td>
-<td align="center">中断服务函数中</td>
-</tr>
-<tr>
-<td>主循环复杂度</td>
-<td align="center">按键逻辑和主逻辑混在一起</td>
-<td align="center">主循环只关心本职工作</td>
-</tr>
-<tr>
-<td>适用场景</td>
-<td align="center">低频检测、简单系统</td>
-<td align="center">实时性要求高的场景</td>
-</tr>
-</tbody></table>
-<p>当然，中断也有代价——每次进入和退出中断都有<strong>上下文切换开销</strong>（保存现场、恢复现场），并且中断函数要尽量简短，否则会影响其他实时任务的响应。</p>
-<hr>
-<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><h3 id="1-用回调函数分离逻辑"><a href="#1-用回调函数分离逻辑" class="headerlink" title="1. 用回调函数分离逻辑"></a>1. 用回调函数分离逻辑</h3><p>前面提到过，可以把中断处理逻辑写到 <code>HAL_GPIO_EXTI_Callback</code> 里，中断服务函数保持整洁。当项目中多个引脚共用一个 EXTI 中断线时（比如 EXTI15_10 同时服务 PB12 和 PB13），回调函数里用 <code>GPIO_Pin</code> 区分来源，代码结构更清晰。</p>
-<h3 id="2-中断中只设标志位，主循环处理"><a href="#2-中断中只设标志位，主循环处理" class="headerlink" title="2. 中断中只设标志位，主循环处理"></a>2. 中断中只设标志位，主循环处理</h3><p>标准的嵌入式写法——中断里只设一个 <code>volatile</code> 标志位：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">volatile</span> <span class="type">uint8_t</span> key1_flag = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">EXTI15_10_IRQHandler</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (__HAL_GPIO_EXTI_GET_IT(KEY1_Pin) != RESET)</span><br><span class="line">    &#123;</span><br><span class="line">        __HAL_GPIO_EXTI_CLEAR_IT(KEY1_Pin);</span><br><span class="line">        key1_flag = <span class="number">1</span>;  <span class="comment">// 只设标志，不做复杂操作</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>主循环检测到标志位置位后，再执行消抖、翻转等操作。这样 ISR 的执行时间最短，对系统实时性的影响最小。</p>
-<h3 id="3-上升沿-下降沿双触发"><a href="#3-上升沿-下降沿双触发" class="headerlink" title="3. 上升沿 + 下降沿双触发"></a>3. 上升沿 + 下降沿双触发</h3><p>按键按下和松开都产生中断，可以用来检测”长按”和”短按”，或者做更精细的状态控制。</p>
-<h3 id="4-优先级嵌套测试"><a href="#4-优先级嵌套测试" class="headerlink" title="4. 优先级嵌套测试"></a>4. 优先级嵌套测试</h3><p>可以给不同的外设中断配置不同的抢占优先级，观察高优先级中断打断低优先级中断的行为，加深对中断嵌套的理解。</p>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的收获：</p>
-<ol>
-<li><strong>外部中断（EXTI）的基本配置方法</strong>——CubeMX 里配引脚模式 + NVIC 设置</li>
-<li><strong>中断服务函数的写法</strong>——消抖 → 读引脚确认 → 执行逻辑 → 清标志位</li>
-<li><strong>中断优先级</strong>——优先级分组、优先级编码、抢占与嵌套的基本概念</li>
-<li><strong>CMake 生成器的注意事项</strong>——NVIC 配置可能不会自动生成，需要手动检查</li>
-</ol>
-<p>中断是嵌入式开发中非常重要的概念，后面学定时器、UART、I2C、SPI 等外设时都会用到中断机制。理解了这个 demo，后面的路会顺畅很多。</p>
-<hr>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
-<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
-<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入</a></li>
-<li><a href="/2026/07/26/STM32_RGB_LED/">上一篇：STM32三色LED流水灯</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>STM32</tag>
-        <tag>嵌入式</tag>
-        <tag>CubeMX</tag>
-        <tag>EXTI</tag>
-        <tag>中断</tag>
       </tags>
   </entry>
   <entry>
@@ -3753,6 +3753,24 @@
       </tags>
   </entry>
   <entry>
+    <title>Hello World</title>
+    <url>/2026/07/06/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
+  </entry>
+  <entry>
     <title>STM32——串口通信，用电脑控制三色LED</title>
     <url>/2026/07/29/STM32_USART_Serial_Communication/</url>
     <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="串口通信基础"><a href="#串口通信基础" class="headerlink" title="串口通信基础"></a>串口通信基础</h3><p>串口（UART，Universal Asynchronous Receiver&#x2F;Transmitter）是嵌入式领域最常用的通信方式之一。它的原理其实很简单——<strong>用两根数据线就能实现两个设备之间的双向通信</strong>。</p>
@@ -4396,24 +4414,6 @@
         <tag>USART</tag>
         <tag>串口</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>Hello World</title>
-    <url>/2026/07/06/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
   </entry>
   <entry>
     <title>hexo博客静态网站项目总结回顾深挖</title>
@@ -9314,246 +9314,6 @@
       </tags>
   </entry>
   <entry>
-    <title>前缀和与差分 —— 从概念到公式</title>
-    <url>/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/</url>
-    <content><![CDATA[<h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
-<p>最直接的做法：每次从 3 加到 7。如果数组很大（比如 10 万个数），问你 10 万次，那总共要算 100 亿次加法——太慢了。<br>如果换一种思路，我能不能<strong>提前把「前 i 个数的和」全部算好存起来</strong>，这样每次询问直接用减法得到结果？</p>
-<p>这就是<strong>前缀和</strong>的核心思想——<strong>预处理，换时间</strong>。</p>
-<hr>
-<h2 id="二、一维前缀和"><a href="#二、一维前缀和" class="headerlink" title="二、一维前缀和"></a>二、一维前缀和</h2><h3 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="2.1 定义"></a>2.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，定义前缀和数组 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = a[1] + a[2] + ... + a[i]   （前 i 个数的总和）</span><br></pre></td></tr></table></figure>
-
-<h3 id="2-2-核心公式"><a href="#2-2-核心公式" class="headerlink" title="2.2 核心公式"></a>2.2 核心公式</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = s[i-1] + a[i]</span><br></pre></td></tr></table></figure>
-
-<p>边界条件：<code>s[0] = 0</code>（前 0 个数的和为 0）。</p>
-<blockquote>
-<p>公式的意思是：前 i 个数的和 &#x3D; 前 i-1 个数的和 + 第 i 个数。</p>
-</blockquote>
-<h3 id="2-3-图示"><a href="#2-3-图示" class="headerlink" title="2.3 图示"></a>2.3 图示</h3><p>假设原数组 <code>a</code> 如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：  1    2    3    4    5</span><br><span class="line">a[]：  2    5    3    1    4</span><br></pre></td></tr></table></figure>
-
-<p>逐个计算前缀和：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + 2 = 2</span><br><span class="line">s[2] = 2 + 5 = 7</span><br><span class="line">s[3] = 7 + 3 = 10</span><br><span class="line">s[4] = 10 + 1 = 11</span><br><span class="line">s[5] = 11 + 4 = 15</span><br></pre></td></tr></table></figure>
-
-<p>得到前缀和数组 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：  2    7    10   11   15</span><br><span class="line">      ↑    ↑    ↑    ↑    ↑</span><br><span class="line">      前1  前2  前3  前4  前5</span><br></pre></td></tr></table></figure>
-
-<p>可以直观地看到：<code>s[i]</code> 就是从第一个数一直加到第 i 个数的「累计值」。</p>
-<h3 id="2-4-用途：快速求区间和"><a href="#2-4-用途：快速求区间和" class="headerlink" title="2.4 用途：快速求区间和"></a>2.4 用途：快速求区间和</h3><p>现在想求 <code>a[2] + a[3] + a[4]</code>（即区间 <code>[2, 4]</code> 的和）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间[2,4]的和 = s[4] - s[1] = 11 - 2 = 9</span><br><span class="line">验证：5 + 3 + 1 = 9  ✅</span><br></pre></td></tr></table></figure>
-
-<p><strong>核心公式：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间 [l, r] 的和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>文字理解：<strong>前 r 个数的和 减去 前 l-1 个数的和</strong>，剩下的就是第 l 个到第 r 个。</p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                   ┌─────────── 区间[l, r] ───────────┐</span><br><span class="line">                   │                                   │</span><br><span class="line">a[1] a[2] ... a[l-1]  a[l] a[l+1] ... a[r-1] a[r]  a[r+1] ...</span><br><span class="line">├──── 前 l-1 项 ────┤├────────── 前 r 项 ──────────┤</span><br><span class="line">                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</span><br><span class="line">                     s[r] = 前 r 项的总和</span><br><span class="line">     s[l-1] = 前 l-1 项的总和</span><br><span class="line">             </span><br><span class="line">     区间和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
-
-<p>预处理完 <code>s</code> 数组后，<strong>每次求区间和只需要 O(1) 的时间</strong>（一次减法），这就是前缀和的威力。</p>
-<hr>
-<h2 id="三、二维前缀和"><a href="#三、二维前缀和" class="headerlink" title="三、二维前缀和"></a>三、二维前缀和</h2><h3 id="3-1-问题升级"><a href="#3-1-问题升级" class="headerlink" title="3.1 问题升级"></a>3.1 问题升级</h3><p>如果你面对的<strong>不是一维数组，而是一个二维矩阵</strong>，想快速求出<strong>任意一个子矩形内所有数的和</strong>，怎么办？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">    列1  列2  列3  列4</span><br><span class="line">行1   1    2    3    4</span><br><span class="line">行2   5    6    7    8</span><br><span class="line">行3   9   10   11   12</span><br></pre></td></tr></table></figure>
-
-<p>比如：求从 <code>[2][2]</code> 到 <code>[3][4]</code> 这个 2×3 矩形里所有数的和。</p>
-<p>类比一维的思路：<strong>二维前缀和</strong>就是提前算好从 <code>[1][1]</code> 到 <code>[i][j]</code> 这个矩形内所有数的总和。</p>
-<h3 id="3-2-核心公式"><a href="#3-2-核心公式" class="headerlink" title="3.2 核心公式"></a>3.2 核心公式</h3><p>定义 <code>s[i][j]</code> &#x3D; 从左上角 <code>(1,1)</code> 到右下角 <code>(i,j)</code> 的矩形区域内所有元素的和。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-3-图解：容斥原理"><a href="#3-3-图解：容斥原理" class="headerlink" title="3.3 图解：容斥原理"></a>3.3 图解：容斥原理</h3><p>公式看着复杂，其实核心就是<strong>容斥原理</strong>——两个有重叠的区域合并时，<strong>加完两边，减掉重叠</strong>。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">             列1     列2    ...   列j-1    列j    列j+1</span><br><span class="line">     ┌──────────────────────────────────────────────────┐</span><br><span class="line">行1   │                                                  │</span><br><span class="line">     │                      A区域                        │</span><br><span class="line"> ...  │                  s[i-1][j]                       │</span><br><span class="line">     │              ┌──────────────┐                     │</span><br><span class="line">行i-1 │              │  重叠部分    │                     │</span><br><span class="line">     │              │ s[i-1][j-1]  │                     │</span><br><span class="line">     │              └──────────────┘                     │</span><br><span class="line">     ├─────────────────────────────┬────────────────────┤</span><br><span class="line">行i   │          B区域             │      a[i][j]       │</span><br><span class="line">     │       s[i][j-1]            │      (当前格子)     │</span><br><span class="line">     └─────────────────────────────┴────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<p>把 s[i][j] 拆成三块来看：</p>
-<ul>
-<li><strong>A 区域</strong> &#x3D; <code>s[i-1][j]</code>：第 1<del>i-1 行、第 1</del>j 列（不含第 i 行）</li>
-<li><strong>B 区域</strong> &#x3D; <code>s[i][j-1]</code>：第 1<del>i 行、第 1</del>j-1 列（不含第 j 列）</li>
-<li><strong>重叠部分</strong> &#x3D; <code>s[i-1][j-1]</code>：A 和 B 都覆盖的左上角</li>
-</ul>
-<p>根据容斥原理（两个集合的并集 &#x3D; 各自之和 − 交集）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = |A ∪ B| + a[i][j]</span><br><span class="line">        = |A| + |B| − |A ∩ B| + a[i][j]</span><br><span class="line">        = s[i-1][j] + s[i][j-1] − s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-4-用途：求子矩阵和"><a href="#3-4-用途：求子矩阵和" class="headerlink" title="3.4 用途：求子矩阵和"></a>3.4 用途：求子矩阵和</h3><p>现在想求矩形区域 <code>(x1, y1)</code> 到 <code>(x2, y2)</code> 的和：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">子矩阵和 = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</span><br></pre></td></tr></table></figure>
-
-<p>同样还是<strong>面积加减法</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">(x1,y1) ───────────── (x1,y2)</span><br><span class="line">   │                     │</span><br><span class="line">   │    ┌────────────┐   │</span><br><span class="line">   │    │  目标矩形    │   │</span><br><span class="line">   │    │ (红色区域)   │   │</span><br><span class="line">   │    └────────────┘   │</span><br><span class="line">(x2,y1) ───────────── (x2,y2)</span><br></pre></td></tr></table></figure>
-
-<p>怎么从 <code>s[x2][y2]</code>（整个大矩形）扣出目标红色区域？</p>
-<ol>
-<li><strong>减</strong>掉上边部分 <code>s[x1-1][y2]</code>  </li>
-<li><strong>减</strong>掉左边部分 <code>s[x2][y1-1]</code>  </li>
-<li>左上角区域 <code>s[x1-1][y1-1]</code> 被减了两次，<strong>加</strong>回来</li>
-</ol>
-<hr>
-<h2 id="四、差分"><a href="#四、差分" class="headerlink" title="四、差分"></a>四、差分</h2><h3 id="4-1-差分是前缀和的逆运算"><a href="#4-1-差分是前缀和的逆运算" class="headerlink" title="4.1 差分是前缀和的逆运算"></a>4.1 差分是前缀和的逆运算</h3><p>先回顾前缀和的定义：<code>s[i] = a[1] + ... + a[i]</code>。</p>
-<p>那反过来，已知 <code>s</code> 怎么求 <code>a</code>？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">a[i] = s[i] - s[i-1]</span><br></pre></td></tr></table></figure>
-
-<p><strong>这就是差分。</strong> 对前缀和数组求差分，就得到原数组；对差分数组求前缀和，也得到原数组——两者互逆。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原数组 a</span><br><span class="line">  │  求前缀和</span><br><span class="line">  ▼</span><br><span class="line">前缀和数组 s</span><br><span class="line">  │  求差分（相邻两项相减）</span><br><span class="line">  ▼</span><br><span class="line">原数组 a</span><br></pre></td></tr></table></figure>
-
-<p>那差分有什么用？看一个场景：</p>
-<blockquote>
-<p>如果要反复给数组的某个区间统一加上一个数，最后再看结果，能不能快速做？</p>
-</blockquote>
-<p>暴力做法是每次从 l 到 r 逐个加，太慢。差分能做到时间复杂度是<strong>O(1)， 一次标记，最后统一还原</strong>。</p>
-<hr>
-<h2 id="五、一维差分"><a href="#五、一维差分" class="headerlink" title="五、一维差分"></a>五、一维差分</h2><h3 id="5-1-定义"><a href="#5-1-定义" class="headerlink" title="5.1 定义"></a>5.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，差分数组 <code>b</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i] = a[i] - a[i-1]</span><br></pre></td></tr></table></figure>
-
-<p>其中 <code>b[1] = a[1]</code>（<code>a[0] = 0</code>）。</p>
-<h3 id="5-2-核心操作：区间加-c"><a href="#5-2-核心操作：区间加-c" class="headerlink" title="5.2 核心操作：区间加 c"></a>5.2 核心操作：区间加 c</h3><p>给 <code>a[l] ~ a[r]</code> 每个数都加 <code>c</code>，分成两步：</p>
-<blockquote>
-<p><strong>① 在差分数组上改两个位置 → ② 再对差分数组求一次前缀和，就得到修改后的原数组</strong></p>
-</blockquote>
-<p>改哪两个位置？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[l]   += c</span><br><span class="line">b[r+1] -= c</span><br></pre></td></tr></table></figure>
-
-<p>也就是说，在差分数组上做完标记后，<strong>只要再求一遍前缀和就能得到修改后的数组</strong>。<br>不是说好了差分和前缀和是逆运算吗？为什么这样改两个位置就能让一整段加上 c？<br>拿一个具体的例子走一遍就明白了。</p>
-<hr>
-<h4 id="举个具体的例子"><a href="#举个具体的例子" class="headerlink" title="举个具体的例子"></a>举个具体的例子</h4><p>假设原数组 <code>a</code> 长度为 6：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">a[]：      2    5    3    1    4    6</span><br></pre></td></tr></table></figure>
-
-<p>先按定义造出差分数组 <code>b</code>（<code>b[i] = a[i] - a[i-1]</code>）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[1] = a[1] - 0      = 2</span><br><span class="line">b[2] = a[2] - a[1]   = 5 - 2   = 3</span><br><span class="line">b[3] = a[3] - a[2]   = 3 - 5   = -2</span><br><span class="line">b[4] = a[4] - a[3]   = 1 - 3   = -2</span><br><span class="line">b[5] = a[5] - a[4]   = 4 - 1   = 3</span><br><span class="line">b[6] = a[6] - a[5]   = 6 - 4   = 2</span><br><span class="line"></span><br><span class="line">b[]：      2    3   -2   -2    3    2</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h4 id="现在，我想给-a-3-a-5-每个数都加上-5"><a href="#现在，我想给-a-3-a-5-每个数都加上-5" class="headerlink" title="现在，我想给 a[3] ~ a[5] 每个数都加上 5"></a>现在，我想给 a[3] ~ a[5] 每个数都加上 5</h4><p>按照公式，改 <code>b</code> 的两个位置：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[3] += 5      （原来是 -2，变成 3）</span><br><span class="line">b[6] -= 5      （原来是 2，变成 -3）</span><br></pre></td></tr></table></figure>
-
-<p>修改后的 <code>b</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">b[]：      2    3    3   -2    3   -3</span><br><span class="line">                    ↑ b[3] 从 -2 变成 3</span><br><span class="line">                                   ↑ b[6] 从 2 变成 -3</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h4 id="关键一步：对修改后的-b-求前缀和，看看会发生什么"><a href="#关键一步：对修改后的-b-求前缀和，看看会发生什么" class="headerlink" title="关键一步：对修改后的 b 求前缀和，看看会发生什么"></a>关键一步：对修改后的 b 求前缀和，看看会发生什么</h4><p>还记得前缀和怎么算吗？**<code>s[i] = s[i-1] + b[i]</code>**。一步步来：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + b[1] = 0 + 2  = 2</span><br><span class="line">s[2] = 2 + b[2] = 2 + 3  = 5</span><br><span class="line">s[3] = 5 + b[3] = 5 + 3  = 8    ← 注意，这里用的是修改后的 b[3]（加了 5）</span><br><span class="line">s[4] = 8 + b[4] = 8 + (-2)= 6</span><br><span class="line">s[5] = 6 + b[5] = 6 + 3  = 9</span><br><span class="line">s[6] = 9 + b[6] = 9 + (-3)= 6    ← 这里用的是修改后的 b[6]（减了 5）</span><br></pre></td></tr></table></figure>
-
-<p>得到新的 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：      2    5    8    6    9    6</span><br></pre></td></tr></table></figure>
-
-<p>对比原来的 <code>a</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原来 a：   2    5    3    1    4    6</span><br><span class="line">新的 s：   2    5    8    6    9    6</span><br><span class="line">                          ↑    ↑    ↑</span><br><span class="line">                     a[3]+5  a[4]+5  a[5]+5</span><br></pre></td></tr></table></figure>
-
-<p><strong>正好</strong>只有 <code>a[3] ~ a[5]</code> 加了 5，前面和后面都没变！–很神奇对吧！</p>
-<hr>
-<h4 id="为什么？"><a href="#为什么？" class="headerlink" title="为什么？"></a>为什么？</h4><p>原因藏在<strong>前缀和的累加特性</strong>里。把 <code>b</code> 看成一系列”<strong>标记</strong>“：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[]：  2    3    3   -2    3   -3</span><br><span class="line">                 ↑</span><br><span class="line">           这里 b[3] 多了一个 +5</span><br><span class="line">                                ↑</span><br><span class="line">                          这里 b[6] 多了一个 -5</span><br></pre></td></tr></table></figure>
-
-<p>对 <code>b</code> 求前缀和时，每个位置的值会<strong>一直往后累加</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">位置1：       2                                 = 2</span><br><span class="line">位置2：       2 + 3                             = 5</span><br><span class="line">位置3：       2 + 3 + 3      ← +5 从这里开始     = 8 ← 比原来多了 5</span><br><span class="line">位置4：       2 + 3 + 3 + (-2)    ← +5 还在继续   = 6 ← 比原来多了 5</span><br><span class="line">位置5：       2 + 3 + 3 + (-2) + 3               = 9 ← 比原来多了 5</span><br><span class="line">位置6：       2 + 3 + 3 + (-2) + 3 + (-3)        = 6 ← +5 和 -5 抵消了！</span><br><span class="line">           ↑ 前 5 项还带着 +5     这里又减了 5 ──┘</span><br></pre></td></tr></table></figure>
-
-<p>把过程画出来看更清楚：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在 b[3] 放一个 +5 → 从位置 3 开始，所有数都多了 5</span><br><span class="line">                                              ┌───────────────────</span><br><span class="line">位置:    1      2      3      4      5      6 │</span><br><span class="line">累加:    2      5      8      6      9      6 │</span><br><span class="line">        ──────────────────────────────────────┘</span><br><span class="line">                            ← +5 一直跟着 →  </span><br><span class="line">                                              然后在 b[6] 放一个 -5 → +5 被抵消</span><br><span class="line"></span><br><span class="line">位置:    1      2      3      4      5      6</span><br><span class="line">累加:    2      5      8      6      9      6  </span><br><span class="line">                                     +5 被 -5 抵消 → 变回原样</span><br></pre></td></tr></table></figure>
-
-<p><strong>结论：</strong> <code>b[l] += c</code> 让 +c 从位置 l 开始一直往后传，<code>b[r+1] -= c</code> 让它在 r+1 处被抵消。一传一挡，<strong>c 就只落在了 [l, r] 这一段上</strong>。</p>
-<h3 id="5-3-完整流程"><a href="#5-3-完整流程" class="headerlink" title="5.3 完整流程"></a>5.3 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 由原数组 a 构造差分数组 b</span><br><span class="line">2. 在 b 上进行区间修改（b[l] += c, b[r+1] -= c）</span><br><span class="line">3. 所有修改完成后，对 b 求一遍前缀和 → 得到修改后的 a</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>前缀和和差分正好互补：</p>
-<ul>
-<li><strong>前缀和</strong>：一次预处理，多次<strong>查询</strong>区间和</li>
-<li><strong>差分</strong>：多次<strong>修改</strong>区间值，最后一次性看结果</li>
-</ul>
-</blockquote>
-<hr>
-<h2 id="六、二维差分"><a href="#六、二维差分" class="headerlink" title="六、二维差分"></a>六、二维差分</h2><h3 id="6-1-定义"><a href="#6-1-定义" class="headerlink" title="6.1 定义"></a>6.1 定义</h3><p>和一维完全对称：<strong>对 b 求二维前缀和 &#x3D; 原矩阵 a</strong>。</p>
-<p>构造公式（对二维前缀和公式做逆运算）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i][j] = a[i][j] - a[i-1][j] - a[i][j-1] + a[i-1][j-1]</span><br></pre></td></tr></table></figure>
-
-<h3 id="6-2-核心操作：子矩阵加-c"><a href="#6-2-核心操作：子矩阵加-c" class="headerlink" title="6.2 核心操作：子矩阵加 c"></a>6.2 核心操作：子矩阵加 c</h3><p>给矩形 <code>(x1,y1)</code> 到 <code>(x2,y2)</code> 内每个数加 <code>c</code>，只需改<strong>四个点</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1]     += c</span><br><span class="line">b[x1][y2+1]   -= c</span><br><span class="line">b[x2+1][y1]   -= c</span><br><span class="line">b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
-
-<h3 id="6-3-图解"><a href="#6-3-图解" class="headerlink" title="6.3 图解"></a>6.3 图解</h3><p>一维是在<strong>两端</strong>做标记，二维是在<strong>四个角</strong>做标记：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1] += c        b[x1][y2+1] -= c</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">     │                          │</span><br><span class="line">     │       目标区域            │</span><br><span class="line">     │      (+c 的区域)          │</span><br><span class="line">     │                          │</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">b[x2+1][y1] -= c      b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
-
-<p>和一维同理，四个标记经过二维前缀和后，只有矩形内部被加了 c。</p>
-<h3 id="6-4-完整流程"><a href="#6-4-完整流程" class="headerlink" title="6.4 完整流程"></a>6.4 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 构造二维差分数组 b</span><br><span class="line">2. 在 b 上进行子矩阵修改（改四个角）</span><br><span class="line">3. 所有修改完成后，对 b 求二维前缀和 → 得到修改后的矩阵 a</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="七、总结对照"><a href="#七、总结对照" class="headerlink" title="七、总结对照"></a>七、总结对照</h2><h3 id="公式速查表"><a href="#公式速查表" class="headerlink" title="公式速查表"></a>公式速查表</h3><table>
-<thead>
-<tr>
-<th>场景</th>
-<th>公式</th>
-<th>用途</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>一维前缀和</td>
-<td><code>s[i] = s[i-1] + a[i]</code></td>
-<td>预处理</td>
-</tr>
-<tr>
-<td>一维区间和</td>
-<td><code>sum[l,r] = s[r] - s[l-1]</code></td>
-<td>快速查询</td>
-</tr>
-<tr>
-<td>二维前缀和</td>
-<td><code>s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</code></td>
-<td>预处理</td>
-</tr>
-<tr>
-<td>二维子矩阵和</td>
-<td><code>sum = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</code></td>
-<td>快速查询</td>
-</tr>
-<tr>
-<td>一维差分</td>
-<td><code>b[l] += c, b[r+1] -= c</code></td>
-<td>区间加减</td>
-</tr>
-<tr>
-<td>二维差分</td>
-<td><code>b[x1][y1] += c, b[x1][y2+1] -= c, b[x2+1][y1] -= c, b[x2+1][y2+1] += c</code></td>
-<td>子矩阵加减</td>
-</tr>
-</tbody></table>
-<h3 id="一张图理解全部关系"><a href="#一张图理解全部关系" class="headerlink" title="一张图理解全部关系"></a>一张图理解全部关系</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">         求前缀和               求差分</span><br><span class="line">原数组 ────────→ 前缀和数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">         求差分                 求前缀和</span><br><span class="line">原数组 ────────→ 差分数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">前缀和与差分就像积分与求导，是互逆的运算</span><br></pre></td></tr></table></figure>
-
-<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><table>
-<thead>
-<tr>
-<th>算法</th>
-<th>什么时候用</th>
-<th>耗时</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>前缀和</strong></td>
-<td>多次<strong>查询</strong>区间和&#x2F;子矩阵和</td>
-<td>预处理 O(n)，每次查询 O(1)</td>
-</tr>
-<tr>
-<td><strong>差分</strong></td>
-<td>多次<strong>修改</strong>区间&#x2F;子矩阵的值，最后一次性查看结果</td>
-<td>每次修改 O(1)，最后恢复 O(n)</td>
-</tr>
-<tr>
-<td><strong>前缀和 + 差分</strong></td>
-<td>多次修改 + 多次查询</td>
-<td>差分做修改，前缀和做查询，中间通过「求前缀和」衔接</td>
-</tr>
-</tbody></table>
-<h3 id="关键注意点"><a href="#关键注意点" class="headerlink" title="关键注意点"></a>关键注意点</h3><ol>
-<li><strong>数组下标从 1 开始</strong>，避免出现 <code>l-1 = 0</code> 时越界</li>
-<li>设 <code>s[0] = 0</code>（一维）或 <code>s[0][*] = s[*][0] = 0</code>（二维），统一边界条件</li>
-<li><strong>先修改，后查询</strong>——差分所有的修改操作做完后，最后求一遍前缀和才能得到最终结果</li>
-<li>二维的「面积加减法」理解了，前缀和和差分的四个公式<strong>其实是一个思路</strong>，不需要死记硬背</li>
-</ol>
-<hr>
-<blockquote>
-<p>前缀和是「累加」，差分是「标记」——这对互逆的算法体现了预处理和批量操作的核心思想，是算法竞赛和面试中最高频的基础技巧之一。</p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>算法</category>
-      </categories>
-      <tags>
-        <tag>前缀和&amp;差分</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>力扣59题-螺旋矩阵-题解</title>
     <url>/2026/07/12/%E5%8A%9B%E6%89%A3%2059%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/</url>
     <content><![CDATA[<h1 id="力扣59题-螺旋矩阵-题解"><a href="#力扣59题-螺旋矩阵-题解" class="headerlink" title="力扣59题-螺旋矩阵-题解"></a>力扣59题-螺旋矩阵-题解</h1><h2 id="题目描述"><a href="#题目描述" class="headerlink" title="题目描述"></a>题目描述</h2><p>给你一个正整数 <code>n</code> ，生成一个包含 <code>1</code> 到 n^2^ 所有元素，且元素按顺时针顺序螺旋排列的 <code>n x n</code> 正方形矩阵 <code>matrix</code> 。</p>
@@ -13158,6 +12918,246 @@
         <tag>AI</tag>
         <tag>Hexo</tag>
         <tag>Markdown</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>前缀和与差分 —— 从概念到公式</title>
+    <url>/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/</url>
+    <content><![CDATA[<h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
+<p>最直接的做法：每次从 3 加到 7。如果数组很大（比如 10 万个数），问你 10 万次，那总共要算 100 亿次加法——太慢了。<br>如果换一种思路，我能不能<strong>提前把「前 i 个数的和」全部算好存起来</strong>，这样每次询问直接用减法得到结果？</p>
+<p>这就是<strong>前缀和</strong>的核心思想——<strong>预处理，换时间</strong>。</p>
+<hr>
+<h2 id="二、一维前缀和"><a href="#二、一维前缀和" class="headerlink" title="二、一维前缀和"></a>二、一维前缀和</h2><h3 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="2.1 定义"></a>2.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，定义前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = a[1] + a[2] + ... + a[i]   （前 i 个数的总和）</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-核心公式"><a href="#2-2-核心公式" class="headerlink" title="2.2 核心公式"></a>2.2 核心公式</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = s[i-1] + a[i]</span><br></pre></td></tr></table></figure>
+
+<p>边界条件：<code>s[0] = 0</code>（前 0 个数的和为 0）。</p>
+<blockquote>
+<p>公式的意思是：前 i 个数的和 &#x3D; 前 i-1 个数的和 + 第 i 个数。</p>
+</blockquote>
+<h3 id="2-3-图示"><a href="#2-3-图示" class="headerlink" title="2.3 图示"></a>2.3 图示</h3><p>假设原数组 <code>a</code> 如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：  1    2    3    4    5</span><br><span class="line">a[]：  2    5    3    1    4</span><br></pre></td></tr></table></figure>
+
+<p>逐个计算前缀和：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + 2 = 2</span><br><span class="line">s[2] = 2 + 5 = 7</span><br><span class="line">s[3] = 7 + 3 = 10</span><br><span class="line">s[4] = 10 + 1 = 11</span><br><span class="line">s[5] = 11 + 4 = 15</span><br></pre></td></tr></table></figure>
+
+<p>得到前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：  2    7    10   11   15</span><br><span class="line">      ↑    ↑    ↑    ↑    ↑</span><br><span class="line">      前1  前2  前3  前4  前5</span><br></pre></td></tr></table></figure>
+
+<p>可以直观地看到：<code>s[i]</code> 就是从第一个数一直加到第 i 个数的「累计值」。</p>
+<h3 id="2-4-用途：快速求区间和"><a href="#2-4-用途：快速求区间和" class="headerlink" title="2.4 用途：快速求区间和"></a>2.4 用途：快速求区间和</h3><p>现在想求 <code>a[2] + a[3] + a[4]</code>（即区间 <code>[2, 4]</code> 的和）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间[2,4]的和 = s[4] - s[1] = 11 - 2 = 9</span><br><span class="line">验证：5 + 3 + 1 = 9  ✅</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心公式：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间 [l, r] 的和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>文字理解：<strong>前 r 个数的和 减去 前 l-1 个数的和</strong>，剩下的就是第 l 个到第 r 个。</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                   ┌─────────── 区间[l, r] ───────────┐</span><br><span class="line">                   │                                   │</span><br><span class="line">a[1] a[2] ... a[l-1]  a[l] a[l+1] ... a[r-1] a[r]  a[r+1] ...</span><br><span class="line">├──── 前 l-1 项 ────┤├────────── 前 r 项 ──────────┤</span><br><span class="line">                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</span><br><span class="line">                     s[r] = 前 r 项的总和</span><br><span class="line">     s[l-1] = 前 l-1 项的总和</span><br><span class="line">             </span><br><span class="line">     区间和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<p>预处理完 <code>s</code> 数组后，<strong>每次求区间和只需要 O(1) 的时间</strong>（一次减法），这就是前缀和的威力。</p>
+<hr>
+<h2 id="三、二维前缀和"><a href="#三、二维前缀和" class="headerlink" title="三、二维前缀和"></a>三、二维前缀和</h2><h3 id="3-1-问题升级"><a href="#3-1-问题升级" class="headerlink" title="3.1 问题升级"></a>3.1 问题升级</h3><p>如果你面对的<strong>不是一维数组，而是一个二维矩阵</strong>，想快速求出<strong>任意一个子矩形内所有数的和</strong>，怎么办？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">    列1  列2  列3  列4</span><br><span class="line">行1   1    2    3    4</span><br><span class="line">行2   5    6    7    8</span><br><span class="line">行3   9   10   11   12</span><br></pre></td></tr></table></figure>
+
+<p>比如：求从 <code>[2][2]</code> 到 <code>[3][4]</code> 这个 2×3 矩形里所有数的和。</p>
+<p>类比一维的思路：<strong>二维前缀和</strong>就是提前算好从 <code>[1][1]</code> 到 <code>[i][j]</code> 这个矩形内所有数的总和。</p>
+<h3 id="3-2-核心公式"><a href="#3-2-核心公式" class="headerlink" title="3.2 核心公式"></a>3.2 核心公式</h3><p>定义 <code>s[i][j]</code> &#x3D; 从左上角 <code>(1,1)</code> 到右下角 <code>(i,j)</code> 的矩形区域内所有元素的和。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-3-图解：容斥原理"><a href="#3-3-图解：容斥原理" class="headerlink" title="3.3 图解：容斥原理"></a>3.3 图解：容斥原理</h3><p>公式看着复杂，其实核心就是<strong>容斥原理</strong>——两个有重叠的区域合并时，<strong>加完两边，减掉重叠</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">             列1     列2    ...   列j-1    列j    列j+1</span><br><span class="line">     ┌──────────────────────────────────────────────────┐</span><br><span class="line">行1   │                                                  │</span><br><span class="line">     │                      A区域                        │</span><br><span class="line"> ...  │                  s[i-1][j]                       │</span><br><span class="line">     │              ┌──────────────┐                     │</span><br><span class="line">行i-1 │              │  重叠部分    │                     │</span><br><span class="line">     │              │ s[i-1][j-1]  │                     │</span><br><span class="line">     │              └──────────────┘                     │</span><br><span class="line">     ├─────────────────────────────┬────────────────────┤</span><br><span class="line">行i   │          B区域             │      a[i][j]       │</span><br><span class="line">     │       s[i][j-1]            │      (当前格子)     │</span><br><span class="line">     └─────────────────────────────┴────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>把 s[i][j] 拆成三块来看：</p>
+<ul>
+<li><strong>A 区域</strong> &#x3D; <code>s[i-1][j]</code>：第 1<del>i-1 行、第 1</del>j 列（不含第 i 行）</li>
+<li><strong>B 区域</strong> &#x3D; <code>s[i][j-1]</code>：第 1<del>i 行、第 1</del>j-1 列（不含第 j 列）</li>
+<li><strong>重叠部分</strong> &#x3D; <code>s[i-1][j-1]</code>：A 和 B 都覆盖的左上角</li>
+</ul>
+<p>根据容斥原理（两个集合的并集 &#x3D; 各自之和 − 交集）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = |A ∪ B| + a[i][j]</span><br><span class="line">        = |A| + |B| − |A ∩ B| + a[i][j]</span><br><span class="line">        = s[i-1][j] + s[i][j-1] − s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-4-用途：求子矩阵和"><a href="#3-4-用途：求子矩阵和" class="headerlink" title="3.4 用途：求子矩阵和"></a>3.4 用途：求子矩阵和</h3><p>现在想求矩形区域 <code>(x1, y1)</code> 到 <code>(x2, y2)</code> 的和：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">子矩阵和 = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</span><br></pre></td></tr></table></figure>
+
+<p>同样还是<strong>面积加减法</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">(x1,y1) ───────────── (x1,y2)</span><br><span class="line">   │                     │</span><br><span class="line">   │    ┌────────────┐   │</span><br><span class="line">   │    │  目标矩形    │   │</span><br><span class="line">   │    │ (红色区域)   │   │</span><br><span class="line">   │    └────────────┘   │</span><br><span class="line">(x2,y1) ───────────── (x2,y2)</span><br></pre></td></tr></table></figure>
+
+<p>怎么从 <code>s[x2][y2]</code>（整个大矩形）扣出目标红色区域？</p>
+<ol>
+<li><strong>减</strong>掉上边部分 <code>s[x1-1][y2]</code>  </li>
+<li><strong>减</strong>掉左边部分 <code>s[x2][y1-1]</code>  </li>
+<li>左上角区域 <code>s[x1-1][y1-1]</code> 被减了两次，<strong>加</strong>回来</li>
+</ol>
+<hr>
+<h2 id="四、差分"><a href="#四、差分" class="headerlink" title="四、差分"></a>四、差分</h2><h3 id="4-1-差分是前缀和的逆运算"><a href="#4-1-差分是前缀和的逆运算" class="headerlink" title="4.1 差分是前缀和的逆运算"></a>4.1 差分是前缀和的逆运算</h3><p>先回顾前缀和的定义：<code>s[i] = a[1] + ... + a[i]</code>。</p>
+<p>那反过来，已知 <code>s</code> 怎么求 <code>a</code>？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">a[i] = s[i] - s[i-1]</span><br></pre></td></tr></table></figure>
+
+<p><strong>这就是差分。</strong> 对前缀和数组求差分，就得到原数组；对差分数组求前缀和，也得到原数组——两者互逆。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原数组 a</span><br><span class="line">  │  求前缀和</span><br><span class="line">  ▼</span><br><span class="line">前缀和数组 s</span><br><span class="line">  │  求差分（相邻两项相减）</span><br><span class="line">  ▼</span><br><span class="line">原数组 a</span><br></pre></td></tr></table></figure>
+
+<p>那差分有什么用？看一个场景：</p>
+<blockquote>
+<p>如果要反复给数组的某个区间统一加上一个数，最后再看结果，能不能快速做？</p>
+</blockquote>
+<p>暴力做法是每次从 l 到 r 逐个加，太慢。差分能做到时间复杂度是<strong>O(1)， 一次标记，最后统一还原</strong>。</p>
+<hr>
+<h2 id="五、一维差分"><a href="#五、一维差分" class="headerlink" title="五、一维差分"></a>五、一维差分</h2><h3 id="5-1-定义"><a href="#5-1-定义" class="headerlink" title="5.1 定义"></a>5.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，差分数组 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i] = a[i] - a[i-1]</span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>b[1] = a[1]</code>（<code>a[0] = 0</code>）。</p>
+<h3 id="5-2-核心操作：区间加-c"><a href="#5-2-核心操作：区间加-c" class="headerlink" title="5.2 核心操作：区间加 c"></a>5.2 核心操作：区间加 c</h3><p>给 <code>a[l] ~ a[r]</code> 每个数都加 <code>c</code>，分成两步：</p>
+<blockquote>
+<p><strong>① 在差分数组上改两个位置 → ② 再对差分数组求一次前缀和，就得到修改后的原数组</strong></p>
+</blockquote>
+<p>改哪两个位置？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[l]   += c</span><br><span class="line">b[r+1] -= c</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，在差分数组上做完标记后，<strong>只要再求一遍前缀和就能得到修改后的数组</strong>。<br>不是说好了差分和前缀和是逆运算吗？为什么这样改两个位置就能让一整段加上 c？<br>拿一个具体的例子走一遍就明白了。</p>
+<hr>
+<h4 id="举个具体的例子"><a href="#举个具体的例子" class="headerlink" title="举个具体的例子"></a>举个具体的例子</h4><p>假设原数组 <code>a</code> 长度为 6：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">a[]：      2    5    3    1    4    6</span><br></pre></td></tr></table></figure>
+
+<p>先按定义造出差分数组 <code>b</code>（<code>b[i] = a[i] - a[i-1]</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[1] = a[1] - 0      = 2</span><br><span class="line">b[2] = a[2] - a[1]   = 5 - 2   = 3</span><br><span class="line">b[3] = a[3] - a[2]   = 3 - 5   = -2</span><br><span class="line">b[4] = a[4] - a[3]   = 1 - 3   = -2</span><br><span class="line">b[5] = a[5] - a[4]   = 4 - 1   = 3</span><br><span class="line">b[6] = a[6] - a[5]   = 6 - 4   = 2</span><br><span class="line"></span><br><span class="line">b[]：      2    3   -2   -2    3    2</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="现在，我想给-a-3-a-5-每个数都加上-5"><a href="#现在，我想给-a-3-a-5-每个数都加上-5" class="headerlink" title="现在，我想给 a[3] ~ a[5] 每个数都加上 5"></a>现在，我想给 a[3] ~ a[5] 每个数都加上 5</h4><p>按照公式，改 <code>b</code> 的两个位置：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[3] += 5      （原来是 -2，变成 3）</span><br><span class="line">b[6] -= 5      （原来是 2，变成 -3）</span><br></pre></td></tr></table></figure>
+
+<p>修改后的 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">b[]：      2    3    3   -2    3   -3</span><br><span class="line">                    ↑ b[3] 从 -2 变成 3</span><br><span class="line">                                   ↑ b[6] 从 2 变成 -3</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="关键一步：对修改后的-b-求前缀和，看看会发生什么"><a href="#关键一步：对修改后的-b-求前缀和，看看会发生什么" class="headerlink" title="关键一步：对修改后的 b 求前缀和，看看会发生什么"></a>关键一步：对修改后的 b 求前缀和，看看会发生什么</h4><p>还记得前缀和怎么算吗？**<code>s[i] = s[i-1] + b[i]</code>**。一步步来：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + b[1] = 0 + 2  = 2</span><br><span class="line">s[2] = 2 + b[2] = 2 + 3  = 5</span><br><span class="line">s[3] = 5 + b[3] = 5 + 3  = 8    ← 注意，这里用的是修改后的 b[3]（加了 5）</span><br><span class="line">s[4] = 8 + b[4] = 8 + (-2)= 6</span><br><span class="line">s[5] = 6 + b[5] = 6 + 3  = 9</span><br><span class="line">s[6] = 9 + b[6] = 9 + (-3)= 6    ← 这里用的是修改后的 b[6]（减了 5）</span><br></pre></td></tr></table></figure>
+
+<p>得到新的 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：      2    5    8    6    9    6</span><br></pre></td></tr></table></figure>
+
+<p>对比原来的 <code>a</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原来 a：   2    5    3    1    4    6</span><br><span class="line">新的 s：   2    5    8    6    9    6</span><br><span class="line">                          ↑    ↑    ↑</span><br><span class="line">                     a[3]+5  a[4]+5  a[5]+5</span><br></pre></td></tr></table></figure>
+
+<p><strong>正好</strong>只有 <code>a[3] ~ a[5]</code> 加了 5，前面和后面都没变！–很神奇对吧！</p>
+<hr>
+<h4 id="为什么？"><a href="#为什么？" class="headerlink" title="为什么？"></a>为什么？</h4><p>原因藏在<strong>前缀和的累加特性</strong>里。把 <code>b</code> 看成一系列”<strong>标记</strong>“：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[]：  2    3    3   -2    3   -3</span><br><span class="line">                 ↑</span><br><span class="line">           这里 b[3] 多了一个 +5</span><br><span class="line">                                ↑</span><br><span class="line">                          这里 b[6] 多了一个 -5</span><br></pre></td></tr></table></figure>
+
+<p>对 <code>b</code> 求前缀和时，每个位置的值会<strong>一直往后累加</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">位置1：       2                                 = 2</span><br><span class="line">位置2：       2 + 3                             = 5</span><br><span class="line">位置3：       2 + 3 + 3      ← +5 从这里开始     = 8 ← 比原来多了 5</span><br><span class="line">位置4：       2 + 3 + 3 + (-2)    ← +5 还在继续   = 6 ← 比原来多了 5</span><br><span class="line">位置5：       2 + 3 + 3 + (-2) + 3               = 9 ← 比原来多了 5</span><br><span class="line">位置6：       2 + 3 + 3 + (-2) + 3 + (-3)        = 6 ← +5 和 -5 抵消了！</span><br><span class="line">           ↑ 前 5 项还带着 +5     这里又减了 5 ──┘</span><br></pre></td></tr></table></figure>
+
+<p>把过程画出来看更清楚：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在 b[3] 放一个 +5 → 从位置 3 开始，所有数都多了 5</span><br><span class="line">                                              ┌───────────────────</span><br><span class="line">位置:    1      2      3      4      5      6 │</span><br><span class="line">累加:    2      5      8      6      9      6 │</span><br><span class="line">        ──────────────────────────────────────┘</span><br><span class="line">                            ← +5 一直跟着 →  </span><br><span class="line">                                              然后在 b[6] 放一个 -5 → +5 被抵消</span><br><span class="line"></span><br><span class="line">位置:    1      2      3      4      5      6</span><br><span class="line">累加:    2      5      8      6      9      6  </span><br><span class="line">                                     +5 被 -5 抵消 → 变回原样</span><br></pre></td></tr></table></figure>
+
+<p><strong>结论：</strong> <code>b[l] += c</code> 让 +c 从位置 l 开始一直往后传，<code>b[r+1] -= c</code> 让它在 r+1 处被抵消。一传一挡，<strong>c 就只落在了 [l, r] 这一段上</strong>。</p>
+<h3 id="5-3-完整流程"><a href="#5-3-完整流程" class="headerlink" title="5.3 完整流程"></a>5.3 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 由原数组 a 构造差分数组 b</span><br><span class="line">2. 在 b 上进行区间修改（b[l] += c, b[r+1] -= c）</span><br><span class="line">3. 所有修改完成后，对 b 求一遍前缀和 → 得到修改后的 a</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>前缀和和差分正好互补：</p>
+<ul>
+<li><strong>前缀和</strong>：一次预处理，多次<strong>查询</strong>区间和</li>
+<li><strong>差分</strong>：多次<strong>修改</strong>区间值，最后一次性看结果</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="六、二维差分"><a href="#六、二维差分" class="headerlink" title="六、二维差分"></a>六、二维差分</h2><h3 id="6-1-定义"><a href="#6-1-定义" class="headerlink" title="6.1 定义"></a>6.1 定义</h3><p>和一维完全对称：<strong>对 b 求二维前缀和 &#x3D; 原矩阵 a</strong>。</p>
+<p>构造公式（对二维前缀和公式做逆运算）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i][j] = a[i][j] - a[i-1][j] - a[i][j-1] + a[i-1][j-1]</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-核心操作：子矩阵加-c"><a href="#6-2-核心操作：子矩阵加-c" class="headerlink" title="6.2 核心操作：子矩阵加 c"></a>6.2 核心操作：子矩阵加 c</h3><p>给矩形 <code>(x1,y1)</code> 到 <code>(x2,y2)</code> 内每个数加 <code>c</code>，只需改<strong>四个点</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1]     += c</span><br><span class="line">b[x1][y2+1]   -= c</span><br><span class="line">b[x2+1][y1]   -= c</span><br><span class="line">b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-图解"><a href="#6-3-图解" class="headerlink" title="6.3 图解"></a>6.3 图解</h3><p>一维是在<strong>两端</strong>做标记，二维是在<strong>四个角</strong>做标记：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1] += c        b[x1][y2+1] -= c</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">     │                          │</span><br><span class="line">     │       目标区域            │</span><br><span class="line">     │      (+c 的区域)          │</span><br><span class="line">     │                          │</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">b[x2+1][y1] -= c      b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<p>和一维同理，四个标记经过二维前缀和后，只有矩形内部被加了 c。</p>
+<h3 id="6-4-完整流程"><a href="#6-4-完整流程" class="headerlink" title="6.4 完整流程"></a>6.4 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 构造二维差分数组 b</span><br><span class="line">2. 在 b 上进行子矩阵修改（改四个角）</span><br><span class="line">3. 所有修改完成后，对 b 求二维前缀和 → 得到修改后的矩阵 a</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、总结对照"><a href="#七、总结对照" class="headerlink" title="七、总结对照"></a>七、总结对照</h2><h3 id="公式速查表"><a href="#公式速查表" class="headerlink" title="公式速查表"></a>公式速查表</h3><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>公式</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一维前缀和</td>
+<td><code>s[i] = s[i-1] + a[i]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>一维区间和</td>
+<td><code>sum[l,r] = s[r] - s[l-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>二维前缀和</td>
+<td><code>s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>二维子矩阵和</td>
+<td><code>sum = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>一维差分</td>
+<td><code>b[l] += c, b[r+1] -= c</code></td>
+<td>区间加减</td>
+</tr>
+<tr>
+<td>二维差分</td>
+<td><code>b[x1][y1] += c, b[x1][y2+1] -= c, b[x2+1][y1] -= c, b[x2+1][y2+1] += c</code></td>
+<td>子矩阵加减</td>
+</tr>
+</tbody></table>
+<h3 id="一张图理解全部关系"><a href="#一张图理解全部关系" class="headerlink" title="一张图理解全部关系"></a>一张图理解全部关系</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">         求前缀和               求差分</span><br><span class="line">原数组 ────────→ 前缀和数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">         求差分                 求前缀和</span><br><span class="line">原数组 ────────→ 差分数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">前缀和与差分就像积分与求导，是互逆的运算</span><br></pre></td></tr></table></figure>
+
+<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>什么时候用</th>
+<th>耗时</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>前缀和</strong></td>
+<td>多次<strong>查询</strong>区间和&#x2F;子矩阵和</td>
+<td>预处理 O(n)，每次查询 O(1)</td>
+</tr>
+<tr>
+<td><strong>差分</strong></td>
+<td>多次<strong>修改</strong>区间&#x2F;子矩阵的值，最后一次性查看结果</td>
+<td>每次修改 O(1)，最后恢复 O(n)</td>
+</tr>
+<tr>
+<td><strong>前缀和 + 差分</strong></td>
+<td>多次修改 + 多次查询</td>
+<td>差分做修改，前缀和做查询，中间通过「求前缀和」衔接</td>
+</tr>
+</tbody></table>
+<h3 id="关键注意点"><a href="#关键注意点" class="headerlink" title="关键注意点"></a>关键注意点</h3><ol>
+<li><strong>数组下标从 1 开始</strong>，避免出现 <code>l-1 = 0</code> 时越界</li>
+<li>设 <code>s[0] = 0</code>（一维）或 <code>s[0][*] = s[*][0] = 0</code>（二维），统一边界条件</li>
+<li><strong>先修改，后查询</strong>——差分所有的修改操作做完后，最后求一遍前缀和才能得到最终结果</li>
+<li>二维的「面积加减法」理解了，前缀和和差分的四个公式<strong>其实是一个思路</strong>，不需要死记硬背</li>
+</ol>
+<hr>
+<blockquote>
+<p>前缀和是「累加」，差分是「标记」——这对互逆的算法体现了预处理和批量操作的核心思想，是算法竞赛和面试中最高频的基础技巧之一。</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>算法</category>
+      </categories>
+      <tags>
+        <tag>前缀和&amp;差分</tag>
       </tags>
   </entry>
 </search>
