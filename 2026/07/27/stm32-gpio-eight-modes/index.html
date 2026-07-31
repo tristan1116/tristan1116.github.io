@@ -26,7 +26,7 @@
 <meta property="og:type" content="article">
 <meta property="og:title" content="STM32--浅析GPIO八大模式">
 <meta property="og:url" content="http://tristan1116.github.io/2026/07/27/stm32-gpio-eight-modes/index.html">
-<meta property="og:site_name" content="童诗轩的博客网站">
+<meta property="og:site_name" content="点灯大王的博客">
 <meta property="og:description" content="前面三篇博客分别介绍了点灯、RGB流水灯和按键输入，已经用到了GPIO的推挽输出和上拉输入等模式。但GPIO一共有八种工作模式，它们在内部电路上有什么区别？什么时候该用哪种？本文从内部电路结构出发，逐一拆解这八大模式，帮助理解背后&quot;为什么&quot;。">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://tristan1116.github.io/images/stm32-gpio-eight-modes/image-20260727221629861.png">
@@ -41,8 +41,8 @@
 <meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/alternate_output.png">
 <meta property="og:image" content="http://tristan1116.github.io/images/gpio_eight_modes/alternate_input.png">
 <meta property="article:published_time" content="2026-07-27T10:02:02.000Z">
-<meta property="article:modified_time" content="2026-07-31T03:15:06.386Z">
-<meta property="article:author" content="童诗轩">
+<meta property="article:modified_time" content="2026-07-31T05:01:56.862Z">
+<meta property="article:author" content="点灯大王">
 <meta property="article:tag" content="STM32">
 <meta property="article:tag" content="嵌入式">
 <meta property="article:tag" content="CubeMX">
@@ -63,7 +63,7 @@
   };
 </script>
 
-  <title>STM32--浅析GPIO八大模式 | 童诗轩的博客网站</title>
+  <title>STM32--浅析GPIO八大模式 | 点灯大王的博客</title>
   
 
 
@@ -114,7 +114,7 @@
 
     <a href="/" class="brand" rel="start">
       <span class="logo-line-before"><i></i></span>
-      <h1 class="site-title">童诗轩的博客网站</h1>
+      <h1 class="site-title">点灯大王的博客</h1>
       <span class="logo-line-after"><i></i></span>
     </a>
   </div>
@@ -210,12 +210,12 @@
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
-      <meta itemprop="name" content="童诗轩">
+      <meta itemprop="name" content="点灯大王">
       <meta itemprop="description" content="博客、记录">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="童诗轩的博客网站">
+      <meta itemprop="name" content="点灯大王的博客">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
@@ -236,7 +236,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-07-31 03:15:06" itemprop="dateModified" datetime="2026-07-31T03:15:06+00:00">2026-07-31</time>
+                <time title="修改时间：2026-07-31 05:01:56" itemprop="dateModified" datetime="2026-07-31T05:01:56+00:00">2026-07-31</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -709,9 +709,9 @@
 
       <div class="site-overview-wrap sidebar-panel">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-    <img class="site-author-image" itemprop="image" alt="童诗轩"
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
       src="/images/avatar/potatolearning.jpg">
-  <p class="site-author-name" itemprop="name">童诗轩</p>
+  <p class="site-author-name" itemprop="name">点灯大王</p>
   <div class="site-description" itemprop="description">博客、记录</div>
 </div>
 <div class="site-state-wrap motion-element">
@@ -763,7 +763,7 @@
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
-  <span class="author" itemprop="copyrightHolder">童诗轩</span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
