@@ -2072,6 +2072,524 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——IIC通信读取温湿度传感器AHT20</title>
+    <url>/2026/08/01/STM32_I2C_AHT20/</url>
+    <content><![CDATA[<h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上篇我们实现了<strong>蓝牙BLE通信</strong>：用 USART3 + DMA + 空闲中断接收手机发来的数据包，再解析 0xAA 包头 + 长度 + 校验和，控制了开发板上的 LED。</p>
+<p>不管是串口、蓝牙还是 DMA，本质上都是<strong>把数据从 A 传到 B</strong>。但嵌入式世界里还有一种非常常见的场景：<strong>MCU 需要读取传感器的数据</strong>——温湿度、气压、加速度……这些传感器体积小、引脚少，不可能每个都占一个完整的串口。</p>
+<p>于是就有了本期主角：<strong>IIC 通信</strong>，用它读出我房间的温度和湿度，再通过串口打印传输到电脑上。</p>
+<blockquote>
+<p>顺带一提：AHT20 和 DHT20 是同一颗芯片（AHT20 是原厂名，DHT20 是兼容封装名），协议完全一样。</p>
+</blockquote>
+<hr>
+<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="2-1-两根线的总线：SDA-SCL"><a href="#2-1-两根线的总线：SDA-SCL" class="headerlink" title="2.1 两根线的总线：SDA + SCL"></a>2.1 两根线的总线：SDA + SCL</h3><p>串口用两根数据线做全双工通信，就像<strong>双向车道</strong>，两个方向可以同时走。而 IIC 只有<strong>一根数据线 SDA</strong>（Serial Data）+ <strong>一根时钟线 SCL</strong>（Serial Clock）：</p>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="center">串口 (USART)</th>
+<th align="center">IIC (I2C)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">数据线数量</td>
+<td align="center">2 根（TX&#x2F;RX）</td>
+<td align="center">1 根（SDA）</td>
+</tr>
+<tr>
+<td align="left">时钟</td>
+<td align="center">双方各自时钟（<strong>异步</strong>）</td>
+<td align="center">主机提供（<strong>同步</strong>）</td>
+</tr>
+<tr>
+<td align="left">通信方向</td>
+<td align="center">全双工</td>
+<td align="center"><strong>半双工</strong>（同一时刻只能一个方向）</td>
+</tr>
+<tr>
+<td align="left">设备数量</td>
+<td align="center">点对点</td>
+<td align="center"><strong>总线</strong>（一主多从）</td>
+</tr>
+</tbody></table>
+<p>SDA 虽然允许双向通信，但<strong>同一时刻只能一个方向发送</strong>——就像单车道，来车和去车不能同时走，这就是半双工。</p>
+<h3 id="2-2-主从模式：一问一答"><a href="#2-2-主从模式：一问一答" class="headerlink" title="2.2 主从模式：一问一答"></a>2.2 主从模式：一问一答</h3><p>为了不让总线上的设备”打架”，IIC 采用<strong>主从模式</strong>：只有主机（STM32）能发起通信，从机（传感器）只能回答。</p>
+<p>关键点：<strong>IIC 是总线协议</strong>，一条总线上可以挂很多从机，每个从机有唯一的设备地址。主机想跟谁说话，就在数据开头先发出它的地址，其他设备”选择性失聪”：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">STM32 (主机) ──SDA──┬── AHT20 温湿度 (地址 0x70)</span><br><span class="line">                     ├── OLED 屏幕  (地址 0x7A)</span><br><span class="line">                     └── ...</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>咦，AHT20 数据手册上写的地址明明是 0x38，这里为什么写 0x70？这个”地址之谜”我们到写代码时再解开（见 5.2 节）。</p>
+</blockquote>
+<h3 id="2-3-同步通信：为什么-IIC-要一根时钟线"><a href="#2-3-同步通信：为什么-IIC-要一根时钟线" class="headerlink" title="2.3 同步通信：为什么 IIC 要一根时钟线"></a>2.3 同步通信：为什么 IIC 要一根时钟线</h3><p>串口是<strong>异步通信</strong>：双方各按自己的时钟速率（波特率）收发，这就要求双方晶振都足够精确。但很多小型传感器根本没有精确晶振，时钟一偏，双方就”不知所云”。</p>
+<p>IIC 改用<strong>同步通信</strong>：主机通过 SCL 线发送固定频率的脉冲，作为总线上所有设备统一的时钟源。大家看同一个钟表走步，就永远不会乱。</p>
+<h3 id="2-4-一次完整的-IIC-通信（初学者简单了解即可）"><a href="#2-4-一次完整的-IIC-通信（初学者简单了解即可）" class="headerlink" title="2.4 一次完整的 IIC 通信（初学者简单了解即可）"></a>2.4 一次完整的 IIC 通信（初学者简单了解即可）</h3><p>IIC 数据线和时钟线都有<strong>上拉电阻</strong>，空闲时都是高电平。一次通信的过程：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">SCL  ──┐┌──┐┌──┐┌──┐┌───┐┌──┐┌────</span><br><span class="line">       └┘  └┘  └┘  └┘   └┘  └┘</span><br><span class="line">SDA  ──┐  ┌─┐   ┌──┐   ┌─┐      ┌─</span><br><span class="line">        └──┘ └───┘  └───┘ └──────┘</span><br><span class="line">        ↑开始信号    ↑数据位   ↑结束信号</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li><strong>起始信号</strong>：SCL 为高时，SDA 被拉低 → 所有从机竖起耳朵</li>
+<li><strong>传输数据</strong>：SCL 为低时主机设置 SDA 电平；SCL 为高时从机读取。每次发 8 位（1 字节）</li>
+<li><strong>ACK 应答</strong>：每收完一字节，接收方在 SCL 低电平时把 SDA 拉低一下，表示”收到了”</li>
+<li><strong>结束信号</strong>：SCL 为高时，SDA 被拉高 → 通信结束</li>
+</ol>
+<blockquote>
+<p>这些底层时序 HAL 库全部帮我们封装好了，我们只需调用 <code>HAL_I2C_Master_Transmit</code> &#x2F; <code>HAL_I2C_Master_Receive</code> 两个函数即可，原理了解即可。</p>
+</blockquote>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="3-1-打开-USART2-和-I2C1"><a href="#3-1-打开-USART2-和-I2C1" class="headerlink" title="3.1 打开 USART2 和 I2C1"></a>3.1 打开 USART2 和 I2C1</h3><p>新建工程后（本例工程名 <code>IIc</code>）：</p>
+<ol>
+<li>打开老朋友 <strong>USART2</strong>（模式 Asynchronous，波特率 115200）—— 用于串口打印温湿度</li>
+<li>点击 <strong>I2C1</strong>，Mode 选择 <strong>I2C</strong>（标准模式），其他配置保持默认</li>
+</ol>
+<p><img src="/./../images/STM32_I2C_AHT20/image-20260801113633762.png" alt="image-20260801113633762"></p>
+<p><img src="/./../images/STM32_I2C_AHT20/image-20260801113657526.png" alt="image-20260801113657526"></p>
+<p>I2C 的详细参数（时钟速度、寻址模式等）我们到初始化代码解析章节再讲，这里默认值即可。</p>
+<h3 id="3-2-勾选”为每个外设生成一对-c-h-文件”"><a href="#3-2-勾选”为每个外设生成一对-c-h-文件”" class="headerlink" title="3.2 勾选”为每个外设生成一对 .c&#x2F;.h 文件”"></a>3.2 勾选”为每个外设生成一对 .c&#x2F;.h 文件”</h3><p>这是本期新增的关键一步：<strong>Project Manager → Code Generator</strong>，勾选 <strong>Generate peripheral initialization as a pair of ‘.c&#x2F;.h’ files per peripheral</strong>：</p>
+<p><img src="/./../images/STM32_I2C_AHT20/cubemx-code-generator.png" alt="CubeMX-CodeGenerator设置"></p>
+<p>勾选后生成的代码结构会发生变化：以前全部写在 <code>main.c</code> 里的外设初始化，现在拆成了独立的文件：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Core/</span><br><span class="line">├── Inc/</span><br><span class="line">│   ├── gpio.h      ← 新增</span><br><span class="line">│   ├── i2c.h       ← 新增（包含 hi2c1 句柄声明）</span><br><span class="line">│   └── usart.h     ← 新增</span><br><span class="line">└── Src/</span><br><span class="line">    ├── gpio.c      ← 新增</span><br><span class="line">    ├── i2c.c       ← 新增（MX_I2C1_Init 在这里）</span><br><span class="line">    └── usart.c     ← 新增</span><br></pre></td></tr></table></figure>
+
+<p>这样我们写 AHT20 驱动时，只要 <code>#include &quot;i2c.h&quot;</code> 就能拿到 <code>hi2c1</code> 这个外设操作句柄，不用把代码全堆在 main.c 里。</p>
+<h3 id="3-3-生成代码"><a href="#3-3-生成代码" class="headerlink" title="3.3 生成代码"></a>3.3 生成代码</h3><p>按 <code>Ctrl+S</code> 保存并生成代码。</p>
+<h3 id="3-4-手动创建-AHT20-驱动文件（VS-Code）"><a href="#3-4-手动创建-AHT20-驱动文件（VS-Code）" class="headerlink" title="3.4 手动创建 AHT20 驱动文件（VS Code）"></a>3.4 手动创建 AHT20 驱动文件（VS Code）</h3><p>上一步 CubeMX 只会生成它自己管理的外设文件（gpio.c &#x2F; i2c.c &#x2F; usart.c），而 AHT20 是传感器，<strong>驱动代码需要我们自己写</strong>——所以接下来手动创建一对 .c&#x2F;.h 文件：</p>
+<ol>
+<li><code>Core/Inc</code> 文件夹上右键 → <strong>新建文件</strong> → 命名为 <code>aht20.h</code>（头文件，放函数声明）</li>
+<li><code>Core/Src</code> 文件夹上右键 → <strong>新建文件</strong> → 命名为 <code>aht20.c</code>（源文件，放驱动实现）</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Core/</span><br><span class="line">├── Inc/</span><br><span class="line">│   ├── gpio.h</span><br><span class="line">│   ├── i2c.h</span><br><span class="line">│   ├── usart.h</span><br><span class="line">│   └── aht20.h      ← 手动新建（我们自己的驱动）</span><br><span class="line">└── Src/</span><br><span class="line">    ├── gpio.c</span><br><span class="line">    ├── i2c.c</span><br><span class="line">    ├── usart.c</span><br><span class="line">    └── aht20.c      ← 手动新建（我们自己的驱动）</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>视频教程中是在 CubeIDE 里右键新建 <strong>Header File &#x2F; Source File</strong>，IDE 会贴心生成 <code>#ifndef</code> 防重复包含模板；VS Code 新建的是空文件，这个模板要自己写（4.1 节就会看到）。</p>
+</blockquote>
+<p><strong>⚠️ 注意（VS Code + CMake 工程特有）</strong>：手动新建的 .c 文件<strong>不会自动参与编译</strong>，还要在 CMakeLists.txt 里登记一行，否则链接时找不到函数——这一步我踩了个大坑，详见「踩坑记录 坑 1」。</p>
+<hr>
+<h2 id="核心代码"><a href="#核心代码" class="headerlink" title="核心代码"></a>核心代码</h2><h3 id="4-1-aht20-h-——-头文件"><a href="#4-1-aht20-h-——-头文件" class="headerlink" title="4.1 aht20.h —— 头文件"></a>4.1 aht20.h —— 头文件</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> INC_AHT20_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> INC_AHT20_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;i2c.h&quot;</span></span></span><br><span class="line"><span class="comment">//初始化函数</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">()</span>;</span><br><span class="line"><span class="comment">//读取温湿度函数</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Read</span><span class="params">(<span class="type">float</span>* Temrerature,<span class="type">float</span>* Humidity)</span>;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<p><code>#ifndef</code> 防重复包含：防止头文件被多个文件 include 后出现重复定义（几乎所有 .h 文件都有）。</p>
+<p><code>#include &quot;i2c.h&quot;</code> 的层层递进：<code>i2c.h</code> → <code>main.h</code> → <code>stm32f1xx_hal.h</code> → <code>stm32f1xx_hal_conf.h</code> → 各种 HAL 头文件。所以 aht20.c 里 <code>#include &quot;aht20.h&quot;</code> 就能用 <code>hi2c1</code> 和 HAL_I2C 系列函数。</p>
+<h3 id="4-2-aht20-c-——-驱动实现（对照AHT20手册编写）"><a href="#4-2-aht20-c-——-驱动实现（对照AHT20手册编写）" class="headerlink" title="4.2 aht20.c —— 驱动实现（对照AHT20手册编写）"></a>4.2 aht20.c —— 驱动实现（对照AHT20手册编写）</h3><p><img src="/./../images/STM32_I2C_AHT20/image-20260801120704276.png" alt="image-20260801120704276"></p>
+<p><img src="/./../images/STM32_I2C_AHT20/image-20260801120727375.png" alt="image-20260801120727375"></p>
+<p><img src="/./../images/STM32_I2C_AHT20/image-20260801120759240.png" alt="image-20260801120759240"></p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;aht20.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;i2c.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal_def.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal_i2c.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdint.h&gt;</span></span></span><br><span class="line"><span class="comment">//设备地址</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> AHT20_ADDRESS 0x70</span></span><br><span class="line"><span class="comment">//根据手册中传感器读取流程来写初始化函数</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">//接收状态信息的变量</span></span><br><span class="line">    <span class="type">uint8_t</span> readBuffer;</span><br><span class="line">    HAL_Delay(<span class="number">40</span>);</span><br><span class="line">    HAL_I2C_Master_Receive(&amp;hi2c1, AHT20_ADDRESS, &amp;readBuffer, <span class="number">1</span>, HAL_MAX_DELAY);</span><br><span class="line">    <span class="comment">//如果校准字的第三位不是1--需要再次初始化</span></span><br><span class="line">    <span class="keyword">if</span>((readBuffer &amp; <span class="number">0x08</span>)==<span class="number">0x00</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>]=&#123;<span class="number">0xBE</span>,<span class="number">0x08</span>,<span class="number">0x00</span>&#125;;</span><br><span class="line">        HAL_I2C_Master_Transmit(&amp;hi2c1,AHT20_ADDRESS,sendBuffer,<span class="number">3</span>,HAL_MAX_DELAY);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//读取温湿度函数</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Read</span><span class="params">(<span class="type">float</span>* Temrerature,<span class="type">float</span>* Humidity)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>]=&#123;<span class="number">0xAC</span>,<span class="number">0x33</span>,<span class="number">0x00</span>&#125;;</span><br><span class="line">    <span class="type">uint8_t</span> readBuffer[<span class="number">6</span>];</span><br><span class="line"></span><br><span class="line">    HAL_I2C_Master_Transmit(&amp;hi2c1, AHT20_ADDRESS , sendBuffer, <span class="number">3</span>, HAL_MAX_DELAY);</span><br><span class="line">    HAL_Delay(<span class="number">75</span>);</span><br><span class="line">    HAL_I2C_Master_Receive(&amp;hi2c1, AHT20_ADDRESS, readBuffer, <span class="number">6</span>, HAL_MAX_DELAY);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span>((readBuffer[<span class="number">0</span>]&amp;<span class="number">0x80</span>)==<span class="number">0x00</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">uint32_t</span> data=<span class="number">0</span>;</span><br><span class="line">        <span class="comment">//湿度数据的拼接和计算：Byte1&lt;&lt;12 | Byte2&lt;&lt;4 | Byte3&gt;&gt;4</span></span><br><span class="line">        data=((<span class="type">uint32_t</span>)readBuffer[<span class="number">1</span>]&lt;&lt;<span class="number">12</span>)</span><br><span class="line">             |((<span class="type">uint32_t</span>)readBuffer[<span class="number">2</span>]&lt;&lt;<span class="number">4</span>)</span><br><span class="line">             |((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>]&gt;&gt;<span class="number">4</span>);</span><br><span class="line">        *Humidity=data*<span class="number">100.0f</span>/(<span class="number">1</span>&lt;&lt;<span class="number">20</span>);</span><br><span class="line">        <span class="comment">//温度数据的拼接和计算：(Byte3&amp;0x0F)&lt;&lt;16 | Byte4&lt;&lt;8 | Byte5</span></span><br><span class="line">        data=(((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>]&amp;<span class="number">0x0F</span>)&lt;&lt;<span class="number">16</span>)</span><br><span class="line">             |((<span class="type">uint32_t</span>)readBuffer[<span class="number">4</span>]&lt;&lt;<span class="number">8</span>)</span><br><span class="line">             |((<span class="type">uint32_t</span>)readBuffer[<span class="number">5</span>]);</span><br><span class="line">        *Temrerature=data*<span class="number">200.0f</span>/(<span class="number">1</span>&lt;&lt;<span class="number">20</span>)<span class="number">-50</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-main-c-——-主程序"><a href="#4-3-main-c-——-主程序" class="headerlink" title="4.3 main.c —— 主程序"></a>4.3 main.c —— 主程序</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN Includes */</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;aht20.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="comment">/* USER CODE END Includes */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">AHT20_Init();</span><br><span class="line"><span class="type">float</span> Temrerature,Humidity;</span><br><span class="line"><span class="type">char</span> message[<span class="number">50</span>];</span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    AHT20_Read(&amp;Temrerature, &amp;Humidity);</span><br><span class="line">    <span class="built_in">sprintf</span>(message,<span class="string">&quot;温度：%.1f℃,湿度：%.1f%%\r\n&quot;</span>,Temrerature,Humidity);</span><br><span class="line">    HAL_UART_Transmit(&amp;huart2, (<span class="type">uint8_t</span>*)message, <span class="built_in">strlen</span>(message), HAL_MAX_DELAY);</span><br><span class="line">    HAL_Delay(<span class="number">2000</span>);</span><br><span class="line">    <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h2><h3 id="5-1-AHT20-Init-——-初始化流程"><a href="#5-1-AHT20-Init-——-初始化流程" class="headerlink" title="5.1 AHT20_Init() —— 初始化流程"></a>5.1 AHT20_Init() —— 初始化流程</h3><p>对照 AHT20 数据手册第 5.4 节「传感器读取流程」：</p>
+<table>
+<thead>
+<tr>
+<th align="center">步骤</th>
+<th align="left">手册要求</th>
+<th align="left">代码实现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left">上电后等待 <strong>40ms</strong> 才能通信</td>
+<td align="left"><code>HAL_Delay(40)</code></td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">读取 1 字节<strong>状态信息</strong></td>
+<td align="left"><code>HAL_I2C_Master_Receive(..., 1, ...)</code></td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">状态字<strong>第 3 位 &#x3D; 1</strong> 表示正常</td>
+<td align="left"><code>if((readBuffer &amp; 0x08) == 0x00)</code></td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">若第 3 位为 0，发送初始化命令 <code>0xBE 0x08 0x00</code></td>
+<td align="left"><code>HAL_I2C_Master_Transmit(...)</code></td>
+</tr>
+</tbody></table>
+<h3 id="5-2-0x70-还是-0x71？7-位地址与-8-位地址之谜"><a href="#5-2-0x70-还是-0x71？7-位地址与-8-位地址之谜" class="headerlink" title="5.2 0x70 还是 0x71？7 位地址与 8 位地址之谜"></a>5.2 0x70 还是 0x71？7 位地址与 8 位地址之谜</h3><p>写代码时我们会遇到一个困惑：原理部分说 AHT20 的地址是 0x70，但 AHT20 数据手册上写的却是 <strong>0x38</strong>（7 位：<code>0111000</code>），而我们发送读取命令时实际发出去的又是 <strong>0x71</strong>。三个数，到底谁是对的？</p>
+<p>其实它们都对。IIC 通信每次发送一字节（8 位），但从机地址只有 7 位，所以协议规定：<strong>地址左移 1 位，空出的最低位作为 R&#x2F;W 位</strong>——表示本次通信是写还是读：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">7位地址: 0111000  (0x38)</span><br><span class="line">                ↓ 左移1位</span><br><span class="line">        01110000 + 0 = 0x70  → 主机写（发送数据给从机）</span><br><span class="line">        01110000 + 1 = 0x71  → 主机读（从从机读数据）</span><br></pre></td></tr></table></figure>
+
+<p>所以 0x70 是”带写标志的地址”，0x71 是”带读标志的地址”，底层是同一个从机。</p>
+<p><strong>写代码时我们不用纠结</strong>：<code>HAL_I2C_Master_Receive</code> 内部会自动把 0x70 改成 0x71 使用，所以 aht20.c 里读状态、发命令统一写宏 <code>AHT20_ADDRESS</code>（0x70）就好——这也是 5.1 节初始化函数里传 0x70 的原因。</p>
+<h3 id="5-3-AHT20-Read-——-触发测量并读取"><a href="#5-3-AHT20-Read-——-触发测量并读取" class="headerlink" title="5.3 AHT20_Read() —— 触发测量并读取"></a>5.3 AHT20_Read() —— 触发测量并读取</h3><table>
+<thead>
+<tr>
+<th align="center">步骤</th>
+<th align="left">手册要求</th>
+<th align="left">代码实现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left">发送测量命令 <code>0xAC 0x33 0x00</code></td>
+<td align="left"><code>HAL_I2C_Master_Transmit</code></td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">等待测量完成 <strong>75ms</strong></td>
+<td align="left"><code>HAL_Delay(75)</code></td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">读取 <strong>6 字节</strong>数据（状态+温湿度）</td>
+<td align="left"><code>HAL_I2C_Master_Receive(..., 6, ...)</code></td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">判断状态字<strong>第 7 位 &#x3D; 0</strong>（数据有效）</td>
+<td align="left"><code>if((readBuffer[0] &amp; 0x80) == 0x00)</code></td>
+</tr>
+</tbody></table>
+<h3 id="5-4-HAL-I2C-Master-Receive-Transmit-参数详解"><a href="#5-4-HAL-I2C-Master-Receive-Transmit-参数详解" class="headerlink" title="5.4 HAL_I2C_Master_Receive &#x2F; Transmit 参数详解"></a>5.4 HAL_I2C_Master_Receive &#x2F; Transmit 参数详解</h3><p>两个函数是本期的核心 API：</p>
+<p>**<code>HAL_I2C_Master_Receive</code>**：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="center">本项目中填的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>I2C 句柄指针</strong></td>
+<td align="left">操作哪个 I2C 外设</td>
+<td align="center"><code>&amp;hi2c1</code></td>
+</tr>
+<tr>
+<td align="left"><strong>从机地址</strong></td>
+<td align="left">要读取哪个从机（HAL 自动加 R&#x2F;W 位）</td>
+<td align="center"><code>AHT20_ADDRESS</code> (0x70)</td>
+</tr>
+<tr>
+<td align="left"><strong>数据缓冲区指针</strong></td>
+<td align="left">数据存到哪里</td>
+<td align="center"><code>&amp;readBuffer</code> &#x2F; <code>readBuffer</code></td>
+</tr>
+<tr>
+<td align="left"><strong>读取字节数</strong></td>
+<td align="left">读多少个字节</td>
+<td align="center"><code>1</code> &#x2F; <code>6</code></td>
+</tr>
+<tr>
+<td align="left"><strong>超时时间</strong></td>
+<td align="left">多久没成功就放弃</td>
+<td align="center"><code>HAL_MAX_DELAY</code>（永久等待）</td>
+</tr>
+</tbody></table>
+<p>**<code>HAL_I2C_Master_Transmit</code>**：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="center">本项目中填的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>I2C 句柄指针</strong></td>
+<td align="left">操作哪个 I2C 外设</td>
+<td align="center"><code>&amp;hi2c1</code></td>
+</tr>
+<tr>
+<td align="left"><strong>从机地址</strong></td>
+<td align="left">发给哪个从机</td>
+<td align="center"><code>AHT20_ADDRESS</code> (0x70)</td>
+</tr>
+<tr>
+<td align="left"><strong>数据缓冲区指针</strong></td>
+<td align="left">要发送的数据</td>
+<td align="center"><code>sendBuffer</code></td>
+</tr>
+<tr>
+<td align="left"><strong>发送字节数</strong></td>
+<td align="left">发多少个字节</td>
+<td align="center"><code>3</code></td>
+</tr>
+<tr>
+<td align="left"><strong>超时时间</strong></td>
+<td align="left">多久没成功就放弃</td>
+<td align="center"><code>HAL_MAX_DELAY</code></td>
+</tr>
+</tbody></table>
+<h3 id="5-5-20-位数据拼接（重点）"><a href="#5-5-20-位数据拼接（重点）" class="headerlink" title="5.5 20 位数据拼接（重点）"></a>5.5 20 位数据拼接（重点）</h3><p>AHT20 返回的 6 字节中，温湿度各占 <strong>20 位（2.5 字节）</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Byte0    Byte1      Byte2      Byte3      Byte4      Byte5</span><br><span class="line">状态    湿度[19:12] 湿度[11:4] 湿度[3:0]|温度[19:16] 温度[15:8]  温度[7:0]</span><br></pre></td></tr></table></figure>
+
+<p><strong>湿度拼接</strong>（20 位 &#x3D; Byte1 高 12 位 + Byte2 高 8 位 + Byte3 高 4 位）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">data = ((<span class="type">uint32_t</span>)readBuffer[<span class="number">1</span>] &lt;&lt; <span class="number">12</span>)   <span class="comment">// Byte1 移到 19~8 位</span></span><br><span class="line">     | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">2</span>] &lt;&lt; <span class="number">4</span>)    <span class="comment">// Byte2 移到 7~0 位</span></span><br><span class="line">     | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>] &gt;&gt; <span class="number">4</span>);   <span class="comment">// Byte3 高4位移到 3~0 位</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么强转 <code>uint32_t</code>？</strong> 因为 <code>uint8_t</code> 只有 8 位，<code>readBuffer[1] &lt;&lt; 12</code> 会让 8 位数据直接”移出界”丢失！必须先转成 32 位再移位。</p>
+<p><strong>为什么用 <code>|</code> 不用 <code>+</code>？</strong> 位拼接是”按位组装”而不是数值相加——虽然位不重叠时两者结果相同，但 <code>|</code> 语义更准确，也避免未来位重叠时进位污染。**拼位用 <code>|</code>，算数用 <code>+</code>**。</p>
+<h3 id="5-6-温湿度转换公式"><a href="#5-6-温湿度转换公式" class="headerlink" title="5.6 温湿度转换公式"></a>5.6 温湿度转换公式</h3><p>对照手册给出的公式：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 湿度：20位原始值 / 2^20 × 100%</span></span><br><span class="line">*Humidity = data * <span class="number">100.0f</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>);</span><br><span class="line"><span class="comment">// 温度：20位原始值 / 2^20 × 200 - 50</span></span><br><span class="line">*Temrerature = data * <span class="number">200.0f</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>) - <span class="number">50</span>;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>1 &lt;&lt; 20</code> 就是 2 的 20 次方（1048576），用移位比写死数字更清晰</li>
+<li>写 <code>100.0f</code> 而不是 <code>100</code>：<strong>强迫计算变成浮点运算</strong>，否则整数除法会丢掉小数部分</li>
+</ul>
+<h3 id="5-6-main-c-主程序讲解"><a href="#5-6-main-c-主程序讲解" class="headerlink" title="5.6 main.c 主程序讲解"></a>5.6 main.c 主程序讲解</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="built_in">sprintf</span>(message,<span class="string">&quot;温度：%.1f℃,湿度：%.1f%%\r\n&quot;</span>,Temrerature,Humidity);</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>%.1f</code>：保留一位小数的浮点占位符</li>
+<li><code>%%</code>：因为 <code>%</code> 本身是占位符标记，想输出真正的百分号要写两个</li>
+<li><code>\r\n</code>：回车换行</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">HAL_UART_Transmit(&amp;huart2, (<span class="type">uint8_t</span>*)message, <span class="built_in">strlen</span>(message), HAL_MAX_DELAY);</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>(uint8_t*)message</code>：把 <code>char*</code> 强转成 <code>uint8_t*</code>，因为 HAL 函数要求 <code>uint8_t*</code>，防止编译警告</li>
+<li><code>strlen(message)</code>：字符串长度（需要 <code>#include &lt;string.h&gt;</code>）</li>
+<li><code>HAL_Delay(2000)</code>：每 2 秒测量打印一次</li>
+</ul>
+<hr>
+<h2 id="解读初始化代码"><a href="#解读初始化代码" class="headerlink" title="解读初始化代码"></a>解读初始化代码</h2><h3 id="6-1-MX-I2C1-Init-——-I2C1-初始化"><a href="#6-1-MX-I2C1-Init-——-I2C1-初始化" class="headerlink" title="6.1 MX_I2C1_Init() —— I2C1 初始化"></a>6.1 MX_I2C1_Init() —— I2C1 初始化</h3><p>本期工程勾选了”为每个外设生成 .c&#x2F;.h 文件”，所以 <code>MX_I2C1_Init</code> 不再出现在 main.c，而是移到了 <code>i2c.c</code> 中：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">MX_I2C1_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  hi2c1.Instance = I2C1;</span><br><span class="line">  hi2c1.Init.ClockSpeed = <span class="number">100000</span>;</span><br><span class="line">  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;</span><br><span class="line">  hi2c1.Init.OwnAddress1 = <span class="number">0</span>;</span><br><span class="line">  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;</span><br><span class="line">  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;</span><br><span class="line">  hi2c1.Init.OwnAddress2 = <span class="number">0</span>;</span><br><span class="line">  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;</span><br><span class="line">  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;</span><br><span class="line">  <span class="keyword">if</span> (HAL_I2C_Init(&amp;hi2c1) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>参数含义：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="center">本项目填的值</th>
+<th align="left">对应 CubeMX 设置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>ClockSpeed</code></td>
+<td align="left">I2C 通信速率</td>
+<td align="center"><code>100000</code>（100kHz）</td>
+<td align="left">Clock Speed: 100 kHz（标准模式）</td>
+</tr>
+<tr>
+<td align="left"><code>DutyCycle</code></td>
+<td align="left">时钟占空比</td>
+<td align="center"><code>I2C_DUTYCYCLE_2</code>（2:1）</td>
+<td align="left">快速模式专用，标准模式下无效</td>
+</tr>
+<tr>
+<td align="left"><code>OwnAddress1</code></td>
+<td align="left">本机地址（作为从机时用）</td>
+<td align="center"><code>0</code></td>
+<td align="left">本机地址（主模式用不到）</td>
+</tr>
+<tr>
+<td align="left"><code>AddressingMode</code></td>
+<td align="left">寻址模式</td>
+<td align="center"><code>I2C_ADDRESSINGMODE_7BIT</code></td>
+<td align="left">Addressing Mode: 7-bit</td>
+</tr>
+<tr>
+<td align="left"><code>GeneralCallMode</code></td>
+<td align="left">广播呼叫支持</td>
+<td align="center"><code>I2C_GENERALCALL_DISABLE</code></td>
+<td align="left">General Call: Disable</td>
+</tr>
+<tr>
+<td align="left"><code>NoStretchMode</code></td>
+<td align="left">时钟拉伸</td>
+<td align="center"><code>I2C_NOSTRETCH_DISABLE</code></td>
+<td align="left">No Stretch: Disable</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>注意</strong>：标准模式（100kHz）下最高只能传 100000，想用 400kHz 需要在 CubeMX 里把模式改成 Fast Mode。</p>
+</blockquote>
+<h3 id="6-2-HAL-I2C-MspInit-——-引脚与时钟配置"><a href="#6-2-HAL-I2C-MspInit-——-引脚与时钟配置" class="headerlink" title="6.2 HAL_I2C_MspInit() —— 引脚与时钟配置"></a>6.2 HAL_I2C_MspInit() —— 引脚与时钟配置</h3><p>MSP（MCU Specific Package）初始化负责<strong>引脚复用和时钟使能</strong>，是外设功能能否跑通的关键：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_I2C_MspInit</span><span class="params">(I2C_HandleTypeDef* i2cHandle)</span></span><br><span class="line">&#123;</span><br><span class="line">  GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">  <span class="keyword">if</span>(i2cHandle-&gt;Instance==I2C1)</span><br><span class="line">  &#123;</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line">    <span class="comment">/**I2C1 GPIO Configuration</span></span><br><span class="line"><span class="comment">    PB6     ------&gt; I2C1_SCL</span></span><br><span class="line"><span class="comment">    PB7     ------&gt; I2C1_SDA</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;</span><br><span class="line">    HAL_GPIO_Init(GPIOB, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* I2C1 clock enable */</span></span><br><span class="line">    __HAL_RCC_I2C1_CLK_ENABLE();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里有两个<strong>全新的知识点</strong>，和 GPIO 输出、串口的配置都不一样：</p>
+<p><strong>① 引脚模式 <code>GPIO_MODE_AF_OD</code>（复用开漏）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="left">模式</th>
+<th align="left">含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td align="left">推挽输出（LED 用过）</td>
+</tr>
+<tr>
+<td align="left"><code>GPIO_MODE_INPUT</code></td>
+<td align="left">输入（按键用过）</td>
+</tr>
+<tr>
+<td align="left"><code>GPIO_MODE_AF_PP</code></td>
+<td align="left">复用推挽（串口 TX&#x2F;RX 用过）</td>
+</tr>
+<tr>
+<td align="left"><code>GPIO_MODE_AF_OD</code></td>
+<td align="left"><strong>复用开漏</strong>（I2C 专用，本期新增）</td>
+</tr>
+</tbody></table>
+<p>为什么 I2C 必须用<strong>开漏</strong>？回顾 2.4 节的时序图：IIC 总线靠<strong>上拉电阻</strong>工作，设备只能把 SDA&#x2F;SCL <strong>拉低</strong>，拉高靠上拉电阻完成。开漏输出正好就是这个特性——引脚只能输出低电平或”释放”（高阻态），由外部上拉电阻拉高。这样多个设备才能安全地共用一个引脚（任何一个设备都能把总线拉低）。</p>
+<p><strong>② 时钟使能顺序</strong>：先使能 GPIOB 时钟（引脚复用），再使能 I2C1 时钟（外设本身）。顺序反了会导致外设初始化失败。</p>
+<h3 id="6-3-配置对应关系表"><a href="#6-3-配置对应关系表" class="headerlink" title="6.3 配置对应关系表"></a>6.3 配置对应关系表</h3><table>
+<thead>
+<tr>
+<th align="left">CubeMX 设置</th>
+<th align="left">代码位置</th>
+<th align="left">底层寄存器</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">I2C1 Mode: I2C</td>
+<td align="left"><code>MX_I2C1_Init()</code> + <code>HAL_I2C_MspInit()</code></td>
+<td align="left">CR1&#x2F;CR2&#x2F;CCR 寄存器</td>
+</tr>
+<tr>
+<td align="left">Clock Speed: 100kHz</td>
+<td align="left"><code>hi2c1.Init.ClockSpeed = 100000</code></td>
+<td align="left">CCR 寄存器（分频）</td>
+</tr>
+<tr>
+<td align="left">PB6&#x2F;PB7 复用开漏</td>
+<td align="left"><code>GPIO_MODE_AF_OD</code></td>
+<td align="left">CRL 寄存器（复用功能）</td>
+</tr>
+<tr>
+<td align="left">I2C1 时钟使能</td>
+<td align="left"><code>__HAL_RCC_I2C1_CLK_ENABLE()</code></td>
+<td align="left">RCC_APB1ENR 寄存器</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>老样子，这里不再展开。</p>
+<p>如果使用 CubeIDE（视频中的方式）：<code>%f</code> 浮点输出需要到 <code>Project Properties → C/C++ Build → Settings → Tool Settings → MCU Settings</code> 勾选 <strong>Use float with printf from newlib-nano</strong>；Eclipse 构建系统会自动扫描新建的 .c 文件，无需手动登记。</p>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>连接好开发板，打开波特律动串口助手，选择对应 COM 口，就能看到每 2 秒刷新的温湿度：</p>
+<p><a href="https://www.bilibili.com/video/BV1tGGu6uEub/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1tGGu6uEub/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+<hr>
+<h2 id="踩坑记录"><a href="#踩坑记录" class="headerlink" title="踩坑记录"></a>踩坑记录</h2><p>本期踩坑特别多，而且和视频中 CubeIDE 环境不同，在 VS Code + CMake 工程下遇到了一连串问题，全部记录如下：</p>
+<h3 id="坑-1：undefined-reference-to-‘AHT20-Init’（链接失败）"><a href="#坑-1：undefined-reference-to-‘AHT20-Init’（链接失败）" class="headerlink" title="坑 1：undefined reference to ‘AHT20_Init’（链接失败）"></a>坑 1：undefined reference to ‘AHT20_Init’（链接失败）</h3><p><strong>现象</strong>：编译报错 <code>undefined reference to &#39;AHT20_Init&#39;</code> &#x2F; <code>&#39;AHT20_Read&#39;</code>。</p>
+<p><strong>原因</strong>：CubeMX 生成的 CMake 工程里，<code>cmake/stm32cubemx/CMakeLists.txt</code> 的源文件列表是<strong>显式列出</strong>的，只包含 CubeMX 自己生成的文件（main.c、i2c.c、usart.c…）。我们手动新建的 <code>aht20.c</code> 不在列表里，<strong>根本没被编译</strong>，链接时自然找不到函数。</p>
+<p><strong>解决</strong>：在<strong>顶层</strong> <code>CMakeLists.txt</code> 的 <code>target_sources</code> 中手动添加（顶层文件 CubeMX 重新生成时不会覆盖）：</p>
+<figure class="highlight cmake"><table><tr><td class="code"><pre><span class="line"><span class="keyword">target_sources</span>(<span class="variable">$&#123;CMAKE_PROJECT_NAME&#125;</span> PRIVATE</span><br><span class="line">    <span class="comment"># Add user sources here</span></span><br><span class="line">    Core/Src/aht20.c</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>如果用的是 CubeIDE，Eclipse 构建系统会自动扫描新建的 .c 文件，不会有这个问题——这是 <strong>CMake 系工程（VS Code&#x2F;CLion）的通病</strong>。以后新建驱动文件，一定要记得在 CMakeLists.txt 里加一行！</p>
+</blockquote>
+<h3 id="坑-2：串口输出”温度：℃-湿度：-”（数值空白）"><a href="#坑-2：串口输出”温度：℃-湿度：-”（数值空白）" class="headerlink" title="坑 2：串口输出”温度：℃,湿度：%”（数值空白）"></a>坑 2：串口输出”温度：℃,湿度：%”（数值空白）</h3><p><strong>现象</strong>：烧录后串口正常输出文字，但 <code>%f</code> 的数值部分是空的。</p>
+<p><strong>原因</strong>：工程链接时用了 <code>--specs=nano.specs</code>（newlib-nano 精简 C 库，为了省 Flash），它<strong>默认不支持浮点格式化输出</strong>（<code>%f</code>），数值直接不打印。</p>
+<p><strong>解决</strong>：链接参数加 <code>-u _printf_float</code> 强制拉入浮点支持。代价是 Flash 占用增加约 12KB（本项目 15.5KB → 27.5KB）。CubeIDE 里对应勾选 <strong>“Use float with printf from newlib-nano”</strong> 选项，本质就是加这个参数：</p>
+<figure class="highlight cmake"><table><tr><td class="code"><pre><span class="line"><span class="keyword">target_link_options</span>(<span class="variable">$&#123;CMAKE_PROJECT_NAME&#125;</span> PRIVATE -u _printf_float)</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>备选方案（Flash 紧张时）：不用 <code>%f</code>，手动拆整数和小数：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="built_in">sprintf</span>(message, <span class="string">&quot;温度：%d.%d℃&quot;</span>, (<span class="type">int</span>)T, (<span class="type">int</span>)(T*<span class="number">10</span>)%<span class="number">10</span>);</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="坑-3：sprintf-参数类型警告"><a href="#坑-3：sprintf-参数类型警告" class="headerlink" title="坑 3：sprintf 参数类型警告"></a>坑 3：sprintf 参数类型警告</h3><p><strong>现象</strong>：<code>sprintf(message, ...)</code> 报 warning——<code>message</code> 是 <code>uint8_t</code> 数组，而 <code>sprintf</code>&#x2F;<code>strlen</code> 期望 <code>char *</code>。</p>
+<p><strong>解决</strong>：<code>message</code> 定义为 <code>char message[50]</code>（视频中定义 <code>uint8_t</code> 在 CubeIDE 里没警告，VS Code + GCC 更严格），发送时再强转 <code>(uint8_t*)message</code> 给 HAL 函数，两边都干净。</p>
+<h3 id="坑-4：位拼接用-还是"><a href="#坑-4：位拼接用-还是" class="headerlink" title="坑 4：位拼接用 + 还是 |"></a>坑 4：位拼接用 <code>+</code> 还是 <code>|</code></h3><p><strong>现象</strong>：编译出现 <code>-Wparentheses</code> 警告：<code>suggest parentheses around &#39;+&#39; inside &#39;&lt;&lt;&#39;</code>。</p>
+<p><strong>原因</strong>：<code>data = ((uint32_t)readBuffer[3]&gt;&gt;4 + (uint32_t)readBuffer[2]&lt;&lt;4 + ...)</code> 这种写法，虽然因为 <code>&lt;&lt;</code> 优先级高于 <code>+</code> 结果碰巧正确，但可读性差、编译器警告。</p>
+<p><strong>解决</strong>：位拼接统一用 <code>|</code> 并加括号（**拼位用 <code>|</code>，算数用 <code>+</code>**）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">data = ((<span class="type">uint32_t</span>)readBuffer[<span class="number">1</span>] &lt;&lt; <span class="number">12</span>)</span><br><span class="line">     | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">2</span>] &lt;&lt; <span class="number">4</span>)</span><br><span class="line">     | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>] &gt;&gt; <span class="number">4</span>);</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="新知识点一览"><a href="#新知识点一览" class="headerlink" title="新知识点一览"></a>新知识点一览</h3><table>
+<thead>
+<tr>
+<th align="left">知识点</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>IIC 通信</strong></td>
+<td align="left">半双工、主从模式、总线协议、同步通信</td>
+</tr>
+<tr>
+<td align="left"><strong>SDA&#x2F;SCL</strong></td>
+<td align="left">数据线 + 时钟线，开漏输出 + 上拉电阻</td>
+</tr>
+<tr>
+<td align="left"><strong>7位&#x2F;8位地址</strong></td>
+<td align="left">地址左移 1 位 + R&#x2F;W 位，HAL 自动处理</td>
+</tr>
+<tr>
+<td align="left"><strong>HAL_I2C_Master_Transmit</strong></td>
+<td align="left">I2C 发送函数</td>
+</tr>
+<tr>
+<td align="left"><strong>HAL_I2C_Master_Receive</strong></td>
+<td align="left">I2C 接收函数</td>
+</tr>
+<tr>
+<td align="left"><strong>GPIO_MODE_AF_OD</strong></td>
+<td align="left">复用开漏模式（I2C 专用）</td>
+</tr>
+<tr>
+<td align="left"><strong>AHT20 驱动编写</strong></td>
+<td align="left">对照数据手册：初始化 → 触发测量 → 读 6 字节 → 拼接 → 公式转换</td>
+</tr>
+<tr>
+<td align="left"><strong>独立驱动文件</strong></td>
+<td align="left">.c&#x2F;.h 文件模式 + <code>#ifndef</code> 防重复包含</td>
+</tr>
+<tr>
+<td align="left"><strong>sprintf 浮点输出</strong></td>
+<td align="left"><code>%.1f</code> 占位符 + <code>-u _printf_float</code> 链接参数</td>
+</tr>
+</tbody></table>
+<h3 id="和上一篇的对比"><a href="#和上一篇的对比" class="headerlink" title="和上一篇的对比"></a>和上一篇的对比</h3><table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">上一篇（蓝牙 BLE）</th>
+<th align="left">本篇（IIC + AHT20）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">通信外设</td>
+<td align="left">USART3</td>
+<td align="left"><strong>I2C1</strong></td>
+</tr>
+<tr>
+<td align="left">数据方向</td>
+<td align="left">双向收发（全双工）</td>
+<td align="left">主从一问一答（半双工）</td>
+</tr>
+<tr>
+<td align="left">时钟</td>
+<td align="left">双方约定波特率（异步）</td>
+<td align="left">主机提供 SCL（<strong>同步</strong>）</td>
+</tr>
+<tr>
+<td align="left">驱动结构</td>
+<td align="left">代码写在 main.c</td>
+<td align="left"><strong>独立 aht20.c&#x2F;h 驱动文件</strong></td>
+</tr>
+<tr>
+<td align="left">传输内容</td>
+<td align="left">数据包协议（包头+长度+校验）</td>
+<td align="left">传感器寄存器读写</td>
+</tr>
+<tr>
+<td align="left">新 API</td>
+<td align="left">DMA + 空闲中断</td>
+<td align="left"><strong>HAL_I2C_Master_Transmit&#x2F;Receive</strong></td>
+</tr>
+</tbody></table>
+<p>从串口到 IIC，我们从”点对点通信”进入”总线通信”。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li>视频：<a href="https://www.bilibili.com/video/BV1QN411D7ak/">keysking STM32入门教程 第12集 IIC通信读取温湿度传感器AHT20(DHT20)</a></li>
+<li>AHT20 数据手册（波特律动资料包中提供）</li>
+<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">STM32 学习指南</a></li>
+<li><a href="/2026/07/30/STM32_BLE_Bluetooth/">上一篇：蓝牙BLE通信，用蓝牙无线控制小灯</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>I2C</tag>
+        <tag>AHT20</tag>
+        <tag>传感器</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——按键输入控制小灯亮灭</title>
     <url>/2026/07/26/STM32_Key_Input/</url>
     <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="按键电路"><a href="#按键电路" class="headerlink" title="按键电路"></a>按键电路</h3><p>开发板上的两个按键分别连接在以下引脚：</p>
@@ -8368,7 +8886,7 @@
   <entry>
     <title>STM32再出发——从Keil转到VSCode+CubeMX</title>
     <url>/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/</url>
-    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>大一上的时候，我曾短暂学习过 STM32，当时用的是 <strong>Keil + 寄存器</strong> 的开发方式。Keil 的界面老旧、代码补全基本没有、所有内容全靠硬写，或者说硬抄。由于当时面临很多压力，所以我暂时终止了STM32的学习。</p>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>大一上的时候，我曾短暂学习过 STM32，当时用的是 keil5 的开发方式。Keil 的代码补全基本没有、所有内容全靠硬写，或者说硬抄。由于当时面临很多压力，所以我暂时终止了STM32的学习。</p>
 <p>这次重新出发，我决定换一套更现代化的工具链：</p>
 <ul>
 <li><strong>STM32CubeMX</strong> —— 图形化配置引脚和外设，生成初始化代码</li>
