@@ -2239,7 +2239,7 @@
 </tr>
 </tbody></table>
 <h3 id="5-4-HAL-I2C-Master-Receive-Transmit-参数详解"><a href="#5-4-HAL-I2C-Master-Receive-Transmit-参数详解" class="headerlink" title="5.4 HAL_I2C_Master_Receive &#x2F; Transmit 参数详解"></a>5.4 HAL_I2C_Master_Receive &#x2F; Transmit 参数详解</h3><p>两个函数是本期的核心 API：</p>
-<p>**<code>HAL_I2C_Master_Receive</code>**：</p>
+<p><code>HAL_I2C_Master_Receive</code>：</p>
 <table>
 <thead>
 <tr>
@@ -2274,7 +2274,7 @@
 <td align="center"><code>HAL_MAX_DELAY</code>（永久等待）</td>
 </tr>
 </tbody></table>
-<p>**<code>HAL_I2C_Master_Transmit</code>**：</p>
+<p><code>HAL_I2C_Master_Transmit</code>：</p>
 <table>
 <thead>
 <tr>
@@ -2932,6 +2932,345 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——用三色LED打造绚烂流水灯</title>
+    <url>/2026/07/26/STM32_RGB_LED/</url>
+    <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>这块板子是 keysking大佬开发的集成开发板，板上载了三个LED，分别连接在以下引脚：</p>
+<table>
+<thead>
+<tr>
+<th align="left">LED</th>
+<th align="center">引脚</th>
+<th align="center">控制信号</th>
+<th align="center">限流电阻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">🔴 红色</td>
+<td align="center">PB0</td>
+<td align="center">GPIO 高电平亮</td>
+<td align="center">板载已集成</td>
+</tr>
+<tr>
+<td align="left">🟢 绿色</td>
+<td align="center">PA7</td>
+<td align="center">GPIO 高电平亮</td>
+<td align="center">板载已集成</td>
+</tr>
+<tr>
+<td align="left">🔵 蓝色</td>
+<td align="center">PA6</td>
+<td align="center">GPIO 高电平亮</td>
+<td align="center">板载已集成</td>
+</tr>
+</tbody></table>
+<p>电路原理图是这样的<img src="/./../images/STM32_RGB_LED/schematic.png" alt="schematic"></p>
+<p>电路原理很简单：GPIO 引脚输出高电平时，LED 通过限流电阻接地，灯就亮了。</p>
+<blockquote>
+<p>如果你用的是其他开发板，只需要设置或者查询一下LED对应的引脚号，原理是一样的。</p>
+</blockquote>
+<hr>
+<h2 id="CubeMX-引脚配置"><a href="#CubeMX-引脚配置" class="headerlink" title="CubeMX 引脚配置"></a>CubeMX 引脚配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>打开 CubeMX，新建项目，芯片选择 <strong>STM32F103C8T6</strong>，步骤和上一篇完全一样，不再重复。</p>
+<h3 id="配置三个GPIO引脚"><a href="#配置三个GPIO引脚" class="headerlink" title="配置三个GPIO引脚"></a>配置三个GPIO引脚</h3><p>这次要用到三个引脚，分别控制三个颜色的LED：</p>
+<table>
+<thead>
+<tr>
+<th align="left">LED</th>
+<th align="center">引脚</th>
+<th align="left">功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">🔴 红色</td>
+<td align="center">PB0</td>
+<td align="left">GPIO_Output</td>
+</tr>
+<tr>
+<td align="left">🟢 绿色</td>
+<td align="center">PA7</td>
+<td align="left">GPIO_Output</td>
+</tr>
+<tr>
+<td align="left">🔵 蓝色</td>
+<td align="center">PA6</td>
+<td align="left">GPIO_Output</td>
+</tr>
+</tbody></table>
+<p>在芯片图上依次配置 <strong>PB0 → GPIO_Output</strong>、<strong>PA7 → GPIO_Output</strong>、<strong>PA6 → GPIO_Output</strong>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_RGB_LED/pinout_1.png" alt="pinout_1"></p>
+<p><img src="/./../images/STM32_RGB_LED/pinout_2.png" alt="pinout_2"></p>
+</blockquote>
+<p>配置完成后，右键各个引脚，给每个引脚起一个<strong>User Label</strong>（用户标签），这样生成的代码里就不用记 PB0、PA6 这种编号了，直接写 <code>LED_RED</code>、<code>LED_BLUE</code> 就行，可读性高很多。</p>
+<p>以 PA6 为例：在芯片界面中找到 PA6，在 <code>ENTER User Label</code> 一栏输入 <code>LED_BLUE</code>。同样，PA7 标为 <code>LED_GREEN</code>，PB0 标为 <code>LED_RED</code>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_RGB_LED/label_setting.png" alt="label_setting"></p>
+</blockquote>
+<blockquote>
+<p><img src="/./../images/STM32_RGB_LED/pinout_overview.png" alt="pinout_overview"></p>
+</blockquote>
+<p>其他参数保持默认即可：</p>
+<ul>
+<li><strong>Output mode</strong>：Push-Pull（推挽输出）</li>
+<li><strong>Pull</strong>：No pull（无上下拉）</li>
+<li><strong>Speed</strong>：Low（低速即可，LED不需要高速翻转）</li>
+<li><strong>Initial level</strong>：Low（初始低电平，LED默认熄灭）</li>
+</ul>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>这一步<strong>非常重要</strong>——如果不配，烧录一次后 SWD 就被禁用了，再也烧不进新程序。</p>
+<p>在 System Core → SYS 中，将 <strong>Debug</strong> 设为 <strong>Serial Wire</strong>。</p>
+<blockquote>
+<p>这一步在上一篇博客里也强调过，如果你的项目是从之前的 CubeMX 项目改过来的，记得检查这一步有没有漏掉。</p>
+</blockquote>
+<h3 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h3><p>切换到 <strong>Project Manager</strong> 标签页：</p>
+<table>
+<thead>
+<tr>
+<th>设置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project Name</strong></td>
+<td><code>LED_Blink</code></td>
+</tr>
+<tr>
+<td><strong>Toolchain &#x2F; IDE</strong></td>
+<td><strong>CMake</strong></td>
+</tr>
+<tr>
+<td><strong>Toolchain Location</strong></td>
+<td>保持默认</td>
+</tr>
+</tbody></table>
+<p>点击 <strong>Generate Code</strong>，生成后用 VS Code 打开项目。</p>
+<hr>
+<h2 id="VS-Code-中编写核心代码"><a href="#VS-Code-中编写核心代码" class="headerlink" title="VS Code 中编写核心代码"></a>VS Code 中编写核心代码</h2><h3 id="认识-main-h-中的引脚宏定义"><a href="#认识-main-h-中的引脚宏定义" class="headerlink" title="认识 main.h 中的引脚宏定义"></a>认识 main.h 中的引脚宏定义</h3><p>CubeMX 生成的 <code>main.h</code> 里，User Label 会自动转换成宏定义：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 蓝色 LED — PA6</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_Pin GPIO_PIN_6</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br></pre></td></tr></table></figure>
+
+<p>有了这些宏，后面的代码就不用记引脚号了，直接写 <code>LED_RED_Pin</code> 就行。</p>
+<h3 id="状态机思路"><a href="#状态机思路" class="headerlink" title="状态机思路"></a>状态机思路</h3><p>我们要实现的效果是：三个LED按照不同的组合依次亮灭，通过红绿蓝三色的搭配混合出绚烂的灯光变化。</p>
+<p>这里设计成一个<strong>6状态的循环</strong>，每个状态持续300ms：</p>
+<table>
+<thead>
+<tr>
+<th align="center">状态</th>
+<th align="center">红色(PB0)</th>
+<th align="center">绿色(PA7)</th>
+<th align="center">蓝色(PA6)</th>
+<th align="center">实际颜色</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢灭</td>
+<td align="center">🔵灭</td>
+<td align="center">🔴 红色</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢亮</td>
+<td align="center">🔵灭</td>
+<td align="center">🟡 黄色（红+绿）</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢亮</td>
+<td align="center">🔵亮</td>
+<td align="center">⚪ 白色（红+绿+蓝）</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="center">🔴灭</td>
+<td align="center">🟢亮</td>
+<td align="center">🔵亮</td>
+<td align="center">🟢 青色（绿+蓝）</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="center">🔴灭</td>
+<td align="center">🟢灭</td>
+<td align="center">🔵亮</td>
+<td align="center">🔵 蓝色</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="center">🔴亮</td>
+<td align="center">🟢灭</td>
+<td align="center">🔵亮</td>
+<td align="center">🟣 紫色（红+蓝）</td>
+</tr>
+</tbody></table>
+<p>每300ms切换到下一个状态，完成一轮（6个状态）后回到状态0，一直循环。</p>
+<h3 id="main-c-核心代码"><a href="#main-c-核心代码" class="headerlink" title="main.c 核心代码"></a>main.c 核心代码</h3><p>打开 <code>main.c</code>，在 <code>USER CODE BEGIN 2</code> 中定义一个状态变量：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"><span class="type">int</span> state = <span class="number">0</span>;</span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
+
+<p>然后在 <code>while(1)</code> 中编写状态切换逻辑：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">// 红色LED：状态0、1、2、5 时亮，3、4 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &lt;= <span class="number">2</span> || state == <span class="number">5</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 绿色LED：状态1、2、3 时亮，0、4、5 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &gt;= <span class="number">1</span> &amp;&amp; state &lt;= <span class="number">3</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 蓝色LED：状态2、3、4、5 时亮，0、1 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &gt;= <span class="number">2</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  HAL_Delay(<span class="number">300</span>);  <span class="comment">// 每个状态维持300ms</span></span><br><span class="line">  state++;</span><br><span class="line">  <span class="keyword">if</span> (state &gt; <span class="number">5</span>)</span><br><span class="line">      state = <span class="number">0</span>;   <span class="comment">// 循环回状态0</span></span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 3 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h3><p><strong>用到的HAL函数：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_GPIO_WritePin(GPIO端口, 引脚号, 电平)</code></td>
+<td align="left">设置指定引脚输出高或低电平</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_Delay(毫秒)</code></td>
+<td align="left">延时，单位毫秒</td>
+</tr>
+</tbody></table>
+<p>重点看 <code>HAL_GPIO_WritePin</code>，它的三个参数分别是：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="left">取值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>GPIO端口</strong></td>
+<td align="left">引脚属于哪个GPIO组（GPIOA、GPIOB…）</td>
+<td align="left"><code>GPIOA</code>、<code>GPIOB</code> 等</td>
+</tr>
+<tr>
+<td align="left"><strong>引脚号</strong></td>
+<td align="left">具体第几个引脚</td>
+<td align="left"><code>GPIO_PIN_0</code>、<code>GPIO_PIN_6</code>、<code>GPIO_PIN_7</code> 等</td>
+</tr>
+<tr>
+<td align="left"><strong>电平</strong></td>
+<td align="left">输出高电平还是低电平</td>
+<td align="left"><code>GPIO_PIN_SET</code>（高电平&#x2F;亮）或 <code>GPIO_PIN_RESET</code>（低电平&#x2F;灭）</td>
+</tr>
+</tbody></table>
+<p>所以 <code>HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET)</code> 的意思就是：<strong>让 GPIOB 组的第 0 号引脚输出高电平</strong>——对应到电路上，就是红色 LED 亮了。</p>
+<p>但问题来了——每次写代码都要记”红色LED在PB0、蓝色在PA6……”，引脚一多根本记不住。这时就体现出 <strong>User Label</strong> 的作用了。</p>
+<p>回头看在 CubeMX 里配置的那几个标签，生成代码后会变成宏定义：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br></pre></td></tr></table></figure>
+
+<p>这样一来，上面的代码就可以写成：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
+
+<p>不用记引脚号，代码自己就能说明白自己在干什么。对比一下两种写法：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 不用 User Label — 每次要回想&quot;PB0是什么灯来着？&quot;</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 用 User Label — 一眼能看懂：红色LED亮</span></span><br><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
+
+<p>在项目只有一两个LED时差距还不明显，但当你同时操作多个引脚时，User Label 能让代码可读性提升一个档次，再也不用对着引脚表一个个对了。</p>
+<p><strong>逻辑分析：</strong></p>
+<p>每个LED的亮灭由 <code>state</code> 的值决定。<code>state</code> 每300ms加1，到5后归0，形成循环。</p>
+<p>这里每个LED的亮灭条件是用<strong>区间判断</strong>写的，比如绿色LED在 <code>state &gt;= 1 &amp;&amp; state &lt;= 3</code> 时亮。你也可以改成查表法——用一个数组存6种状态，每次读数组取值——逻辑会更清晰，但原理是一样的。</p>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-三个引脚的配置"><a href="#解读-MX-GPIO-Init-——-三个引脚的配置" class="headerlink" title="解读 MX_GPIO_Init —— 三个引脚的配置"></a>解读 MX_GPIO_Init —— 三个引脚的配置</h2><p><code>MX_GPIO_Init()</code> 中配置了三个 GPIO 输出引脚，我们看看代码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始电平：全部低电平→默认熄灭 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;   <span class="comment">// 推挽输出</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;             <span class="comment">// 无上下拉</span></span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;    <span class="comment">// 低速</span></span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 同上 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_BLUE (PA6) —— 同上 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_BLUE_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_BLUE_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="和第一篇的区别"><a href="#和第一篇的区别" class="headerlink" title="和第一篇的区别"></a>和第一篇的区别</h3><p>相比第一篇博客的单引脚配置，这次有三个关键变化：</p>
+<table>
+<thead>
+<tr>
+<th>变化</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>两个时钟使能</strong></td>
+<td><code>__HAL_RCC_GPIOA_CLK_ENABLE()</code> + <code>__HAL_RCC_GPIOB_CLK_ENABLE()</code>，因为三个引脚分布在 GPIOA（PA6、PA7）和 GPIOB（PB0）两个端口</td>
+</tr>
+<tr>
+<td><strong>User Label 替代硬编码</strong></td>
+<td>前一篇直接写 <code>GPIOA</code>、<code>GPIO_PIN_7</code>，这一篇写成 <code>LED_RED_GPIO_Port</code>、<code>LED_RED_Pin</code>——CubeMX 把 User Label 翻译成了宏，代码可读性大大提升</td>
+</tr>
+<tr>
+<td><strong>三个引脚重复配置</strong></td>
+<td>每次配置前重新给 <code>GPIO_InitStruct</code> 赋值，CubeMX 就是按照这个模板批量配置引脚的</td>
+</tr>
+</tbody></table>
+<h3 id="参数回顾"><a href="#参数回顾" class="headerlink" title="参数回顾"></a>参数回顾</h3><p>单个引脚的配置参数和第一篇完全一样，这里汇总一下：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th align="center">值</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Mode</code></td>
+<td align="center"><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td>推挽输出——可以输出高&#x2F;低电平，适合驱动LED</td>
+</tr>
+<tr>
+<td><code>Pull</code></td>
+<td align="center"><code>GPIO_NOPULL</code></td>
+<td>输出引脚不需要上下拉</td>
+</tr>
+<tr>
+<td><code>Speed</code></td>
+<td align="center"><code>GPIO_SPEED_FREQ_LOW</code></td>
+<td>LED 不需要高速翻转，低速省电、抗干扰</td>
+</tr>
+</tbody></table>
+<h3 id="为什么不一次性配置所有引脚？"><a href="#为什么不一次性配置所有引脚？" class="headerlink" title="为什么不一次性配置所有引脚？"></a>为什么不一次性配置所有引脚？</h3><p>你可能会想，既然三个引脚参数都一样，为什么 CubeMX 不把它们放在一个结构体里一次性配置？</p>
+<p>答案是 <code>HAL_GPIO_Init</code> 的 <code>Pin</code> 成员支持<strong>按位或组合</strong>，所以<strong>其实可以一次配多个</strong>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">GPIO_InitStruct.Pin = LED_RED_Pin | LED_GREEN_Pin | LED_BLUE_Pin;</span><br><span class="line">GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);  <span class="comment">// 但这里只能指定一个端口</span></span><br></pre></td></tr></table></figure>
+
+<p>不过引脚分布在不同的端口（PA6、PA7 在 GPIOA，PB0 在 GPIOB），所以至少要用两次 <code>HAL_GPIO_Init</code>。CubeMX 选择分开配置，逻辑更清晰，也更容易针对某个引脚单独修改参数。</p>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>编译和烧录的步骤和上一篇完全一样，不再重复写一遍了：</p>
+<ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
+<li>连接 ST-Link，点击<strong>运行和调试</strong> → 选择 STM32Cube:STM32 Launch STLink GDB Server</li>
+<li>点击<strong>继续</strong>按钮，程序开始运行</li>
+</ol>
+<blockquote>
+<p>如果遇到编译或烧录的问题，翻回去看上一篇的排坑部分。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后，三色 LED 会以 300ms 的间隔循环变化：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">红色亮 → 红+绿亮 → 全亮 → 绿+蓝亮 → 蓝色亮 → 红+蓝亮 → 回到红色亮 ...</span><br></pre></td></tr></table></figure>
+
+<p>红色、绿色、蓝色以不同的组合交替出现，看起来就像在调色盘上不断调出新的颜色，比单灯闪烁丰富太多了。</p>
+<blockquote>
+<p>效果展示视频：<a href="https://www.bilibili.com/video/BV1dq356YEse/">https://www.bilibili.com/video/BV1dq356YEse/</a></p>
+</blockquote>
+<hr>
+<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><p>这个状态机虽然简单，但稍加扩展就能玩出更多花样：</p>
+<ul>
+<li><strong>改变速度</strong>：把 <code>state++</code> 放到定时器中断里，用按键调节速度</li>
+<li><strong>呼吸效果</strong>：把 GPIO 换成 PWM，LED 就能渐亮渐灭</li>
+<li><strong>更多状态</strong>：把6种组合扩展到 2³ &#x3D; 8 种（全亮&#x2F;全灭也加进来），或者用随机数控制</li>
+<li><strong>查表法</strong>：用一个二维数组存所有状态，<code>while(1)</code> 里取第 <code>state</code> 行的值写入引脚，代码更简洁</li>
+</ul>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的项目相比上一篇的单灯闪烁，主要多了两个新东西：</p>
+<ol>
+<li><strong>多引脚配置</strong> —— CubeMX 里配多个 GPIO，用 User Label 区分</li>
+<li><strong>状态机编程</strong> —— 用一个变量控制多个LED的亮灭组合，比单独控制每个灯要简洁得多</li>
+</ol>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">上一篇文章：《STM32再出发》</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>GPIO</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——串口DMA模式收发，与不定长数据接收</title>
     <url>/2026/07/30/STM32_USART_DMA_Idle_Receive/</url>
     <content><![CDATA[<h2 id="从中断到-DMA——CPU-还是太忙了"><a href="#从中断到-DMA——CPU-还是太忙了" class="headerlink" title="从中断到 DMA——CPU 还是太忙了"></a>从中断到 DMA——CPU 还是太忙了</h2><p>上篇博客，我们用串口中断模式解决了 CPU “傻等”的问题。回顾一下当时的代码结构：</p>
@@ -3570,345 +3909,6 @@
         <tag>DMA</tag>
         <tag>中断</tag>
         <tag>NVIC</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>STM32——用三色LED打造绚烂流水灯</title>
-    <url>/2026/07/26/STM32_RGB_LED/</url>
-    <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><p>这块板子是 keysking大佬开发的集成开发板，板上载了三个LED，分别连接在以下引脚：</p>
-<table>
-<thead>
-<tr>
-<th align="left">LED</th>
-<th align="center">引脚</th>
-<th align="center">控制信号</th>
-<th align="center">限流电阻</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">🔴 红色</td>
-<td align="center">PB0</td>
-<td align="center">GPIO 高电平亮</td>
-<td align="center">板载已集成</td>
-</tr>
-<tr>
-<td align="left">🟢 绿色</td>
-<td align="center">PA7</td>
-<td align="center">GPIO 高电平亮</td>
-<td align="center">板载已集成</td>
-</tr>
-<tr>
-<td align="left">🔵 蓝色</td>
-<td align="center">PA6</td>
-<td align="center">GPIO 高电平亮</td>
-<td align="center">板载已集成</td>
-</tr>
-</tbody></table>
-<p>电路原理图是这样的<img src="/./../images/STM32_RGB_LED/schematic.png" alt="schematic"></p>
-<p>电路原理很简单：GPIO 引脚输出高电平时，LED 通过限流电阻接地，灯就亮了。</p>
-<blockquote>
-<p>如果你用的是其他开发板，只需要设置或者查询一下LED对应的引脚号，原理是一样的。</p>
-</blockquote>
-<hr>
-<h2 id="CubeMX-引脚配置"><a href="#CubeMX-引脚配置" class="headerlink" title="CubeMX 引脚配置"></a>CubeMX 引脚配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>打开 CubeMX，新建项目，芯片选择 <strong>STM32F103C8T6</strong>，步骤和上一篇完全一样，不再重复。</p>
-<h3 id="配置三个GPIO引脚"><a href="#配置三个GPIO引脚" class="headerlink" title="配置三个GPIO引脚"></a>配置三个GPIO引脚</h3><p>这次要用到三个引脚，分别控制三个颜色的LED：</p>
-<table>
-<thead>
-<tr>
-<th align="left">LED</th>
-<th align="center">引脚</th>
-<th align="left">功能</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">🔴 红色</td>
-<td align="center">PB0</td>
-<td align="left">GPIO_Output</td>
-</tr>
-<tr>
-<td align="left">🟢 绿色</td>
-<td align="center">PA7</td>
-<td align="left">GPIO_Output</td>
-</tr>
-<tr>
-<td align="left">🔵 蓝色</td>
-<td align="center">PA6</td>
-<td align="left">GPIO_Output</td>
-</tr>
-</tbody></table>
-<p>在芯片图上依次配置 <strong>PB0 → GPIO_Output</strong>、<strong>PA7 → GPIO_Output</strong>、<strong>PA6 → GPIO_Output</strong>。</p>
-<blockquote>
-<p><img src="/./../images/STM32_RGB_LED/pinout_1.png" alt="pinout_1"></p>
-<p><img src="/./../images/STM32_RGB_LED/pinout_2.png" alt="pinout_2"></p>
-</blockquote>
-<p>配置完成后，右键各个引脚，给每个引脚起一个<strong>User Label</strong>（用户标签），这样生成的代码里就不用记 PB0、PA6 这种编号了，直接写 <code>LED_RED</code>、<code>LED_BLUE</code> 就行，可读性高很多。</p>
-<p>以 PA6 为例：在芯片界面中找到 PA6，在 <code>ENTER User Label</code> 一栏输入 <code>LED_BLUE</code>。同样，PA7 标为 <code>LED_GREEN</code>，PB0 标为 <code>LED_RED</code>。</p>
-<blockquote>
-<p><img src="/./../images/STM32_RGB_LED/label_setting.png" alt="label_setting"></p>
-</blockquote>
-<blockquote>
-<p><img src="/./../images/STM32_RGB_LED/pinout_overview.png" alt="pinout_overview"></p>
-</blockquote>
-<p>其他参数保持默认即可：</p>
-<ul>
-<li><strong>Output mode</strong>：Push-Pull（推挽输出）</li>
-<li><strong>Pull</strong>：No pull（无上下拉）</li>
-<li><strong>Speed</strong>：Low（低速即可，LED不需要高速翻转）</li>
-<li><strong>Initial level</strong>：Low（初始低电平，LED默认熄灭）</li>
-</ul>
-<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>这一步<strong>非常重要</strong>——如果不配，烧录一次后 SWD 就被禁用了，再也烧不进新程序。</p>
-<p>在 System Core → SYS 中，将 <strong>Debug</strong> 设为 <strong>Serial Wire</strong>。</p>
-<blockquote>
-<p>这一步在上一篇博客里也强调过，如果你的项目是从之前的 CubeMX 项目改过来的，记得检查这一步有没有漏掉。</p>
-</blockquote>
-<h3 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h3><p>切换到 <strong>Project Manager</strong> 标签页：</p>
-<table>
-<thead>
-<tr>
-<th>设置项</th>
-<th>值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Project Name</strong></td>
-<td><code>LED_Blink</code></td>
-</tr>
-<tr>
-<td><strong>Toolchain &#x2F; IDE</strong></td>
-<td><strong>CMake</strong></td>
-</tr>
-<tr>
-<td><strong>Toolchain Location</strong></td>
-<td>保持默认</td>
-</tr>
-</tbody></table>
-<p>点击 <strong>Generate Code</strong>，生成后用 VS Code 打开项目。</p>
-<hr>
-<h2 id="VS-Code-中编写核心代码"><a href="#VS-Code-中编写核心代码" class="headerlink" title="VS Code 中编写核心代码"></a>VS Code 中编写核心代码</h2><h3 id="认识-main-h-中的引脚宏定义"><a href="#认识-main-h-中的引脚宏定义" class="headerlink" title="认识 main.h 中的引脚宏定义"></a>认识 main.h 中的引脚宏定义</h3><p>CubeMX 生成的 <code>main.h</code> 里，User Label 会自动转换成宏定义：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 红色 LED — PB0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 蓝色 LED — PA6</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_Pin GPIO_PIN_6</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_BLUE_GPIO_Port GPIOA</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 绿色 LED — PA7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br></pre></td></tr></table></figure>
-
-<p>有了这些宏，后面的代码就不用记引脚号了，直接写 <code>LED_RED_Pin</code> 就行。</p>
-<h3 id="状态机思路"><a href="#状态机思路" class="headerlink" title="状态机思路"></a>状态机思路</h3><p>我们要实现的效果是：三个LED按照不同的组合依次亮灭，通过红绿蓝三色的搭配混合出绚烂的灯光变化。</p>
-<p>这里设计成一个<strong>6状态的循环</strong>，每个状态持续300ms：</p>
-<table>
-<thead>
-<tr>
-<th align="center">状态</th>
-<th align="center">红色(PB0)</th>
-<th align="center">绿色(PA7)</th>
-<th align="center">蓝色(PA6)</th>
-<th align="center">实际颜色</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">0</td>
-<td align="center">🔴亮</td>
-<td align="center">🟢灭</td>
-<td align="center">🔵灭</td>
-<td align="center">🔴 红色</td>
-</tr>
-<tr>
-<td align="center">1</td>
-<td align="center">🔴亮</td>
-<td align="center">🟢亮</td>
-<td align="center">🔵灭</td>
-<td align="center">🟡 黄色（红+绿）</td>
-</tr>
-<tr>
-<td align="center">2</td>
-<td align="center">🔴亮</td>
-<td align="center">🟢亮</td>
-<td align="center">🔵亮</td>
-<td align="center">⚪ 白色（红+绿+蓝）</td>
-</tr>
-<tr>
-<td align="center">3</td>
-<td align="center">🔴灭</td>
-<td align="center">🟢亮</td>
-<td align="center">🔵亮</td>
-<td align="center">🟢 青色（绿+蓝）</td>
-</tr>
-<tr>
-<td align="center">4</td>
-<td align="center">🔴灭</td>
-<td align="center">🟢灭</td>
-<td align="center">🔵亮</td>
-<td align="center">🔵 蓝色</td>
-</tr>
-<tr>
-<td align="center">5</td>
-<td align="center">🔴亮</td>
-<td align="center">🟢灭</td>
-<td align="center">🔵亮</td>
-<td align="center">🟣 紫色（红+蓝）</td>
-</tr>
-</tbody></table>
-<p>每300ms切换到下一个状态，完成一轮（6个状态）后回到状态0，一直循环。</p>
-<h3 id="main-c-核心代码"><a href="#main-c-核心代码" class="headerlink" title="main.c 核心代码"></a>main.c 核心代码</h3><p>打开 <code>main.c</code>，在 <code>USER CODE BEGIN 2</code> 中定义一个状态变量：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line"><span class="type">int</span> state = <span class="number">0</span>;</span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
-
-<p>然后在 <code>while(1)</code> 中编写状态切换逻辑：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">// 红色LED：状态0、1、2、5 时亮，3、4 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &lt;= <span class="number">2</span> || state == <span class="number">5</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 绿色LED：状态1、2、3 时亮，0、4、5 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &gt;= <span class="number">1</span> &amp;&amp; state &lt;= <span class="number">3</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 蓝色LED：状态2、3、4、5 时亮，0、1 时灭</span></span><br><span class="line">  <span class="keyword">if</span> (state &gt;= <span class="number">2</span>)</span><br><span class="line">      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_SET);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">  HAL_Delay(<span class="number">300</span>);  <span class="comment">// 每个状态维持300ms</span></span><br><span class="line">  state++;</span><br><span class="line">  <span class="keyword">if</span> (state &gt; <span class="number">5</span>)</span><br><span class="line">      state = <span class="number">0</span>;   <span class="comment">// 循环回状态0</span></span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 3 */</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h3><p><strong>用到的HAL函数：</strong></p>
-<table>
-<thead>
-<tr>
-<th align="left">函数</th>
-<th align="left">作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><code>HAL_GPIO_WritePin(GPIO端口, 引脚号, 电平)</code></td>
-<td align="left">设置指定引脚输出高或低电平</td>
-</tr>
-<tr>
-<td align="left"><code>HAL_Delay(毫秒)</code></td>
-<td align="left">延时，单位毫秒</td>
-</tr>
-</tbody></table>
-<p>重点看 <code>HAL_GPIO_WritePin</code>，它的三个参数分别是：</p>
-<table>
-<thead>
-<tr>
-<th align="left">参数</th>
-<th align="left">含义</th>
-<th align="left">取值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>GPIO端口</strong></td>
-<td align="left">引脚属于哪个GPIO组（GPIOA、GPIOB…）</td>
-<td align="left"><code>GPIOA</code>、<code>GPIOB</code> 等</td>
-</tr>
-<tr>
-<td align="left"><strong>引脚号</strong></td>
-<td align="left">具体第几个引脚</td>
-<td align="left"><code>GPIO_PIN_0</code>、<code>GPIO_PIN_6</code>、<code>GPIO_PIN_7</code> 等</td>
-</tr>
-<tr>
-<td align="left"><strong>电平</strong></td>
-<td align="left">输出高电平还是低电平</td>
-<td align="left"><code>GPIO_PIN_SET</code>（高电平&#x2F;亮）或 <code>GPIO_PIN_RESET</code>（低电平&#x2F;灭）</td>
-</tr>
-</tbody></table>
-<p>所以 <code>HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET)</code> 的意思就是：<strong>让 GPIOB 组的第 0 号引脚输出高电平</strong>——对应到电路上，就是红色 LED 亮了。</p>
-<p>但问题来了——每次写代码都要记”红色LED在PB0、蓝色在PA6……”，引脚一多根本记不住。这时就体现出 <strong>User Label</strong> 的作用了。</p>
-<p>回头看在 CubeMX 里配置的那几个标签，生成代码后会变成宏定义：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br></pre></td></tr></table></figure>
-
-<p>这样一来，上面的代码就可以写成：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
-
-<p>不用记引脚号，代码自己就能说明白自己在干什么。对比一下两种写法：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 不用 User Label — 每次要回想&quot;PB0是什么灯来着？&quot;</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 用 User Label — 一眼能看懂：红色LED亮</span></span><br><span class="line">HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);</span><br></pre></td></tr></table></figure>
-
-<p>在项目只有一两个LED时差距还不明显，但当你同时操作多个引脚时，User Label 能让代码可读性提升一个档次，再也不用对着引脚表一个个对了。</p>
-<p><strong>逻辑分析：</strong></p>
-<p>每个LED的亮灭由 <code>state</code> 的值决定。<code>state</code> 每300ms加1，到5后归0，形成循环。</p>
-<p>这里每个LED的亮灭条件是用<strong>区间判断</strong>写的，比如绿色LED在 <code>state &gt;= 1 &amp;&amp; state &lt;= 3</code> 时亮。你也可以改成查表法——用一个数组存6种状态，每次读数组取值——逻辑会更清晰，但原理是一样的。</p>
-<hr>
-<h2 id="解读-MX-GPIO-Init-——-三个引脚的配置"><a href="#解读-MX-GPIO-Init-——-三个引脚的配置" class="headerlink" title="解读 MX_GPIO_Init —— 三个引脚的配置"></a>解读 MX_GPIO_Init —— 三个引脚的配置</h2><p><code>MX_GPIO_Init()</code> 中配置了三个 GPIO 输出引脚，我们看看代码：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始电平：全部低电平→默认熄灭 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_RED (PB0) */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;   <span class="comment">// 推挽输出</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;             <span class="comment">// 无上下拉</span></span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;    <span class="comment">// 低速</span></span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_GREEN (PA7) —— 同上 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 配置 LED_BLUE (PA6) —— 同上 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_BLUE_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_BLUE_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="和第一篇的区别"><a href="#和第一篇的区别" class="headerlink" title="和第一篇的区别"></a>和第一篇的区别</h3><p>相比第一篇博客的单引脚配置，这次有三个关键变化：</p>
-<table>
-<thead>
-<tr>
-<th>变化</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>两个时钟使能</strong></td>
-<td><code>__HAL_RCC_GPIOA_CLK_ENABLE()</code> + <code>__HAL_RCC_GPIOB_CLK_ENABLE()</code>，因为三个引脚分布在 GPIOA（PA6、PA7）和 GPIOB（PB0）两个端口</td>
-</tr>
-<tr>
-<td><strong>User Label 替代硬编码</strong></td>
-<td>前一篇直接写 <code>GPIOA</code>、<code>GPIO_PIN_7</code>，这一篇写成 <code>LED_RED_GPIO_Port</code>、<code>LED_RED_Pin</code>——CubeMX 把 User Label 翻译成了宏，代码可读性大大提升</td>
-</tr>
-<tr>
-<td><strong>三个引脚重复配置</strong></td>
-<td>每次配置前重新给 <code>GPIO_InitStruct</code> 赋值，CubeMX 就是按照这个模板批量配置引脚的</td>
-</tr>
-</tbody></table>
-<h3 id="参数回顾"><a href="#参数回顾" class="headerlink" title="参数回顾"></a>参数回顾</h3><p>单个引脚的配置参数和第一篇完全一样，这里汇总一下：</p>
-<table>
-<thead>
-<tr>
-<th>参数</th>
-<th align="center">值</th>
-<th>解释</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>Mode</code></td>
-<td align="center"><code>GPIO_MODE_OUTPUT_PP</code></td>
-<td>推挽输出——可以输出高&#x2F;低电平，适合驱动LED</td>
-</tr>
-<tr>
-<td><code>Pull</code></td>
-<td align="center"><code>GPIO_NOPULL</code></td>
-<td>输出引脚不需要上下拉</td>
-</tr>
-<tr>
-<td><code>Speed</code></td>
-<td align="center"><code>GPIO_SPEED_FREQ_LOW</code></td>
-<td>LED 不需要高速翻转，低速省电、抗干扰</td>
-</tr>
-</tbody></table>
-<h3 id="为什么不一次性配置所有引脚？"><a href="#为什么不一次性配置所有引脚？" class="headerlink" title="为什么不一次性配置所有引脚？"></a>为什么不一次性配置所有引脚？</h3><p>你可能会想，既然三个引脚参数都一样，为什么 CubeMX 不把它们放在一个结构体里一次性配置？</p>
-<p>答案是 <code>HAL_GPIO_Init</code> 的 <code>Pin</code> 成员支持<strong>按位或组合</strong>，所以<strong>其实可以一次配多个</strong>：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">GPIO_InitStruct.Pin = LED_RED_Pin | LED_GREEN_Pin | LED_BLUE_Pin;</span><br><span class="line">GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);  <span class="comment">// 但这里只能指定一个端口</span></span><br></pre></td></tr></table></figure>
-
-<p>不过引脚分布在不同的端口（PA6、PA7 在 GPIOA，PB0 在 GPIOB），所以至少要用两次 <code>HAL_GPIO_Init</code>。CubeMX 选择分开配置，逻辑更清晰，也更容易针对某个引脚单独修改参数。</p>
-<hr>
-<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>编译和烧录的步骤和上一篇完全一样，不再重复写一遍了：</p>
-<ol>
-<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
-<li>连接 ST-Link，点击<strong>运行和调试</strong> → 选择 STM32Cube:STM32 Launch STLink GDB Server</li>
-<li>点击<strong>继续</strong>按钮，程序开始运行</li>
-</ol>
-<blockquote>
-<p>如果遇到编译或烧录的问题，翻回去看上一篇的排坑部分。</p>
-</blockquote>
-<hr>
-<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后，三色 LED 会以 300ms 的间隔循环变化：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">红色亮 → 红+绿亮 → 全亮 → 绿+蓝亮 → 蓝色亮 → 红+蓝亮 → 回到红色亮 ...</span><br></pre></td></tr></table></figure>
-
-<p>红色、绿色、蓝色以不同的组合交替出现，看起来就像在调色盘上不断调出新的颜色，比单灯闪烁丰富太多了。</p>
-<blockquote>
-<p>效果展示视频：<a href="https://www.bilibili.com/video/BV1dq356YEse/">https://www.bilibili.com/video/BV1dq356YEse/</a></p>
-</blockquote>
-<hr>
-<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><p>这个状态机虽然简单，但稍加扩展就能玩出更多花样：</p>
-<ul>
-<li><strong>改变速度</strong>：把 <code>state++</code> 放到定时器中断里，用按键调节速度</li>
-<li><strong>呼吸效果</strong>：把 GPIO 换成 PWM，LED 就能渐亮渐灭</li>
-<li><strong>更多状态</strong>：把6种组合扩展到 2³ &#x3D; 8 种（全亮&#x2F;全灭也加进来），或者用随机数控制</li>
-<li><strong>查表法</strong>：用一个二维数组存所有状态，<code>while(1)</code> 里取第 <code>state</code> 行的值写入引脚，代码更简洁</li>
-</ul>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次的项目相比上一篇的单灯闪烁，主要多了两个新东西：</p>
-<ol>
-<li><strong>多引脚配置</strong> —— CubeMX 里配多个 GPIO，用 User Label 区分</li>
-<li><strong>状态机编程</strong> —— 用一个变量控制多个LED的亮灭组合，比单独控制每个灯要简洁得多</li>
-</ol>
-<hr>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
-<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
-<li><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">上一篇文章：《STM32再出发》</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>STM32</tag>
-        <tag>嵌入式</tag>
-        <tag>CubeMX</tag>
-        <tag>GPIO</tag>
       </tags>
   </entry>
   <entry>
@@ -4932,6 +4932,120 @@
 
 <p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
 ]]></content>
+  </entry>
+  <entry>
+    <title>Markdown 语法规则</title>
+    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
+    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
+<p>这是第二行</p>
+<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
+<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
+<p>效果：</p>
+<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>代码和快捷键：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
+<p>效果：</p>
+<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
+<p>效果：只有同一级别</p>
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：-&#x2F;*&#x2F;+ +空格</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
+<p>效果：</p>
+<ol>
+<li>一</li>
+<li>二</li>
+<li>子1</li>
+<li>子2<ol>
+<li>子1-子1</li>
+</ol>
+</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<p>数字+.+空格</p>
+<p>缩进用tab,回退shift+tab</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
+<p>效果：</p>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+练习markdown语法</p>
+</li>
+<li><p><input disabled="" type="checkbox"> 
+维护网站</p>
+</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
+<p>效果：</p>
+<blockquote>
+<p>这是最外层区块</p>
+<blockquote>
+<p>这是内层</p>
+<blockquote>
+<p>这是更内层</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
+<p>效果：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
+<p>效果：</p>
+<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
+<p>效果：</p>
+<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Markdown</tag>
+      </tags>
   </entry>
   <entry>
     <title>hexo博客静态网站项目总结回顾深挖</title>
@@ -8405,9 +8519,9 @@
       </categories>
       <tags>
         <tag>VS Code</tag>
+        <tag>Markdown</tag>
         <tag>Node.js</tag>
         <tag>Hexo</tag>
-        <tag>Markdown</tag>
         <tag>静态站点</tag>
         <tag>VirtualBox</tag>
         <tag>Ubuntu</tag>
@@ -8417,120 +8531,6 @@
         <tag>CI/CD</tag>
         <tag>Git</tag>
         <tag>Nginx</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Markdown 语法规则</title>
-    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
-    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
-<p>这是第二行</p>
-<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
-<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
-<p>效果：</p>
-<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
-</blockquote>
-<blockquote>
-<p>代码和快捷键：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
-<p>效果：</p>
-<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
-<p>效果：只有同一级别</p>
-<ul>
-<li>1</li>
-<li>2</li>
-<li>3</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：-&#x2F;*&#x2F;+ +空格</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
-<p>效果：</p>
-<ol>
-<li>一</li>
-<li>二</li>
-<li>子1</li>
-<li>子2<ol>
-<li>子1-子1</li>
-</ol>
-</li>
-</ol>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<p>数字+.+空格</p>
-<p>缩进用tab,回退shift+tab</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
-<p>效果：</p>
-<ul>
-<li><p><input checked="" disabled="" type="checkbox"> 
-练习markdown语法</p>
-</li>
-<li><p><input disabled="" type="checkbox"> 
-维护网站</p>
-</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
-<p>效果：</p>
-<blockquote>
-<p>这是最外层区块</p>
-<blockquote>
-<p>这是内层</p>
-<blockquote>
-<p>这是更内层</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
-<p>效果：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
-<p>效果：</p>
-<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
-<p>效果：</p>
-<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>Markdown</tag>
       </tags>
   </entry>
   <entry>
@@ -9415,87 +9415,6 @@
       </tags>
   </entry>
   <entry>
-    <title>一次成功的Git分支统一实战</title>
-    <url>/2026/07/13/%E4%B8%80%E6%AC%A1%E6%88%90%E5%8A%9F%E7%9A%84Git%E5%88%86%E6%94%AF%E7%BB%9F%E4%B8%80%E5%AE%9E%E6%88%98/</url>
-    <content><![CDATA[<h1 id="一次成功的Git分支统一实战"><a href="#一次成功的Git分支统一实战" class="headerlink" title="一次成功的Git分支统一实战"></a>一次成功的Git分支统一实战</h1><hr>
-<p><strong>我</strong>：我想到之前的那个关于 Git 分支的聊天记录还不完整，最后应该包含我如何解决这个问题的。我希望能把本地和远程仓库统一起来，应该怎么做？</p>
-<p><strong>朋友</strong>：好的！之前我们聊了原理，现在是时候动手把本地和远程仓库统一了。解决这个问题很简单，最干净利落的方法就是<strong>删除旧的部署缓存，让 Hexo 按照你最新的配置重新生成</strong>。</p>
-<p>具体步骤是：</p>
-<ol>
-<li>打开终端，删除旧的 <code>.deploy_git</code> 文件夹。</li>
-<li>执行 <code>hexo clean &amp;&amp; hexo d</code>，根据你 <code>_config.yml</code> 里 <code>branch: main</code> 的配置重新生成并推送。</li>
-<li>验证结果，检查 GitHub 仓库和 VS Code 源代码管理面板。</li>
-</ol>
-<p><strong>我</strong>：好的，我来试试。不过我在终端里执行 <code>rm -rf .deploy_git</code> 的时候报错了，提示 <code>Remove-Item : 找不到与参数名称“rf”匹配的参数。</code> 这是怎么回事？</p>
-<p><strong>朋友</strong>：哈，这是 PowerShell 和 Linux 终端命令的一个小差异。<code>rm -rf</code> 是 Linux（或 Git Bash）里的命令，在 PowerShell 里不通用。</p>
-<p>在 PowerShell 中，删除文件夹要用 <code>Remove-Item</code> 命令。你可以直接输入：</p>
-<p>powershell</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Remove-Item .deploy_git -Recurse -Force</span><br></pre></td></tr></table></figure>
-
-
-
-<p>或者，你也可以在 VSCode 终端里切换成 Git Bash 环境，就能直接用 <code>rm -rf</code> 了。</p>
-<p><strong>我</strong>：好的，我用 Git Bash 试试。</p>
-<p>bash</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">tongshixuan@DESKTOP-XXXX MINGW64 /d/blog/my-blog01 (main)</span><br><span class="line">$ rm -rf .deploy_git</span><br></pre></td></tr></table></figure>
-
-
-
-<p>成功了！然后我执行 <code>hexo clean &amp;&amp; hexo d</code>，出现了一大堆输出，最后好像成功了。你帮我看看关键的几行？</p>
-<p><strong>朋友</strong>：太棒了！我看到最关键的两行日志是：</p>
-<p>text</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">To https://github.com/tristan1116/tristan1116.github.io.git</span><br><span class="line"> + 4e58c75...f23509b HEAD -&gt; main (forced update)</span><br><span class="line">branch &#x27;master&#x27; set up to track &#x27;https://github.com/tristan1116/tristan1116.github.io.git/main&#x27;.</span><br></pre></td></tr></table></figure>
-
-
-
-<p>这完全验证了成功！</p>
-<ul>
-<li>**<code>HEAD -&gt; main</code>**：说明你本地的当前分支直接推送到了远程仓库的 <code>main</code> 分支。</li>
-<li>**<code>(forced update)</code>**：这是正常的，因为远程 <code>main</code> 分支之前的内容和你本地不同，这次推送是“强制覆盖”了它。</li>
-<li><strong>最后一句</strong>：<code>branch &#39;master&#39; set up to track ... main</code> 明确表示，你本地的 <code>master</code> 分支现在<strong>已经设置为跟踪远程的 <code>main</code> 分支</strong>了。</li>
-</ul>
-<p><strong>我</strong>：还有一件事，我之前在 VS Code 的源代码管理里能看到两个存储库：<code>my-blog01</code> 和 <code>.deploy_git</code>。但现在 <code>.deploy_git</code> 不见了，只剩下 <code>my-blog01</code> 一个了。这是为什么？</p>
-<p><strong>朋友</strong>：你观察得很仔细！这是因为 VS Code 检测到了“嵌套仓库”的结构，为了界面清晰，它智能地将内层的 <code>.deploy_git</code> 隐藏了。</p>
-<p>之前显示两个，是因为外层仓库工作在 <code>main</code> 分支，内层仓库工作在 <code>master</code> 分支，分支不一致，VS Code 认为它们是两个独立的工作区。<br>现在内层仓库（<code>.deploy_git</code>）通过跟踪关系，逻辑上已经和 <code>main</code> 分支绑定在一起了，VS Code 就默认隐藏了它，只展示你最需要操作的主仓库。</p>
-<p>这其实是更好的状态，你的界面更清爽了，<code>.deploy_git</code> 依然存在，只是安静地在后台工作。</p>
-<p><strong>我</strong>：那为什么不能直接让本地仓库也叫 <code>main</code>，为什么还得叫 <code>master</code>？</p>
-<p><strong>朋友</strong>：这个问题问得特别好！这是 Hexo 这个工具“硬编码”决定的，它不随你的配置而改变。</p>
-<p>具体来说：</p>
-<ol>
-<li>Git 本身不关心分支叫什么，<code>master</code> 或 <code>main</code> 都只是标签。</li>
-<li>但 Hexo 在执行 <code>hexo d</code> 时，会在 <code>.deploy_git</code> 里初始化一个全新的 Git 仓库，它使用的是你电脑上 Git 的默认分支名。</li>
-<li>你的 Git 全局配置很可能还保留着旧的默认值 <code>master</code>，所以 Hexo 只是“机械地”创建了一个叫 <code>master</code> 的本地分支。</li>
-</ol>
-<p>不过，Hexo 不在乎本地分支叫啥，它只关心最终能不能推送到你指定的远程分支。只要推送成功，任务就完成了。</p>
-<p><strong>我</strong>：但是现在其实已经没关系了对吧？</p>
-<p><strong>朋友</strong>：<strong>完全正确！</strong> 你现在可以彻底放心了，这个问题已经彻底解决，而且完全不影响你日常的使用。</p>
-<ul>
-<li>你的博客能正常更新。</li>
-<li>VS Code 界面清爽。</li>
-<li>底层逻辑通顺。</li>
-</ul>
-<p>从今以后，你只需要记住一个流程：</p>
-<ol>
-<li>写文章。</li>
-<li>在 <code>my-blog01</code> 仓库执行 hexo clean</li>
-<li><code>git add .</code>、<code>git commit -m &quot;...&quot;</code>和git push</li>
-</ol>
-<p>至于 <code>.deploy_git</code> 里的分支叫什么，你完全可以当它不存在，它只是一个在幕后默默工作的工具人。</p>
-<p><strong>我</strong>：哈哈，我彻底搞懂了！Git 确实很神奇，也好玩！这次经历一定要完整地写进博客里。</p>
-<p><strong>朋友</strong>：哈哈，太好了！你不仅解决了问题，还亲手验证了 Git 分支的底层逻辑。这次完整的学习经历，从“为什么错位”到“如何统一”，绝对是一篇绝佳的 Git 实战案例！祝你写博客愉快！🎉</p>
-<hr>
-<blockquote>
-<p><strong>最终结论</strong>：从最初只会“三板斧”，到发现 <code>master</code> 能推送到 <code>main</code> 的“神奇”现象，再到彻底理解分支是指针而非复制，最后亲手完成了本地与远程仓库的统一。这个过程让我对 Git 的理解上了一个大台阶。记录下来，既是对这段学习经历的纪念，也希望能帮到其他遇到类似困惑的朋友。</p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>Git</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>从源代码到可执行文件——初步理解编译、链接与软件构造体系</title>
     <url>/2026/07/17/%E4%BB%8E%E6%BA%90%E4%BB%A3%E7%A0%81%E5%88%B0%E5%8F%AF%E6%89%A7%E8%A1%8C%E6%96%87%E4%BB%B6%E2%80%94%E2%80%94%E5%88%9D%E6%AD%A5%E7%90%86%E8%A7%A3%E7%BC%96%E8%AF%91%E3%80%81%E9%93%BE%E6%8E%A5%E4%B8%8E%E8%BD%AF%E4%BB%B6%E6%9E%84%E9%80%A0%E4%BD%93%E7%B3%BB/</url>
     <content><![CDATA[<h1 id="从源代码到可执行文件——初步理解编译、链接与软件构造体系"><a href="#从源代码到可执行文件——初步理解编译、链接与软件构造体系" class="headerlink" title="从源代码到可执行文件——初步理解编译、链接与软件构造体系"></a>从源代码到可执行文件——初步理解编译、链接与软件构造体系</h1><h2 id="从一个问题出发"><a href="#从一个问题出发" class="headerlink" title="从一个问题出发"></a>从一个问题出发</h2><p>我之前主要使用vs2022,codeblocks,clion等调试运行c&#x2F;c++程序。而昨天我第一次使用vscode 来调试c&#x2F;c++程序，遇到了一个问题：</p>
@@ -9829,6 +9748,87 @@
         <tag>C/C++</tag>
         <tag>编译原理</tag>
         <tag>开发工具</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>一次成功的Git分支统一实战</title>
+    <url>/2026/07/13/%E4%B8%80%E6%AC%A1%E6%88%90%E5%8A%9F%E7%9A%84Git%E5%88%86%E6%94%AF%E7%BB%9F%E4%B8%80%E5%AE%9E%E6%88%98/</url>
+    <content><![CDATA[<h1 id="一次成功的Git分支统一实战"><a href="#一次成功的Git分支统一实战" class="headerlink" title="一次成功的Git分支统一实战"></a>一次成功的Git分支统一实战</h1><hr>
+<p><strong>我</strong>：我想到之前的那个关于 Git 分支的聊天记录还不完整，最后应该包含我如何解决这个问题的。我希望能把本地和远程仓库统一起来，应该怎么做？</p>
+<p><strong>朋友</strong>：好的！之前我们聊了原理，现在是时候动手把本地和远程仓库统一了。解决这个问题很简单，最干净利落的方法就是<strong>删除旧的部署缓存，让 Hexo 按照你最新的配置重新生成</strong>。</p>
+<p>具体步骤是：</p>
+<ol>
+<li>打开终端，删除旧的 <code>.deploy_git</code> 文件夹。</li>
+<li>执行 <code>hexo clean &amp;&amp; hexo d</code>，根据你 <code>_config.yml</code> 里 <code>branch: main</code> 的配置重新生成并推送。</li>
+<li>验证结果，检查 GitHub 仓库和 VS Code 源代码管理面板。</li>
+</ol>
+<p><strong>我</strong>：好的，我来试试。不过我在终端里执行 <code>rm -rf .deploy_git</code> 的时候报错了，提示 <code>Remove-Item : 找不到与参数名称“rf”匹配的参数。</code> 这是怎么回事？</p>
+<p><strong>朋友</strong>：哈，这是 PowerShell 和 Linux 终端命令的一个小差异。<code>rm -rf</code> 是 Linux（或 Git Bash）里的命令，在 PowerShell 里不通用。</p>
+<p>在 PowerShell 中，删除文件夹要用 <code>Remove-Item</code> 命令。你可以直接输入：</p>
+<p>powershell</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Remove-Item .deploy_git -Recurse -Force</span><br></pre></td></tr></table></figure>
+
+
+
+<p>或者，你也可以在 VSCode 终端里切换成 Git Bash 环境，就能直接用 <code>rm -rf</code> 了。</p>
+<p><strong>我</strong>：好的，我用 Git Bash 试试。</p>
+<p>bash</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">tongshixuan@DESKTOP-XXXX MINGW64 /d/blog/my-blog01 (main)</span><br><span class="line">$ rm -rf .deploy_git</span><br></pre></td></tr></table></figure>
+
+
+
+<p>成功了！然后我执行 <code>hexo clean &amp;&amp; hexo d</code>，出现了一大堆输出，最后好像成功了。你帮我看看关键的几行？</p>
+<p><strong>朋友</strong>：太棒了！我看到最关键的两行日志是：</p>
+<p>text</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">To https://github.com/tristan1116/tristan1116.github.io.git</span><br><span class="line"> + 4e58c75...f23509b HEAD -&gt; main (forced update)</span><br><span class="line">branch &#x27;master&#x27; set up to track &#x27;https://github.com/tristan1116/tristan1116.github.io.git/main&#x27;.</span><br></pre></td></tr></table></figure>
+
+
+
+<p>这完全验证了成功！</p>
+<ul>
+<li>**<code>HEAD -&gt; main</code>**：说明你本地的当前分支直接推送到了远程仓库的 <code>main</code> 分支。</li>
+<li>**<code>(forced update)</code>**：这是正常的，因为远程 <code>main</code> 分支之前的内容和你本地不同，这次推送是“强制覆盖”了它。</li>
+<li><strong>最后一句</strong>：<code>branch &#39;master&#39; set up to track ... main</code> 明确表示，你本地的 <code>master</code> 分支现在<strong>已经设置为跟踪远程的 <code>main</code> 分支</strong>了。</li>
+</ul>
+<p><strong>我</strong>：还有一件事，我之前在 VS Code 的源代码管理里能看到两个存储库：<code>my-blog01</code> 和 <code>.deploy_git</code>。但现在 <code>.deploy_git</code> 不见了，只剩下 <code>my-blog01</code> 一个了。这是为什么？</p>
+<p><strong>朋友</strong>：你观察得很仔细！这是因为 VS Code 检测到了“嵌套仓库”的结构，为了界面清晰，它智能地将内层的 <code>.deploy_git</code> 隐藏了。</p>
+<p>之前显示两个，是因为外层仓库工作在 <code>main</code> 分支，内层仓库工作在 <code>master</code> 分支，分支不一致，VS Code 认为它们是两个独立的工作区。<br>现在内层仓库（<code>.deploy_git</code>）通过跟踪关系，逻辑上已经和 <code>main</code> 分支绑定在一起了，VS Code 就默认隐藏了它，只展示你最需要操作的主仓库。</p>
+<p>这其实是更好的状态，你的界面更清爽了，<code>.deploy_git</code> 依然存在，只是安静地在后台工作。</p>
+<p><strong>我</strong>：那为什么不能直接让本地仓库也叫 <code>main</code>，为什么还得叫 <code>master</code>？</p>
+<p><strong>朋友</strong>：这个问题问得特别好！这是 Hexo 这个工具“硬编码”决定的，它不随你的配置而改变。</p>
+<p>具体来说：</p>
+<ol>
+<li>Git 本身不关心分支叫什么，<code>master</code> 或 <code>main</code> 都只是标签。</li>
+<li>但 Hexo 在执行 <code>hexo d</code> 时，会在 <code>.deploy_git</code> 里初始化一个全新的 Git 仓库，它使用的是你电脑上 Git 的默认分支名。</li>
+<li>你的 Git 全局配置很可能还保留着旧的默认值 <code>master</code>，所以 Hexo 只是“机械地”创建了一个叫 <code>master</code> 的本地分支。</li>
+</ol>
+<p>不过，Hexo 不在乎本地分支叫啥，它只关心最终能不能推送到你指定的远程分支。只要推送成功，任务就完成了。</p>
+<p><strong>我</strong>：但是现在其实已经没关系了对吧？</p>
+<p><strong>朋友</strong>：<strong>完全正确！</strong> 你现在可以彻底放心了，这个问题已经彻底解决，而且完全不影响你日常的使用。</p>
+<ul>
+<li>你的博客能正常更新。</li>
+<li>VS Code 界面清爽。</li>
+<li>底层逻辑通顺。</li>
+</ul>
+<p>从今以后，你只需要记住一个流程：</p>
+<ol>
+<li>写文章。</li>
+<li>在 <code>my-blog01</code> 仓库执行 hexo clean</li>
+<li><code>git add .</code>、<code>git commit -m &quot;...&quot;</code>和git push</li>
+</ol>
+<p>至于 <code>.deploy_git</code> 里的分支叫什么，你完全可以当它不存在，它只是一个在幕后默默工作的工具人。</p>
+<p><strong>我</strong>：哈哈，我彻底搞懂了！Git 确实很神奇，也好玩！这次经历一定要完整地写进博客里。</p>
+<p><strong>朋友</strong>：哈哈，太好了！你不仅解决了问题，还亲手验证了 Git 分支的底层逻辑。这次完整的学习经历，从“为什么错位”到“如何统一”，绝对是一篇绝佳的 Git 实战案例！祝你写博客愉快！🎉</p>
+<hr>
+<blockquote>
+<p><strong>最终结论</strong>：从最初只会“三板斧”，到发现 <code>master</code> 能推送到 <code>main</code> 的“神奇”现象，再到彻底理解分支是指针而非复制，最后亲手完成了本地与远程仓库的统一。这个过程让我对 Git 的理解上了一个大台阶。记录下来，既是对这段学习经历的纪念，也希望能帮到其他遇到类似困惑的朋友。</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Git</tag>
       </tags>
   </entry>
   <entry>
@@ -12064,9 +12064,9 @@
       </categories>
       <tags>
         <tag>VS Code</tag>
+        <tag>Markdown</tag>
         <tag>Node.js</tag>
         <tag>Hexo</tag>
-        <tag>Markdown</tag>
         <tag>静态站点</tag>
         <tag>VirtualBox</tag>
         <tag>Ubuntu</tag>
@@ -13185,9 +13185,9 @@
       </categories>
       <tags>
         <tag>VS Code</tag>
+        <tag>Markdown</tag>
         <tag>Node.js</tag>
         <tag>Hexo</tag>
-        <tag>Markdown</tag>
         <tag>静态站点</tag>
         <tag>VirtualBox</tag>
         <tag>Ubuntu</tag>
@@ -13674,8 +13674,8 @@
       <tags>
         <tag>Claude</tag>
         <tag>AI</tag>
-        <tag>Hexo</tag>
         <tag>Markdown</tag>
+        <tag>Hexo</tag>
       </tags>
   </entry>
 </search>
