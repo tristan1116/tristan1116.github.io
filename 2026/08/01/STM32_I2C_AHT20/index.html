@@ -24,7 +24,7 @@
 
   <meta name="description" content="前几篇博客学习的通信方式是串口：轮询、中断、DMA、蓝牙，把数据从一个设备传到另一个设备。这篇开始学习另一种嵌入式领域常见的通信方式：IIC（I2C）。读取温湿度传感器AHT20，把房间的温度湿度通过串口打印传输到电脑上。同时学习为外设编写独立驱动文件（.c&#x2F;.h），并踩了一遍 VS Code 工程里&quot;新文件没被编译&quot;的大坑。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="STM32——IIC通信读取温湿度传感器AHT20">
+<meta property="og:title" content="STM32——IIC通信，轮询模式读取温湿度传感器AHT20">
 <meta property="og:url" content="http://tristan1116.github.io/2026/08/01/STM32_I2C_AHT20/index.html">
 <meta property="og:site_name" content="点灯大王的博客">
 <meta property="og:description" content="前几篇博客学习的通信方式是串口：轮询、中断、DMA、蓝牙，把数据从一个设备传到另一个设备。这篇开始学习另一种嵌入式领域常见的通信方式：IIC（I2C）。读取温湿度传感器AHT20，把房间的温度湿度通过串口打印传输到电脑上。同时学习为外设编写独立驱动文件（.c&#x2F;.h），并踩了一遍 VS Code 工程里&quot;新文件没被编译&quot;的大坑。">
@@ -60,7 +60,7 @@
   };
 </script>
 
-  <title>STM32——IIC通信读取温湿度传感器AHT20 | 点灯大王的博客</title>
+  <title>STM32——IIC通信，轮询模式读取温湿度传感器AHT20 | 点灯大王的博客</title>
   
 
 
@@ -216,7 +216,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          STM32——IIC通信读取温湿度传感器AHT20
+          STM32——IIC通信，轮询模式读取温湿度传感器AHT20
         </h1>
 
         <div class="post-meta">
