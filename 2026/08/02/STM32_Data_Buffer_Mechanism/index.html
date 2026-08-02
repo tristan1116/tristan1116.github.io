@@ -24,7 +24,7 @@
 
   <meta name="description" content="前面学了串口轮询、中断、DMA、蓝牙，又学了 I2C 读温湿度，每次 HAL 函数里都传一个&quot;数据缓冲区指针&quot;（receiveData、sendBuffer、readBuffer……）。这些数组到底存在哪？数据是怎么进到数组里、又从数组里发出去的？外设数据寄存器（DR）和数组是什么关系？这篇把 5 篇通信博客串起来，深入这个嵌入式通信的底层模型。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="深入stm32的底层通信模型--探究数据存在哪里，怎么传输">
+<meta property="og:title" content="深入stm32的底层通信模型--数据的存储与传输">
 <meta property="og:url" content="http://tristan1116.github.io/2026/08/02/STM32_Data_Buffer_Mechanism/index.html">
 <meta property="og:site_name" content="点灯大王的博客">
 <meta property="og:description" content="前面学了串口轮询、中断、DMA、蓝牙，又学了 I2C 读温湿度，每次 HAL 函数里都传一个&quot;数据缓冲区指针&quot;（receiveData、sendBuffer、readBuffer……）。这些数组到底存在哪？数据是怎么进到数组里、又从数组里发出去的？外设数据寄存器（DR）和数组是什么关系？这篇把 5 篇通信博客串起来，深入这个嵌入式通信的底层模型。">
@@ -54,7 +54,7 @@
   };
 </script>
 
-  <title>深入stm32的底层通信模型--探究数据存在哪里，怎么传输 | 点灯大王的博客</title>
+  <title>深入stm32的底层通信模型--数据的存储与传输 | 点灯大王的博客</title>
   
 
 
@@ -210,7 +210,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          深入stm32的底层通信模型--探究数据存在哪里，怎么传输
+          深入stm32的底层通信模型--数据的存储与传输
         </h1>
 
         <div class="post-meta">
