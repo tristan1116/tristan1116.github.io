@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="上篇用 I2C 轮询模式读取了 AHT20 温湿度，本篇改造为中断模式：非阻塞的收发函数 + 状态机编程，CPU 不再傻等。同时踩了两个大坑——非阻塞函数里局部数组会被回收（要用 static）、跨文件共享变量 extern 的正确姿势。最后把中断版一行改成 DMA 版。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度">
+<meta property="og:url" content="http://tristan1116.github.io/2026/08/02/STM32_I2C_Interrupt_DMA/index.html">
+<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:description" content="上篇用 I2C 轮询模式读取了 AHT20 温湿度，本篇改造为中断模式：非阻塞的收发函数 + 状态机编程，CPU 不再傻等。同时踩了两个大坑——非阻塞函数里局部数组会被回收（要用 static）、跨文件共享变量 extern 的正确姿势。最后把中断版一行改成 DMA 版。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_I2C_Interrupt_DMA/image-20260802182354106.png">
+<meta property="article:published_time" content="2026-08-02T18:30:00.000Z">
+<meta property="article:modified_time" content="2026-08-02T18:30:00.000Z">
+<meta property="article:author" content="点灯大王">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="DMA">
+<meta property="article:tag" content="I2C">
+<meta property="article:tag" content="中断">
+<meta property="article:tag" content="AHT20">
+<meta property="article:tag" content="状态机">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_I2C_Interrupt_DMA/image-20260802182354106.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/08/02/STM32_I2C_Interrupt_DMA/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度 | 点灯大王的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">点灯大王的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/08/02/STM32_I2C_Interrupt_DMA/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="点灯大王的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-02 18:30:00" itemprop="dateCreated datePublished" datetime="2026-08-02T18:30:00+00:00">2026-08-02</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>12k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+            <div class="post-description">上篇用 I2C 轮询模式读取了 AHT20 温湿度，本篇改造为中断模式：非阻塞的收发函数 + 状态机编程，CPU 不再傻等。同时踩了两个大坑——非阻塞函数里局部数组会被回收（要用 static）、跨文件共享变量 extern 的正确姿势。最后把中断版一行改成 DMA 版。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上篇我们学习了 I2C 轮询模式读取 AHT20：用 <code>HAL_I2C_Master_Transmit</code> 发送测量命令、<code>HAL_I2C_Master_Receive</code> 读取 6 字节数据，再拼接换算成温湿度。</p>
+<p>但轮询模式有个老问题——<strong>阻塞</strong>。发送和接收函数内部”等一个字节搬一个字节”，整个过程 CPU 被占住，什么别的事都干不了。这和之前串口学的完全一样：轮询 → 中断 → DMA。</p>
+<p>本篇把 I2C 通信改造成<strong>中断模式</strong>，并引入单片机里极其常见的<strong>状态机编程</strong>思想。中间我遇到两个很有价值的问题：</p>
+<ol>
+<li><strong>非阻塞函数 + 局部数组 &#x3D; 数据被回收</strong>（要用 <code>static</code>）</li>
+<li><strong>跨文件共享变量：extern 声明 vs 定义</strong>（编译报 undeclared 的根源）</li>
+</ol>
+<p>最后把中断版改成 <strong>DMA 版</strong>——因为中断和 DMA 在 HAL 里只差一个后缀。</p>
+<blockquote>
+<p>本篇和<a href="/2026/08/01/STM32_I2C_AHT20/">上篇</a>是同一块板子、同一个工程。</p>
+</blockquote>
+<hr>
+<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="2-1-轮询-vs-中断-vs-DMA（回顾-迁移）"><a href="#2-1-轮询-vs-中断-vs-DMA（回顾-迁移）" class="headerlink" title="2.1 轮询 vs 中断 vs DMA（回顾 + 迁移）"></a>2.1 轮询 vs 中断 vs DMA（回顾 + 迁移）</h3><p>串口那几篇已经详细讲过三种模式的区别，I2C 完全一样：</p>
+<table>
+<thead>
+<tr>
+<th align="left">模式</th>
+<th align="left">发送&#x2F;接收过程</th>
+<th align="left">CPU 在干嘛</th>
+<th align="left">怎么知道完成了</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>轮询</strong></td>
+<td align="left">CPU 逐字节写入&#x2F;读取寄存器</td>
+<td align="left">阻塞等待</td>
+<td align="left">函数返回 &#x3D; 完成</td>
+</tr>
+<tr>
+<td align="left"><strong>中断</strong></td>
+<td align="left">每搬完 1 字节触发中断，中断里搬下一字节</td>
+<td align="left">平时干别的，被中断叫去搬</td>
+<td align="left"><strong>回调函数</strong></td>
+</tr>
+<tr>
+<td align="left"><strong>DMA</strong></td>
+<td align="left">DMA 硬件整批搬运</td>
+<td align="left">彻底解放</td>
+<td align="left">回调函数（DMA 通过中断通知）</td>
+</tr>
+</tbody></table>
+<p>关键区别一句话：<strong>轮询的函数返回 &#x3D; 数据传完了；中断&#x2F;DMA 的函数调用完 &#x3D; 只是把任务交给了外设，数据还没传</strong>。</p>
+<h3 id="2-2-非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑"><a href="#2-2-非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑" class="headerlink" title="2.2 非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑"></a>2.2 非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑</h3><p>这是本篇最容易出 bug 的地方。看这个改造前”想当然”的代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Read_IT</span><span class="params">()</span>   <span class="comment">// 想当然的错误写法</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>] = &#123;<span class="number">0xAC</span>, <span class="number">0x33</span>, <span class="number">0x00</span>&#125;;  <span class="comment">// 局部数组</span></span><br><span class="line">    <span class="type">uint8_t</span> readBuffer[<span class="number">6</span>];</span><br><span class="line"></span><br><span class="line">    HAL_I2C_Master_Transmit_IT(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>);  <span class="comment">// 非阻塞，立即返回！</span></span><br><span class="line">    HAL_Delay(<span class="number">75</span>);</span><br><span class="line">    HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, readBuffer, <span class="number">6</span>);   <span class="comment">// 同样立即返回！</span></span><br><span class="line">    <span class="comment">// 到这里 readBuffer 里还是初始值，数据根本没收到！</span></span><br><span class="line">    <span class="comment">// 而且 sendBuffer 是局部数组，函数返回后内存就被回收了，中断传输还没结束……</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>两个致命问题：</p>
+<p><strong>① 数据没收到就往下执行</strong>：<code>Receive_IT</code> 只是”通知外设开始接收”，真正搬运是中断里逐字节完成的。函数返回时 <code>readBuffer</code> 里全是初始值。这就需要一个<strong>状态机</strong>：把”发送命令”、”等待”、”读取”、”解析”拆成独立动作，由中断回调来驱动状态切换。</p>
+<p><strong>② 局部数组内存被回收</strong>：<code>Transmit_IT</code> 是非阻塞的，函数返回后<strong>中断还在用 <code>sendBuffer</code> 的地址传数据</strong>，但 <code>sendBuffer</code> 是局部变量，函数一结束它的内存就被回收、可能被其他变量覆盖——发出去的数据就错了。解决方案：加 <code>static</code> 让数组常驻内存。</p>
+<h3 id="2-3-状态机：让”异步”变得可控"><a href="#2-3-状态机：让”异步”变得可控" class="headerlink" title="2.3 状态机：让”异步”变得可控"></a>2.3 状态机：让”异步”变得可控</h3><p>非阻塞编程的核心思想就是状态机。我们把 stm32与AHT20交互 的完整流程拆成 5 个状态，由中断回调推进状态，主循环只负责”看状态、做该做的事”：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">           AHT20_Measure()           中断回调              AHT20_Get()</span><br><span class="line">┌──────┐   发送测量命令     ┌──────┐   发送完成      ┌──────┐   读取数据      ┌──────┐</span><br><span class="line">│  0   │ ────────────────→ │  1   │ ────────────→ │  2   │ ────────────→ │  3   │</span><br><span class="line">│初始  │                   │发送中 │               │等75ms│               │读取中 │</span><br><span class="line">└──────┘                   └──────┘               └──────┘               └──────┘</span><br><span class="line">   ↑                                                                        │</span><br><span class="line">   │                                                    中断回调（接收完成）    |</span><br><span class="line">   │  串口打印，回到初始      ←────── 状态4：解析数据+传到电脑上 ←──────────────────┘</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="center">状态值</th>
+<th align="left">含义</th>
+<th align="left">谁触发的</th>
+<th align="left">当前状态要做的事</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="left">初始状态</td>
+<td align="left">上电&#x2F;打印完</td>
+<td align="left">调用 <code>AHT20_Measure()</code> 发送测量命令 → 状态 1</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="left">正在发送</td>
+<td align="left">—</td>
+<td align="left">什么都不用做，等中断</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">发送完成</td>
+<td align="left"><strong>发送完成回调</strong></td>
+<td align="left">延时 75ms → 调用 <code>AHT20_Get()</code> 读取数据 → 状态 3</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">正在读取</td>
+<td align="left">—</td>
+<td align="left">什么都不用做，等中断</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">读取完成</td>
+<td align="left"><strong>接收完成回调</strong></td>
+<td align="left">解析数据 → 串口打印 → 回到状态 0</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="3-1-开启-I2C1-的两个中断向量"><a href="#3-1-开启-I2C1-的两个中断向量" class="headerlink" title="3.1 开启 I2C1 的两个中断向量"></a>3.1 开启 I2C1 的两个中断向量</h3><p>在 CubeMX 中点击 <strong>I2C1 → NVIC Settings</strong>，勾选：</p>
+<ul>
+<li><strong>I2C1 event interrupt</strong>（事件中断，本篇主要用这个）</li>
+<li><strong>I2C1 error interrupt</strong>（错误中断）</li>
+</ul>
+<p>![屏幕截图 2026-08-02 182142](.&#x2F;..&#x2F;images&#x2F;STM32_I2C_Interrupt_DMA&#x2F;屏幕截图 2026-08-02 182142.png)</p>
+<p>Ctrl+S 保存并生成代码后，<code>stm32f1xx_it.c</code> 里会自动多出两个中断服务函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">I2C1_EV_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 事件中断：发送/接收完成、地址匹配等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_EV_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">I2C1_ER_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 错误中断：总线错误、仲裁丢失等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_ER_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-DMA-模式"><a href="#3-2-DMA-模式" class="headerlink" title="3.2 DMA 模式"></a>3.2 DMA 模式</h3><p>如果要切换到 DMA 模式，在 <strong>I2C1 → DMA Settings</strong> 里添加 <strong>I2C1_TX</strong> 和 <strong>I2C1_RX</strong> 两条 DMA 通道，默认配置即可。本篇主要讲中断模式，DMA模式仅需要把I2C收发函数的后缀从IT改为DMA即可<img src="/./../images/STM32_I2C_Interrupt_DMA/image-20260802182354106.png" alt="image-20260802182354106"></p>
+<hr>
+<h2 id="核心代码"><a href="#核心代码" class="headerlink" title="核心代码"></a>核心代码</h2><h3 id="4-1-aht20-h-——-头文件（声明拆分后的三个函数）"><a href="#4-1-aht20-h-——-头文件（声明拆分后的三个函数）" class="headerlink" title="4.1 aht20.h —— 头文件（声明拆分后的三个函数）"></a>4.1 aht20.h —— 头文件（声明拆分后的三个函数）</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> INC_AHT20_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> INC_AHT20_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;i2c.h&quot;</span>        <span class="comment">// 引入 hi2c1 句柄声明和 HAL_I2C 系列函数</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">(<span class="type">void</span>)</span>;                                  <span class="comment">// 初始化传感器</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Measure</span><span class="params">(<span class="type">void</span>)</span>;                               <span class="comment">// 触发测量（发送测量命令，非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Get</span><span class="params">(<span class="type">void</span>)</span>;                                   <span class="comment">// 读取测量数据（非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Analysis</span><span class="params">(<span class="type">float</span>* Temrerature, <span class="type">float</span>* Humidity)</span>;  <span class="comment">// 解析 readBuffer 为温湿度</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-aht20-c-——-驱动实现（拆分为-Measure-Get-Analysis）"><a href="#4-2-aht20-c-——-驱动实现（拆分为-Measure-Get-Analysis）" class="headerlink" title="4.2 aht20.c —— 驱动实现（拆分为 Measure &#x2F; Get &#x2F; Analysis）"></a>4.2 aht20.c —— 驱动实现（拆分为 Measure &#x2F; Get &#x2F; Analysis）</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;aht20.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;i2c.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal_def.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal_i2c.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdint.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// ========== 设备地址 ==========</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> AHT20_ADDRESS 0x70</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 接收缓冲区：提升为全局变量！</span></span><br><span class="line"><span class="comment">// 因为 AHT20_Get() 触发的是非阻塞接收，数据由中断慢慢填进来，</span></span><br><span class="line"><span class="comment">// 而 AHT20_Analysis() 要在之后的某个时刻去读它——局部数组活不了那么久。</span></span><br><span class="line"><span class="type">uint8_t</span> readBuffer[<span class="number">6</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 初始化：和上篇完全一样（轮询，阻塞，没问题）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint8_t</span> readBuffer;</span><br><span class="line">    HAL_Delay(<span class="number">40</span>);</span><br><span class="line">    HAL_I2C_Master_Receive(&amp;hi2c1, AHT20_ADDRESS, &amp;readBuffer, <span class="number">1</span>, HAL_MAX_DELAY);</span><br><span class="line">    <span class="keyword">if</span> ((readBuffer &amp; <span class="number">0x08</span>) == <span class="number">0x00</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>] = &#123;<span class="number">0xBE</span>, <span class="number">0x08</span>, <span class="number">0x00</span>&#125;;</span><br><span class="line">        HAL_I2C_Master_Transmit(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>, HAL_MAX_DELAY);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 触发测量：发送 3 字节测量命令（中断模式，非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Measure</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// static 是关键！非阻塞函数返回后，局部数组内存会被回收，</span></span><br><span class="line">    <span class="comment">// 但中断还在用这个地址传数据 → 必须让数组常驻内存</span></span><br><span class="line">    <span class="type">static</span> <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>] = &#123;<span class="number">0xAC</span>, <span class="number">0x33</span>, <span class="number">0x00</span>&#125;;</span><br><span class="line">    HAL_I2C_Master_Transmit_IT(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 读取数据：触发接收 6 字节（中断模式，非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Get</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, readBuffer, <span class="number">6</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 解析数据：和上篇 AHT20_Read 后半段完全一样</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Analysis</span><span class="params">(<span class="type">float</span> *Temrerature, <span class="type">float</span> *Humidity)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> ((readBuffer[<span class="number">0</span>] &amp; <span class="number">0x80</span>) == <span class="number">0x00</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">uint32_t</span> data = <span class="number">0</span>;</span><br><span class="line">        <span class="comment">// 湿度 = Byte1&lt;&lt;12 | Byte2&lt;&lt;4 | Byte3&gt;&gt;4</span></span><br><span class="line">        data = ((<span class="type">uint32_t</span>)readBuffer[<span class="number">1</span>] &lt;&lt; <span class="number">12</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">2</span>] &lt;&lt; <span class="number">4</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>] &gt;&gt; <span class="number">4</span>);</span><br><span class="line">        *Humidity = data * <span class="number">100.0f</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>);</span><br><span class="line">        <span class="comment">// 温度 = (Byte3 &amp; 0x0F)&lt;&lt;16 | Byte4&lt;&lt;8 | Byte5</span></span><br><span class="line">        data = (((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>] &amp; <span class="number">0x0F</span>) &lt;&lt; <span class="number">16</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">4</span>] &lt;&lt; <span class="number">8</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">5</span>]);</span><br><span class="line">        *Temrerature = data * <span class="number">200.0f</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>) - <span class="number">50</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-i2c-c-——-中断回调（状态机的”驱动引擎”）"><a href="#4-3-i2c-c-——-中断回调（状态机的”驱动引擎”）" class="headerlink" title="4.3 i2c.c —— 中断回调（状态机的”驱动引擎”）"></a>4.3 i2c.c —— 中断回调（状态机的”驱动引擎”）</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 0 */</span></span><br><span class="line"><span class="comment">// 状态机变量真正定义在 main.c 里，extern 声明放在 main.h 里。</span></span><br><span class="line"><span class="comment">// i2c.c → i2c.h → main.h 的 include 链让它在这里直接可见，无需重复声明（详见踩坑记录 坑1）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// I2C 发送完成回调：测量命令发出去了 → 状态 1 → 2</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_I2C_MasterTxCpltCallback</span><span class="params">(I2C_HandleTypeDef *hi2c)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span>(hi2c==&amp;hi2c1)          <span class="comment">// 确认是 I2C1 完成（多个 I2C 时区分用）</span></span><br><span class="line">  &#123;</span><br><span class="line">    aht20_State=<span class="number">2</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// I2C 接收完成回调：6 字节数据收齐了 → 状态 3 → 4</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_I2C_MasterRxCpltCallback</span><span class="params">(I2C_HandleTypeDef *hi2c)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span>(hi2c==&amp;hi2c1)</span><br><span class="line">  &#123;</span><br><span class="line">    aht20_State=<span class="number">4</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 0 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-main-c-——-状态机主循环"><a href="#4-4-main-c-——-状态机主循环" class="headerlink" title="4.4 main.c —— 状态机主循环"></a>4.4 main.c —— 状态机主循环</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN PV */</span></span><br><span class="line"><span class="comment">//0：初始状态，发送测量命令</span></span><br><span class="line"><span class="comment">//1：正在发送测量命令</span></span><br><span class="line"><span class="comment">//2：测量命令发送完成，等待75ms，读取数据</span></span><br><span class="line"><span class="comment">//3：正在读取数据</span></span><br><span class="line"><span class="comment">//4：读取完成，解析并展示数据，回到初始状态</span></span><br><span class="line"><span class="type">uint8_t</span> aht20_State = <span class="number">0</span>;    <span class="comment">// 状态机变量（定义，分配内存）</span></span><br><span class="line"><span class="comment">/* USER CODE END PV */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">AHT20_Init();                    <span class="comment">// 初始化传感器</span></span><br><span class="line"><span class="type">float</span> Temrerature = <span class="number">0</span>, Humidity = <span class="number">0</span>;  <span class="comment">// 存放温湿度</span></span><br><span class="line"><span class="type">char</span> message[<span class="number">50</span>];                <span class="comment">// 串口发送缓冲区</span></span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">//初始状态：触发测量</span></span><br><span class="line">    <span class="keyword">if</span>(aht20_State==<span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">      AHT20_Measure();       <span class="comment">// 发送测量命令（非阻塞，立即返回）</span></span><br><span class="line">      aht20_State=<span class="number">1</span>;</span><br><span class="line">    <span class="comment">//测量命令发送完成：等待75毫秒，读取数据</span></span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(aht20_State==<span class="number">2</span>)</span><br><span class="line">    &#123;</span><br><span class="line">      HAL_Delay(<span class="number">75</span>);         <span class="comment">// 给传感器测量时间</span></span><br><span class="line">      AHT20_Get();           <span class="comment">// 触发读取（非阻塞，立即返回）</span></span><br><span class="line">      aht20_State=<span class="number">3</span>;</span><br><span class="line">    <span class="comment">//读取完成：解析并展示数据</span></span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(aht20_State==<span class="number">4</span>)</span><br><span class="line">    &#123;</span><br><span class="line">      AHT20_Analysis(&amp;Temrerature, &amp;Humidity);  <span class="comment">// 解析 readBuffer</span></span><br><span class="line">      <span class="built_in">sprintf</span>(message,<span class="string">&quot;温度：%.1f℃,湿度：%.1f%%\r\n&quot;</span>,Temrerature,Humidity);</span><br><span class="line">      HAL_UART_Transmit(&amp;huart2, (<span class="type">uint8_t</span>*)message, <span class="built_in">strlen</span>(message), HAL_MAX_DELAY);</span><br><span class="line">      HAL_Delay(<span class="number">2000</span>);       <span class="comment">// 间隔 2 秒</span></span><br><span class="line">      aht20_State=<span class="number">0</span>;         <span class="comment">// 回到初始状态</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 状态 1 和 3 什么都不用做：等中断回调改变状态</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END WHILE */</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h2><h3 id="5-1-为什么把-AHT20-Read-拆成三个函数？"><a href="#5-1-为什么把-AHT20-Read-拆成三个函数？" class="headerlink" title="5.1 为什么把 AHT20_Read 拆成三个函数？"></a>5.1 为什么把 AHT20_Read 拆成三个函数？</h3><p>上篇的 <code>AHT20_Read()</code> 是一个”一气呵成”的大函数：发送命令 → 等待 → 接收 → 解析。这在轮询模式下没问题，因为函数内部阻塞执行，流程是线性的。</p>
+<p>但中断模式下<strong>流程被切碎了</strong>：发送命令是一回事，等待 75ms 是另一回事，接收完成又是更后面的事——它们发生在<strong>不同的时间点</strong>（中间隔着中断）。所以必须拆开：</p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">做什么</th>
+<th align="left">什么时候调用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>AHT20_Measure()</code></td>
+<td align="left">发送测量命令（非阻塞）</td>
+<td align="left">状态 0 → 1</td>
+</tr>
+<tr>
+<td align="left"><code>AHT20_Get()</code></td>
+<td align="left">触发接收 6 字节（非阻塞）</td>
+<td align="left">状态 2 → 3（等 75ms 后）</td>
+</tr>
+<tr>
+<td align="left"><code>AHT20_Analysis()</code></td>
+<td align="left">解析 readBuffer → 温湿度</td>
+<td align="left">状态 4（接收完成后）</td>
+</tr>
+</tbody></table>
+<h3 id="5-2-重点：为什么-sendBuffer-必须加-static？"><a href="#5-2-重点：为什么-sendBuffer-必须加-static？" class="headerlink" title="5.2 重点：为什么 sendBuffer 必须加 static？"></a>5.2 重点：为什么 sendBuffer 必须加 static？</h3><p><code>HAL_I2C_Master_Transmit_IT</code> 是非阻塞的：函数内部只是”告诉外设：从这个地址开始传 3 个字节”，然后<strong>立即返回</strong>。真正的逐字节发送是之后由中断完成的——<strong>中断还在用 sendBuffer 这个地址</strong>。</p>
+<p>而 <code>sendBuffer</code> 是 <code>AHT20_Measure()</code> 的局部变量，这个函数已经返回了，它的局部变量在内存里（栈上）的”地盘”被释放，<strong>可能被后面的函数调用覆盖</strong>。数据被改了就发错了。</p>
+<p><code>static</code> 的作用：把数组从”栈上的临时内存”挪到”常驻内存”（静态存储区），程序运行期间一直占用、永不回收。代价是它不再跟随函数创建销毁，函数每次进来用的是同一个数组。</p>
+<blockquote>
+<p>类比：你给快递员（外设）留了张字条（数组）让他去取货，但字条贴在了马上要拆的墙上（栈）——拆墙后字条就没了。static 就是”把字条贴到永久公告栏上”。</p>
+</blockquote>
+<h3 id="5-3-HAL-中断收发函数参数详解"><a href="#5-3-HAL-中断收发函数参数详解" class="headerlink" title="5.3 HAL 中断收发函数参数详解"></a>5.3 HAL 中断收发函数参数详解</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">HAL_I2C_Master_Transmit_IT(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>);</span><br><span class="line">HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, readBuffer, <span class="number">6</span>);</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="center">本项目中填的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>I2C 句柄指针</strong></td>
+<td align="left">操作哪个 I2C 外设</td>
+<td align="center"><code>&amp;hi2c1</code></td>
+</tr>
+<tr>
+<td align="left"><strong>从机地址</strong></td>
+<td align="left">和谁通信（HAL 库自动处理读写位）</td>
+<td align="center"><code>AHT20_ADDRESS</code> (0x70)</td>
+</tr>
+<tr>
+<td align="left"><strong>数据缓冲区指针</strong></td>
+<td align="left">数据从哪里来（发送）&#x2F; 存到哪里（接收）</td>
+<td align="center"><code>sendBuffer</code> &#x2F; <code>readBuffer</code></td>
+</tr>
+<tr>
+<td align="left"><strong>传输长度</strong></td>
+<td align="left">传多少字节</td>
+<td align="center"><code>3</code> &#x2F; <code>6</code></td>
+</tr>
+<tr>
+<td align="left"><del>超时时间</del></td>
+<td align="left"><strong>中断模式没有这个参数</strong>（不阻塞，无需超时）</td>
+<td align="center">—</td>
+</tr>
+</tbody></table>
+<p>对比轮询版 <code>HAL_I2C_Master_Transmit(..., HAL_MAX_DELAY)</code>：<strong>只改了函数名加 <code>_IT</code> 和删掉超时参数</strong>，其他完全一样。</p>
+<h3 id="5-4-回调函数：中断的”完成通知”"><a href="#5-4-回调函数：中断的”完成通知”" class="headerlink" title="5.4 回调函数：中断的”完成通知”"></a>5.4 回调函数：中断的”完成通知”</h3><p>数据搬运完成后，HAL 库通过<strong>回调函数</strong>通知我们：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">发送完成 → HAL_I2C_MasterTxCpltCallback(hi2c)   ← 我们重写的</span><br><span class="line">接收完成 → HAL_I2C_MasterRxCpltCallback(hi2c)   ← 我们重写的</span><br></pre></td></tr></table></figure>
+
+<p>回调里判断 <code>if(hi2c == &amp;hi2c1)</code>：因为程序里可能挂了多个 I2C（比如以后加 OLED），回调是所有 I2C 共用的，必须确认是哪个外设完成了。</p>
+<p>回调里做的事很简单——<strong>改状态</strong>：</p>
+<ul>
+<li>发送完成 → <code>aht20_State = 2</code>（可以开始等待+读取了）</li>
+<li>接收完成 → <code>aht20_State = 4</code>（可以解析+打印了）</li>
+</ul>
+<p>主循环”看到”状态变化后，就去做对应的事。这就是状态机 + 中断回调的协作模式。</p>
+<h3 id="5-5-为什么-readBuffer-要全局变量？"><a href="#5-5-为什么-readBuffer-要全局变量？" class="headerlink" title="5.5 为什么 readBuffer 要全局变量？"></a>5.5 为什么 readBuffer 要全局变量？</h3><p>和 sendBuffer 同理：<code>AHT20_Get()</code> 触发非阻塞接收后立即返回，数据是中断<strong>之后慢慢填进</strong> readBuffer 的；而 <code>AHT20_Analysis()</code> 在<strong>更后面</strong>（状态 4）才来读它。局部变量活不过函数返回，必须提升为全局变量（常驻内存）。</p>
+<blockquote>
+<p>注意区分：sendBuffer 用 static（还是函数内可见的”局部静态”），readBuffer 用全局。两者本质一样——常驻内存——但 readBuffer 要跨函数使用，所以直接全局。</p>
+</blockquote>
+<hr>
+<h2 id="解读初始化代码"><a href="#解读初始化代码" class="headerlink" title="解读初始化代码"></a>解读初始化代码</h2><h3 id="6-1-中断服务函数的调用链"><a href="#6-1-中断服务函数的调用链" class="headerlink" title="6.1 中断服务函数的调用链"></a>6.1 中断服务函数的调用链</h3><p>CubeMX 生成的 <code>stm32f1xx_it.c</code> 里，两个中断服务函数是硬件中断的入口：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">硬件事件（发送完成/接收完成/地址匹配...）</span><br><span class="line">   ↓ 触发中断</span><br><span class="line">I2C1_EV_IRQHandler()                    ← stm32f1xx_it.c，CubeMX 生成</span><br><span class="line">   ↓</span><br><span class="line">HAL_I2C_EV_IRQHandler(&amp;hi2c1)           ← HAL 库内部：处理事件、逐字节搬运</span><br><span class="line">   ↓</span><br><span class="line">HAL_I2C_MasterTxCpltCallback(&amp;hi2c1)    ← 我们重写的回调（__weak 弱定义）</span><br><span class="line">   ↓</span><br><span class="line">aht20_State = 2;                        ← 状态机推进</span><br></pre></td></tr></table></figure>
+
+<p>之前学串口中断时解析过完全一样的链路（<code>USART2_IRQHandler → HAL_UART_IRQHandler → UART_Receive_IT → HAL_UART_RxCpltCallback</code>），I2C 只是把名字换成了 <code>EV</code>（事件）。<strong>中断编程的心智模型是通用的。</strong></p>
+<h3 id="6-2-MspInit-里的-NVIC-配置"><a href="#6-2-MspInit-里的-NVIC-配置" class="headerlink" title="6.2 MspInit 里的 NVIC 配置"></a>6.2 MspInit 里的 NVIC 配置</h3><p><code>i2c.c</code> 的 <code>HAL_I2C_MspInit()</code> 里（CubeMX 自动生成）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* I2C1 interrupt Init */</span></span><br><span class="line">HAL_NVIC_SetPriority(I2C1_EV_IRQn, <span class="number">0</span>, <span class="number">0</span>);   <span class="comment">// 事件中断：抢占优先级0，子优先级0</span></span><br><span class="line">HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);           <span class="comment">// 使能事件中断</span></span><br><span class="line">HAL_NVIC_SetPriority(I2C1_ER_IRQn, <span class="number">0</span>, <span class="number">0</span>);   <span class="comment">// 错误中断：优先级0</span></span><br><span class="line">HAL_NVIC_EnableIRQ(I2C1_ER_IRQn);           <span class="comment">// 使能错误中断</span></span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">含义</th>
+<th align="left">参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_NVIC_SetPriority</code></td>
+<td align="left">设置中断优先级</td>
+<td align="left">(中断号, 抢占优先级, 子优先级)</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_NVIC_EnableIRQ</code></td>
+<td align="left">使能中断（不开则中断不会触发）</td>
+<td align="left">中断号</td>
+</tr>
+</tbody></table>
+<p>优先级 0&#x2F;0 是最高优先级。<strong>注意</strong>：勾选了 NVIC 才生成这几行；如果忘了勾选，回调函数永远不会被调用，状态机永远卡在状态 1 和 3。</p>
+<h3 id="6-3-配置对应关系表"><a href="#6-3-配置对应关系表" class="headerlink" title="6.3 配置对应关系表"></a>6.3 配置对应关系表</h3><table>
+<thead>
+<tr>
+<th align="left">CubeMX 设置</th>
+<th align="left">代码位置</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">I2C1 event interrupt 勾选</td>
+<td align="left"><code>HAL_NVIC_EnableIRQ(I2C1_EV_IRQn)</code></td>
+<td align="left">使能事件中断（搬运完成后通知 CPU）</td>
+</tr>
+<tr>
+<td align="left">I2C1 error interrupt 勾选</td>
+<td align="left"><code>HAL_NVIC_EnableIRQ(I2C1_ER_IRQn)</code></td>
+<td align="left">使能错误中断</td>
+</tr>
+<tr>
+<td align="left">—</td>
+<td align="left"><code>I2C1_EV_IRQHandler</code> → <code>HAL_I2C_EV_IRQHandler</code></td>
+<td align="left">中断入口，HAL 库内部逐字节搬运</td>
+</tr>
+<tr>
+<td align="left">—</td>
+<td align="left"><code>HAL_I2C_MasterTxCpltCallback</code> &#x2F; <code>RxCpltCallback</code></td>
+<td align="left">完成回调，我们写状态推进逻辑</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>老样子，这里不再展开（参考<a href="/2026/07/28/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">这篇博客</a>）。</p>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><table>
+<thead>
+<tr>
+<th align="left">操作</th>
+<th align="left">现象</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">打开串口助手，选择对应 COM 口，波特率 115200</td>
+<td align="left">每 2 秒刷新一行温湿度</td>
+</tr>
+<tr>
+<td align="left">观察温度读数</td>
+<td align="left">与室温一致，约 26-32℃</td>
+</tr>
+<tr>
+<td align="left">用手捂住传感器</td>
+<td align="left">温度上升、湿度升高，读数随环境变化</td>
+</tr>
+</tbody></table>
+<p>此处效果和上一篇轮询模式一模一样，不再重复录制</p>
+<hr>
+<h2 id="踩坑记录"><a href="#踩坑记录" class="headerlink" title="踩坑记录"></a>踩坑记录</h2><h3 id="坑-1：aht20-State-undeclared-——-extern-是”文件级”的，且-extern-不是定义"><a href="#坑-1：aht20-State-undeclared-——-extern-是”文件级”的，且-extern-不是定义" class="headerlink" title="坑 1：aht20_State undeclared —— extern 是”文件级”的，且 extern 不是定义"></a>坑 1：<code>aht20_State</code> undeclared —— extern 是”文件级”的，且 extern 不是定义</h3><p><strong>现象</strong>：main.c 里写了 <code>extern uint8_t aht20_State;</code>，但 i2c.c 的回调里用 <code>aht20_State</code> 编译报 <code>undeclared</code>。</p>
+<p><strong>原因</strong>：这里踩了两个叠加的坑——</p>
+<ol>
+<li><strong>extern 声明只对声明它的文件可见</strong>：每个 .c 文件是独立编译的，main.c 里的 extern 对 i2c.c 来说不存在。i2c.c 要用，必须能”看到”声明——靠 include 链。</li>
+<li><strong>extern 是声明不是定义</strong>：<code>extern uint8_t aht20_State;</code> 只是”这变量在别处定义了”，本身不分配内存。全项目必须<strong>有且仅有一个</strong>文件写不带 extern 的定义（<code>uint8_t aht20_State = 0;</code>），否则链接报 <code>undefined reference</code>。</li>
+</ol>
+<p><strong>解决</strong>：定义放 main.c，<strong>extern 声明放 main.h</strong>——这样所有 include 了 main.h 的文件（i2c.c 通过 <code>i2c.h → main.h</code> 间接 include）都能看到声明，不需要在 i2c.c 里重复写：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// main.c（USER CODE BEGIN PV）：定义（分配内存，全项目唯一）</span></span><br><span class="line"><span class="type">uint8_t</span> aht20_State = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// main.h（USER CODE BEGIN PV）：声明，全局可见</span></span><br><span class="line"><span class="keyword">extern</span> <span class="type">uint8_t</span> aht20_State;</span><br><span class="line"></span><br><span class="line"><span class="comment">// i2c.c：什么都不用加，i2c.c → i2c.h → main.h 的 include 链让声明自动可见</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>通用规则</strong>：跨文件共享变量 → <strong>一个 .c 里定义，extern 放公共头文件</strong>（谁用谁 include）。这样不用在每个使用的 .c 文件里各写一遍 extern，也避免漏写。</p>
+<h3 id="坑-2：sendBuffer-忘记加-static"><a href="#坑-2：sendBuffer-忘记加-static" class="headerlink" title="坑 2：sendBuffer 忘记加 static"></a>坑 2：sendBuffer 忘记加 static</h3><p><strong>现象</strong>：加不加 static 都能编译，但<strong>发送的数据会随机出错</strong>（内存被覆盖）。</p>
+<p><strong>原因</strong>：非阻塞函数返回后局部数组内存被回收，中断传数据时地址里的内容已被其他代码覆盖。<strong>编译不报错、现象随机</strong>——这是最难排查的一类 bug，只能靠理解原理预防。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">新知识点</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_I2C_Master_Transmit_IT</code> &#x2F; <code>Receive_IT</code></td>
+<td align="left">中断模式收发，非阻塞，无超时参数</td>
+</tr>
+<tr>
+<td align="left">状态机编程</td>
+<td align="left">0→1→2→3→4 状态循环，中断回调驱动状态</td>
+</tr>
+<tr>
+<td align="left">回调函数</td>
+<td align="left"><code>MasterTxCpltCallback</code>（发送完成）&#x2F; <code>MasterRxCpltCallback</code>（接收完成）</td>
+</tr>
+<tr>
+<td align="left">static 局部变量</td>
+<td align="left">非阻塞函数的数组必须常驻内存（函数返回后不回收）</td>
+</tr>
+<tr>
+<td align="left">全局变量提升</td>
+<td align="left">readBuffer 跨函数使用 → 全局</td>
+</tr>
+<tr>
+<td align="left">extern vs 定义</td>
+<td align="left">一个 .c 定义（分配内存），extern 放公共头文件（include 即用）</td>
+</tr>
+<tr>
+<td align="left">DMA 模式</td>
+<td align="left"><code>_IT</code> → <code>_DMA</code>，一行切换（CubeMX 需先加 DMA 通道）</td>
+</tr>
+</tbody></table>
+<h3 id="和上一篇的对比"><a href="#和上一篇的对比" class="headerlink" title="和上一篇的对比"></a>和上一篇的对比</h3><table>
+<thead>
+<tr>
+<th align="left">对比项</th>
+<th align="left">上篇（轮询）</th>
+<th align="left">本篇（中断）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">HAL 函数</td>
+<td align="left"><code>Master_Transmit/Receive</code></td>
+<td align="left"><code>Master_Transmit_IT/Receive_IT</code>（去 <code>_IT</code> 即 DMA）</td>
+</tr>
+<tr>
+<td align="left">超时参数</td>
+<td align="left"><code>HAL_MAX_DELAY</code></td>
+<td align="left">无</td>
+</tr>
+<tr>
+<td align="left">函数形态</td>
+<td align="left">一个大函数 <code>AHT20_Read()</code> 一气呵成</td>
+<td align="left">拆成 Measure &#x2F; Get &#x2F; Analysis + 状态机</td>
+</tr>
+<tr>
+<td align="left">CPU 占用</td>
+<td align="left">阻塞，全程等待</td>
+<td align="left">非阻塞，只在中断里搬一下</td>
+</tr>
+<tr>
+<td align="left">数组生命周期</td>
+<td align="left">局部数组即可</td>
+<td align="left">sendBuffer 要 static，readBuffer 要全局</td>
+</tr>
+</tbody></table>
+<p><strong>核心收获</strong>：本篇不只是学了 I2C 中断模式，更重要的是<strong>状态机编程</strong>——非阻塞外设（中断&#x2F;DMA）驱动下的标准写法。后面学 OLED、FreeRTOS 时，稍微复杂一点的程序处处都是状态机的身影。</p>
+<hr>
+<h2 id="进阶思考：什么时候才需要状态机？"><a href="#进阶思考：什么时候才需要状态机？" class="headerlink" title="进阶思考：什么时候才需要状态机？"></a>进阶思考：什么时候才需要状态机？</h2><p>写完这篇博客后，我正在复习 <code>AHT20_Init()</code> 里的轮询收发函数，突然冒出一个问题：<strong>既然 CubeMX 里 I2C1 的中断和 DMA 都打开了，那是不是只要把 receive&#x2F;transmit 后面加上 <code>_IT</code>&#x2F;<code>_DMA</code>，这里的阻塞也就能变成非阻塞的了？</strong></p>
+<p>紧接着第二个问题来了：<strong>如果非阻塞这么”香”，为什么之前那么多项目（串口中断、串口 DMA、蓝牙）都没用显式状态机，也跑得好好的？本篇却非要引入状态机不可？</strong></p>
+<p>这两个问题值得好好拆一拆。</p>
+<h3 id="一、AHT20-Init-能直接加-IT-吗？——不能，而且它保持轮询是正确的"><a href="#一、AHT20-Init-能直接加-IT-吗？——不能，而且它保持轮询是正确的" class="headerlink" title="一、AHT20_Init 能直接加 _IT 吗？——不能，而且它保持轮询是正确的"></a>一、AHT20_Init 能直接加 <code>_IT</code> 吗？——不能，而且它保持轮询是正确的</h3><p>看 Init 的代码结构：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Delay(<span class="number">40</span>);</span><br><span class="line">    HAL_I2C_Master_Receive(&amp;hi2c1, AHT20_ADDRESS, &amp;readBuffer, <span class="number">1</span>, HAL_MAX_DELAY);  <span class="comment">// ① 读状态字</span></span><br><span class="line">    <span class="keyword">if</span> ((readBuffer &amp; <span class="number">0x08</span>) == <span class="number">0x00</span>)      <span class="comment">// ② 马上用读到的结果做判断！</span></span><br><span class="line">    &#123;</span><br><span class="line">        ...发送初始化命令...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里有一条**”读→判→写”依赖链<strong>：第②行的判断</strong>依赖**第①行读到的数据。阻塞模式下没问题——函数返回时数据一定到位。但改成 <code>Receive_IT</code> 后：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, &amp;readBuffer, <span class="number">1</span>);  <span class="comment">// 立即返回，readBuffer 还是垃圾值！</span></span><br><span class="line"><span class="keyword">if</span> ((readBuffer &amp; <span class="number">0x08</span>) == <span class="number">0x00</span>)   <span class="comment">// ← 在垃圾值上做判断，逻辑全错</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>依赖关系是阻塞&#x2F;非阻塞切换的死穴</strong>：只要”后面一行要用前面调用的结果”，改成非阻塞就炸。真要改，只能把 Init 也拆进状态机（读状态字 → 回调里判断 → 发初始化命令 → 再回调 → 完成），一个 10 行的函数变成 3 个状态 + 2 个回调。</p>
+<p>而它值得吗？<strong>初始化只在上电时执行一次，那一刻系统里本来就没有别的任务</strong>——CPU 等这几毫秒毫无损失。所以正确做法就是保持轮询。这引出一个重要原则：</p>
+<p><strong>该阻塞时阻塞，该非阻塞时才非阻塞。非阻塞 + 状态机是为了”腾出 CPU 做别的”，如果当时没有”别的”可做，阻塞就是最优解。</strong></p>
+<h3 id="二、之前的项目为什么不用状态机？——回调就是”隐式状态机”"><a href="#二、之前的项目为什么不用状态机？——回调就是”隐式状态机”" class="headerlink" title="二、之前的项目为什么不用状态机？——回调就是”隐式状态机”"></a>二、之前的项目为什么不用状态机？——回调就是”隐式状态机”</h3><p>回顾之前所有项目的收数据方式：</p>
+<table>
+<thead>
+<tr>
+<th align="left">项目</th>
+<th align="left">启动接收</th>
+<th align="left">消费数据的时机</th>
+<th align="center">显式状态机</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">串口轮询</td>
+<td align="left"><code>HAL_UART_Receive</code>（阻塞）</td>
+<td align="left">函数返回 &#x3D; 数据到位，直接处理</td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left">串口中断</td>
+<td align="left"><code>Receive_IT</code> 启动</td>
+<td align="left"><strong>在回调函数里处理</strong></td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left">串口 DMA 不定长</td>
+<td align="left"><code>ReceiveToIdle_DMA</code> 启动</td>
+<td align="left"><strong>在回调函数里解析数据包</strong></td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left">蓝牙</td>
+<td align="left">同上</td>
+<td align="left"><strong>在回调函数里解析</strong></td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left"><strong>I2C AHT20（本篇）</strong></td>
+<td align="left"><code>Measure</code> &#x2F; <code>Get</code> 分两次启动</td>
+<td align="left">分阶段，各等各的</td>
+<td align="center">✅</td>
+</tr>
+</tbody></table>
+<p><strong>前面几个项目里，”启动接收”和”消费数据”是两个分离的代码位置</strong>——启动函数只管启动，数据到位后的处理全部写在回调函数里。回调本身就是”数据好了”的事件通知，<strong>处理逻辑天然发生在数据到位之后</strong>，根本不存在”数据没到就用”的问题。</p>
+<p>所以它们其实不是没用状态机，而是用了一个<strong>隐式的两状态机</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">隐式状态机：状态A（等数据）──收到数据→ 状态B（回调：处理数据）──处理完→ 回到状态A</span><br></pre></td></tr></table></figure>
+
+<p>整个系统只有两个状态，**根本不需要显式变量记录”走到哪了”**——回调被调用的那一刻，CPU 天然知道”数据到了”。</p>
+<h3 id="三、AHT20-为什么必须显式状态机？——多阶段流水线"><a href="#三、AHT20-为什么必须显式状态机？——多阶段流水线" class="headerlink" title="三、AHT20 为什么必须显式状态机？——多阶段流水线"></a>三、AHT20 为什么必须显式状态机？——多阶段流水线</h3><p>而 AHT20 的流程是一条<strong>多阶段流水线</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">发测量命令 →(等) 75ms →(等) 读数据 →(等) 解析 → 循环</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>75ms 延时<strong>必须等发送完成</strong>之后才开始</li>
+<li>读取<strong>必须等 75ms 过后</strong>才能触发</li>
+<li>解析<strong>必须等接收完成</strong>之后才能做</li>
+</ul>
+<p>阶段之间有严格的先后依赖，每一阶段都要”等一个外部事件”才能推进。这时候回调就不够用了——回调只知道”某个事件发生了”，但<strong>主循环不知道这是流水线的第几步</strong>。必须有一个变量记录”我现在走到哪一步了”，这个变量就是状态机。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">显式状态机：0 →(发命令) 1 →(发完回调) 2 →(延时+Get) 3 →(收完回调) 4 →(解析打印) 0</span><br><span class="line">                                                              ↑</span><br><span class="line">                                            每一步都知道自己在流水线的什么位置</span><br></pre></td></tr></table></figure>
+
+<h3 id="四、结论：什么时候用状态机"><a href="#四、结论：什么时候用状态机" class="headerlink" title="四、结论：什么时候用状态机"></a>四、结论：什么时候用状态机</h3><table>
+<thead>
+<tr>
+<th align="left">场景</th>
+<th align="left">判断依据</th>
+<th align="left">做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>不用</strong></td>
+<td align="left">一次性流程，阻塞等待无代价（初始化、开机自检）</td>
+<td align="left">保持轮询</td>
+</tr>
+<tr>
+<td align="left"><strong>不用</strong></td>
+<td align="left">单次异步等待：收完就处理，没有后续阶段</td>
+<td align="left">回调里直接处理</td>
+</tr>
+<tr>
+<td align="left"><strong>用</strong></td>
+<td align="left">多阶段流水线，阶段间有先后依赖，且要重复循环</td>
+<td align="left">显式状态变量 + 回调推进</td>
+</tr>
+<tr>
+<td align="left"><strong>用</strong></td>
+<td align="left">系统里还有其他任务要跑，CPU 不能长期占用</td>
+<td align="left">非阻塞 + 状态机</td>
+</tr>
+</tbody></table>
+<p>一句话判断法：<strong>代码里有没有”等一件事做完，才能开始下一件事”的链条？链条只有一环 → 回调够用；链条有多环 → 显式状态机。</strong></p>
+<p>所以本篇引入状态机不是”I2C 必须这样”，而是”<strong>任何外设的多阶段异步流程都这样</strong>“——以后学 OLED、FreeRTOS、电机控制，遇到”发指令→等应答→再发”的交互，全是同一个套路。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1AN41127VL/">B站视频：STM32入门教程2025版 第13集 I2C中断与DMA</a></li>
+<li><a href="/2026/08/01/STM32_I2C_AHT20/">上一篇：STM32——IIC通信，轮询模式读取温湿度传感器AHT20</a></li>
+<li><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断那篇：理解中断回调链路的参考</a></li>
+<li>波特律动文档站：<a target="_blank" rel="noopener" href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
+<li>AHT20 数据手册</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/DMA/" rel="tag"># DMA</a>
+              <a href="/tags/I2C/" rel="tag"># I2C</a>
+              <a href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag"># 中断</a>
+              <a href="/tags/AHT20/" rel="tag"># AHT20</a>
+              <a href="/tags/%E7%8A%B6%E6%80%81%E6%9C%BA/" rel="tag"># 状态机</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/08/02/STM32_Data_Buffer_Mechanism/" rel="prev" title="深入stm32的底层通信模型--探究数据存在哪里，怎么传输">
+      <i class="fa fa-chevron-left"></i> 深入stm32的底层通信模型--探究数据存在哪里，怎么传输
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E4%B8%8A%E4%B8%80%E7%AF%87%E5%88%B0%E8%BF%99%E7%AF%87"><span class="nav-number">1.</span> <span class="nav-text">从上一篇到这篇</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E5%8E%9F%E7%90%86"><span class="nav-number">2.</span> <span class="nav-text">硬件原理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E8%BD%AE%E8%AF%A2-vs-%E4%B8%AD%E6%96%AD-vs-DMA%EF%BC%88%E5%9B%9E%E9%A1%BE-%E8%BF%81%E7%A7%BB%EF%BC%89"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 轮询 vs 中断 vs DMA（回顾 + 迁移）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E9%9D%9E%E9%98%BB%E5%A1%9E%E5%87%BD%E6%95%B0%E7%9A%84%E2%80%9D%E5%A4%A7%E5%9D%91%E2%80%9D%EF%BC%9A%E4%BB%BB%E5%8A%A1%E4%BA%A4%E7%BB%99%E5%A4%96%E8%AE%BE%E5%90%8E%EF%BC%8C%E4%BB%A3%E7%A0%81%E7%BB%A7%E7%BB%AD%E5%BE%80%E4%B8%8B%E8%B7%91"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E7%8A%B6%E6%80%81%E6%9C%BA%EF%BC%9A%E8%AE%A9%E2%80%9D%E5%BC%82%E6%AD%A5%E2%80%9D%E5%8F%98%E5%BE%97%E5%8F%AF%E6%8E%A7"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 状态机：让”异步”变得可控</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E9%85%8D%E7%BD%AE"><span class="nav-number">3.</span> <span class="nav-text">CubeMX 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E5%BC%80%E5%90%AF-I2C1-%E7%9A%84%E4%B8%A4%E4%B8%AA%E4%B8%AD%E6%96%AD%E5%90%91%E9%87%8F"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 开启 I2C1 的两个中断向量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-DMA-%E6%A8%A1%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 DMA 模式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">4.</span> <span class="nav-text">核心代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-aht20-h-%E2%80%94%E2%80%94-%E5%A4%B4%E6%96%87%E4%BB%B6%EF%BC%88%E5%A3%B0%E6%98%8E%E6%8B%86%E5%88%86%E5%90%8E%E7%9A%84%E4%B8%89%E4%B8%AA%E5%87%BD%E6%95%B0%EF%BC%89"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 aht20.h —— 头文件（声明拆分后的三个函数）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-aht20-c-%E2%80%94%E2%80%94-%E9%A9%B1%E5%8A%A8%E5%AE%9E%E7%8E%B0%EF%BC%88%E6%8B%86%E5%88%86%E4%B8%BA-Measure-Get-Analysis%EF%BC%89"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 aht20.c —— 驱动实现（拆分为 Measure &#x2F; Get &#x2F; Analysis）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-i2c-c-%E2%80%94%E2%80%94-%E4%B8%AD%E6%96%AD%E5%9B%9E%E8%B0%83%EF%BC%88%E7%8A%B6%E6%80%81%E6%9C%BA%E7%9A%84%E2%80%9D%E9%A9%B1%E5%8A%A8%E5%BC%95%E6%93%8E%E2%80%9D%EF%BC%89"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 i2c.c —— 中断回调（状态机的”驱动引擎”）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-main-c-%E2%80%94%E2%80%94-%E7%8A%B6%E6%80%81%E6%9C%BA%E4%B8%BB%E5%BE%AA%E7%8E%AF"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 main.c —— 状态机主循环</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E8%AE%B2%E8%A7%A3"><span class="nav-number">5.</span> <span class="nav-text">代码讲解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%8A%8A-AHT20-Read-%E6%8B%86%E6%88%90%E4%B8%89%E4%B8%AA%E5%87%BD%E6%95%B0%EF%BC%9F"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 为什么把 AHT20_Read 拆成三个函数？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-%E9%87%8D%E7%82%B9%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88-sendBuffer-%E5%BF%85%E9%A1%BB%E5%8A%A0-static%EF%BC%9F"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 重点：为什么 sendBuffer 必须加 static？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-HAL-%E4%B8%AD%E6%96%AD%E6%94%B6%E5%8F%91%E5%87%BD%E6%95%B0%E5%8F%82%E6%95%B0%E8%AF%A6%E8%A7%A3"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 HAL 中断收发函数参数详解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-%E5%9B%9E%E8%B0%83%E5%87%BD%E6%95%B0%EF%BC%9A%E4%B8%AD%E6%96%AD%E7%9A%84%E2%80%9D%E5%AE%8C%E6%88%90%E9%80%9A%E7%9F%A5%E2%80%9D"><span class="nav-number">5.4.</span> <span class="nav-text">5.4 回调函数：中断的”完成通知”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-5-%E4%B8%BA%E4%BB%80%E4%B9%88-readBuffer-%E8%A6%81%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%EF%BC%9F"><span class="nav-number">5.5.</span> <span class="nav-text">5.5 为什么 readBuffer 要全局变量？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB%E5%88%9D%E5%A7%8B%E5%8C%96%E4%BB%A3%E7%A0%81"><span class="nav-number">6.</span> <span class="nav-text">解读初始化代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-%E4%B8%AD%E6%96%AD%E6%9C%8D%E5%8A%A1%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E9%93%BE"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 中断服务函数的调用链</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-MspInit-%E9%87%8C%E7%9A%84-NVIC-%E9%85%8D%E7%BD%AE"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 MspInit 里的 NVIC 配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-%E9%85%8D%E7%BD%AE%E5%AF%B9%E5%BA%94%E5%85%B3%E7%B3%BB%E8%A1%A8"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 配置对应关系表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91-%E7%83%A7%E5%BD%95"><span class="nav-number">7.</span> <span class="nav-text">编译 &amp; 烧录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E5%B1%95%E7%A4%BA"><span class="nav-number">8.</span> <span class="nav-text">效果展示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B8%A9%E5%9D%91%E8%AE%B0%E5%BD%95"><span class="nav-number">9.</span> <span class="nav-text">踩坑记录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-1%EF%BC%9Aaht20-State-undeclared-%E2%80%94%E2%80%94-extern-%E6%98%AF%E2%80%9D%E6%96%87%E4%BB%B6%E7%BA%A7%E2%80%9D%E7%9A%84%EF%BC%8C%E4%B8%94-extern-%E4%B8%8D%E6%98%AF%E5%AE%9A%E4%B9%89"><span class="nav-number">9.1.</span> <span class="nav-text">坑 1：aht20_State undeclared —— extern 是”文件级”的，且 extern 不是定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-2%EF%BC%9AsendBuffer-%E5%BF%98%E8%AE%B0%E5%8A%A0-static"><span class="nav-number">9.2.</span> <span class="nav-text">坑 2：sendBuffer 忘记加 static</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%92%8C%E4%B8%8A%E4%B8%80%E7%AF%87%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">10.1.</span> <span class="nav-text">和上一篇的对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E9%98%B6%E6%80%9D%E8%80%83%EF%BC%9A%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E9%9C%80%E8%A6%81%E7%8A%B6%E6%80%81%E6%9C%BA%EF%BC%9F"><span class="nav-number">11.</span> <span class="nav-text">进阶思考：什么时候才需要状态机？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E3%80%81AHT20-Init-%E8%83%BD%E7%9B%B4%E6%8E%A5%E5%8A%A0-IT-%E5%90%97%EF%BC%9F%E2%80%94%E2%80%94%E4%B8%8D%E8%83%BD%EF%BC%8C%E8%80%8C%E4%B8%94%E5%AE%83%E4%BF%9D%E6%8C%81%E8%BD%AE%E8%AF%A2%E6%98%AF%E6%AD%A3%E7%A1%AE%E7%9A%84"><span class="nav-number">11.1.</span> <span class="nav-text">一、AHT20_Init 能直接加 _IT 吗？——不能，而且它保持轮询是正确的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B9%8B%E5%89%8D%E7%9A%84%E9%A1%B9%E7%9B%AE%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%94%A8%E7%8A%B6%E6%80%81%E6%9C%BA%EF%BC%9F%E2%80%94%E2%80%94%E5%9B%9E%E8%B0%83%E5%B0%B1%E6%98%AF%E2%80%9D%E9%9A%90%E5%BC%8F%E7%8A%B6%E6%80%81%E6%9C%BA%E2%80%9D"><span class="nav-number">11.2.</span> <span class="nav-text">二、之前的项目为什么不用状态机？——回调就是”隐式状态机”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%89%E3%80%81AHT20-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%85%E9%A1%BB%E6%98%BE%E5%BC%8F%E7%8A%B6%E6%80%81%E6%9C%BA%EF%BC%9F%E2%80%94%E2%80%94%E5%A4%9A%E9%98%B6%E6%AE%B5%E6%B5%81%E6%B0%B4%E7%BA%BF"><span class="nav-number">11.3.</span> <span class="nav-text">三、AHT20 为什么必须显式状态机？——多阶段流水线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E7%BB%93%E8%AE%BA%EF%BC%9A%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E7%94%A8%E7%8A%B6%E6%80%81%E6%9C%BA"><span class="nav-number">11.4.</span> <span class="nav-text">四、结论：什么时候用状态机</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">12.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">34</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">271k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">4:07</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

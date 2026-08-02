@@ -1318,7 +1318,7 @@
       </tags>
   </entry>
   <entry>
-    <title>深挖数据的存储与传输——stm32的底层通信模型</title>
+    <title>深入stm32的底层通信模型--探究数据存在哪里，怎么传输</title>
     <url>/2026/08/02/STM32_Data_Buffer_Mechanism/</url>
     <content><![CDATA[<h2 id="从串口到-I2C：一个反复出现的问题"><a href="#从串口到-I2C：一个反复出现的问题" class="headerlink" title="从串口到 I2C：一个反复出现的问题"></a>从串口到 I2C：一个反复出现的问题</h2><p>回顾一下我们这一路学过的通信博客：</p>
 <table>
@@ -2966,6 +2966,494 @@
         <tag>I2C</tag>
         <tag>AHT20</tag>
         <tag>传感器</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度</title>
+    <url>/2026/08/02/STM32_I2C_Interrupt_DMA/</url>
+    <content><![CDATA[<h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上篇我们学习了 I2C 轮询模式读取 AHT20：用 <code>HAL_I2C_Master_Transmit</code> 发送测量命令、<code>HAL_I2C_Master_Receive</code> 读取 6 字节数据，再拼接换算成温湿度。</p>
+<p>但轮询模式有个老问题——<strong>阻塞</strong>。发送和接收函数内部”等一个字节搬一个字节”，整个过程 CPU 被占住，什么别的事都干不了。这和之前串口学的完全一样：轮询 → 中断 → DMA。</p>
+<p>本篇把 I2C 通信改造成<strong>中断模式</strong>，并引入单片机里极其常见的<strong>状态机编程</strong>思想。中间我遇到两个很有价值的问题：</p>
+<ol>
+<li><strong>非阻塞函数 + 局部数组 &#x3D; 数据被回收</strong>（要用 <code>static</code>）</li>
+<li><strong>跨文件共享变量：extern 声明 vs 定义</strong>（编译报 undeclared 的根源）</li>
+</ol>
+<p>最后把中断版改成 <strong>DMA 版</strong>——因为中断和 DMA 在 HAL 里只差一个后缀。</p>
+<blockquote>
+<p>本篇和<a href="/2026/08/01/STM32_I2C_AHT20/">上篇</a>是同一块板子、同一个工程。</p>
+</blockquote>
+<hr>
+<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="2-1-轮询-vs-中断-vs-DMA（回顾-迁移）"><a href="#2-1-轮询-vs-中断-vs-DMA（回顾-迁移）" class="headerlink" title="2.1 轮询 vs 中断 vs DMA（回顾 + 迁移）"></a>2.1 轮询 vs 中断 vs DMA（回顾 + 迁移）</h3><p>串口那几篇已经详细讲过三种模式的区别，I2C 完全一样：</p>
+<table>
+<thead>
+<tr>
+<th align="left">模式</th>
+<th align="left">发送&#x2F;接收过程</th>
+<th align="left">CPU 在干嘛</th>
+<th align="left">怎么知道完成了</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>轮询</strong></td>
+<td align="left">CPU 逐字节写入&#x2F;读取寄存器</td>
+<td align="left">阻塞等待</td>
+<td align="left">函数返回 &#x3D; 完成</td>
+</tr>
+<tr>
+<td align="left"><strong>中断</strong></td>
+<td align="left">每搬完 1 字节触发中断，中断里搬下一字节</td>
+<td align="left">平时干别的，被中断叫去搬</td>
+<td align="left"><strong>回调函数</strong></td>
+</tr>
+<tr>
+<td align="left"><strong>DMA</strong></td>
+<td align="left">DMA 硬件整批搬运</td>
+<td align="left">彻底解放</td>
+<td align="left">回调函数（DMA 通过中断通知）</td>
+</tr>
+</tbody></table>
+<p>关键区别一句话：<strong>轮询的函数返回 &#x3D; 数据传完了；中断&#x2F;DMA 的函数调用完 &#x3D; 只是把任务交给了外设，数据还没传</strong>。</p>
+<h3 id="2-2-非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑"><a href="#2-2-非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑" class="headerlink" title="2.2 非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑"></a>2.2 非阻塞函数的”大坑”：任务交给外设后，代码继续往下跑</h3><p>这是本篇最容易出 bug 的地方。看这个改造前”想当然”的代码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Read_IT</span><span class="params">()</span>   <span class="comment">// 想当然的错误写法</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>] = &#123;<span class="number">0xAC</span>, <span class="number">0x33</span>, <span class="number">0x00</span>&#125;;  <span class="comment">// 局部数组</span></span><br><span class="line">    <span class="type">uint8_t</span> readBuffer[<span class="number">6</span>];</span><br><span class="line"></span><br><span class="line">    HAL_I2C_Master_Transmit_IT(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>);  <span class="comment">// 非阻塞，立即返回！</span></span><br><span class="line">    HAL_Delay(<span class="number">75</span>);</span><br><span class="line">    HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, readBuffer, <span class="number">6</span>);   <span class="comment">// 同样立即返回！</span></span><br><span class="line">    <span class="comment">// 到这里 readBuffer 里还是初始值，数据根本没收到！</span></span><br><span class="line">    <span class="comment">// 而且 sendBuffer 是局部数组，函数返回后内存就被回收了，中断传输还没结束……</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>两个致命问题：</p>
+<p><strong>① 数据没收到就往下执行</strong>：<code>Receive_IT</code> 只是”通知外设开始接收”，真正搬运是中断里逐字节完成的。函数返回时 <code>readBuffer</code> 里全是初始值。这就需要一个<strong>状态机</strong>：把”发送命令”、”等待”、”读取”、”解析”拆成独立动作，由中断回调来驱动状态切换。</p>
+<p><strong>② 局部数组内存被回收</strong>：<code>Transmit_IT</code> 是非阻塞的，函数返回后<strong>中断还在用 <code>sendBuffer</code> 的地址传数据</strong>，但 <code>sendBuffer</code> 是局部变量，函数一结束它的内存就被回收、可能被其他变量覆盖——发出去的数据就错了。解决方案：加 <code>static</code> 让数组常驻内存。</p>
+<h3 id="2-3-状态机：让”异步”变得可控"><a href="#2-3-状态机：让”异步”变得可控" class="headerlink" title="2.3 状态机：让”异步”变得可控"></a>2.3 状态机：让”异步”变得可控</h3><p>非阻塞编程的核心思想就是状态机。我们把 stm32与AHT20交互 的完整流程拆成 5 个状态，由中断回调推进状态，主循环只负责”看状态、做该做的事”：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">           AHT20_Measure()           中断回调              AHT20_Get()</span><br><span class="line">┌──────┐   发送测量命令     ┌──────┐   发送完成      ┌──────┐   读取数据      ┌──────┐</span><br><span class="line">│  0   │ ────────────────→ │  1   │ ────────────→ │  2   │ ────────────→ │  3   │</span><br><span class="line">│初始  │                   │发送中 │               │等75ms│               │读取中 │</span><br><span class="line">└──────┘                   └──────┘               └──────┘               └──────┘</span><br><span class="line">   ↑                                                                        │</span><br><span class="line">   │                                                    中断回调（接收完成）    |</span><br><span class="line">   │  串口打印，回到初始      ←────── 状态4：解析数据+传到电脑上 ←──────────────────┘</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="center">状态值</th>
+<th align="left">含义</th>
+<th align="left">谁触发的</th>
+<th align="left">当前状态要做的事</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="left">初始状态</td>
+<td align="left">上电&#x2F;打印完</td>
+<td align="left">调用 <code>AHT20_Measure()</code> 发送测量命令 → 状态 1</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="left">正在发送</td>
+<td align="left">—</td>
+<td align="left">什么都不用做，等中断</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">发送完成</td>
+<td align="left"><strong>发送完成回调</strong></td>
+<td align="left">延时 75ms → 调用 <code>AHT20_Get()</code> 读取数据 → 状态 3</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">正在读取</td>
+<td align="left">—</td>
+<td align="left">什么都不用做，等中断</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">读取完成</td>
+<td align="left"><strong>接收完成回调</strong></td>
+<td align="left">解析数据 → 串口打印 → 回到状态 0</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="3-1-开启-I2C1-的两个中断向量"><a href="#3-1-开启-I2C1-的两个中断向量" class="headerlink" title="3.1 开启 I2C1 的两个中断向量"></a>3.1 开启 I2C1 的两个中断向量</h3><p>在 CubeMX 中点击 <strong>I2C1 → NVIC Settings</strong>，勾选：</p>
+<ul>
+<li><strong>I2C1 event interrupt</strong>（事件中断，本篇主要用这个）</li>
+<li><strong>I2C1 error interrupt</strong>（错误中断）</li>
+</ul>
+<p>![屏幕截图 2026-08-02 182142](.&#x2F;..&#x2F;images&#x2F;STM32_I2C_Interrupt_DMA&#x2F;屏幕截图 2026-08-02 182142.png)</p>
+<p>Ctrl+S 保存并生成代码后，<code>stm32f1xx_it.c</code> 里会自动多出两个中断服务函数：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">I2C1_EV_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 事件中断：发送/接收完成、地址匹配等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_EV_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">I2C1_ER_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 错误中断：总线错误、仲裁丢失等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_ER_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-DMA-模式"><a href="#3-2-DMA-模式" class="headerlink" title="3.2 DMA 模式"></a>3.2 DMA 模式</h3><p>如果要切换到 DMA 模式，在 <strong>I2C1 → DMA Settings</strong> 里添加 <strong>I2C1_TX</strong> 和 <strong>I2C1_RX</strong> 两条 DMA 通道，默认配置即可。本篇主要讲中断模式，DMA模式仅需要把I2C收发函数的后缀从IT改为DMA即可<img src="/./../images/STM32_I2C_Interrupt_DMA/image-20260802182354106.png" alt="image-20260802182354106"></p>
+<hr>
+<h2 id="核心代码"><a href="#核心代码" class="headerlink" title="核心代码"></a>核心代码</h2><h3 id="4-1-aht20-h-——-头文件（声明拆分后的三个函数）"><a href="#4-1-aht20-h-——-头文件（声明拆分后的三个函数）" class="headerlink" title="4.1 aht20.h —— 头文件（声明拆分后的三个函数）"></a>4.1 aht20.h —— 头文件（声明拆分后的三个函数）</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> INC_AHT20_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> INC_AHT20_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;i2c.h&quot;</span>        <span class="comment">// 引入 hi2c1 句柄声明和 HAL_I2C 系列函数</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">(<span class="type">void</span>)</span>;                                  <span class="comment">// 初始化传感器</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Measure</span><span class="params">(<span class="type">void</span>)</span>;                               <span class="comment">// 触发测量（发送测量命令，非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Get</span><span class="params">(<span class="type">void</span>)</span>;                                   <span class="comment">// 读取测量数据（非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Analysis</span><span class="params">(<span class="type">float</span>* Temrerature, <span class="type">float</span>* Humidity)</span>;  <span class="comment">// 解析 readBuffer 为温湿度</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-aht20-c-——-驱动实现（拆分为-Measure-Get-Analysis）"><a href="#4-2-aht20-c-——-驱动实现（拆分为-Measure-Get-Analysis）" class="headerlink" title="4.2 aht20.c —— 驱动实现（拆分为 Measure &#x2F; Get &#x2F; Analysis）"></a>4.2 aht20.c —— 驱动实现（拆分为 Measure &#x2F; Get &#x2F; Analysis）</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;aht20.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;i2c.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal_def.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stm32f1xx_hal_i2c.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdint.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// ========== 设备地址 ==========</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> AHT20_ADDRESS 0x70</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 接收缓冲区：提升为全局变量！</span></span><br><span class="line"><span class="comment">// 因为 AHT20_Get() 触发的是非阻塞接收，数据由中断慢慢填进来，</span></span><br><span class="line"><span class="comment">// 而 AHT20_Analysis() 要在之后的某个时刻去读它——局部数组活不了那么久。</span></span><br><span class="line"><span class="type">uint8_t</span> readBuffer[<span class="number">6</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 初始化：和上篇完全一样（轮询，阻塞，没问题）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint8_t</span> readBuffer;</span><br><span class="line">    HAL_Delay(<span class="number">40</span>);</span><br><span class="line">    HAL_I2C_Master_Receive(&amp;hi2c1, AHT20_ADDRESS, &amp;readBuffer, <span class="number">1</span>, HAL_MAX_DELAY);</span><br><span class="line">    <span class="keyword">if</span> ((readBuffer &amp; <span class="number">0x08</span>) == <span class="number">0x00</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>] = &#123;<span class="number">0xBE</span>, <span class="number">0x08</span>, <span class="number">0x00</span>&#125;;</span><br><span class="line">        HAL_I2C_Master_Transmit(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>, HAL_MAX_DELAY);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 触发测量：发送 3 字节测量命令（中断模式，非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Measure</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// static 是关键！非阻塞函数返回后，局部数组内存会被回收，</span></span><br><span class="line">    <span class="comment">// 但中断还在用这个地址传数据 → 必须让数组常驻内存</span></span><br><span class="line">    <span class="type">static</span> <span class="type">uint8_t</span> sendBuffer[<span class="number">3</span>] = &#123;<span class="number">0xAC</span>, <span class="number">0x33</span>, <span class="number">0x00</span>&#125;;</span><br><span class="line">    HAL_I2C_Master_Transmit_IT(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 读取数据：触发接收 6 字节（中断模式，非阻塞）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Get</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, readBuffer, <span class="number">6</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 解析数据：和上篇 AHT20_Read 后半段完全一样</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Analysis</span><span class="params">(<span class="type">float</span> *Temrerature, <span class="type">float</span> *Humidity)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> ((readBuffer[<span class="number">0</span>] &amp; <span class="number">0x80</span>) == <span class="number">0x00</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">uint32_t</span> data = <span class="number">0</span>;</span><br><span class="line">        <span class="comment">// 湿度 = Byte1&lt;&lt;12 | Byte2&lt;&lt;4 | Byte3&gt;&gt;4</span></span><br><span class="line">        data = ((<span class="type">uint32_t</span>)readBuffer[<span class="number">1</span>] &lt;&lt; <span class="number">12</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">2</span>] &lt;&lt; <span class="number">4</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>] &gt;&gt; <span class="number">4</span>);</span><br><span class="line">        *Humidity = data * <span class="number">100.0f</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>);</span><br><span class="line">        <span class="comment">// 温度 = (Byte3 &amp; 0x0F)&lt;&lt;16 | Byte4&lt;&lt;8 | Byte5</span></span><br><span class="line">        data = (((<span class="type">uint32_t</span>)readBuffer[<span class="number">3</span>] &amp; <span class="number">0x0F</span>) &lt;&lt; <span class="number">16</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">4</span>] &lt;&lt; <span class="number">8</span>)</span><br><span class="line">             | ((<span class="type">uint32_t</span>)readBuffer[<span class="number">5</span>]);</span><br><span class="line">        *Temrerature = data * <span class="number">200.0f</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>) - <span class="number">50</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-i2c-c-——-中断回调（状态机的”驱动引擎”）"><a href="#4-3-i2c-c-——-中断回调（状态机的”驱动引擎”）" class="headerlink" title="4.3 i2c.c —— 中断回调（状态机的”驱动引擎”）"></a>4.3 i2c.c —— 中断回调（状态机的”驱动引擎”）</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 0 */</span></span><br><span class="line"><span class="comment">// 状态机变量真正定义在 main.c 里，extern 声明放在 main.h 里。</span></span><br><span class="line"><span class="comment">// i2c.c → i2c.h → main.h 的 include 链让它在这里直接可见，无需重复声明（详见踩坑记录 坑1）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// I2C 发送完成回调：测量命令发出去了 → 状态 1 → 2</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_I2C_MasterTxCpltCallback</span><span class="params">(I2C_HandleTypeDef *hi2c)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span>(hi2c==&amp;hi2c1)          <span class="comment">// 确认是 I2C1 完成（多个 I2C 时区分用）</span></span><br><span class="line">  &#123;</span><br><span class="line">    aht20_State=<span class="number">2</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// I2C 接收完成回调：6 字节数据收齐了 → 状态 3 → 4</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_I2C_MasterRxCpltCallback</span><span class="params">(I2C_HandleTypeDef *hi2c)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span>(hi2c==&amp;hi2c1)</span><br><span class="line">  &#123;</span><br><span class="line">    aht20_State=<span class="number">4</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 0 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-main-c-——-状态机主循环"><a href="#4-4-main-c-——-状态机主循环" class="headerlink" title="4.4 main.c —— 状态机主循环"></a>4.4 main.c —— 状态机主循环</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN PV */</span></span><br><span class="line"><span class="comment">//0：初始状态，发送测量命令</span></span><br><span class="line"><span class="comment">//1：正在发送测量命令</span></span><br><span class="line"><span class="comment">//2：测量命令发送完成，等待75ms，读取数据</span></span><br><span class="line"><span class="comment">//3：正在读取数据</span></span><br><span class="line"><span class="comment">//4：读取完成，解析并展示数据，回到初始状态</span></span><br><span class="line"><span class="type">uint8_t</span> aht20_State = <span class="number">0</span>;    <span class="comment">// 状态机变量（定义，分配内存）</span></span><br><span class="line"><span class="comment">/* USER CODE END PV */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">AHT20_Init();                    <span class="comment">// 初始化传感器</span></span><br><span class="line"><span class="type">float</span> Temrerature = <span class="number">0</span>, Humidity = <span class="number">0</span>;  <span class="comment">// 存放温湿度</span></span><br><span class="line"><span class="type">char</span> message[<span class="number">50</span>];                <span class="comment">// 串口发送缓冲区</span></span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">//初始状态：触发测量</span></span><br><span class="line">    <span class="keyword">if</span>(aht20_State==<span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">      AHT20_Measure();       <span class="comment">// 发送测量命令（非阻塞，立即返回）</span></span><br><span class="line">      aht20_State=<span class="number">1</span>;</span><br><span class="line">    <span class="comment">//测量命令发送完成：等待75毫秒，读取数据</span></span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(aht20_State==<span class="number">2</span>)</span><br><span class="line">    &#123;</span><br><span class="line">      HAL_Delay(<span class="number">75</span>);         <span class="comment">// 给传感器测量时间</span></span><br><span class="line">      AHT20_Get();           <span class="comment">// 触发读取（非阻塞，立即返回）</span></span><br><span class="line">      aht20_State=<span class="number">3</span>;</span><br><span class="line">    <span class="comment">//读取完成：解析并展示数据</span></span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(aht20_State==<span class="number">4</span>)</span><br><span class="line">    &#123;</span><br><span class="line">      AHT20_Analysis(&amp;Temrerature, &amp;Humidity);  <span class="comment">// 解析 readBuffer</span></span><br><span class="line">      <span class="built_in">sprintf</span>(message,<span class="string">&quot;温度：%.1f℃,湿度：%.1f%%\r\n&quot;</span>,Temrerature,Humidity);</span><br><span class="line">      HAL_UART_Transmit(&amp;huart2, (<span class="type">uint8_t</span>*)message, <span class="built_in">strlen</span>(message), HAL_MAX_DELAY);</span><br><span class="line">      HAL_Delay(<span class="number">2000</span>);       <span class="comment">// 间隔 2 秒</span></span><br><span class="line">      aht20_State=<span class="number">0</span>;         <span class="comment">// 回到初始状态</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 状态 1 和 3 什么都不用做：等中断回调改变状态</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END WHILE */</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h2><h3 id="5-1-为什么把-AHT20-Read-拆成三个函数？"><a href="#5-1-为什么把-AHT20-Read-拆成三个函数？" class="headerlink" title="5.1 为什么把 AHT20_Read 拆成三个函数？"></a>5.1 为什么把 AHT20_Read 拆成三个函数？</h3><p>上篇的 <code>AHT20_Read()</code> 是一个”一气呵成”的大函数：发送命令 → 等待 → 接收 → 解析。这在轮询模式下没问题，因为函数内部阻塞执行，流程是线性的。</p>
+<p>但中断模式下<strong>流程被切碎了</strong>：发送命令是一回事，等待 75ms 是另一回事，接收完成又是更后面的事——它们发生在<strong>不同的时间点</strong>（中间隔着中断）。所以必须拆开：</p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">做什么</th>
+<th align="left">什么时候调用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>AHT20_Measure()</code></td>
+<td align="left">发送测量命令（非阻塞）</td>
+<td align="left">状态 0 → 1</td>
+</tr>
+<tr>
+<td align="left"><code>AHT20_Get()</code></td>
+<td align="left">触发接收 6 字节（非阻塞）</td>
+<td align="left">状态 2 → 3（等 75ms 后）</td>
+</tr>
+<tr>
+<td align="left"><code>AHT20_Analysis()</code></td>
+<td align="left">解析 readBuffer → 温湿度</td>
+<td align="left">状态 4（接收完成后）</td>
+</tr>
+</tbody></table>
+<h3 id="5-2-重点：为什么-sendBuffer-必须加-static？"><a href="#5-2-重点：为什么-sendBuffer-必须加-static？" class="headerlink" title="5.2 重点：为什么 sendBuffer 必须加 static？"></a>5.2 重点：为什么 sendBuffer 必须加 static？</h3><p><code>HAL_I2C_Master_Transmit_IT</code> 是非阻塞的：函数内部只是”告诉外设：从这个地址开始传 3 个字节”，然后<strong>立即返回</strong>。真正的逐字节发送是之后由中断完成的——<strong>中断还在用 sendBuffer 这个地址</strong>。</p>
+<p>而 <code>sendBuffer</code> 是 <code>AHT20_Measure()</code> 的局部变量，这个函数已经返回了，它的局部变量在内存里（栈上）的”地盘”被释放，<strong>可能被后面的函数调用覆盖</strong>。数据被改了就发错了。</p>
+<p><code>static</code> 的作用：把数组从”栈上的临时内存”挪到”常驻内存”（静态存储区），程序运行期间一直占用、永不回收。代价是它不再跟随函数创建销毁，函数每次进来用的是同一个数组。</p>
+<blockquote>
+<p>类比：你给快递员（外设）留了张字条（数组）让他去取货，但字条贴在了马上要拆的墙上（栈）——拆墙后字条就没了。static 就是”把字条贴到永久公告栏上”。</p>
+</blockquote>
+<h3 id="5-3-HAL-中断收发函数参数详解"><a href="#5-3-HAL-中断收发函数参数详解" class="headerlink" title="5.3 HAL 中断收发函数参数详解"></a>5.3 HAL 中断收发函数参数详解</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line">HAL_I2C_Master_Transmit_IT(&amp;hi2c1, AHT20_ADDRESS, sendBuffer, <span class="number">3</span>);</span><br><span class="line">HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, readBuffer, <span class="number">6</span>);</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="center">本项目中填的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>I2C 句柄指针</strong></td>
+<td align="left">操作哪个 I2C 外设</td>
+<td align="center"><code>&amp;hi2c1</code></td>
+</tr>
+<tr>
+<td align="left"><strong>从机地址</strong></td>
+<td align="left">和谁通信（HAL 库自动处理读写位）</td>
+<td align="center"><code>AHT20_ADDRESS</code> (0x70)</td>
+</tr>
+<tr>
+<td align="left"><strong>数据缓冲区指针</strong></td>
+<td align="left">数据从哪里来（发送）&#x2F; 存到哪里（接收）</td>
+<td align="center"><code>sendBuffer</code> &#x2F; <code>readBuffer</code></td>
+</tr>
+<tr>
+<td align="left"><strong>传输长度</strong></td>
+<td align="left">传多少字节</td>
+<td align="center"><code>3</code> &#x2F; <code>6</code></td>
+</tr>
+<tr>
+<td align="left"><del>超时时间</del></td>
+<td align="left"><strong>中断模式没有这个参数</strong>（不阻塞，无需超时）</td>
+<td align="center">—</td>
+</tr>
+</tbody></table>
+<p>对比轮询版 <code>HAL_I2C_Master_Transmit(..., HAL_MAX_DELAY)</code>：<strong>只改了函数名加 <code>_IT</code> 和删掉超时参数</strong>，其他完全一样。</p>
+<h3 id="5-4-回调函数：中断的”完成通知”"><a href="#5-4-回调函数：中断的”完成通知”" class="headerlink" title="5.4 回调函数：中断的”完成通知”"></a>5.4 回调函数：中断的”完成通知”</h3><p>数据搬运完成后，HAL 库通过<strong>回调函数</strong>通知我们：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">发送完成 → HAL_I2C_MasterTxCpltCallback(hi2c)   ← 我们重写的</span><br><span class="line">接收完成 → HAL_I2C_MasterRxCpltCallback(hi2c)   ← 我们重写的</span><br></pre></td></tr></table></figure>
+
+<p>回调里判断 <code>if(hi2c == &amp;hi2c1)</code>：因为程序里可能挂了多个 I2C（比如以后加 OLED），回调是所有 I2C 共用的，必须确认是哪个外设完成了。</p>
+<p>回调里做的事很简单——<strong>改状态</strong>：</p>
+<ul>
+<li>发送完成 → <code>aht20_State = 2</code>（可以开始等待+读取了）</li>
+<li>接收完成 → <code>aht20_State = 4</code>（可以解析+打印了）</li>
+</ul>
+<p>主循环”看到”状态变化后，就去做对应的事。这就是状态机 + 中断回调的协作模式。</p>
+<h3 id="5-5-为什么-readBuffer-要全局变量？"><a href="#5-5-为什么-readBuffer-要全局变量？" class="headerlink" title="5.5 为什么 readBuffer 要全局变量？"></a>5.5 为什么 readBuffer 要全局变量？</h3><p>和 sendBuffer 同理：<code>AHT20_Get()</code> 触发非阻塞接收后立即返回，数据是中断<strong>之后慢慢填进</strong> readBuffer 的；而 <code>AHT20_Analysis()</code> 在<strong>更后面</strong>（状态 4）才来读它。局部变量活不过函数返回，必须提升为全局变量（常驻内存）。</p>
+<blockquote>
+<p>注意区分：sendBuffer 用 static（还是函数内可见的”局部静态”），readBuffer 用全局。两者本质一样——常驻内存——但 readBuffer 要跨函数使用，所以直接全局。</p>
+</blockquote>
+<hr>
+<h2 id="解读初始化代码"><a href="#解读初始化代码" class="headerlink" title="解读初始化代码"></a>解读初始化代码</h2><h3 id="6-1-中断服务函数的调用链"><a href="#6-1-中断服务函数的调用链" class="headerlink" title="6.1 中断服务函数的调用链"></a>6.1 中断服务函数的调用链</h3><p>CubeMX 生成的 <code>stm32f1xx_it.c</code> 里，两个中断服务函数是硬件中断的入口：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">硬件事件（发送完成/接收完成/地址匹配...）</span><br><span class="line">   ↓ 触发中断</span><br><span class="line">I2C1_EV_IRQHandler()                    ← stm32f1xx_it.c，CubeMX 生成</span><br><span class="line">   ↓</span><br><span class="line">HAL_I2C_EV_IRQHandler(&amp;hi2c1)           ← HAL 库内部：处理事件、逐字节搬运</span><br><span class="line">   ↓</span><br><span class="line">HAL_I2C_MasterTxCpltCallback(&amp;hi2c1)    ← 我们重写的回调（__weak 弱定义）</span><br><span class="line">   ↓</span><br><span class="line">aht20_State = 2;                        ← 状态机推进</span><br></pre></td></tr></table></figure>
+
+<p>之前学串口中断时解析过完全一样的链路（<code>USART2_IRQHandler → HAL_UART_IRQHandler → UART_Receive_IT → HAL_UART_RxCpltCallback</code>），I2C 只是把名字换成了 <code>EV</code>（事件）。<strong>中断编程的心智模型是通用的。</strong></p>
+<h3 id="6-2-MspInit-里的-NVIC-配置"><a href="#6-2-MspInit-里的-NVIC-配置" class="headerlink" title="6.2 MspInit 里的 NVIC 配置"></a>6.2 MspInit 里的 NVIC 配置</h3><p><code>i2c.c</code> 的 <code>HAL_I2C_MspInit()</code> 里（CubeMX 自动生成）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* I2C1 interrupt Init */</span></span><br><span class="line">HAL_NVIC_SetPriority(I2C1_EV_IRQn, <span class="number">0</span>, <span class="number">0</span>);   <span class="comment">// 事件中断：抢占优先级0，子优先级0</span></span><br><span class="line">HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);           <span class="comment">// 使能事件中断</span></span><br><span class="line">HAL_NVIC_SetPriority(I2C1_ER_IRQn, <span class="number">0</span>, <span class="number">0</span>);   <span class="comment">// 错误中断：优先级0</span></span><br><span class="line">HAL_NVIC_EnableIRQ(I2C1_ER_IRQn);           <span class="comment">// 使能错误中断</span></span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">含义</th>
+<th align="left">参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_NVIC_SetPriority</code></td>
+<td align="left">设置中断优先级</td>
+<td align="left">(中断号, 抢占优先级, 子优先级)</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_NVIC_EnableIRQ</code></td>
+<td align="left">使能中断（不开则中断不会触发）</td>
+<td align="left">中断号</td>
+</tr>
+</tbody></table>
+<p>优先级 0&#x2F;0 是最高优先级。<strong>注意</strong>：勾选了 NVIC 才生成这几行；如果忘了勾选，回调函数永远不会被调用，状态机永远卡在状态 1 和 3。</p>
+<h3 id="6-3-配置对应关系表"><a href="#6-3-配置对应关系表" class="headerlink" title="6.3 配置对应关系表"></a>6.3 配置对应关系表</h3><table>
+<thead>
+<tr>
+<th align="left">CubeMX 设置</th>
+<th align="left">代码位置</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">I2C1 event interrupt 勾选</td>
+<td align="left"><code>HAL_NVIC_EnableIRQ(I2C1_EV_IRQn)</code></td>
+<td align="left">使能事件中断（搬运完成后通知 CPU）</td>
+</tr>
+<tr>
+<td align="left">I2C1 error interrupt 勾选</td>
+<td align="left"><code>HAL_NVIC_EnableIRQ(I2C1_ER_IRQn)</code></td>
+<td align="left">使能错误中断</td>
+</tr>
+<tr>
+<td align="left">—</td>
+<td align="left"><code>I2C1_EV_IRQHandler</code> → <code>HAL_I2C_EV_IRQHandler</code></td>
+<td align="left">中断入口，HAL 库内部逐字节搬运</td>
+</tr>
+<tr>
+<td align="left">—</td>
+<td align="left"><code>HAL_I2C_MasterTxCpltCallback</code> &#x2F; <code>RxCpltCallback</code></td>
+<td align="left">完成回调，我们写状态推进逻辑</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>老样子，这里不再展开（参考<a href="/2026/07/28/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">这篇博客</a>）。</p>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><table>
+<thead>
+<tr>
+<th align="left">操作</th>
+<th align="left">现象</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">打开串口助手，选择对应 COM 口，波特率 115200</td>
+<td align="left">每 2 秒刷新一行温湿度</td>
+</tr>
+<tr>
+<td align="left">观察温度读数</td>
+<td align="left">与室温一致，约 26-32℃</td>
+</tr>
+<tr>
+<td align="left">用手捂住传感器</td>
+<td align="left">温度上升、湿度升高，读数随环境变化</td>
+</tr>
+</tbody></table>
+<p>此处效果和上一篇轮询模式一模一样，不再重复录制</p>
+<hr>
+<h2 id="踩坑记录"><a href="#踩坑记录" class="headerlink" title="踩坑记录"></a>踩坑记录</h2><h3 id="坑-1：aht20-State-undeclared-——-extern-是”文件级”的，且-extern-不是定义"><a href="#坑-1：aht20-State-undeclared-——-extern-是”文件级”的，且-extern-不是定义" class="headerlink" title="坑 1：aht20_State undeclared —— extern 是”文件级”的，且 extern 不是定义"></a>坑 1：<code>aht20_State</code> undeclared —— extern 是”文件级”的，且 extern 不是定义</h3><p><strong>现象</strong>：main.c 里写了 <code>extern uint8_t aht20_State;</code>，但 i2c.c 的回调里用 <code>aht20_State</code> 编译报 <code>undeclared</code>。</p>
+<p><strong>原因</strong>：这里踩了两个叠加的坑——</p>
+<ol>
+<li><strong>extern 声明只对声明它的文件可见</strong>：每个 .c 文件是独立编译的，main.c 里的 extern 对 i2c.c 来说不存在。i2c.c 要用，必须能”看到”声明——靠 include 链。</li>
+<li><strong>extern 是声明不是定义</strong>：<code>extern uint8_t aht20_State;</code> 只是”这变量在别处定义了”，本身不分配内存。全项目必须<strong>有且仅有一个</strong>文件写不带 extern 的定义（<code>uint8_t aht20_State = 0;</code>），否则链接报 <code>undefined reference</code>。</li>
+</ol>
+<p><strong>解决</strong>：定义放 main.c，<strong>extern 声明放 main.h</strong>——这样所有 include 了 main.h 的文件（i2c.c 通过 <code>i2c.h → main.h</code> 间接 include）都能看到声明，不需要在 i2c.c 里重复写：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// main.c（USER CODE BEGIN PV）：定义（分配内存，全项目唯一）</span></span><br><span class="line"><span class="type">uint8_t</span> aht20_State = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// main.h（USER CODE BEGIN PV）：声明，全局可见</span></span><br><span class="line"><span class="keyword">extern</span> <span class="type">uint8_t</span> aht20_State;</span><br><span class="line"></span><br><span class="line"><span class="comment">// i2c.c：什么都不用加，i2c.c → i2c.h → main.h 的 include 链让声明自动可见</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>通用规则</strong>：跨文件共享变量 → <strong>一个 .c 里定义，extern 放公共头文件</strong>（谁用谁 include）。这样不用在每个使用的 .c 文件里各写一遍 extern，也避免漏写。</p>
+<h3 id="坑-2：sendBuffer-忘记加-static"><a href="#坑-2：sendBuffer-忘记加-static" class="headerlink" title="坑 2：sendBuffer 忘记加 static"></a>坑 2：sendBuffer 忘记加 static</h3><p><strong>现象</strong>：加不加 static 都能编译，但<strong>发送的数据会随机出错</strong>（内存被覆盖）。</p>
+<p><strong>原因</strong>：非阻塞函数返回后局部数组内存被回收，中断传数据时地址里的内容已被其他代码覆盖。<strong>编译不报错、现象随机</strong>——这是最难排查的一类 bug，只能靠理解原理预防。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">新知识点</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_I2C_Master_Transmit_IT</code> &#x2F; <code>Receive_IT</code></td>
+<td align="left">中断模式收发，非阻塞，无超时参数</td>
+</tr>
+<tr>
+<td align="left">状态机编程</td>
+<td align="left">0→1→2→3→4 状态循环，中断回调驱动状态</td>
+</tr>
+<tr>
+<td align="left">回调函数</td>
+<td align="left"><code>MasterTxCpltCallback</code>（发送完成）&#x2F; <code>MasterRxCpltCallback</code>（接收完成）</td>
+</tr>
+<tr>
+<td align="left">static 局部变量</td>
+<td align="left">非阻塞函数的数组必须常驻内存（函数返回后不回收）</td>
+</tr>
+<tr>
+<td align="left">全局变量提升</td>
+<td align="left">readBuffer 跨函数使用 → 全局</td>
+</tr>
+<tr>
+<td align="left">extern vs 定义</td>
+<td align="left">一个 .c 定义（分配内存），extern 放公共头文件（include 即用）</td>
+</tr>
+<tr>
+<td align="left">DMA 模式</td>
+<td align="left"><code>_IT</code> → <code>_DMA</code>，一行切换（CubeMX 需先加 DMA 通道）</td>
+</tr>
+</tbody></table>
+<h3 id="和上一篇的对比"><a href="#和上一篇的对比" class="headerlink" title="和上一篇的对比"></a>和上一篇的对比</h3><table>
+<thead>
+<tr>
+<th align="left">对比项</th>
+<th align="left">上篇（轮询）</th>
+<th align="left">本篇（中断）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">HAL 函数</td>
+<td align="left"><code>Master_Transmit/Receive</code></td>
+<td align="left"><code>Master_Transmit_IT/Receive_IT</code>（去 <code>_IT</code> 即 DMA）</td>
+</tr>
+<tr>
+<td align="left">超时参数</td>
+<td align="left"><code>HAL_MAX_DELAY</code></td>
+<td align="left">无</td>
+</tr>
+<tr>
+<td align="left">函数形态</td>
+<td align="left">一个大函数 <code>AHT20_Read()</code> 一气呵成</td>
+<td align="left">拆成 Measure &#x2F; Get &#x2F; Analysis + 状态机</td>
+</tr>
+<tr>
+<td align="left">CPU 占用</td>
+<td align="left">阻塞，全程等待</td>
+<td align="left">非阻塞，只在中断里搬一下</td>
+</tr>
+<tr>
+<td align="left">数组生命周期</td>
+<td align="left">局部数组即可</td>
+<td align="left">sendBuffer 要 static，readBuffer 要全局</td>
+</tr>
+</tbody></table>
+<p><strong>核心收获</strong>：本篇不只是学了 I2C 中断模式，更重要的是<strong>状态机编程</strong>——非阻塞外设（中断&#x2F;DMA）驱动下的标准写法。后面学 OLED、FreeRTOS 时，稍微复杂一点的程序处处都是状态机的身影。</p>
+<hr>
+<h2 id="进阶思考：什么时候才需要状态机？"><a href="#进阶思考：什么时候才需要状态机？" class="headerlink" title="进阶思考：什么时候才需要状态机？"></a>进阶思考：什么时候才需要状态机？</h2><p>写完这篇博客后，我正在复习 <code>AHT20_Init()</code> 里的轮询收发函数，突然冒出一个问题：<strong>既然 CubeMX 里 I2C1 的中断和 DMA 都打开了，那是不是只要把 receive&#x2F;transmit 后面加上 <code>_IT</code>&#x2F;<code>_DMA</code>，这里的阻塞也就能变成非阻塞的了？</strong></p>
+<p>紧接着第二个问题来了：<strong>如果非阻塞这么”香”，为什么之前那么多项目（串口中断、串口 DMA、蓝牙）都没用显式状态机，也跑得好好的？本篇却非要引入状态机不可？</strong></p>
+<p>这两个问题值得好好拆一拆。</p>
+<h3 id="一、AHT20-Init-能直接加-IT-吗？——不能，而且它保持轮询是正确的"><a href="#一、AHT20-Init-能直接加-IT-吗？——不能，而且它保持轮询是正确的" class="headerlink" title="一、AHT20_Init 能直接加 _IT 吗？——不能，而且它保持轮询是正确的"></a>一、AHT20_Init 能直接加 <code>_IT</code> 吗？——不能，而且它保持轮询是正确的</h3><p>看 Init 的代码结构：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">AHT20_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Delay(<span class="number">40</span>);</span><br><span class="line">    HAL_I2C_Master_Receive(&amp;hi2c1, AHT20_ADDRESS, &amp;readBuffer, <span class="number">1</span>, HAL_MAX_DELAY);  <span class="comment">// ① 读状态字</span></span><br><span class="line">    <span class="keyword">if</span> ((readBuffer &amp; <span class="number">0x08</span>) == <span class="number">0x00</span>)      <span class="comment">// ② 马上用读到的结果做判断！</span></span><br><span class="line">    &#123;</span><br><span class="line">        ...发送初始化命令...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里有一条**”读→判→写”依赖链<strong>：第②行的判断</strong>依赖**第①行读到的数据。阻塞模式下没问题——函数返回时数据一定到位。但改成 <code>Receive_IT</code> 后：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">HAL_I2C_Master_Receive_IT(&amp;hi2c1, AHT20_ADDRESS, &amp;readBuffer, <span class="number">1</span>);  <span class="comment">// 立即返回，readBuffer 还是垃圾值！</span></span><br><span class="line"><span class="keyword">if</span> ((readBuffer &amp; <span class="number">0x08</span>) == <span class="number">0x00</span>)   <span class="comment">// ← 在垃圾值上做判断，逻辑全错</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>依赖关系是阻塞&#x2F;非阻塞切换的死穴</strong>：只要”后面一行要用前面调用的结果”，改成非阻塞就炸。真要改，只能把 Init 也拆进状态机（读状态字 → 回调里判断 → 发初始化命令 → 再回调 → 完成），一个 10 行的函数变成 3 个状态 + 2 个回调。</p>
+<p>而它值得吗？<strong>初始化只在上电时执行一次，那一刻系统里本来就没有别的任务</strong>——CPU 等这几毫秒毫无损失。所以正确做法就是保持轮询。这引出一个重要原则：</p>
+<p><strong>该阻塞时阻塞，该非阻塞时才非阻塞。非阻塞 + 状态机是为了”腾出 CPU 做别的”，如果当时没有”别的”可做，阻塞就是最优解。</strong></p>
+<h3 id="二、之前的项目为什么不用状态机？——回调就是”隐式状态机”"><a href="#二、之前的项目为什么不用状态机？——回调就是”隐式状态机”" class="headerlink" title="二、之前的项目为什么不用状态机？——回调就是”隐式状态机”"></a>二、之前的项目为什么不用状态机？——回调就是”隐式状态机”</h3><p>回顾之前所有项目的收数据方式：</p>
+<table>
+<thead>
+<tr>
+<th align="left">项目</th>
+<th align="left">启动接收</th>
+<th align="left">消费数据的时机</th>
+<th align="center">显式状态机</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">串口轮询</td>
+<td align="left"><code>HAL_UART_Receive</code>（阻塞）</td>
+<td align="left">函数返回 &#x3D; 数据到位，直接处理</td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left">串口中断</td>
+<td align="left"><code>Receive_IT</code> 启动</td>
+<td align="left"><strong>在回调函数里处理</strong></td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left">串口 DMA 不定长</td>
+<td align="left"><code>ReceiveToIdle_DMA</code> 启动</td>
+<td align="left"><strong>在回调函数里解析数据包</strong></td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left">蓝牙</td>
+<td align="left">同上</td>
+<td align="left"><strong>在回调函数里解析</strong></td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td align="left"><strong>I2C AHT20（本篇）</strong></td>
+<td align="left"><code>Measure</code> &#x2F; <code>Get</code> 分两次启动</td>
+<td align="left">分阶段，各等各的</td>
+<td align="center">✅</td>
+</tr>
+</tbody></table>
+<p><strong>前面几个项目里，”启动接收”和”消费数据”是两个分离的代码位置</strong>——启动函数只管启动，数据到位后的处理全部写在回调函数里。回调本身就是”数据好了”的事件通知，<strong>处理逻辑天然发生在数据到位之后</strong>，根本不存在”数据没到就用”的问题。</p>
+<p>所以它们其实不是没用状态机，而是用了一个<strong>隐式的两状态机</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">隐式状态机：状态A（等数据）──收到数据→ 状态B（回调：处理数据）──处理完→ 回到状态A</span><br></pre></td></tr></table></figure>
+
+<p>整个系统只有两个状态，**根本不需要显式变量记录”走到哪了”**——回调被调用的那一刻，CPU 天然知道”数据到了”。</p>
+<h3 id="三、AHT20-为什么必须显式状态机？——多阶段流水线"><a href="#三、AHT20-为什么必须显式状态机？——多阶段流水线" class="headerlink" title="三、AHT20 为什么必须显式状态机？——多阶段流水线"></a>三、AHT20 为什么必须显式状态机？——多阶段流水线</h3><p>而 AHT20 的流程是一条<strong>多阶段流水线</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">发测量命令 →(等) 75ms →(等) 读数据 →(等) 解析 → 循环</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>75ms 延时<strong>必须等发送完成</strong>之后才开始</li>
+<li>读取<strong>必须等 75ms 过后</strong>才能触发</li>
+<li>解析<strong>必须等接收完成</strong>之后才能做</li>
+</ul>
+<p>阶段之间有严格的先后依赖，每一阶段都要”等一个外部事件”才能推进。这时候回调就不够用了——回调只知道”某个事件发生了”，但<strong>主循环不知道这是流水线的第几步</strong>。必须有一个变量记录”我现在走到哪一步了”，这个变量就是状态机。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">显式状态机：0 →(发命令) 1 →(发完回调) 2 →(延时+Get) 3 →(收完回调) 4 →(解析打印) 0</span><br><span class="line">                                                              ↑</span><br><span class="line">                                            每一步都知道自己在流水线的什么位置</span><br></pre></td></tr></table></figure>
+
+<h3 id="四、结论：什么时候用状态机"><a href="#四、结论：什么时候用状态机" class="headerlink" title="四、结论：什么时候用状态机"></a>四、结论：什么时候用状态机</h3><table>
+<thead>
+<tr>
+<th align="left">场景</th>
+<th align="left">判断依据</th>
+<th align="left">做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>不用</strong></td>
+<td align="left">一次性流程，阻塞等待无代价（初始化、开机自检）</td>
+<td align="left">保持轮询</td>
+</tr>
+<tr>
+<td align="left"><strong>不用</strong></td>
+<td align="left">单次异步等待：收完就处理，没有后续阶段</td>
+<td align="left">回调里直接处理</td>
+</tr>
+<tr>
+<td align="left"><strong>用</strong></td>
+<td align="left">多阶段流水线，阶段间有先后依赖，且要重复循环</td>
+<td align="left">显式状态变量 + 回调推进</td>
+</tr>
+<tr>
+<td align="left"><strong>用</strong></td>
+<td align="left">系统里还有其他任务要跑，CPU 不能长期占用</td>
+<td align="left">非阻塞 + 状态机</td>
+</tr>
+</tbody></table>
+<p>一句话判断法：<strong>代码里有没有”等一件事做完，才能开始下一件事”的链条？链条只有一环 → 回调够用；链条有多环 → 显式状态机。</strong></p>
+<p>所以本篇引入状态机不是”I2C 必须这样”，而是”<strong>任何外设的多阶段异步流程都这样</strong>“——以后学 OLED、FreeRTOS、电机控制，遇到”发指令→等应答→再发”的交互，全是同一个套路。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV1AN41127VL/">B站视频：STM32入门教程2025版 第13集 I2C中断与DMA</a></li>
+<li><a href="/2026/08/01/STM32_I2C_AHT20/">上一篇：STM32——IIC通信，轮询模式读取温湿度传感器AHT20</a></li>
+<li><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断那篇：理解中断回调链路的参考</a></li>
+<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
+<li>AHT20 数据手册</li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>DMA</tag>
+        <tag>I2C</tag>
+        <tag>中断</tag>
+        <tag>AHT20</tag>
+        <tag>状态机</tag>
       </tags>
   </entry>
   <entry>
@@ -5311,928 +5799,6 @@
 
 <p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
 ]]></content>
-  </entry>
-  <entry>
-    <title>Markdown 语法规则</title>
-    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
-    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
-<p>这是第二行</p>
-<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
-<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
-<p>效果：</p>
-<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
-</blockquote>
-<blockquote>
-<p>代码和快捷键：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
-<p>效果：</p>
-<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
-<p>效果：只有同一级别</p>
-<ul>
-<li>1</li>
-<li>2</li>
-<li>3</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：-&#x2F;*&#x2F;+ +空格</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
-<p>效果：</p>
-<ol>
-<li>一</li>
-<li>二</li>
-<li>子1</li>
-<li>子2<ol>
-<li>子1-子1</li>
-</ol>
-</li>
-</ol>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<p>数字+.+空格</p>
-<p>缩进用tab,回退shift+tab</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
-<p>效果：</p>
-<ul>
-<li><p><input checked="" disabled="" type="checkbox"> 
-练习markdown语法</p>
-</li>
-<li><p><input disabled="" type="checkbox"> 
-维护网站</p>
-</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
-<p>效果：</p>
-<blockquote>
-<p>这是最外层区块</p>
-<blockquote>
-<p>这是内层</p>
-<blockquote>
-<p>这是更内层</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
-<p>效果：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
-<p>效果：</p>
-<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
-<p>效果：</p>
-<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>Markdown</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>STM32--浅析GPIO八大模式</title>
-    <url>/2026/07/27/stm32-gpio-eight-modes/</url>
-    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>回顾前面三篇博客，我们已经接触过几种 GPIO 模式：</p>
-<table>
-<thead>
-<tr>
-<th align="left">博客</th>
-<th align="left">用到的 GPIO 模式</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">STM32再出发</a></td>
-<td align="left"><strong>推挽输出</strong>（驱动 LED）</td>
-</tr>
-<tr>
-<td align="left"><a href="/2026/07/26/STM32_RGB_LED/">三色LED流水灯</a></td>
-<td align="left"><strong>推挽输出</strong>（三个 LED）</td>
-</tr>
-<tr>
-<td align="left"><a href="/2026/07/26/STM32_Key_Input/">按键输入</a></td>
-<td align="left"><strong>上拉输入</strong>（KEY2 内部上拉）+ <strong>浮空输入+外部上拉</strong>（KEY1 板载上拉）</td>
-</tr>
-</tbody></table>
-<p>除了上述几种模式，GPIO还有其他的输入输出模式。这篇文章就是对于GPIO八大模式的总结和梳理，顺便把前几篇博客里实际用到的 GPIO 模式串联起来分析一下。</p>
-<hr>
-<h2 id="GPIO-内部结构速览"><a href="#GPIO-内部结构速览" class="headerlink" title="GPIO 内部结构速览"></a>GPIO 内部结构速览</h2><p>在拆解 8 种模式之前，先认识一下 GPIO 引脚内部的核心组件。</p>
-<blockquote>
-<p><img src="/./../images/stm32-gpio-eight-modes/image-20260727221629861.png" alt="image-20260727221629861"></p>
-</blockquote>
-<h3 id="关键元件"><a href="#关键元件" class="headerlink" title="关键元件"></a>关键元件</h3><table>
-<thead>
-<tr>
-<th align="left">元件</th>
-<th align="left">作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>保护二极管</strong></td>
-<td align="left">钳位电压：引脚电压 &gt; VDD 时电流引入 VDD，&lt; VSS 时引入 VSS，防止高压损坏芯片</td>
-</tr>
-<tr>
-<td align="left"><strong>施密特触发器（TTL肖密特触发器）</strong></td>
-<td align="left">将模拟电压转换为干净的数字电平，具备滞回特性，有效抗噪声</td>
-</tr>
-<tr>
-<td align="left"><strong>上拉&#x2F;下拉电阻</strong></td>
-<td align="left">输入模式下决定悬空引脚的电平状态，约 40kΩ，可软件配置</td>
-</tr>
-<tr>
-<td align="left"><strong>P-MOS</strong></td>
-<td align="left">输出驱动器的上管，导通时将引脚接到 VDD（输出高电平）</td>
-</tr>
-<tr>
-<td align="left"><strong>N-MOS</strong></td>
-<td align="left">输出驱动器的下管，导通时将引脚接到 VSS（输出低电平）</td>
-</tr>
-<tr>
-<td align="left"><strong>输出寄存器</strong></td>
-<td align="left">锁存 CPU 要输出的电平值</td>
-</tr>
-<tr>
-<td align="left"><strong>输入寄存器</strong></td>
-<td align="left">锁存引脚上当前的电平值</td>
-</tr>
-</tbody></table>
-<p>GPIO 内部的工作模式，本质上就是<strong>控制这些开关元件的通断组合</strong>。不同的通断组合 &#x3D; 不同的工作模式。</p>
-<hr>
-<h2 id="输入模式（4种）"><a href="#输入模式（4种）" class="headerlink" title="输入模式（4种）"></a>输入模式（4种）</h2><p>输入模式的核心：<strong>数据从引脚 → 内部总线</strong>（CPU 读取）。</p>
-<blockquote>
-<p><img src="/./../images/gpio_eight_modes/image-20260727213728237.png" alt="image-20260727213728237"></p>
-</blockquote>
-<h3 id="1-浮空输入"><a href="#1-浮空输入" class="headerlink" title="1. 浮空输入"></a>1. 浮空输入</h3><p><strong>内部状态：</strong> 上下拉电阻均断开，施密特触发器导通。</p>
-<p><strong>引脚状态：</strong> 完全由外部电路决定。如果引脚什么都不接，电平是不确定的——可能是高、可能是低、甚至可能是中间电平。</p>
-<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>No pull</code></p>
-<p><strong>实际例子：</strong> 按键输入博客里的 <strong>KEY1（PB12）</strong> 用的就是”浮空输入 + 外部上拉电阻”。板子上已经焊了一个上拉电阻把 PB12 拉到 VDD，所以引脚悬空时是确定的——高电平。按下按键接地，读到低电平。</p>
-<blockquote>
-<p><img src="/./../images/gpio_eight_modes/image-20260727214136258.png" alt="image-20260727214136258"></p>
-</blockquote>
-<h3 id="2-上拉输入"><a href="#2-上拉输入" class="headerlink" title="2. 上拉输入"></a>2. 上拉输入</h3><p><strong>内部状态：</strong> 内部上拉电阻（约 40kΩ）接通到 VDD，施密特触发器导通。</p>
-<p><strong>引脚状态：</strong> 悬空时默认高电平。外部驱动为低电平时，可以读到低电平。</p>
-<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>Pull-up</code></p>
-<p><strong>实际例子：</strong> 按键输入博客里的 <strong>KEY2（PB13）</strong> 用的就是内部上拉。这个引脚板子上没有配外部上拉电阻，所以在 CubeMX 中配置 <code>Pull-up</code>，让芯片内部的电阻来负责拉高。功能和 KEY1 一样，只是上拉电阻的位置不同——一个在芯片外面，一个在芯片里面。</p>
-<blockquote>
-<p><img src="/./../images/gpio_eight_modes/image-20260727214222002.png" alt="image-20260727214222002"></p>
-</blockquote>
-<h3 id="3-下拉输入"><a href="#3-下拉输入" class="headerlink" title="3. 下拉输入"></a>3. 下拉输入</h3><p><strong>内部状态：</strong> 内部下拉电阻（约 40kΩ）接通到 VSS，施密特触发器导通。</p>
-<p><strong>引脚状态：</strong> 悬空时默认低电平。外部驱动为高电平时，可以读到高电平。</p>
-<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>Pull-down</code></p>
-<p><strong>和上拉输入的关系：</strong> 上拉和下拉是对称的——上拉是电阻接到 VDD（默认高），下拉是电阻接到 VSS（默认低）。</p>
-<h3 id="4-模拟输入"><a href="#4-模拟输入" class="headerlink" title="4. 模拟输入"></a>4. 模拟输入</h3><p><strong>内部状态：</strong> 施密特触发器关闭（数字输入路径断开），引脚直接连接到 ADC 模块的模拟开关。</p>
-<p><strong>引脚状态：</strong> 不读高低电平，读电压模拟量。</p>
-<p><strong>在 CubeMX 中：</strong> 引脚功能选 <code>ADC_INx</code>（比如 ADC1_IN0），或直接选 <code>GPIO_Analog</code></p>
-<p><strong>用途：</strong> ADC 采样。比如读取电位器电压、温度传感器输出等。后续学到 ADC 时会用到。</p>
-<hr>
-<h2 id="输出模式（4种）"><a href="#输出模式（4种）" class="headerlink" title="输出模式（4种）"></a>输出模式（4种）</h2><p>输出模式的核心：<strong>数据从内部总线 → 引脚</strong>（CPU 写值出去），同时也可以回读引脚当前电平。</p>
-<blockquote>
-<p><img src="/./../images/gpio_eight_modes/image-20260727214346566.png" alt="image-20260727214346566"></p>
-</blockquote>
-<h3 id="5-推挽输出"><a href="#5-推挽输出" class="headerlink" title="5. 推挽输出"></a>5. 推挽输出</h3><p><strong>内部状态：</strong> 输出寄存器控制 P-MOS 和 N-MOS 交替导通：</p>
-<table>
-<thead>
-<tr>
-<th align="center">输出</th>
-<th align="center">P-MOS</th>
-<th align="center">N-MOS</th>
-<th align="center">引脚电平</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">1</td>
-<td align="center">导通</td>
-<td align="center">断开</td>
-<td align="center">VDD（高电平）</td>
-</tr>
-<tr>
-<td align="center">0</td>
-<td align="center">断开</td>
-<td align="center">导通</td>
-<td align="center">VSS（低电平）</td>
-</tr>
-</tbody></table>
-<p><strong>在 CubeMX 中：</strong> <code>GPIO_Output</code> → <code>Output Mode</code> 选 <code>Push-Pull</code></p>
-<p><strong>特点：</strong> 驱动能力强，高电平和低电平都能主动输出。这是最常用的输出模式。</p>
-<p><strong>实际例子：</strong> 前两篇博客所有的 LED 点灯代码全都是<strong>推挽输出</strong>。翻开 CubeMX 配置能看到：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PA7 Output Mode:  Push-Pull</span><br><span class="line">PA6 Output Mode:  Push-Pull</span><br><span class="line">PB0 Output Mode:  Push-Pull</span><br></pre></td></tr></table></figure>
-
-<p>LED 需要足够的电流才能亮，推挽输出的驱动能力正好满足需求。</p>
-<blockquote>
-<p>下面是推挽输出控制I&#x2F;O口，输出高电平和低电平的电流流通图（假设I&#x2F;O口连接一个小灯，小灯另一端连接GND）</p>
-</blockquote>
-<blockquote>
-<p><img src="/./../images/gpio_eight_modes/image-20260727214716103.png" alt="image-20260727214716103"></p>
-<p><img src="/./../images/gpio_eight_modes/image-20260727214908086.png" alt="image-20260727214908086"></p>
-</blockquote>
-<h3 id="6-开漏输出"><a href="#6-开漏输出" class="headerlink" title="6. 开漏输出"></a>6. 开漏输出</h3><p><strong>内部状态：</strong> P-MOS 始终断开（不工作），只有 N-MOS 受控：</p>
-<table>
-<thead>
-<tr>
-<th align="center">输出</th>
-<th align="center">P-MOS</th>
-<th align="center">N-MOS</th>
-<th align="center">引脚电平</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">1</td>
-<td align="center">断开</td>
-<td align="center">断开</td>
-<td align="center"><strong>高阻态</strong>（引脚浮空）</td>
-</tr>
-<tr>
-<td align="center">0</td>
-<td align="center">断开</td>
-<td align="center">导通</td>
-<td align="center">VSS（低电平）</td>
-</tr>
-</tbody></table>
-<p><strong>在 CubeMX 中：</strong> <code>GPIO_Output</code> → <code>Output Mode</code> 选 <code>Open-Drain</code></p>
-<p><strong>关键区别：</strong> 推挽能主动输出高电平，开漏不行。开漏输出高电平时引脚处于高阻态——必须靠<strong>外部上拉电阻</strong>才能拉高到想要的电压。</p>
-<blockquote>
-<p>下面是开漏输出控制I&#x2F;O口，输出高电平和低电平的电流流通图（假设I&#x2F;O口连接一个小灯，小灯另一端连接来自外部的5V而非GND）</p>
-<p>注意：此时需要使用5V容忍的I&#x2F;O口，不能用普通的，否则会使上方的保护二极管长期导通，将5V引入电源中，造成损坏。</p>
-</blockquote>
-<blockquote>
-<p><img src="/./../images/gpio_eight_modes/image-20260727215442581.png" alt="image-20260727215442581"></p>
-<p><img src="/./../images/gpio_eight_modes/image-20260727215312807.png" alt="image-20260727215312807"></p>
-</blockquote>
-<h3 id="推挽输出-vs-开漏输出-对比"><a href="#推挽输出-vs-开漏输出-对比" class="headerlink" title="推挽输出 vs 开漏输出 对比"></a>推挽输出 vs 开漏输出 对比</h3><table>
-<thead>
-<tr>
-<th align="left"></th>
-<th align="left">推挽输出</th>
-<th align="left">开漏输出</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>高电平</strong></td>
-<td align="left">P-MOS 激活 N-MOS 断开，3.3V</td>
-<td align="left">P-MOS 断开 N-MOS 断开，由外部电路决定</td>
-</tr>
-<tr>
-<td align="left"><strong>低电平</strong></td>
-<td align="left">P-MOS 断开 N-MOS 激活，0V</td>
-<td align="left">P-MOS 断开 N-MOS 激活，0V</td>
-</tr>
-<tr>
-<td align="left"><strong>优点</strong></td>
-<td align="left">可以直接输出 3.3V</td>
-<td align="left">配合外部电路更加灵活</td>
-</tr>
-<tr>
-<td align="left"><strong>缺点</strong></td>
-<td align="left">只能输出 3.3V</td>
-<td align="left">高电平实际是高阻态，无法输出电流</td>
-</tr>
-</tbody></table>
-<p><strong>为什么需要开漏输出？两个经典场景：</strong></p>
-<p><strong>场景一：电平转换</strong><br>如果芯片是 3.3V 的，但想驱动一个 5V 的器件——开漏输出 + 外部上拉到 5V 就能实现。推挽输出去接的话，3.3V 的高电平可能不被识别为高电平。</p>
-<p><strong>场景二：I2C 通信的”线与”</strong><br>多个器件共享一根数据线（SDA），任何一个器件都可以把总线拉低。如果其中一个输出高电平，另一个同时输出低电平，用推挽输出的话两个 MOS 管会”打架”（短路风险）。开漏输出+上拉电阻天然支持这种”谁都可以拉低”的结构。</p>
-<h3 id="7-复用推挽输出"><a href="#7-复用推挽输出" class="headerlink" title="7. 复用推挽输出"></a>7. 复用推挽输出</h3><p><strong>内部状态：</strong> 和推挽输出电路完全一样，只不过控制 P-MOS&#x2F;N-MOS 的信号不再是输出寄存器，而是<strong>片上外设</strong>（USART、SPI、定时器等）。</p>
-<p><strong>在 CubeMX 中：</strong> 配置外设时自动设置（比如把 PA9 配成 USART1_TX，CubeMX 自动设为复用推挽）</p>
-<p><strong>实际例子：</strong> 以后配串口时，CubeMX 的提示里多半就是这个。</p>
-<h3 id="8-复用开漏输出"><a href="#8-复用开漏输出" class="headerlink" title="8. 复用开漏输出"></a>8. 复用开漏输出</h3><p><strong>内部状态：</strong> 和开漏输出电路完全一样，只不过控制 N-MOS 的信号来自<strong>片上外设</strong>。</p>
-<p><strong>在 CubeMX 中：</strong> 配置外设时自动设置（比如把 PB6 配成 I2C1_SCL，CubeMX 自动设为复用开漏）</p>
-<p><strong>实际例子：</strong> I2C 通信。如果使用硬件 I2C 外设（而不是软件模拟），SCL 和 SDA 引脚会被配置为复用开漏输出。</p>
-<blockquote>
-<p>下面两张图为普通的输出和复用的输出的电流流经图</p>
-<p><img src="/./../images/gpio_eight_modes/alternate_output.png" alt="alt_output"></p>
-<p><img src="/./../images/gpio_eight_modes/alternate_input.png" alt="alt_input"></p>
-</blockquote>
-<hr>
-<h2 id="为什么没有”复用输入”模式？"><a href="#为什么没有”复用输入”模式？" class="headerlink" title="为什么没有”复用输入”模式？"></a>为什么没有”复用输入”模式？</h2><p>留意到一个问题：输出模式有普通和复用两种，但输入模式只有 4 种，没有”复用输入”这个分类。</p>
-<p>原因是输入模式下，普通输入和复用功能<strong>共用同一路信号</strong>——都通过施密特触发器，送到输入寄存器，同时也送给片上外设。</p>
-<p>所以无论引脚工作在什么模式下（只要不是模拟输入），外设都能读到引脚的值。不需要额外的”复用输入”模式。</p>
-<blockquote>
-<p>有例外：ADC 的模拟输入走的是独立路径（不走施密特触发器），所以模拟输入被划为独立的输入模式。</p>
-</blockquote>
-<hr>
-<h2 id="八大模式速查表"><a href="#八大模式速查表" class="headerlink" title="八大模式速查表"></a>八大模式速查表</h2><table>
-<thead>
-<tr>
-<th align="center">编号</th>
-<th align="left">模式</th>
-<th align="center">方向</th>
-<th align="left">核心特点</th>
-<th align="left">典型用途</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">1</td>
-<td align="left">浮空输入</td>
-<td align="center">输入</td>
-<td align="left">上下拉全关，电平完全由外部决定</td>
-<td align="left">外部已有上下拉电阻的按键</td>
-</tr>
-<tr>
-<td align="center">2</td>
-<td align="left">上拉输入</td>
-<td align="center">输入</td>
-<td align="left">内部接 VDD，默认高电平</td>
-<td align="left">无外部上拉的按键</td>
-</tr>
-<tr>
-<td align="center">3</td>
-<td align="left">下拉输入</td>
-<td align="center">输入</td>
-<td align="left">内部接 VSS，默认低电平</td>
-<td align="left">默认需为低电平的输入</td>
-</tr>
-<tr>
-<td align="center">4</td>
-<td align="left">模拟输入</td>
-<td align="center">输入</td>
-<td align="left">绕开施密特触发器，直通 ADC</td>
-<td align="left">ADC 采样</td>
-</tr>
-<tr>
-<td align="center">5</td>
-<td align="left">推挽输出</td>
-<td align="center">输出</td>
-<td align="left">P&#x2F;N-MOS 交替，可主动输出高低</td>
-<td align="left">驱动 LED、普通数字信号</td>
-</tr>
-<tr>
-<td align="center">6</td>
-<td align="left">开漏输出</td>
-<td align="center">输出</td>
-<td align="left">只有 N-MOS，高阻态需外部上拉</td>
-<td align="left">I2C、电平转换</td>
-</tr>
-<tr>
-<td align="center">7</td>
-<td align="left">复用推挽</td>
-<td align="center">输出</td>
-<td align="left">信号源改由外设控制</td>
-<td align="left">串口 TX、PWM、SPI</td>
-</tr>
-<tr>
-<td align="center">8</td>
-<td align="left">复用开漏</td>
-<td align="center">输出</td>
-<td align="left">外设控制 + 开漏特性</td>
-<td align="left">硬件 I2C</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="从前面三篇博客回看-GPIO-配置"><a href="#从前面三篇博客回看-GPIO-配置" class="headerlink" title="从前面三篇博客回看 GPIO 配置"></a>从前面三篇博客回看 GPIO 配置</h2><h3 id="第一篇：STM32再出发-—-PA7-推挽输出"><a href="#第一篇：STM32再出发-—-PA7-推挽输出" class="headerlink" title="第一篇：STM32再出发 — PA7 推挽输出"></a>第一篇：STM32再出发 — PA7 推挽输出</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// CubeMX 配置：PA7 → GPIO_Output, Push-Pull, No pull, Low speed</span></span><br><span class="line">HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  <span class="comment">// 翻转电平</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);  <span class="comment">// 拉高</span></span><br></pre></td></tr></table></figure>
-
-<p>LED 是纯数字负载，只需要开关两个状态就够。推挽输出的高电平驱动电流足以点亮 LED。</p>
-<h3 id="第二篇：三色LED流水灯-—-三个推挽输出"><a href="#第二篇：三色LED流水灯-—-三个推挽输出" class="headerlink" title="第二篇：三色LED流水灯 — 三个推挽输出"></a>第二篇：三色LED流水灯 — 三个推挽输出</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PB0 → Push-Pull  (LED_RED)</span><br><span class="line">PA7 → Push-Pull  (LED_GREEN)</span><br><span class="line">PA6 → Push-Pull  (LED_BLUE)</span><br></pre></td></tr></table></figure>
-
-<p>三个 LED 都一样，推挽输出 + 状态机控制亮灭组合。没有特殊情况需要特殊模式。</p>
-<h3 id="第三篇：按键输入-—-KEY1-浮空输入，KEY2-上拉输入"><a href="#第三篇：按键输入-—-KEY1-浮空输入，KEY2-上拉输入" class="headerlink" title="第三篇：按键输入 — KEY1 浮空输入，KEY2 上拉输入"></a>第三篇：按键输入 — KEY1 浮空输入，KEY2 上拉输入</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// KEY1（PB12）：浮空输入，板载外部上拉 → 按下读低电平</span></span><br><span class="line"><span class="comment">// KEY2（PB13）：内部上拉输入，CubeMX 配 Pull-up → 按下读低电平</span></span><br><span class="line"><span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    <span class="comment">// 按键被按下</span></span><br></pre></td></tr></table></figure>
-
-<p>这里就体现了两种输入模式的选择差异——<strong>外部已有上拉电阻的用浮空输入，没有的就用内部上拉。</strong> 同一个功能（按键检测），因为硬件设计不同，选择的 GPIO 模式也不同。</p>
-<hr>
-<h2 id="进阶：一些值得思考的问题"><a href="#进阶：一些值得思考的问题" class="headerlink" title="进阶：一些值得思考的问题"></a>进阶：一些值得思考的问题</h2><h3 id="1-推挽输出能同时输出高和低吗？"><a href="#1-推挽输出能同时输出高和低吗？" class="headerlink" title="1. 推挽输出能同时输出高和低吗？"></a>1. 推挽输出能同时输出高和低吗？</h3><p><strong>不能。</strong> P-MOS 和 N-MOS 是交替工作的，不可能同时导通。如果两者不小心同时导通了（称为”穿通”），VDD 和 VSS 直接短路，电流瞬间增大，芯片会发热甚至烧毁。幸好 CubeMX 和 HAL 库会处理好这些，不需要我们操心。</p>
-<h3 id="2-开漏输出为什么不内置上拉电阻？"><a href="#2-开漏输出为什么不内置上拉电阻？" class="headerlink" title="2. 开漏输出为什么不内置上拉电阻？"></a>2. 开漏输出为什么不内置上拉电阻？</h3><p>因为上拉电阻的值需要根据应用场景决定。I2C 总线通常用 4.7kΩ，高速时会用 1.5kΩ，低功耗场合会用到 10kΩ。ST 不知道你的应用场景，所以把选择权留给了用户。</p>
-<h3 id="3-GPIO-速度（Speed）选-Low-还是-High？"><a href="#3-GPIO-速度（Speed）选-Low-还是-High？" class="headerlink" title="3. GPIO 速度（Speed）选 Low 还是 High？"></a>3. GPIO 速度（Speed）选 Low 还是 High？</h3><p>与 GPIO 模式无关但值得注意。在 CubeMX 配置里有个 <code>Maximum output speed</code> 选项：</p>
-<table>
-<thead>
-<tr>
-<th align="left">速度等级</th>
-<th align="left">适用场景</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">Low (2MHz)</td>
-<td align="left">LED、按键、普通 GPIO 信号</td>
-</tr>
-<tr>
-<td align="left">Medium (10MHz)</td>
-<td align="left">串口、中等频率信号</td>
-</tr>
-<tr>
-<td align="left">High (50MHz)</td>
-<td align="left">SPI、高速通信</td>
-</tr>
-</tbody></table>
-<p>速度越高，功耗越大、电磁干扰越强。所以对于 LED 这种低速应用，选 Low 就够了，没必要开 High。前两篇博客里选的 <code>Low</code> 是正确的选择。</p>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>学完这 8 种模式再回头看 CubeMX 的引脚配置界面，选项就不再是零散的下拉菜单了——每个选项对应的是内部某条电路的开关状态：</p>
-<ul>
-<li>选 <code>Input</code> 还是 <code>Output</code> → 决定输入驱动还是输出驱动接入引脚</li>
-<li>选 <code>Pull-up/No pull/Pull-down</code> → 决定内部上拉&#x2F;下拉电阻是否接通</li>
-<li>选 <code>Push-Pull/Open-Drain</code> → 决定 P-MOS 是否参与工作</li>
-<li>选 <code>GPIO/Alternate</code> → 决定控制信号来自寄存器还是外设</li>
-</ul>
-<p>理解了内部电路的结构，CubeMX 配置就不再是”乱填的”，而是——<strong>我知道我配置了什么，也知道为什么这么配。</strong></p>
-<p>学完这 8 种模式之后，下一步就可以学习<strong>中断（EXTI）</strong>了——当按键不需要靠 while 循环轮询，而是按下时 CPU 主动响应，就是中断的用武之地。这也是按键输入博客末尾提到的”进阶思路”。</p>
-<hr>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a> — 第5集 GPIO 内部那些事</li>
-<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
-<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入控制小灯亮灭</a></li>
-<li><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">STM32 再出发：工具链搭建</a></li>
-<li><a href="https://www.st.com/resource/en/reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">STM32 参考手册 RM0008（STM32F10xxx 参考手册）</a> — GPIO 相关章节</li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>STM32</tag>
-        <tag>嵌入式</tag>
-        <tag>CubeMX</tag>
-        <tag>GPIO</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>STM32再出发——从Keil转到VSCode+CubeMX</title>
-    <url>/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/</url>
-    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>大一上的时候，我曾短暂学习过 STM32，当时用的是 keil5 的开发方式。Keil 的代码补全基本没有、所有内容全靠硬写，或者说硬抄。由于当时面临很多压力，所以我暂时终止了STM32的学习。</p>
-<p>这次重新出发，我决定换一套更现代化的工具链：</p>
-<ul>
-<li><strong>STM32CubeMX</strong> —— 图形化配置引脚和外设，生成初始化代码</li>
-<li><strong>VS Code + STM32 扩展</strong> —— 现代化的代码编辑器，补全、跳转、Git 集成</li>
-<li><strong>HAL 库</strong> —— 用库函数操作外设，先建立工程能力，以后再深入底层</li>
-</ul>
-<p>最终效果：通过 <strong>VS Code</strong> 管理项目，只用写核心的功能代码，一键编译，一键烧录到开发板，LED 灯点亮并闪烁。</p>
-<hr>
-<h2 id="工具链概览"><a href="#工具链概览" class="headerlink" title="工具链概览"></a>工具链概览</h2><p>先搞清楚每样东西是干什么的：</p>
-<table>
-<thead>
-<tr>
-<th>工具</th>
-<th>作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>STM32CubeMX</strong></td>
-<td>图形化配置芯片引脚、时钟、外设，生成初始化 C 代码</td>
-</tr>
-<tr>
-<td><strong>VS Code</strong></td>
-<td>代码编辑器，用于编写业务逻辑</td>
-</tr>
-<tr>
-<td><strong>STM32 VS Code Extension</strong></td>
-<td>ST 官方插件，集成编译、烧录、调试功能</td>
-</tr>
-<tr>
-<td><strong>GCC Toolchain</strong></td>
-<td>编译器（arm-none-eabi-gcc），把代码编译成机器码</td>
-</tr>
-<tr>
-<td><strong>ST-Link</strong></td>
-<td>调试器&#x2F;烧录器，通过 SWD 接口连接电脑和开发板</td>
-</tr>
-</tbody></table>
-<p>整个工作流程：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CubeMX 配置引脚 → 生成代码 → VS Code 编写LED灯闪烁的逻辑 → 编译 → 烧录 → 跑起来！</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="安装步骤"><a href="#安装步骤" class="headerlink" title="安装步骤"></a>安装步骤</h2><h3 id="安装-STM32CubeMX"><a href="#安装-STM32CubeMX" class="headerlink" title="安装 STM32CubeMX"></a>安装 STM32CubeMX</h3><ol>
-<li>去 <a href="https://www.st.com/en/development-tools/stm32cubemx.html">ST 官网</a> 下载 STM32CubeMX（需要注册 ST 账号，免费）</li>
-<li>运行安装程序，一直下一步</li>
-<li>安装过程中它会自动下载芯片支持包（STM32Cube FW_F1 等），等它下载完就行</li>
-</ol>
-<p>安装完成后桌面上会有个 <code>STM32CubeMX</code> 的图标。</p>
-<h3 id="安装-VS-Code-与-STM32-扩展"><a href="#安装-VS-Code-与-STM32-扩展" class="headerlink" title="安装 VS Code 与 STM32 扩展"></a>安装 VS Code 与 STM32 扩展</h3><ol>
-<li>去 <a href="https://code.visualstudio.com/">VS Code 官网</a> 下载安装</li>
-<li>安装完成后，打开 VS Code，点左侧的扩展图标（或按 <code>Ctrl+Shift+X</code>）</li>
-<li>搜索 <strong>STM32</strong>，找到 STMicroelectronics 官方出的 <strong>STM32 VS Code Extension</strong>，点击安装</li>
-<li>安装完成后，VS Code 会自动检测并建议安装一些配套工具，确认即可</li>
-</ol>
-<p>这个扩展帮我们集成了编译和烧录的功能，不用自己手动配 CMake 和命令行。</p>
-<h3 id="安装-ST-Link-驱动"><a href="#安装-ST-Link-驱动" class="headerlink" title="安装 ST-Link 驱动"></a>安装 ST-Link 驱动</h3><p>ST-Link 是连接电脑和开发板的调试器。插上电脑后，如果设备管理器里显示黄色感叹号，说明没装驱动。</p>
-<p><strong>解决方法：</strong></p>
-<ol>
-<li>下载 <a href="https://www.st.com/en/development-tools/stsw-link009.html">ST-Link 驱动</a>（<code>en.stsw-link009.zip</code>）</li>
-<li>解压后，64 位系统运行 <code>dpinst_amd64.exe</code></li>
-<li>安装完成后，重新插拔 ST-Link</li>
-<li>打开设备管理器，应该能看到 <code>STMicroelectronics STM32 STLink</code>，没有黄色感叹号</li>
-</ol>
-<blockquote>
-<p>如果不想单独装驱动，安装 STM32CubeProgrammer 也会自动装好 ST-Link 驱动。</p>
-</blockquote>
-<hr>
-<h2 id="创建第一个项目"><a href="#创建第一个项目" class="headerlink" title="创建第一个项目"></a>创建第一个项目</h2><h3 id="在-CubeMX-中新建项目"><a href="#在-CubeMX-中新建项目" class="headerlink" title="在 CubeMX 中新建项目"></a>在 CubeMX 中新建项目</h3><ol>
-<li>打开 STM32CubeMX</li>
-<li>点击 <strong>“New Project”</strong></li>
-<li>在搜索框输入 <strong>STM32F103C8T6</strong>（我用的是 Keysking大佬开发的集成开发板），双击选中</li>
-<li>弹窗问是否初始化外设，点 <strong>“No”</strong></li>
-</ol>
-<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
-<p><strong>配置 LED 灯引脚（PA7）：</strong></p>
-<ol>
-<li><p>在芯片图上找到 <strong>PA7</strong>，点击它</p>
-</li>
-<li><p>选择 <strong>GPIO_Output</strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202119625.png" alt="image-20260724202119625"></p>
-</li>
-<li><p>在左侧的 Categories面板下面的System Core里找到 GPIO 设置，点击后中间会跳出Configuration界面，如下图所示</p>
-</li>
-<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202248835.png" alt="image-20260724202248835"></p>
-</li>
-<li><p>选中PA7引脚，下方跳出具体的设置界面<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202524255.png" alt="image-20260724202524255"></p>
-</li>
-<li><p>此处本来GPIO output level是low，也就是低电平，把它改成High,高电平即可</p>
-</li>
-<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202648342.png" alt="image-20260724202648342"></p>
-</li>
-<li><p>其他保持默认：推挽输出、无上下拉、低速度</p>
-</li>
-</ol>
-<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：![屏幕截图 2026-07-24 211145](.&#x2F;..&#x2F;images&#x2F;stm32再出发-从keil转到vscode+cubemx&#x2F;屏幕截图 2026-07-24 211145.png)</p>
-<ul>
-<li><strong>Debug</strong> 选择 <strong>Serial Wire</strong></li>
-<li>这样 PA13&#x2F;SWDIO 和 PA14&#x2F;SWCLK 会被自动配置，用于 ST-Link 调试</li>
-</ul>
-<blockquote>
-<p>这一步很重要！否则烧录一次后，下次 SWD 就被禁用了，再也烧不进新程序。</p>
-</blockquote>
-<h3 id="选择工具链"><a href="#选择工具链" class="headerlink" title="选择工具链"></a>选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
-<table>
-<thead>
-<tr>
-<th>设置项</th>
-<th>值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Project Name</strong></td>
-<td><code>stm32code-demo</code></td>
-</tr>
-<tr>
-<td><strong>Project Location</strong></td>
-<td>选一个<strong>纯英文</strong>目录–此处我选的是D盘下的stm32project目录</td>
-</tr>
-<tr>
-<td><strong>Toolchain &#x2F; IDE</strong></td>
-<td><strong>CMake</strong>（关键！一定要选 CMake，而不是其他的）</td>
-</tr>
-<tr>
-<td><strong>Default Compiler&#x2F;Linker</strong></td>
-<td>GCC</td>
-</tr>
-</tbody></table>
-<p>点击右上角 **”Generate Code”**，生成代码。弹窗问要不要打开项目，选 **”Open Project”**，它会自动用 VS Code 打开。</p>
-<hr>
-<h2 id="在-VS-Code-中编写代码"><a href="#在-VS-Code-中编写代码" class="headerlink" title="在 VS Code 中编写代码"></a>在 VS Code 中编写代码</h2><p>项目打开后，目录结构大致是这样：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">stm32code-demo/</span><br><span class="line">├── Core/</span><br><span class="line">│   ├── Inc/</span><br><span class="line">│   │   └── main.h           ← 引脚宏定义在这里</span><br><span class="line">│   └── Src/</span><br><span class="line">│       └── main.c           ← 主程序</span><br><span class="line">├── Drivers/                  ← HAL 库和 CMSIS</span><br><span class="line">├── cmake/                    ← CMake 配置</span><br><span class="line">├── CMakeLists.txt            ← CMake 主文件</span><br><span class="line">└── stm32code-demo.ioc        ← CubeMX 配置文件（不要删）</span><br></pre></td></tr></table></figure>
-
-<h3 id="认识-main-c"><a href="#认识-main-c" class="headerlink" title="认识 main.c"></a>认识 main.c</h3><p>CubeMX 生成的 <code>main.c</code> 骨架代码结构如下：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();                 <span class="comment">// 1. 初始化 HAL 库</span></span><br><span class="line">    SystemClock_Config();       <span class="comment">// 2. 配置系统时钟</span></span><br><span class="line">    MX_GPIO_Init();             <span class="comment">// 3. 初始化 GPIO（在这里配置引脚）</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">    <span class="comment">// 4. 用户初始化代码写在这里</span></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 5. 主循环 —— 反复执行的逻辑</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>关键点：**<code>USER CODE BEGIN</code> 和 <code>USER CODE END</code> 之间的代码**，CubeMX 重新生成时不会覆盖。你自己的逻辑都写在这之间。</p>
-<h3 id="写点灯代码"><a href="#写点灯代码" class="headerlink" title="写点灯代码"></a>写点灯代码</h3><p><strong>让 LED 一直亮：</strong> 不需要写任何代码。<code>MX_GPIO_Init()</code> 里已经通过 <code>HAL_GPIO_WritePin()</code> 设好了初始电平，灯自然会亮。</p>
-<p><strong>让 LED 闪烁：</strong> 在 <code>while(1)</code> 里写翻转逻辑：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);    <span class="comment">// PA7 翻转电平</span></span><br><span class="line">  HAL_Delay(<span class="number">500</span>);                             <span class="comment">// 等 500ms</span></span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>如果用到了 User Label，也可以写成 <code>HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);</code></p>
-</blockquote>
-<h3 id="关于-USER-CODE-区块"><a href="#关于-USER-CODE-区块" class="headerlink" title="关于 USER CODE 区块"></a>关于 USER CODE 区块</h3><p>这是 CubeMX 最贴心的设计之一。每次 CubeMX 重新生成代码时：</p>
-<ul>
-<li>✅ <code>USER CODE BEGIN/END</code> 之间的内容会被保留</li>
-<li>❌ 外部的代码会被完全覆盖</li>
-</ul>
-<p>所以养成习惯：<strong>所有自己写的代码，都放在 USER CODE 区块里。</strong></p>
-<p>常用的 USER CODE 位置：</p>
-<table>
-<thead>
-<tr>
-<th>区块</th>
-<th>位置</th>
-<th>用途</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>USER CODE BEGIN 2</code></td>
-<td><code>MX_GPIO_Init()</code> 之后</td>
-<td>初始化设置</td>
-</tr>
-<tr>
-<td><code>USER CODE BEGIN WHILE</code></td>
-<td><code>while(1)</code> 内部开头</td>
-<td>主循环逻辑</td>
-</tr>
-<tr>
-<td><code>USER CODE BEGIN 3</code></td>
-<td><code>while(1)</code> 内部结尾</td>
-<td>主循环末尾</td>
-</tr>
-<tr>
-<td><code>USER CODE BEGIN 0</code></td>
-<td><code>main.c</code> 顶部函数区</td>
-<td>自定义函数</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码"><a href="#解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码" class="headerlink" title="解读 MX_GPIO_Init —— CubeMX 生成的初始化代码"></a>解读 MX_GPIO_Init —— CubeMX 生成的初始化代码</h2><p>前面提到，CubeMX 帮我们生成了引脚配置代码。但”能用”和”理解”是两回事，我们来看看 <code>MX_GPIO_Init()</code> 函数里每段代码到底在干什么。</p>
-<h3 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin Output Level */</span></span><br><span class="line">    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin : PA7 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = GPIO_PIN_7;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="逐行解析"><a href="#逐行解析" class="headerlink" title="逐行解析"></a>逐行解析</h3><table>
-<thead>
-<tr>
-<th>代码</th>
-<th>作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>GPIO_InitTypeDef GPIO_InitStruct = &#123;0&#125;;</code></td>
-<td>定义一个 GPIO 配置结构体，<code>&#123;0&#125;</code> 把所有成员初始化为 0，避免使用未初始化的值</td>
-</tr>
-<tr>
-<td><code>__HAL_RCC_GPIOA_CLK_ENABLE()</code></td>
-<td><strong>使能 GPIOA 端口的时钟</strong>。STM32 的外设默认时钟是关闭的，使用前必须开启时钟，否则寄存器写不进。这条是一个宏，背后操作的是 RCC 寄存器</td>
-</tr>
-<tr>
-<td><code>HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET)</code></td>
-<td>在配置之前先把引脚输出设为低电平，保证初始时 LED 是灭的，不会出现瞬间闪一下</td>
-</tr>
-<tr>
-<td><code>GPIO_InitStruct.Pin = GPIO_PIN_7</code></td>
-<td>指定要配置的引脚是第 7 号引脚（PA7）</td>
-</tr>
-<tr>
-<td><code>GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP</code></td>
-<td><strong>输出模式：推挽输出（Push-Pull）</strong>。这是 GPIO 最常用的输出模式——可以输出高&#x2F;低电平，驱动能力强</td>
-</tr>
-<tr>
-<td><code>GPIO_InitStruct.Pull = GPIO_NOPULL</code></td>
-<td><strong>上下拉：无</strong>。LED 是输出引脚，不需要上下拉电阻</td>
-</tr>
-<tr>
-<td><code>GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW</code></td>
-<td><strong>输出速度：低速</strong>。LED 翻转速度很慢（几百 ms 一次），低速就够用了。速度越快功耗越高、电磁干扰越大</td>
-</tr>
-<tr>
-<td><code>HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct)</code></td>
-<td><strong>将上面配置的结构体写入寄存器</strong>，GPIO 才真正按我们的设置工作。<code>GPIOA</code> 参数表示操作 A 组引脚</td>
-</tr>
-</tbody></table>
-<h3 id="关于-GPIO-模式"><a href="#关于-GPIO-模式" class="headerlink" title="关于 GPIO 模式"></a>关于 GPIO 模式</h3><p><code>GPIO_MODE_OUTPUT_PP</code> 是最常用的输出模式，还有一些其他模式你以后会遇到：</p>
-<table>
-<thead>
-<tr>
-<th>模式</th>
-<th>含义</th>
-<th>典型用途</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>GPIO_MODE_OUTPUT_PP</code></td>
-<td>推挽输出</td>
-<td>驱动 LED、普通数字信号输出</td>
-</tr>
-<tr>
-<td><code>GPIO_MODE_OUTPUT_OD</code></td>
-<td>开漏输出</td>
-<td>I2C 通信、电平转换</td>
-</tr>
-<tr>
-<td><code>GPIO_MODE_INPUT</code></td>
-<td>浮空输入</td>
-<td>读取按键、传感器信号</td>
-</tr>
-<tr>
-<td><code>GPIO_MODE_IT_RISING</code></td>
-<td>上升沿触发中断</td>
-<td>外部中断</td>
-</tr>
-<tr>
-<td><code>GPIO_MODE_IT_FALLING</code></td>
-<td>下降沿触发中断</td>
-<td>按键中断</td>
-</tr>
-<tr>
-<td><code>GPIO_MODE_AF_PP</code></td>
-<td>复用推挽输出</td>
-<td>UART、SPI 等外设功能引脚</td>
-</tr>
-</tbody></table>
-<p>目前只需掌握前两个输出模式，后续文章中会接触到更多。</p>
-<h3 id="关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX"><a href="#关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX" class="headerlink" title="关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX"></a>关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX</h3><p>CubeMX 帮我们生成了这段代码，我们可以直接拿来用，但这不意味着可以跳过理解。建议的学习路径是：</p>
-<ol>
-<li><strong>先用 CubeMX 生成</strong> —— 快速搭建项目，不纠结寄存器细节</li>
-<li><strong>再解析生成的代码</strong> —— 搞清楚每行配置在做什么</li>
-<li><strong>最后能不用 CubeMX 也写出来</strong> —— 真正掌握后，即使工作中没有 CubeMX 也能手写驱动</li>
-</ol>
-<p>这也是后续所有博客都会保持的风格——不只是展示 CubeMX 的操作步骤，还会解析生成的代码。</p>
-<hr>
-<h2 id="编译"><a href="#编译" class="headerlink" title="编译"></a>编译</h2><p>写好了代码，怎么编译成开发板能运行的机器码？</p>
-<h3 id="通过-VS-Code-编译"><a href="#通过-VS-Code-编译" class="headerlink" title="通过 VS Code 编译"></a>通过 VS Code 编译</h3><p>在 VS Code 底部状态栏，ST 扩展提供了按钮：</p>
-<ol>
-<li>先点 <strong>齿轮图标  “生成”</strong> → 开始编译</li>
-<li>观察底部终端面板的输出</li>
-<li>看到类似下面的输出就是编译成功了：</li>
-</ol>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[build] Memory region         Used Size  Region Size  %age Used</span><br><span class="line">[build]              RAM:        1584 B        20 KB      7.73%</span><br><span class="line">[build]            FLASH:        4628 B        64 KB      7.06%</span><br><span class="line">[driver] 生成完毕: 00:00:01.235</span><br><span class="line">[build] 生成已完成，退出代码为 0</span><br></pre></td></tr></table></figure>
-
-<p>其中 <code>RAM</code> 和 <code>FLASH</code> 显示了固件占用的空间，<code>生成完毕</code> 和 <code>退出代码为 0</code> 代表编译成功。</p>
-<p>编译产物在 <code>build/Debug/</code> 目录下：</p>
-<ul>
-<li><code>stm32code-demo.elf</code> — 可执行文件（包含调试信息）</li>
-<li><code>stm32code-demo.bin</code> — 纯二进制文件（用于烧录）</li>
-</ul>
-<h3 id="常见编译错误"><a href="#常见编译错误" class="headerlink" title="常见编译错误"></a>常见编译错误</h3><table>
-<thead>
-<tr>
-<th>错误</th>
-<th>原因</th>
-<th>解决</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>undefined reference to XXX_Pin</code></td>
-<td>引脚宏被删了但代码还在引用</td>
-<td>去 CubeMX 重新配引脚并生成代码</td>
-</tr>
-<tr>
-<td><code>arm-none-eabi-gcc: not found</code></td>
-<td>工具链没装上</td>
-<td>重新安装 STM32 VS Code Extension</td>
-</tr>
-<tr>
-<td><code>CMake Error: toolchain file not found</code></td>
-<td>工具链路径不对</td>
-<td>确保 STM32 扩展已正确安装</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="烧录"><a href="#烧录" class="headerlink" title="烧录"></a>烧录</h2><p>编译通过后，把程序下载到开发板上。</p>
-<h3 id="硬件连接"><a href="#硬件连接" class="headerlink" title="硬件连接"></a>硬件连接</h3><p>ST-Link 和开发板通过 SWD 接口连接，只需要 4 根线：</p>
-<table>
-<thead>
-<tr>
-<th>ST-Link</th>
-<th>开发板</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>SWDIO</td>
-<td>PA13</td>
-</tr>
-<tr>
-<td>SWCLK</td>
-<td>PA14</td>
-</tr>
-<tr>
-<td>GND</td>
-<td>GND</td>
-</tr>
-<tr>
-<td>3.3V</td>
-<td>VCC</td>
-</tr>
-</tbody></table>
-<blockquote>
-<p>有些 ST-Link 还多一根 NRST（复位）线，也可以接上，但不是必须的。</p>
-</blockquote>
-<h3 id="驱动问题排坑"><a href="#驱动问题排坑" class="headerlink" title="驱动问题排坑"></a>驱动问题排坑</h3><p>插上 ST-Link 后，如果 VS Code 检测不到设备，大概率是驱动没装。</p>
-<p><strong>排坑步骤：</strong></p>
-<ol>
-<li>打开<strong>设备管理器</strong>（Win + X → 设备管理器）</li>
-<li>看有没有 <code>STM32 STLink</code> 出现</li>
-<li>如果有黄色感叹号 → 运行 <code>dpinst_amd64.exe</code> 安装驱动</li>
-<li>装好驱动后，重新插拔 ST-Link</li>
-<li>设备管理器里应该显示正常</li>
-</ol>
-<h3 id="烧录到开发板"><a href="#烧录到开发板" class="headerlink" title="烧录到开发板"></a>烧录到开发板</h3><p>驱动正常后，在 VS Code 中：</p>
-<ol>
-<li>点击左侧的 <strong>运行和调试</strong> 图标（🦖 或 <code>Ctrl+Shift+D</code>），打开运行和调试面板</li>
-<li>确认下方 <strong>STM32Cube设备与开发板</strong> 列表中能看到 <code>STM32 STLink</code>（<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-device-list.png" alt="STM32设备列表"></li>
-<li>点击上方的 <strong>运行和调试</strong> 按钮，选择 <strong><code>STM32Cube:STM32 Launch STLink GDB Server</code></strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-launch-gdb.png" alt="选择Launch STLink GDB Server"></li>
-<li>此时 ST-Link 开始连接开发板，终端会输出连接日志</li>
-<li>点击 VS Code 上方调试工具栏中的 <strong>继续</strong> 按钮（▶️ 图标）<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-continue-button.png" alt="点击继续按钮运行程序"></li>
-<li>程序开始运行，LED 灯闪烁 🎉</li>
-</ol>
-<h3 id="如何确认烧录成功"><a href="#如何确认烧录成功" class="headerlink" title="如何确认烧录成功"></a>如何确认烧录成功</h3><p>烧录完成后，如果代码写的是闪烁逻辑，会看到：</p>
-<ul>
-<li>LED 以 500ms 的间隔一亮一灭 💡</li>
-<li>这说明：程序成功烧录 → 芯片运行 → GPIO 正常翻转</li>
-</ul>
-<p>如果灯不亮：</p>
-<table>
-<thead>
-<tr>
-<th>现象</th>
-<th>可能原因</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>完全不亮</td>
-<td>接线反了？引脚号对不对？初始电平设的是 High 吗？</td>
-</tr>
-<tr>
-<td>一直亮不闪</td>
-<td><code>while(1)</code> 里没写 <code>TogglePin</code> 或 <code>Delay</code></td>
-</tr>
-<tr>
-<td>亮一下就不亮了</td>
-<td>可能芯片复位了，检查电源</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="与传统-Keil-开发的对比"><a href="#与传统-Keil-开发的对比" class="headerlink" title="与传统 Keil 开发的对比"></a>与传统 Keil 开发的对比</h3><table>
-<thead>
-<tr>
-<th>对比项</th>
-<th>Keil 方案</th>
-<th>VS Code + CubeMX 方案</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>界面</td>
-<td>老旧，2000 年代风格</td>
-<td>现代化，美观</td>
-</tr>
-<tr>
-<td>代码编辑</td>
-<td>无补全</td>
-<td>智能补全、跳转定义</td>
-</tr>
-<tr>
-<td>配置方式</td>
-<td>手动写寄存器或配图形界面</td>
-<td>CubeMX 统一图形化配置</td>
-</tr>
-<tr>
-<td>项目迁移</td>
-<td>难跨平台</td>
-<td>基于 CMake，跨平台</td>
-</tr>
-<tr>
-<td>费用</td>
-<td>收费（商业版）</td>
-<td>全部免费</td>
-</tr>
-<tr>
-<td>学习曲线</td>
-<td>陡峭（要学很多很多很多细节）</td>
-<td>平缓（HAL 封装好了，只关心核心功能）</td>
-</tr>
-</tbody></table>
-<h3 id="工作流总结"><a href="#工作流总结" class="headerlink" title="工作流总结"></a>工作流总结</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1.  打开 CubeMX → 配引脚 → Generate Code</span><br><span class="line">2.  在 VS Code 中打开项目</span><br><span class="line">3.  在 USER CODE 区域写业务逻辑</span><br><span class="line">4.  Ctrl+Shift+P → STM32: Build</span><br><span class="line">5.  插上 ST-Link 连接开发板</span><br><span class="line">6.  Ctrl+Shift+P → STM32: Download</span><br><span class="line">7.  🎉 灯亮了！</span><br></pre></td></tr></table></figure>
-
-<h3 id="后续学习路线"><a href="#后续学习路线" class="headerlink" title="后续学习路线"></a>后续学习路线</h3><p>点灯是嵌入式开发的 **”Hello World”**，下一步可以学：</p>
-<ul>
-<li><strong>外部中断</strong> —— 按键控制 LED</li>
-<li><strong>定时器&#x2F;PWM</strong> —— 呼吸灯、舵机控制</li>
-<li><strong>UART 串口</strong> —— 和电脑通信，打印调试信息</li>
-<li><strong>ADC</strong> —— 读取传感器数值</li>
-<li><strong>I2C&#x2F;SPI</strong> —— 驱动 OLED 屏幕、传感器模块</li>
-</ul>
-<p>每条路线跑通后，我都会写博客记录下来，欢迎继续关注 😄</p>
-<hr>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
-<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
-<li><a href="https://www.st.com/en/development-tools/stsw-link009.html">ST-Link 驱动下载</a></li>
-<li><a href="https://www.st.com/en/development-tools/stm32cubemx.html">STM32CubeMX 下载</a></li>
-<li><a href="https://marketplace.visualstudio.com/items?itemName=stmicroelectronics.stm32-vscode-extension">STM32 VS Code Extension</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>VS Code</tag>
-        <tag>STM32</tag>
-        <tag>嵌入式</tag>
-        <tag>CubeMX</tag>
-        <tag>GPIO</tag>
-      </tags>
   </entry>
   <entry>
     <title>hexo博客静态网站项目总结回顾深挖</title>
@@ -9706,9 +9272,9 @@
       </categories>
       <tags>
         <tag>VS Code</tag>
-        <tag>Markdown</tag>
         <tag>Node.js</tag>
         <tag>Hexo</tag>
+        <tag>Markdown</tag>
         <tag>静态站点</tag>
         <tag>VirtualBox</tag>
         <tag>Ubuntu</tag>
@@ -9718,6 +9284,928 @@
         <tag>CI/CD</tag>
         <tag>Git</tag>
         <tag>Nginx</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Markdown 语法规则</title>
+    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
+    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
+<p>这是第二行</p>
+<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
+<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
+<p>效果：</p>
+<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>代码和快捷键：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
+<p>效果：</p>
+<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
+<p>效果：只有同一级别</p>
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：-&#x2F;*&#x2F;+ +空格</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
+<p>效果：</p>
+<ol>
+<li>一</li>
+<li>二</li>
+<li>子1</li>
+<li>子2<ol>
+<li>子1-子1</li>
+</ol>
+</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<p>数字+.+空格</p>
+<p>缩进用tab,回退shift+tab</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
+<p>效果：</p>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+练习markdown语法</p>
+</li>
+<li><p><input disabled="" type="checkbox"> 
+维护网站</p>
+</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
+<p>效果：</p>
+<blockquote>
+<p>这是最外层区块</p>
+<blockquote>
+<p>这是内层</p>
+<blockquote>
+<p>这是更内层</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
+<p>效果：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
+<p>效果：</p>
+<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
+<p>效果：</p>
+<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Markdown</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>STM32--浅析GPIO八大模式</title>
+    <url>/2026/07/27/stm32-gpio-eight-modes/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>回顾前面三篇博客，我们已经接触过几种 GPIO 模式：</p>
+<table>
+<thead>
+<tr>
+<th align="left">博客</th>
+<th align="left">用到的 GPIO 模式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">STM32再出发</a></td>
+<td align="left"><strong>推挽输出</strong>（驱动 LED）</td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/07/26/STM32_RGB_LED/">三色LED流水灯</a></td>
+<td align="left"><strong>推挽输出</strong>（三个 LED）</td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/07/26/STM32_Key_Input/">按键输入</a></td>
+<td align="left"><strong>上拉输入</strong>（KEY2 内部上拉）+ <strong>浮空输入+外部上拉</strong>（KEY1 板载上拉）</td>
+</tr>
+</tbody></table>
+<p>除了上述几种模式，GPIO还有其他的输入输出模式。这篇文章就是对于GPIO八大模式的总结和梳理，顺便把前几篇博客里实际用到的 GPIO 模式串联起来分析一下。</p>
+<hr>
+<h2 id="GPIO-内部结构速览"><a href="#GPIO-内部结构速览" class="headerlink" title="GPIO 内部结构速览"></a>GPIO 内部结构速览</h2><p>在拆解 8 种模式之前，先认识一下 GPIO 引脚内部的核心组件。</p>
+<blockquote>
+<p><img src="/./../images/stm32-gpio-eight-modes/image-20260727221629861.png" alt="image-20260727221629861"></p>
+</blockquote>
+<h3 id="关键元件"><a href="#关键元件" class="headerlink" title="关键元件"></a>关键元件</h3><table>
+<thead>
+<tr>
+<th align="left">元件</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>保护二极管</strong></td>
+<td align="left">钳位电压：引脚电压 &gt; VDD 时电流引入 VDD，&lt; VSS 时引入 VSS，防止高压损坏芯片</td>
+</tr>
+<tr>
+<td align="left"><strong>施密特触发器（TTL肖密特触发器）</strong></td>
+<td align="left">将模拟电压转换为干净的数字电平，具备滞回特性，有效抗噪声</td>
+</tr>
+<tr>
+<td align="left"><strong>上拉&#x2F;下拉电阻</strong></td>
+<td align="left">输入模式下决定悬空引脚的电平状态，约 40kΩ，可软件配置</td>
+</tr>
+<tr>
+<td align="left"><strong>P-MOS</strong></td>
+<td align="left">输出驱动器的上管，导通时将引脚接到 VDD（输出高电平）</td>
+</tr>
+<tr>
+<td align="left"><strong>N-MOS</strong></td>
+<td align="left">输出驱动器的下管，导通时将引脚接到 VSS（输出低电平）</td>
+</tr>
+<tr>
+<td align="left"><strong>输出寄存器</strong></td>
+<td align="left">锁存 CPU 要输出的电平值</td>
+</tr>
+<tr>
+<td align="left"><strong>输入寄存器</strong></td>
+<td align="left">锁存引脚上当前的电平值</td>
+</tr>
+</tbody></table>
+<p>GPIO 内部的工作模式，本质上就是<strong>控制这些开关元件的通断组合</strong>。不同的通断组合 &#x3D; 不同的工作模式。</p>
+<hr>
+<h2 id="输入模式（4种）"><a href="#输入模式（4种）" class="headerlink" title="输入模式（4种）"></a>输入模式（4种）</h2><p>输入模式的核心：<strong>数据从引脚 → 内部总线</strong>（CPU 读取）。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727213728237.png" alt="image-20260727213728237"></p>
+</blockquote>
+<h3 id="1-浮空输入"><a href="#1-浮空输入" class="headerlink" title="1. 浮空输入"></a>1. 浮空输入</h3><p><strong>内部状态：</strong> 上下拉电阻均断开，施密特触发器导通。</p>
+<p><strong>引脚状态：</strong> 完全由外部电路决定。如果引脚什么都不接，电平是不确定的——可能是高、可能是低、甚至可能是中间电平。</p>
+<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>No pull</code></p>
+<p><strong>实际例子：</strong> 按键输入博客里的 <strong>KEY1（PB12）</strong> 用的就是”浮空输入 + 外部上拉电阻”。板子上已经焊了一个上拉电阻把 PB12 拉到 VDD，所以引脚悬空时是确定的——高电平。按下按键接地，读到低电平。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214136258.png" alt="image-20260727214136258"></p>
+</blockquote>
+<h3 id="2-上拉输入"><a href="#2-上拉输入" class="headerlink" title="2. 上拉输入"></a>2. 上拉输入</h3><p><strong>内部状态：</strong> 内部上拉电阻（约 40kΩ）接通到 VDD，施密特触发器导通。</p>
+<p><strong>引脚状态：</strong> 悬空时默认高电平。外部驱动为低电平时，可以读到低电平。</p>
+<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>Pull-up</code></p>
+<p><strong>实际例子：</strong> 按键输入博客里的 <strong>KEY2（PB13）</strong> 用的就是内部上拉。这个引脚板子上没有配外部上拉电阻，所以在 CubeMX 中配置 <code>Pull-up</code>，让芯片内部的电阻来负责拉高。功能和 KEY1 一样，只是上拉电阻的位置不同——一个在芯片外面，一个在芯片里面。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214222002.png" alt="image-20260727214222002"></p>
+</blockquote>
+<h3 id="3-下拉输入"><a href="#3-下拉输入" class="headerlink" title="3. 下拉输入"></a>3. 下拉输入</h3><p><strong>内部状态：</strong> 内部下拉电阻（约 40kΩ）接通到 VSS，施密特触发器导通。</p>
+<p><strong>引脚状态：</strong> 悬空时默认低电平。外部驱动为高电平时，可以读到高电平。</p>
+<p><strong>在 CubeMX 中：</strong> 选 <code>GPIO_Input</code> → <code>Pull</code> 选 <code>Pull-down</code></p>
+<p><strong>和上拉输入的关系：</strong> 上拉和下拉是对称的——上拉是电阻接到 VDD（默认高），下拉是电阻接到 VSS（默认低）。</p>
+<h3 id="4-模拟输入"><a href="#4-模拟输入" class="headerlink" title="4. 模拟输入"></a>4. 模拟输入</h3><p><strong>内部状态：</strong> 施密特触发器关闭（数字输入路径断开），引脚直接连接到 ADC 模块的模拟开关。</p>
+<p><strong>引脚状态：</strong> 不读高低电平，读电压模拟量。</p>
+<p><strong>在 CubeMX 中：</strong> 引脚功能选 <code>ADC_INx</code>（比如 ADC1_IN0），或直接选 <code>GPIO_Analog</code></p>
+<p><strong>用途：</strong> ADC 采样。比如读取电位器电压、温度传感器输出等。后续学到 ADC 时会用到。</p>
+<hr>
+<h2 id="输出模式（4种）"><a href="#输出模式（4种）" class="headerlink" title="输出模式（4种）"></a>输出模式（4种）</h2><p>输出模式的核心：<strong>数据从内部总线 → 引脚</strong>（CPU 写值出去），同时也可以回读引脚当前电平。</p>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214346566.png" alt="image-20260727214346566"></p>
+</blockquote>
+<h3 id="5-推挽输出"><a href="#5-推挽输出" class="headerlink" title="5. 推挽输出"></a>5. 推挽输出</h3><p><strong>内部状态：</strong> 输出寄存器控制 P-MOS 和 N-MOS 交替导通：</p>
+<table>
+<thead>
+<tr>
+<th align="center">输出</th>
+<th align="center">P-MOS</th>
+<th align="center">N-MOS</th>
+<th align="center">引脚电平</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="center">导通</td>
+<td align="center">断开</td>
+<td align="center">VDD（高电平）</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">断开</td>
+<td align="center">导通</td>
+<td align="center">VSS（低电平）</td>
+</tr>
+</tbody></table>
+<p><strong>在 CubeMX 中：</strong> <code>GPIO_Output</code> → <code>Output Mode</code> 选 <code>Push-Pull</code></p>
+<p><strong>特点：</strong> 驱动能力强，高电平和低电平都能主动输出。这是最常用的输出模式。</p>
+<p><strong>实际例子：</strong> 前两篇博客所有的 LED 点灯代码全都是<strong>推挽输出</strong>。翻开 CubeMX 配置能看到：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PA7 Output Mode:  Push-Pull</span><br><span class="line">PA6 Output Mode:  Push-Pull</span><br><span class="line">PB0 Output Mode:  Push-Pull</span><br></pre></td></tr></table></figure>
+
+<p>LED 需要足够的电流才能亮，推挽输出的驱动能力正好满足需求。</p>
+<blockquote>
+<p>下面是推挽输出控制I&#x2F;O口，输出高电平和低电平的电流流通图（假设I&#x2F;O口连接一个小灯，小灯另一端连接GND）</p>
+</blockquote>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214716103.png" alt="image-20260727214716103"></p>
+<p><img src="/./../images/gpio_eight_modes/image-20260727214908086.png" alt="image-20260727214908086"></p>
+</blockquote>
+<h3 id="6-开漏输出"><a href="#6-开漏输出" class="headerlink" title="6. 开漏输出"></a>6. 开漏输出</h3><p><strong>内部状态：</strong> P-MOS 始终断开（不工作），只有 N-MOS 受控：</p>
+<table>
+<thead>
+<tr>
+<th align="center">输出</th>
+<th align="center">P-MOS</th>
+<th align="center">N-MOS</th>
+<th align="center">引脚电平</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="center">断开</td>
+<td align="center">断开</td>
+<td align="center"><strong>高阻态</strong>（引脚浮空）</td>
+</tr>
+<tr>
+<td align="center">0</td>
+<td align="center">断开</td>
+<td align="center">导通</td>
+<td align="center">VSS（低电平）</td>
+</tr>
+</tbody></table>
+<p><strong>在 CubeMX 中：</strong> <code>GPIO_Output</code> → <code>Output Mode</code> 选 <code>Open-Drain</code></p>
+<p><strong>关键区别：</strong> 推挽能主动输出高电平，开漏不行。开漏输出高电平时引脚处于高阻态——必须靠<strong>外部上拉电阻</strong>才能拉高到想要的电压。</p>
+<blockquote>
+<p>下面是开漏输出控制I&#x2F;O口，输出高电平和低电平的电流流通图（假设I&#x2F;O口连接一个小灯，小灯另一端连接来自外部的5V而非GND）</p>
+<p>注意：此时需要使用5V容忍的I&#x2F;O口，不能用普通的，否则会使上方的保护二极管长期导通，将5V引入电源中，造成损坏。</p>
+</blockquote>
+<blockquote>
+<p><img src="/./../images/gpio_eight_modes/image-20260727215442581.png" alt="image-20260727215442581"></p>
+<p><img src="/./../images/gpio_eight_modes/image-20260727215312807.png" alt="image-20260727215312807"></p>
+</blockquote>
+<h3 id="推挽输出-vs-开漏输出-对比"><a href="#推挽输出-vs-开漏输出-对比" class="headerlink" title="推挽输出 vs 开漏输出 对比"></a>推挽输出 vs 开漏输出 对比</h3><table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">推挽输出</th>
+<th align="left">开漏输出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>高电平</strong></td>
+<td align="left">P-MOS 激活 N-MOS 断开，3.3V</td>
+<td align="left">P-MOS 断开 N-MOS 断开，由外部电路决定</td>
+</tr>
+<tr>
+<td align="left"><strong>低电平</strong></td>
+<td align="left">P-MOS 断开 N-MOS 激活，0V</td>
+<td align="left">P-MOS 断开 N-MOS 激活，0V</td>
+</tr>
+<tr>
+<td align="left"><strong>优点</strong></td>
+<td align="left">可以直接输出 3.3V</td>
+<td align="left">配合外部电路更加灵活</td>
+</tr>
+<tr>
+<td align="left"><strong>缺点</strong></td>
+<td align="left">只能输出 3.3V</td>
+<td align="left">高电平实际是高阻态，无法输出电流</td>
+</tr>
+</tbody></table>
+<p><strong>为什么需要开漏输出？两个经典场景：</strong></p>
+<p><strong>场景一：电平转换</strong><br>如果芯片是 3.3V 的，但想驱动一个 5V 的器件——开漏输出 + 外部上拉到 5V 就能实现。推挽输出去接的话，3.3V 的高电平可能不被识别为高电平。</p>
+<p><strong>场景二：I2C 通信的”线与”</strong><br>多个器件共享一根数据线（SDA），任何一个器件都可以把总线拉低。如果其中一个输出高电平，另一个同时输出低电平，用推挽输出的话两个 MOS 管会”打架”（短路风险）。开漏输出+上拉电阻天然支持这种”谁都可以拉低”的结构。</p>
+<h3 id="7-复用推挽输出"><a href="#7-复用推挽输出" class="headerlink" title="7. 复用推挽输出"></a>7. 复用推挽输出</h3><p><strong>内部状态：</strong> 和推挽输出电路完全一样，只不过控制 P-MOS&#x2F;N-MOS 的信号不再是输出寄存器，而是<strong>片上外设</strong>（USART、SPI、定时器等）。</p>
+<p><strong>在 CubeMX 中：</strong> 配置外设时自动设置（比如把 PA9 配成 USART1_TX，CubeMX 自动设为复用推挽）</p>
+<p><strong>实际例子：</strong> 以后配串口时，CubeMX 的提示里多半就是这个。</p>
+<h3 id="8-复用开漏输出"><a href="#8-复用开漏输出" class="headerlink" title="8. 复用开漏输出"></a>8. 复用开漏输出</h3><p><strong>内部状态：</strong> 和开漏输出电路完全一样，只不过控制 N-MOS 的信号来自<strong>片上外设</strong>。</p>
+<p><strong>在 CubeMX 中：</strong> 配置外设时自动设置（比如把 PB6 配成 I2C1_SCL，CubeMX 自动设为复用开漏）</p>
+<p><strong>实际例子：</strong> I2C 通信。如果使用硬件 I2C 外设（而不是软件模拟），SCL 和 SDA 引脚会被配置为复用开漏输出。</p>
+<blockquote>
+<p>下面两张图为普通的输出和复用的输出的电流流经图</p>
+<p><img src="/./../images/gpio_eight_modes/alternate_output.png" alt="alt_output"></p>
+<p><img src="/./../images/gpio_eight_modes/alternate_input.png" alt="alt_input"></p>
+</blockquote>
+<hr>
+<h2 id="为什么没有”复用输入”模式？"><a href="#为什么没有”复用输入”模式？" class="headerlink" title="为什么没有”复用输入”模式？"></a>为什么没有”复用输入”模式？</h2><p>留意到一个问题：输出模式有普通和复用两种，但输入模式只有 4 种，没有”复用输入”这个分类。</p>
+<p>原因是输入模式下，普通输入和复用功能<strong>共用同一路信号</strong>——都通过施密特触发器，送到输入寄存器，同时也送给片上外设。</p>
+<p>所以无论引脚工作在什么模式下（只要不是模拟输入），外设都能读到引脚的值。不需要额外的”复用输入”模式。</p>
+<blockquote>
+<p>有例外：ADC 的模拟输入走的是独立路径（不走施密特触发器），所以模拟输入被划为独立的输入模式。</p>
+</blockquote>
+<hr>
+<h2 id="八大模式速查表"><a href="#八大模式速查表" class="headerlink" title="八大模式速查表"></a>八大模式速查表</h2><table>
+<thead>
+<tr>
+<th align="center">编号</th>
+<th align="left">模式</th>
+<th align="center">方向</th>
+<th align="left">核心特点</th>
+<th align="left">典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left">浮空输入</td>
+<td align="center">输入</td>
+<td align="left">上下拉全关，电平完全由外部决定</td>
+<td align="left">外部已有上下拉电阻的按键</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">上拉输入</td>
+<td align="center">输入</td>
+<td align="left">内部接 VDD，默认高电平</td>
+<td align="left">无外部上拉的按键</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">下拉输入</td>
+<td align="center">输入</td>
+<td align="left">内部接 VSS，默认低电平</td>
+<td align="left">默认需为低电平的输入</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">模拟输入</td>
+<td align="center">输入</td>
+<td align="left">绕开施密特触发器，直通 ADC</td>
+<td align="left">ADC 采样</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="left">推挽输出</td>
+<td align="center">输出</td>
+<td align="left">P&#x2F;N-MOS 交替，可主动输出高低</td>
+<td align="left">驱动 LED、普通数字信号</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="left">开漏输出</td>
+<td align="center">输出</td>
+<td align="left">只有 N-MOS，高阻态需外部上拉</td>
+<td align="left">I2C、电平转换</td>
+</tr>
+<tr>
+<td align="center">7</td>
+<td align="left">复用推挽</td>
+<td align="center">输出</td>
+<td align="left">信号源改由外设控制</td>
+<td align="left">串口 TX、PWM、SPI</td>
+</tr>
+<tr>
+<td align="center">8</td>
+<td align="left">复用开漏</td>
+<td align="center">输出</td>
+<td align="left">外设控制 + 开漏特性</td>
+<td align="left">硬件 I2C</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="从前面三篇博客回看-GPIO-配置"><a href="#从前面三篇博客回看-GPIO-配置" class="headerlink" title="从前面三篇博客回看 GPIO 配置"></a>从前面三篇博客回看 GPIO 配置</h2><h3 id="第一篇：STM32再出发-—-PA7-推挽输出"><a href="#第一篇：STM32再出发-—-PA7-推挽输出" class="headerlink" title="第一篇：STM32再出发 — PA7 推挽输出"></a>第一篇：STM32再出发 — PA7 推挽输出</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// CubeMX 配置：PA7 → GPIO_Output, Push-Pull, No pull, Low speed</span></span><br><span class="line">HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  <span class="comment">// 翻转电平</span></span><br><span class="line">HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);  <span class="comment">// 拉高</span></span><br></pre></td></tr></table></figure>
+
+<p>LED 是纯数字负载，只需要开关两个状态就够。推挽输出的高电平驱动电流足以点亮 LED。</p>
+<h3 id="第二篇：三色LED流水灯-—-三个推挽输出"><a href="#第二篇：三色LED流水灯-—-三个推挽输出" class="headerlink" title="第二篇：三色LED流水灯 — 三个推挽输出"></a>第二篇：三色LED流水灯 — 三个推挽输出</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PB0 → Push-Pull  (LED_RED)</span><br><span class="line">PA7 → Push-Pull  (LED_GREEN)</span><br><span class="line">PA6 → Push-Pull  (LED_BLUE)</span><br></pre></td></tr></table></figure>
+
+<p>三个 LED 都一样，推挽输出 + 状态机控制亮灭组合。没有特殊情况需要特殊模式。</p>
+<h3 id="第三篇：按键输入-—-KEY1-浮空输入，KEY2-上拉输入"><a href="#第三篇：按键输入-—-KEY1-浮空输入，KEY2-上拉输入" class="headerlink" title="第三篇：按键输入 — KEY1 浮空输入，KEY2 上拉输入"></a>第三篇：按键输入 — KEY1 浮空输入，KEY2 上拉输入</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// KEY1（PB12）：浮空输入，板载外部上拉 → 按下读低电平</span></span><br><span class="line"><span class="comment">// KEY2（PB13）：内部上拉输入，CubeMX 配 Pull-up → 按下读低电平</span></span><br><span class="line"><span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">    <span class="comment">// 按键被按下</span></span><br></pre></td></tr></table></figure>
+
+<p>这里就体现了两种输入模式的选择差异——<strong>外部已有上拉电阻的用浮空输入，没有的就用内部上拉。</strong> 同一个功能（按键检测），因为硬件设计不同，选择的 GPIO 模式也不同。</p>
+<hr>
+<h2 id="进阶：一些值得思考的问题"><a href="#进阶：一些值得思考的问题" class="headerlink" title="进阶：一些值得思考的问题"></a>进阶：一些值得思考的问题</h2><h3 id="1-推挽输出能同时输出高和低吗？"><a href="#1-推挽输出能同时输出高和低吗？" class="headerlink" title="1. 推挽输出能同时输出高和低吗？"></a>1. 推挽输出能同时输出高和低吗？</h3><p><strong>不能。</strong> P-MOS 和 N-MOS 是交替工作的，不可能同时导通。如果两者不小心同时导通了（称为”穿通”），VDD 和 VSS 直接短路，电流瞬间增大，芯片会发热甚至烧毁。幸好 CubeMX 和 HAL 库会处理好这些，不需要我们操心。</p>
+<h3 id="2-开漏输出为什么不内置上拉电阻？"><a href="#2-开漏输出为什么不内置上拉电阻？" class="headerlink" title="2. 开漏输出为什么不内置上拉电阻？"></a>2. 开漏输出为什么不内置上拉电阻？</h3><p>因为上拉电阻的值需要根据应用场景决定。I2C 总线通常用 4.7kΩ，高速时会用 1.5kΩ，低功耗场合会用到 10kΩ。ST 不知道你的应用场景，所以把选择权留给了用户。</p>
+<h3 id="3-GPIO-速度（Speed）选-Low-还是-High？"><a href="#3-GPIO-速度（Speed）选-Low-还是-High？" class="headerlink" title="3. GPIO 速度（Speed）选 Low 还是 High？"></a>3. GPIO 速度（Speed）选 Low 还是 High？</h3><p>与 GPIO 模式无关但值得注意。在 CubeMX 配置里有个 <code>Maximum output speed</code> 选项：</p>
+<table>
+<thead>
+<tr>
+<th align="left">速度等级</th>
+<th align="left">适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Low (2MHz)</td>
+<td align="left">LED、按键、普通 GPIO 信号</td>
+</tr>
+<tr>
+<td align="left">Medium (10MHz)</td>
+<td align="left">串口、中等频率信号</td>
+</tr>
+<tr>
+<td align="left">High (50MHz)</td>
+<td align="left">SPI、高速通信</td>
+</tr>
+</tbody></table>
+<p>速度越高，功耗越大、电磁干扰越强。所以对于 LED 这种低速应用，选 Low 就够了，没必要开 High。前两篇博客里选的 <code>Low</code> 是正确的选择。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>学完这 8 种模式再回头看 CubeMX 的引脚配置界面，选项就不再是零散的下拉菜单了——每个选项对应的是内部某条电路的开关状态：</p>
+<ul>
+<li>选 <code>Input</code> 还是 <code>Output</code> → 决定输入驱动还是输出驱动接入引脚</li>
+<li>选 <code>Pull-up/No pull/Pull-down</code> → 决定内部上拉&#x2F;下拉电阻是否接通</li>
+<li>选 <code>Push-Pull/Open-Drain</code> → 决定 P-MOS 是否参与工作</li>
+<li>选 <code>GPIO/Alternate</code> → 决定控制信号来自寄存器还是外设</li>
+</ul>
+<p>理解了内部电路的结构，CubeMX 配置就不再是”乱填的”，而是——<strong>我知道我配置了什么，也知道为什么这么配。</strong></p>
+<p>学完这 8 种模式之后，下一步就可以学习<strong>中断（EXTI）</strong>了——当按键不需要靠 while 循环轮询，而是按下时 CPU 主动响应，就是中断的用武之地。这也是按键输入博客末尾提到的”进阶思路”。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a> — 第5集 GPIO 内部那些事</li>
+<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/26/STM32_Key_Input/">上一篇：STM32按键输入控制小灯亮灭</a></li>
+<li><a href="/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">STM32 再出发：工具链搭建</a></li>
+<li><a href="https://www.st.com/resource/en/reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf">STM32 参考手册 RM0008（STM32F10xxx 参考手册）</a> — GPIO 相关章节</li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>GPIO</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>STM32再出发——从Keil转到VSCode+CubeMX</title>
+    <url>/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>大一上的时候，我曾短暂学习过 STM32，当时用的是 keil5 的开发方式。Keil 的代码补全基本没有、所有内容全靠硬写，或者说硬抄。由于当时面临很多压力，所以我暂时终止了STM32的学习。</p>
+<p>这次重新出发，我决定换一套更现代化的工具链：</p>
+<ul>
+<li><strong>STM32CubeMX</strong> —— 图形化配置引脚和外设，生成初始化代码</li>
+<li><strong>VS Code + STM32 扩展</strong> —— 现代化的代码编辑器，补全、跳转、Git 集成</li>
+<li><strong>HAL 库</strong> —— 用库函数操作外设，先建立工程能力，以后再深入底层</li>
+</ul>
+<p>最终效果：通过 <strong>VS Code</strong> 管理项目，只用写核心的功能代码，一键编译，一键烧录到开发板，LED 灯点亮并闪烁。</p>
+<hr>
+<h2 id="工具链概览"><a href="#工具链概览" class="headerlink" title="工具链概览"></a>工具链概览</h2><p>先搞清楚每样东西是干什么的：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>STM32CubeMX</strong></td>
+<td>图形化配置芯片引脚、时钟、外设，生成初始化 C 代码</td>
+</tr>
+<tr>
+<td><strong>VS Code</strong></td>
+<td>代码编辑器，用于编写业务逻辑</td>
+</tr>
+<tr>
+<td><strong>STM32 VS Code Extension</strong></td>
+<td>ST 官方插件，集成编译、烧录、调试功能</td>
+</tr>
+<tr>
+<td><strong>GCC Toolchain</strong></td>
+<td>编译器（arm-none-eabi-gcc），把代码编译成机器码</td>
+</tr>
+<tr>
+<td><strong>ST-Link</strong></td>
+<td>调试器&#x2F;烧录器，通过 SWD 接口连接电脑和开发板</td>
+</tr>
+</tbody></table>
+<p>整个工作流程：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CubeMX 配置引脚 → 生成代码 → VS Code 编写LED灯闪烁的逻辑 → 编译 → 烧录 → 跑起来！</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="安装步骤"><a href="#安装步骤" class="headerlink" title="安装步骤"></a>安装步骤</h2><h3 id="安装-STM32CubeMX"><a href="#安装-STM32CubeMX" class="headerlink" title="安装 STM32CubeMX"></a>安装 STM32CubeMX</h3><ol>
+<li>去 <a href="https://www.st.com/en/development-tools/stm32cubemx.html">ST 官网</a> 下载 STM32CubeMX（需要注册 ST 账号，免费）</li>
+<li>运行安装程序，一直下一步</li>
+<li>安装过程中它会自动下载芯片支持包（STM32Cube FW_F1 等），等它下载完就行</li>
+</ol>
+<p>安装完成后桌面上会有个 <code>STM32CubeMX</code> 的图标。</p>
+<h3 id="安装-VS-Code-与-STM32-扩展"><a href="#安装-VS-Code-与-STM32-扩展" class="headerlink" title="安装 VS Code 与 STM32 扩展"></a>安装 VS Code 与 STM32 扩展</h3><ol>
+<li>去 <a href="https://code.visualstudio.com/">VS Code 官网</a> 下载安装</li>
+<li>安装完成后，打开 VS Code，点左侧的扩展图标（或按 <code>Ctrl+Shift+X</code>）</li>
+<li>搜索 <strong>STM32</strong>，找到 STMicroelectronics 官方出的 <strong>STM32 VS Code Extension</strong>，点击安装</li>
+<li>安装完成后，VS Code 会自动检测并建议安装一些配套工具，确认即可</li>
+</ol>
+<p>这个扩展帮我们集成了编译和烧录的功能，不用自己手动配 CMake 和命令行。</p>
+<h3 id="安装-ST-Link-驱动"><a href="#安装-ST-Link-驱动" class="headerlink" title="安装 ST-Link 驱动"></a>安装 ST-Link 驱动</h3><p>ST-Link 是连接电脑和开发板的调试器。插上电脑后，如果设备管理器里显示黄色感叹号，说明没装驱动。</p>
+<p><strong>解决方法：</strong></p>
+<ol>
+<li>下载 <a href="https://www.st.com/en/development-tools/stsw-link009.html">ST-Link 驱动</a>（<code>en.stsw-link009.zip</code>）</li>
+<li>解压后，64 位系统运行 <code>dpinst_amd64.exe</code></li>
+<li>安装完成后，重新插拔 ST-Link</li>
+<li>打开设备管理器，应该能看到 <code>STMicroelectronics STM32 STLink</code>，没有黄色感叹号</li>
+</ol>
+<blockquote>
+<p>如果不想单独装驱动，安装 STM32CubeProgrammer 也会自动装好 ST-Link 驱动。</p>
+</blockquote>
+<hr>
+<h2 id="创建第一个项目"><a href="#创建第一个项目" class="headerlink" title="创建第一个项目"></a>创建第一个项目</h2><h3 id="在-CubeMX-中新建项目"><a href="#在-CubeMX-中新建项目" class="headerlink" title="在 CubeMX 中新建项目"></a>在 CubeMX 中新建项目</h3><ol>
+<li>打开 STM32CubeMX</li>
+<li>点击 <strong>“New Project”</strong></li>
+<li>在搜索框输入 <strong>STM32F103C8T6</strong>（我用的是 Keysking大佬开发的集成开发板），双击选中</li>
+<li>弹窗问是否初始化外设，点 <strong>“No”</strong></li>
+</ol>
+<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
+<p><strong>配置 LED 灯引脚（PA7）：</strong></p>
+<ol>
+<li><p>在芯片图上找到 <strong>PA7</strong>，点击它</p>
+</li>
+<li><p>选择 <strong>GPIO_Output</strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202119625.png" alt="image-20260724202119625"></p>
+</li>
+<li><p>在左侧的 Categories面板下面的System Core里找到 GPIO 设置，点击后中间会跳出Configuration界面，如下图所示</p>
+</li>
+<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202248835.png" alt="image-20260724202248835"></p>
+</li>
+<li><p>选中PA7引脚，下方跳出具体的设置界面<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202524255.png" alt="image-20260724202524255"></p>
+</li>
+<li><p>此处本来GPIO output level是low，也就是低电平，把它改成High,高电平即可</p>
+</li>
+<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202648342.png" alt="image-20260724202648342"></p>
+</li>
+<li><p>其他保持默认：推挽输出、无上下拉、低速度</p>
+</li>
+</ol>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：![屏幕截图 2026-07-24 211145](.&#x2F;..&#x2F;images&#x2F;stm32再出发-从keil转到vscode+cubemx&#x2F;屏幕截图 2026-07-24 211145.png)</p>
+<ul>
+<li><strong>Debug</strong> 选择 <strong>Serial Wire</strong></li>
+<li>这样 PA13&#x2F;SWDIO 和 PA14&#x2F;SWCLK 会被自动配置，用于 ST-Link 调试</li>
+</ul>
+<blockquote>
+<p>这一步很重要！否则烧录一次后，下次 SWD 就被禁用了，再也烧不进新程序。</p>
+</blockquote>
+<h3 id="选择工具链"><a href="#选择工具链" class="headerlink" title="选择工具链"></a>选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
+<table>
+<thead>
+<tr>
+<th>设置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project Name</strong></td>
+<td><code>stm32code-demo</code></td>
+</tr>
+<tr>
+<td><strong>Project Location</strong></td>
+<td>选一个<strong>纯英文</strong>目录–此处我选的是D盘下的stm32project目录</td>
+</tr>
+<tr>
+<td><strong>Toolchain &#x2F; IDE</strong></td>
+<td><strong>CMake</strong>（关键！一定要选 CMake，而不是其他的）</td>
+</tr>
+<tr>
+<td><strong>Default Compiler&#x2F;Linker</strong></td>
+<td>GCC</td>
+</tr>
+</tbody></table>
+<p>点击右上角 **”Generate Code”**，生成代码。弹窗问要不要打开项目，选 **”Open Project”**，它会自动用 VS Code 打开。</p>
+<hr>
+<h2 id="在-VS-Code-中编写代码"><a href="#在-VS-Code-中编写代码" class="headerlink" title="在 VS Code 中编写代码"></a>在 VS Code 中编写代码</h2><p>项目打开后，目录结构大致是这样：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">stm32code-demo/</span><br><span class="line">├── Core/</span><br><span class="line">│   ├── Inc/</span><br><span class="line">│   │   └── main.h           ← 引脚宏定义在这里</span><br><span class="line">│   └── Src/</span><br><span class="line">│       └── main.c           ← 主程序</span><br><span class="line">├── Drivers/                  ← HAL 库和 CMSIS</span><br><span class="line">├── cmake/                    ← CMake 配置</span><br><span class="line">├── CMakeLists.txt            ← CMake 主文件</span><br><span class="line">└── stm32code-demo.ioc        ← CubeMX 配置文件（不要删）</span><br></pre></td></tr></table></figure>
+
+<h3 id="认识-main-c"><a href="#认识-main-c" class="headerlink" title="认识 main.c"></a>认识 main.c</h3><p>CubeMX 生成的 <code>main.c</code> 骨架代码结构如下：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HAL_Init();                 <span class="comment">// 1. 初始化 HAL 库</span></span><br><span class="line">    SystemClock_Config();       <span class="comment">// 2. 配置系统时钟</span></span><br><span class="line">    MX_GPIO_Init();             <span class="comment">// 3. 初始化 GPIO（在这里配置引脚）</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">    <span class="comment">// 4. 用户初始化代码写在这里</span></span><br><span class="line">    <span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line">        <span class="comment">// 5. 主循环 —— 反复执行的逻辑</span></span><br><span class="line">        <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">        <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>关键点：**<code>USER CODE BEGIN</code> 和 <code>USER CODE END</code> 之间的代码**，CubeMX 重新生成时不会覆盖。你自己的逻辑都写在这之间。</p>
+<h3 id="写点灯代码"><a href="#写点灯代码" class="headerlink" title="写点灯代码"></a>写点灯代码</h3><p><strong>让 LED 一直亮：</strong> 不需要写任何代码。<code>MX_GPIO_Init()</code> 里已经通过 <code>HAL_GPIO_WritePin()</code> 设好了初始电平，灯自然会亮。</p>
+<p><strong>让 LED 闪烁：</strong> 在 <code>while(1)</code> 里写翻转逻辑：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);    <span class="comment">// PA7 翻转电平</span></span><br><span class="line">  HAL_Delay(<span class="number">500</span>);                             <span class="comment">// 等 500ms</span></span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>如果用到了 User Label，也可以写成 <code>HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);</code></p>
+</blockquote>
+<h3 id="关于-USER-CODE-区块"><a href="#关于-USER-CODE-区块" class="headerlink" title="关于 USER CODE 区块"></a>关于 USER CODE 区块</h3><p>这是 CubeMX 最贴心的设计之一。每次 CubeMX 重新生成代码时：</p>
+<ul>
+<li>✅ <code>USER CODE BEGIN/END</code> 之间的内容会被保留</li>
+<li>❌ 外部的代码会被完全覆盖</li>
+</ul>
+<p>所以养成习惯：<strong>所有自己写的代码，都放在 USER CODE 区块里。</strong></p>
+<p>常用的 USER CODE 位置：</p>
+<table>
+<thead>
+<tr>
+<th>区块</th>
+<th>位置</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>USER CODE BEGIN 2</code></td>
+<td><code>MX_GPIO_Init()</code> 之后</td>
+<td>初始化设置</td>
+</tr>
+<tr>
+<td><code>USER CODE BEGIN WHILE</code></td>
+<td><code>while(1)</code> 内部开头</td>
+<td>主循环逻辑</td>
+</tr>
+<tr>
+<td><code>USER CODE BEGIN 3</code></td>
+<td><code>while(1)</code> 内部结尾</td>
+<td>主循环末尾</td>
+</tr>
+<tr>
+<td><code>USER CODE BEGIN 0</code></td>
+<td><code>main.c</code> 顶部函数区</td>
+<td>自定义函数</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码"><a href="#解读-MX-GPIO-Init-——-CubeMX-生成的初始化代码" class="headerlink" title="解读 MX_GPIO_Init —— CubeMX 生成的初始化代码"></a>解读 MX_GPIO_Init —— CubeMX 生成的初始化代码</h2><p>前面提到，CubeMX 帮我们生成了引脚配置代码。但”能用”和”理解”是两回事，我们来看看 <code>MX_GPIO_Init()</code> 函数里每段代码到底在干什么。</p>
+<h3 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin Output Level */</span></span><br><span class="line">    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*Configure GPIO pin : PA7 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = GPIO_PIN_7;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="逐行解析"><a href="#逐行解析" class="headerlink" title="逐行解析"></a>逐行解析</h3><table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_InitTypeDef GPIO_InitStruct = &#123;0&#125;;</code></td>
+<td>定义一个 GPIO 配置结构体，<code>&#123;0&#125;</code> 把所有成员初始化为 0，避免使用未初始化的值</td>
+</tr>
+<tr>
+<td><code>__HAL_RCC_GPIOA_CLK_ENABLE()</code></td>
+<td><strong>使能 GPIOA 端口的时钟</strong>。STM32 的外设默认时钟是关闭的，使用前必须开启时钟，否则寄存器写不进。这条是一个宏，背后操作的是 RCC 寄存器</td>
+</tr>
+<tr>
+<td><code>HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET)</code></td>
+<td>在配置之前先把引脚输出设为低电平，保证初始时 LED 是灭的，不会出现瞬间闪一下</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Pin = GPIO_PIN_7</code></td>
+<td>指定要配置的引脚是第 7 号引脚（PA7）</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP</code></td>
+<td><strong>输出模式：推挽输出（Push-Pull）</strong>。这是 GPIO 最常用的输出模式——可以输出高&#x2F;低电平，驱动能力强</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Pull = GPIO_NOPULL</code></td>
+<td><strong>上下拉：无</strong>。LED 是输出引脚，不需要上下拉电阻</td>
+</tr>
+<tr>
+<td><code>GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW</code></td>
+<td><strong>输出速度：低速</strong>。LED 翻转速度很慢（几百 ms 一次），低速就够用了。速度越快功耗越高、电磁干扰越大</td>
+</tr>
+<tr>
+<td><code>HAL_GPIO_Init(GPIOA, &amp;GPIO_InitStruct)</code></td>
+<td><strong>将上面配置的结构体写入寄存器</strong>，GPIO 才真正按我们的设置工作。<code>GPIOA</code> 参数表示操作 A 组引脚</td>
+</tr>
+</tbody></table>
+<h3 id="关于-GPIO-模式"><a href="#关于-GPIO-模式" class="headerlink" title="关于 GPIO 模式"></a>关于 GPIO 模式</h3><p><code>GPIO_MODE_OUTPUT_PP</code> 是最常用的输出模式，还有一些其他模式你以后会遇到：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>含义</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td>推挽输出</td>
+<td>驱动 LED、普通数字信号输出</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_OUTPUT_OD</code></td>
+<td>开漏输出</td>
+<td>I2C 通信、电平转换</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_INPUT</code></td>
+<td>浮空输入</td>
+<td>读取按键、传感器信号</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_IT_RISING</code></td>
+<td>上升沿触发中断</td>
+<td>外部中断</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_IT_FALLING</code></td>
+<td>下降沿触发中断</td>
+<td>按键中断</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_AF_PP</code></td>
+<td>复用推挽输出</td>
+<td>UART、SPI 等外设功能引脚</td>
+</tr>
+</tbody></table>
+<p>目前只需掌握前两个输出模式，后续文章中会接触到更多。</p>
+<h3 id="关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX"><a href="#关键理念：CubeMX-生成-→-解析代码-→-脱离-CubeMX" class="headerlink" title="关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX"></a>关键理念：CubeMX 生成 → 解析代码 → 脱离 CubeMX</h3><p>CubeMX 帮我们生成了这段代码，我们可以直接拿来用，但这不意味着可以跳过理解。建议的学习路径是：</p>
+<ol>
+<li><strong>先用 CubeMX 生成</strong> —— 快速搭建项目，不纠结寄存器细节</li>
+<li><strong>再解析生成的代码</strong> —— 搞清楚每行配置在做什么</li>
+<li><strong>最后能不用 CubeMX 也写出来</strong> —— 真正掌握后，即使工作中没有 CubeMX 也能手写驱动</li>
+</ol>
+<p>这也是后续所有博客都会保持的风格——不只是展示 CubeMX 的操作步骤，还会解析生成的代码。</p>
+<hr>
+<h2 id="编译"><a href="#编译" class="headerlink" title="编译"></a>编译</h2><p>写好了代码，怎么编译成开发板能运行的机器码？</p>
+<h3 id="通过-VS-Code-编译"><a href="#通过-VS-Code-编译" class="headerlink" title="通过 VS Code 编译"></a>通过 VS Code 编译</h3><p>在 VS Code 底部状态栏，ST 扩展提供了按钮：</p>
+<ol>
+<li>先点 <strong>齿轮图标  “生成”</strong> → 开始编译</li>
+<li>观察底部终端面板的输出</li>
+<li>看到类似下面的输出就是编译成功了：</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[build] Memory region         Used Size  Region Size  %age Used</span><br><span class="line">[build]              RAM:        1584 B        20 KB      7.73%</span><br><span class="line">[build]            FLASH:        4628 B        64 KB      7.06%</span><br><span class="line">[driver] 生成完毕: 00:00:01.235</span><br><span class="line">[build] 生成已完成，退出代码为 0</span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>RAM</code> 和 <code>FLASH</code> 显示了固件占用的空间，<code>生成完毕</code> 和 <code>退出代码为 0</code> 代表编译成功。</p>
+<p>编译产物在 <code>build/Debug/</code> 目录下：</p>
+<ul>
+<li><code>stm32code-demo.elf</code> — 可执行文件（包含调试信息）</li>
+<li><code>stm32code-demo.bin</code> — 纯二进制文件（用于烧录）</li>
+</ul>
+<h3 id="常见编译错误"><a href="#常见编译错误" class="headerlink" title="常见编译错误"></a>常见编译错误</h3><table>
+<thead>
+<tr>
+<th>错误</th>
+<th>原因</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>undefined reference to XXX_Pin</code></td>
+<td>引脚宏被删了但代码还在引用</td>
+<td>去 CubeMX 重新配引脚并生成代码</td>
+</tr>
+<tr>
+<td><code>arm-none-eabi-gcc: not found</code></td>
+<td>工具链没装上</td>
+<td>重新安装 STM32 VS Code Extension</td>
+</tr>
+<tr>
+<td><code>CMake Error: toolchain file not found</code></td>
+<td>工具链路径不对</td>
+<td>确保 STM32 扩展已正确安装</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="烧录"><a href="#烧录" class="headerlink" title="烧录"></a>烧录</h2><p>编译通过后，把程序下载到开发板上。</p>
+<h3 id="硬件连接"><a href="#硬件连接" class="headerlink" title="硬件连接"></a>硬件连接</h3><p>ST-Link 和开发板通过 SWD 接口连接，只需要 4 根线：</p>
+<table>
+<thead>
+<tr>
+<th>ST-Link</th>
+<th>开发板</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SWDIO</td>
+<td>PA13</td>
+</tr>
+<tr>
+<td>SWCLK</td>
+<td>PA14</td>
+</tr>
+<tr>
+<td>GND</td>
+<td>GND</td>
+</tr>
+<tr>
+<td>3.3V</td>
+<td>VCC</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>有些 ST-Link 还多一根 NRST（复位）线，也可以接上，但不是必须的。</p>
+</blockquote>
+<h3 id="驱动问题排坑"><a href="#驱动问题排坑" class="headerlink" title="驱动问题排坑"></a>驱动问题排坑</h3><p>插上 ST-Link 后，如果 VS Code 检测不到设备，大概率是驱动没装。</p>
+<p><strong>排坑步骤：</strong></p>
+<ol>
+<li>打开<strong>设备管理器</strong>（Win + X → 设备管理器）</li>
+<li>看有没有 <code>STM32 STLink</code> 出现</li>
+<li>如果有黄色感叹号 → 运行 <code>dpinst_amd64.exe</code> 安装驱动</li>
+<li>装好驱动后，重新插拔 ST-Link</li>
+<li>设备管理器里应该显示正常</li>
+</ol>
+<h3 id="烧录到开发板"><a href="#烧录到开发板" class="headerlink" title="烧录到开发板"></a>烧录到开发板</h3><p>驱动正常后，在 VS Code 中：</p>
+<ol>
+<li>点击左侧的 <strong>运行和调试</strong> 图标（🦖 或 <code>Ctrl+Shift+D</code>），打开运行和调试面板</li>
+<li>确认下方 <strong>STM32Cube设备与开发板</strong> 列表中能看到 <code>STM32 STLink</code>（<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-device-list.png" alt="STM32设备列表"></li>
+<li>点击上方的 <strong>运行和调试</strong> 按钮，选择 <strong><code>STM32Cube:STM32 Launch STLink GDB Server</code></strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-launch-gdb.png" alt="选择Launch STLink GDB Server"></li>
+<li>此时 ST-Link 开始连接开发板，终端会输出连接日志</li>
+<li>点击 VS Code 上方调试工具栏中的 <strong>继续</strong> 按钮（▶️ 图标）<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-continue-button.png" alt="点击继续按钮运行程序"></li>
+<li>程序开始运行，LED 灯闪烁 🎉</li>
+</ol>
+<h3 id="如何确认烧录成功"><a href="#如何确认烧录成功" class="headerlink" title="如何确认烧录成功"></a>如何确认烧录成功</h3><p>烧录完成后，如果代码写的是闪烁逻辑，会看到：</p>
+<ul>
+<li>LED 以 500ms 的间隔一亮一灭 💡</li>
+<li>这说明：程序成功烧录 → 芯片运行 → GPIO 正常翻转</li>
+</ul>
+<p>如果灯不亮：</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>可能原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>完全不亮</td>
+<td>接线反了？引脚号对不对？初始电平设的是 High 吗？</td>
+</tr>
+<tr>
+<td>一直亮不闪</td>
+<td><code>while(1)</code> 里没写 <code>TogglePin</code> 或 <code>Delay</code></td>
+</tr>
+<tr>
+<td>亮一下就不亮了</td>
+<td>可能芯片复位了，检查电源</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="与传统-Keil-开发的对比"><a href="#与传统-Keil-开发的对比" class="headerlink" title="与传统 Keil 开发的对比"></a>与传统 Keil 开发的对比</h3><table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>Keil 方案</th>
+<th>VS Code + CubeMX 方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>界面</td>
+<td>老旧，2000 年代风格</td>
+<td>现代化，美观</td>
+</tr>
+<tr>
+<td>代码编辑</td>
+<td>无补全</td>
+<td>智能补全、跳转定义</td>
+</tr>
+<tr>
+<td>配置方式</td>
+<td>手动写寄存器或配图形界面</td>
+<td>CubeMX 统一图形化配置</td>
+</tr>
+<tr>
+<td>项目迁移</td>
+<td>难跨平台</td>
+<td>基于 CMake，跨平台</td>
+</tr>
+<tr>
+<td>费用</td>
+<td>收费（商业版）</td>
+<td>全部免费</td>
+</tr>
+<tr>
+<td>学习曲线</td>
+<td>陡峭（要学很多很多很多细节）</td>
+<td>平缓（HAL 封装好了，只关心核心功能）</td>
+</tr>
+</tbody></table>
+<h3 id="工作流总结"><a href="#工作流总结" class="headerlink" title="工作流总结"></a>工作流总结</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1.  打开 CubeMX → 配引脚 → Generate Code</span><br><span class="line">2.  在 VS Code 中打开项目</span><br><span class="line">3.  在 USER CODE 区域写业务逻辑</span><br><span class="line">4.  Ctrl+Shift+P → STM32: Build</span><br><span class="line">5.  插上 ST-Link 连接开发板</span><br><span class="line">6.  Ctrl+Shift+P → STM32: Download</span><br><span class="line">7.  🎉 灯亮了！</span><br></pre></td></tr></table></figure>
+
+<h3 id="后续学习路线"><a href="#后续学习路线" class="headerlink" title="后续学习路线"></a>后续学习路线</h3><p>点灯是嵌入式开发的 **”Hello World”**，下一步可以学：</p>
+<ul>
+<li><strong>外部中断</strong> —— 按键控制 LED</li>
+<li><strong>定时器&#x2F;PWM</strong> —— 呼吸灯、舵机控制</li>
+<li><strong>UART 串口</strong> —— 和电脑通信，打印调试信息</li>
+<li><strong>ADC</strong> —— 读取传感器数值</li>
+<li><strong>I2C&#x2F;SPI</strong> —— 驱动 OLED 屏幕、传感器模块</li>
+</ul>
+<p>每条路线跑通后，我都会写博客记录下来，欢迎继续关注 😄</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="https://www.st.com/en/development-tools/stsw-link009.html">ST-Link 驱动下载</a></li>
+<li><a href="https://www.st.com/en/development-tools/stm32cubemx.html">STM32CubeMX 下载</a></li>
+<li><a href="https://marketplace.visualstudio.com/items?itemName=stmicroelectronics.stm32-vscode-extension">STM32 VS Code Extension</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>VS Code</tag>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>GPIO</tag>
       </tags>
   </entry>
   <entry>
@@ -12443,9 +12931,9 @@
       </categories>
       <tags>
         <tag>VS Code</tag>
-        <tag>Markdown</tag>
         <tag>Node.js</tag>
         <tag>Hexo</tag>
+        <tag>Markdown</tag>
         <tag>静态站点</tag>
         <tag>VirtualBox</tag>
         <tag>Ubuntu</tag>
@@ -13564,9 +14052,9 @@
       </categories>
       <tags>
         <tag>VS Code</tag>
-        <tag>Markdown</tag>
         <tag>Node.js</tag>
         <tag>Hexo</tag>
+        <tag>Markdown</tag>
         <tag>静态站点</tag>
         <tag>VirtualBox</tag>
         <tag>Ubuntu</tag>
@@ -14053,8 +14541,8 @@
       <tags>
         <tag>Claude</tag>
         <tag>AI</tag>
-        <tag>Markdown</tag>
         <tag>Hexo</tag>
+        <tag>Markdown</tag>
       </tags>
   </entry>
 </search>
