@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="前面学了串口轮询、中断、DMA、蓝牙，又学了 I2C 读温湿度，每次 HAL 函数里都传一个&quot;数据缓冲区指针&quot;（receiveData、sendBuffer、readBuffer……）。这些数组到底存在哪？数据是怎么进到数组里、又从数组里发出去的？外设数据寄存器（DR）和数组是什么关系？这篇把 5 篇通信博客串起来，深入这个嵌入式通信的底层模型。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="深挖数据的存储与传输——stm32的底层通信模型">
+<meta property="og:url" content="http://tristan1116.github.io/2026/08/02/STM32_Data_Buffer_Mechanism/index.html">
+<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:description" content="前面学了串口轮询、中断、DMA、蓝牙，又学了 I2C 读温湿度，每次 HAL 函数里都传一个&quot;数据缓冲区指针&quot;（receiveData、sendBuffer、readBuffer……）。这些数组到底存在哪？数据是怎么进到数组里、又从数组里发出去的？外设数据寄存器（DR）和数组是什么关系？这篇把 5 篇通信博客串起来，深入这个嵌入式通信的底层模型。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-02T16:30:00.000Z">
+<meta property="article:modified_time" content="2026-08-02T16:30:00.000Z">
+<meta property="article:author" content="点灯大王">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="USART">
+<meta property="article:tag" content="DMA">
+<meta property="article:tag" content="I2C">
+<meta property="article:tag" content="中断">
+<meta property="article:tag" content="内存">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/08/02/STM32_Data_Buffer_Mechanism/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>深挖数据的存储与传输——stm32的底层通信模型 | 点灯大王的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">点灯大王的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/08/02/STM32_Data_Buffer_Mechanism/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="点灯大王的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          深挖数据的存储与传输——stm32的底层通信模型
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-02 16:30:00" itemprop="dateCreated datePublished" datetime="2026-08-02T16:30:00+00:00">2026-08-02</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>6.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+            <div class="post-description">前面学了串口轮询、中断、DMA、蓝牙，又学了 I2C 读温湿度，每次 HAL 函数里都传一个"数据缓冲区指针"（receiveData、sendBuffer、readBuffer……）。这些数组到底存在哪？数据是怎么进到数组里、又从数组里发出去的？外设数据寄存器（DR）和数组是什么关系？这篇把 5 篇通信博客串起来，深入这个嵌入式通信的底层模型。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从串口到-I2C：一个反复出现的问题"><a href="#从串口到-I2C：一个反复出现的问题" class="headerlink" title="从串口到 I2C：一个反复出现的问题"></a>从串口到 I2C：一个反复出现的问题</h2><p>回顾一下我们这一路学过的通信博客：</p>
+<table>
+<thead>
+<tr>
+<th align="left">博客</th>
+<th align="left">外设</th>
+<th align="left">模式</th>
+<th align="left">收发用的数组</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><a href="/2026/07/29/STM32_USART_Serial_Communication/">串口轮询</a></td>
+<td align="left">USART2</td>
+<td align="left">轮询</td>
+<td align="left"><code>receiveData[2]</code></td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断</a></td>
+<td align="left">USART2</td>
+<td align="left">中断</td>
+<td align="left"><code>receiveData[2]</code>（全局变量）</td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/">串口 DMA 不定长</a></td>
+<td align="left">USART2 + DMA</td>
+<td align="left">DMA + 空闲中断</td>
+<td align="left"><code>receiveData[50]</code></td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/07/30/STM32_BLE_Bluetooth/">蓝牙 BLE</a></td>
+<td align="left">USART3 + DMA</td>
+<td align="left">DMA + 空闲中断</td>
+<td align="left"><code>receiveData[50]</code></td>
+</tr>
+<tr>
+<td align="left"><a href="/2026/08/01/STM32_I2C_AHT20/">I2C 读 AHT20</a></td>
+<td align="left">I2C1 + USART2</td>
+<td align="left">I2C 轮询</td>
+<td align="left"><code>sendBuffer[3]</code> &#x2F; <code>readBuffer[6]</code></td>
+</tr>
+</tbody></table>
+<p>写代码时我脑子里一直有个疑惑：每次调用 HAL 收发函数，参数表格里都有一行”<strong>数据缓冲区指针</strong>“——我照着填 <code>receiveData</code>、<code>sendBuffer</code>，程序跑得挺好，但<strong>这些数据到底存在哪里？</strong> 是存在这个数组里，还是存在外设里？为什么每次都要传指针？为什么换个外设（从 UART 到 I2C），这个套路还是一模一样？</p>
+<p>这篇博客就来解决这个疑惑。答案是：<strong>数组在 STM32 的内存（RAM）里，外设内部还有一个”一次只能装 1 字节”的数据寄存器（DR），数据从数组到外设、从外设到数组，都是 1 字节 1 字节地过手的。</strong></p>
+<hr>
+<h2 id="两个存储地点：数组（RAM）和数据寄存器（DR）"><a href="#两个存储地点：数组（RAM）和数据寄存器（DR）" class="headerlink" title="两个存储地点：数组（RAM）和数据寄存器（DR）"></a>两个存储地点：数组（RAM）和数据寄存器（DR）</h2><p>要搞清楚数据存在哪，先分清两个完全不同的存储位置：</p>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">我的数组（RAM）</th>
+<th align="left">外设数据寄存器 DR</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">位置</td>
+<td align="left">STM32 内存，我代码里定义的变量</td>
+<td align="left">外设模块内部（如 USART2、I2C1 外设里）</td>
+</tr>
+<tr>
+<td align="left">容量</td>
+<td align="left">想多大就多大（2、6、50 字节……）</td>
+<td align="left"><strong>只有 1 字节</strong></td>
+</tr>
+<tr>
+<td align="left">谁来读写</td>
+<td align="left">CPU 通过代码读写</td>
+<td align="left">硬件自动操作</td>
+</tr>
+<tr>
+<td align="left">类比</td>
+<td align="left">候车大厅里的<strong>候车人群</strong></td>
+<td align="left"><strong>检票口</strong>（一次只能过一个人）</td>
+</tr>
+</tbody></table>
+<p>关键点：<strong>数据寄存器 DR 一次只能装 1 字节</strong>。这是硬件设计决定的——USART 外设有 <code>USART_DR</code>，I2C 外设有 <code>I2C_DR</code>，都是一字节宽的小寄存器。</p>
+<p>打个比方：我的数组是候车大厅，DR 是检票口。一次通信要传 6 字节数据，就像 6 个人要出站——他们<strong>只能一个一个过检票口</strong>，不可能 6 个人同时挤过去。</p>
+<hr>
+<h2 id="发送：数据从哪来，到哪去"><a href="#发送：数据从哪来，到哪去" class="headerlink" title="发送：数据从哪来，到哪去"></a>发送：数据从哪来，到哪去</h2><p>以 I2C 发送 3 字节测量命令为例（<code>HAL_I2C_Master_Transmit(&amp;hi2c1, addr, sendBuffer, 3, ...)</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">          RAM（我的代码）                 I2C1 外设                   总线</span><br><span class="line">┌──────────────────────┐      ┌─────────────────────────┐</span><br><span class="line">│  sendBuffer[0] = 0xAC │──①──→│          DR            │──②──→  SDA 引脚</span><br><span class="line">│  sendBuffer[1] = 0x33 │──①──→│   （1字节小信箱）        │──②──→  （逐位移位发出）</span><br><span class="line">│  sendBuffer[2] = 0x00 │──①──→│            ↑           │</span><br><span class="line">└──────────────────────┘      └───────────┼─────────────┘</span><br><span class="line">            ① CPU 把 sendBuffer[i] 写入 DR（HAL 库内部循环）</span><br><span class="line">            ② 硬件把 DR 里的字节移出到总线上</span><br></pre></td></tr></table></figure>
+
+<p><code>HAL_I2C_Master_Transmit</code> 内部干的事，简化后就是：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// HAL_I2C_Master_Transmit 内部（简化版）</span></span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_TXE) == RESET);   <span class="comment">// 等 DR 空了</span></span><br><span class="line">    hi2c-&gt;Instance-&gt;DR = pData[i];                             <span class="comment">// 把数组第 i 个字节塞进 DR</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意</strong>：<code>0xAC</code>、<code>0x33</code>、<code>0x00</code> 这三个字节全程待在 <code>sendBuffer</code> 数组里。CPU 只是”读”数组、”写”寄存器，数组里的值并不会消失。发完之后数组还在，下次发新命令直接覆盖。</p>
+<p>串口发送（<code>HAL_UART_Transmit</code>）一模一样，只是把 <code>I2C_FLAG_TXE</code> 换成 <code>UART_FLAG_TXE</code>、把 <code>I2C_DR</code> 换成 <code>USART_DR</code>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_UART_GET_FLAG(huart, UART_FLAG_TXE) == RESET);  <span class="comment">// 等 DR 空了</span></span><br><span class="line">    huart-&gt;Instance-&gt;DR = pData[i];                              <span class="comment">// 塞一个字节</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="接收：数据从哪来，到哪去"><a href="#接收：数据从哪来，到哪去" class="headerlink" title="接收：数据从哪来，到哪去"></a>接收：数据从哪来，到哪去</h2><p>以 I2C 接收 6 字节温湿度为例（<code>HAL_I2C_Master_Receive(&amp;hi2c1, addr, readBuffer, 6, ...)</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">总线               I2C1 外设                    RAM</span><br><span class="line">SDA 引脚 ──→ 移位寄存器 ──→  DR ──②──→  readBuffer[0]</span><br><span class="line">                     （硬件逐位移入）              readBuffer[1]</span><br><span class="line">                                                readBuffer[2]</span><br><span class="line">                                                readBuffer[3]</span><br><span class="line">                                                readBuffer[4]</span><br><span class="line">                                                readBuffer[5]</span><br></pre></td></tr></table></figure>
+
+<p>HAL 内部循环：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_RXNE) == RESET);   <span class="comment">// 等 DR 里有数据</span></span><br><span class="line">    pData[i] = hi2c-&gt;Instance-&gt;DR;                              <span class="comment">// 把 DR 里的字节存进数组</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>6 字节被 CPU <strong>一个一个</strong>塞进 <code>readBuffer</code> 数组——CPU 每读一次 DR，硬件就会自动把下一个字节移进 DR。</p>
+<p>串口中断模式下，这个搬运甚至就写在 HAL 源码里，我们之前还解析过这行代码（<a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断博客</a>）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*huart-&gt;pRxBuffPtr = (<span class="type">uint8_t</span>)(huart-&gt;Instance-&gt;DR &amp; <span class="number">0x00FF</span>);  <span class="comment">// DR → 数组，搬一个字节</span></span><br></pre></td></tr></table></figure>
+
+<p><code>pRxBuffPtr</code> 就是 HAL 库内部的”数组指针”，每搬一个字节它自己 +1，指向数组下一个位置。</p>
+<hr>
+<h2 id="AHT20-在链路中的哪个位置？"><a href="#AHT20-在链路中的哪个位置？" class="headerlink" title="AHT20 在链路中的哪个位置？"></a>AHT20 在链路中的哪个位置？</h2><p>前面的图都只画了 STM32 到总线的这一段，AHT20 一直没露面——它挂在<strong>总线的另一端</strong>。补上它，整条链路才完整：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">                    发送 3 字节测量命令 0xAC 0x33 0x00 时：</span><br><span class="line">                    ┌────────────────────────────────────────────┐</span><br><span class="line">                    │                                            │</span><br><span class="line">   STM32 (主机)     │                 SDA 总线                    │      AHT20 (从机)</span><br><span class="line">┌──────────────┐    │    ┌──────────────┐    ┌──────────────┐     │    ┌──────────────┐</span><br><span class="line">│ sendBuffer   │    │    │  I2C1 外设    │    │              │     │    │  芯片内部      │</span><br><span class="line">│ [0]=0xAC ────┼─①─┼───→│  DR（1字节）  │─②─┼─→  SDA 引脚 ──┼─────┼─→│ 引脚 → 移位    │</span><br><span class="line">│ [1]=0x33     │    │    │              │    │              │     │    │ 寄存器 → 内部   │</span><br><span class="line">│ [2]=0x00     │    │    └──────────────┘    └──────────────┘     │    │ 命令/配置寄存器 │</span><br><span class="line">└──────────────┘    │                                            │    └──────────────┘</span><br><span class="line">                    └────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>①</strong> <code>sendBuffer</code> 数组（STM32 的 RAM）→ CPU 逐字节塞进 I2C1 的 DR</li>
+<li><strong>②</strong> 硬件把 DR 里的字节移位到 SDA 引脚，电平信号在总线上传播</li>
+<li><strong>③</strong> 电平到达 AHT20 的 SDA 引脚 → 芯片内部按 SCL 时钟逐位接收 → 拼成一字节 → <strong>存进 AHT20 芯片内部的寄存器</strong></li>
+</ul>
+<p>所以命令字节的最终”目的地”是 <strong>AHT20 芯片内部的寄存器</strong>——传感器芯片自己也有存储，数据不在 STM32 里，也不在总线上（总线只是”路”）。</p>
+<p>接收时方向反过来：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">                    读取 6 字节测量结果时：</span><br><span class="line">                    ┌────────────────────────────────────────────┐</span><br><span class="line">                    │                                            │</span><br><span class="line">   STM32 (主机)     │                 SDA 总线                    │      AHT20 (从机)</span><br><span class="line">┌──────────────┐    │    ┌──────────────┐    ┌──────────────┐     │    ┌──────────────┐</span><br><span class="line">│ readBuffer   │    │    │  I2C1 外设    │    │              │     │    │ 芯片内部       │</span><br><span class="line">│ [0]←───④────┼───┼───←│  DR（1字节）  │←③─┼── SDA 引脚 ←──┼─────┼──←│ 测量结果寄存器  │</span><br><span class="line">│ [1]          │    │    │              │    │              │     │    │ （温湿度原始值） │</span><br><span class="line">│ ...          │    │    └──────────────┘    └──────────────┘     │    └──────────────┘</span><br><span class="line">└──────────────┘    │                                            │</span><br><span class="line">                    └────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>③</strong> AHT20 把内部寄存器里的测量结果逐字节放上 SDA 线</li>
+<li><strong>④</strong> STM32 的 I2C1 硬件逐位收下 → 装进 DR → CPU 把 DR 读走放进 <code>readBuffer</code></li>
+</ul>
+<h3 id="AHT20-对-STM32-来说是个”黑盒”"><a href="#AHT20-对-STM32-来说是个”黑盒”" class="headerlink" title="AHT20 对 STM32 来说是个”黑盒”"></a>AHT20 对 STM32 来说是个”黑盒”</h3><p>我写的代码里从头到尾没有”直接操作 AHT20 内部寄存器”的写法——STM32 只做两件事：<strong>把命令字节发到总线上、从总线上收字节</strong>。AHT20 收到 0xAC 之后自己知道”该开始测量了”，测量完自己把结果放好等着被读。芯片内部怎么处理，STM32 完全不关心。</p>
+<h3 id="地址参数就是”点名”"><a href="#地址参数就是”点名”" class="headerlink" title="地址参数就是”点名”"></a>地址参数就是”点名”</h3><p><code>HAL_I2C_Master_Transmit(&amp;hi2c1, AHT20_ADDRESS, ...)</code> 里的地址（0x70）就是主机在总线上<strong>喊话点名</strong>：一条总线上可能挂着多个从机（OLED、传感器……），地址告诉它们”这 3 个字节是发给 0x70 的，其他的别收”。数据到了总线上，<strong>只有 AHT20 认领</strong>，别的设备”选择性失聪”。</p>
+<p>这也顺带解释了串口和 I2C 的一个根本区别：<strong>串口是点对点</strong>（线那端就一个设备），不需要地址参数；<strong>I2C 是总线</strong>（线那端可能挂好几个从机），必须带地址点名，数据才能被正确的从机收下。</p>
+<h3 id="完整存储位置列表"><a href="#完整存储位置列表" class="headerlink" title="完整存储位置列表"></a>完整存储位置列表</h3><table>
+<thead>
+<tr>
+<th align="left">环节</th>
+<th align="left">数据存在哪</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">发送起点</td>
+<td align="left">STM32 RAM（<code>sendBuffer</code> 数组）</td>
+</tr>
+<tr>
+<td align="left">过手</td>
+<td align="left">STM32 的 I2C1 DR（1 字节）</td>
+</tr>
+<tr>
+<td align="left">运输</td>
+<td align="left">SDA 总线（电平信号，不存储）</td>
+</tr>
+<tr>
+<td align="left"><strong>发送终点</strong></td>
+<td align="left"><strong>AHT20 芯片内部的寄存器</strong>（命令&#x2F;配置）</td>
+</tr>
+<tr>
+<td align="left">接收起点</td>
+<td align="left">AHT20 芯片内部的寄存器（测量结果）</td>
+</tr>
+<tr>
+<td align="left">过手</td>
+<td align="left">STM32 的 I2C1 DR（1 字节）</td>
+</tr>
+<tr>
+<td align="left"><strong>接收终点</strong></td>
+<td align="left">STM32 RAM（<code>readBuffer</code> 数组）</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="为什么必须是数组？"><a href="#为什么必须是数组？" class="headerlink" title="为什么必须是数组？"></a>为什么必须是数组？</h2><p>因为 DR 一次只能装 1 字节，而通信往往是多字节的。假如不用数组、只用一个变量：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">uint8_t</span> data;   <span class="comment">// 只有 1 字节</span></span><br><span class="line">HAL_UART_Receive(&amp;huart2, &amp;data, <span class="number">2</span>, HAL_MAX_DELAY);  <span class="comment">// 想收 2 字节？没地方放！</span></span><br></pre></td></tr></table></figure>
+
+<p>第二个字节一来就把第一个字节覆盖了。所以必须有”一块连续的内存”把多字节数据都装下——这就是数组。</p>
+<p>数组大小怎么定？看我的通信协议：</p>
+<ul>
+<li>串口轮询：指令固定 2 字节 → <code>receiveData[2]</code></li>
+<li>串口 DMA：数据不定长 → <code>receiveData[50]</code>（50 是安全上限）</li>
+<li>I2C 读 AHT20：每次读 6 字节 → <code>readBuffer[6]</code></li>
+</ul>
+<p>这也解释了之前博客里的一个细节：DMA 接收不定长数据那篇的数组为什么从 <code>[2]</code> 变成 <code>[50]</code>——<strong>不是语法变了，是数据量上限变了</strong>。</p>
+<hr>
+<h2 id="为什么-HAL-函数要传指针？"><a href="#为什么-HAL-函数要传指针？" class="headerlink" title="为什么 HAL 函数要传指针？"></a>为什么 HAL 函数要传指针？</h2><p>看函数签名：<code>HAL_I2C_Master_Receive(..., uint8_t *pData, ...)</code>——传的是<strong>数组首地址</strong>（数组名本身就是首地址，前面加 <code>&amp;</code> 或者直接用数组名都行）。</p>
+<p>因为 HAL 库函数要<strong>往stm32的内存里写数据</strong>（接收）或者<strong>从内存里读数据</strong>（发送）。传指针 &#x3D; 把仓库地址告诉 HAL，它直接操作我的仓库，<strong>不需要把数据复制一份</strong>。这也意味着缓冲区大小、数据格式全由stm32自己掌控——HAL 只负责”从数组第 0 个位置搬到第 Size 个位置”。</p>
+<blockquote>
+<p>想想看：如果不传指针而是传数组本身，C 语言会复制一份整个数组——又慢又浪费内存，而且接收时复制过去的副本根本收不到数据（数据要写回原数组才有用）。所以通信 API 一律传指针。</p>
+</blockquote>
+<hr>
+<h2 id="三种”搬运工”：轮询、中断、DMA"><a href="#三种”搬运工”：轮询、中断、DMA" class="headerlink" title="三种”搬运工”：轮询、中断、DMA"></a>三种”搬运工”：轮询、中断、DMA</h2><p>前面 5 篇博客学过的所有模式，<strong>数据存放的位置完全没变</strong>——数组还是那个数组（RAM），DR 还是那个 DR（外设里）。变的只有一件事：<strong>谁来搬</strong>。</p>
+<table>
+<thead>
+<tr>
+<th align="left">模式</th>
+<th align="left">搬运工</th>
+<th align="left">CPU 在干嘛</th>
+<th align="left">对应博客</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>轮询</strong></td>
+<td align="left">CPU 亲自搬，等一个搬一个</td>
+<td align="left">全程占着，啥也干不了</td>
+<td align="left">串口轮询、I2C 读 AHT20</td>
+</tr>
+<tr>
+<td align="left"><strong>中断</strong></td>
+<td align="left">硬件标志位置位 → 中断服务函数来搬</td>
+<td align="left">平时干别的，被叫去才搬一下</td>
+<td align="left">串口中断</td>
+</tr>
+<tr>
+<td align="left"><strong>DMA</strong></td>
+<td align="left">专门的 DMA 硬件搬，一次搬一批</td>
+<td align="left">彻底解放，搬完了才收到通知（回调）</td>
+<td align="left">串口 DMA、蓝牙</td>
+</tr>
+</tbody></table>
+<p>轮询和中断的搬运其实”长得一模一样”——都是 CPU 执行”等标志位 → 搬一字节”的循环，区别只在<strong>等待方式</strong>：</p>
+<ul>
+<li>轮询：CPU 站在 DR 门口<strong>死等</strong>标志位（<code>while (标志位 == 0);</code>），期间什么事都干不了</li>
+<li>中断：CPU 去干别的，<strong>标志位置位时硬件把 CPU 叫回来</strong>（触发中断），在中断服务函数里搬一字节，搬完继续干别的</li>
+</ul>
+<p>DMA 则是完全不同的搬运工：它是个硬件模块，自己知道”源地址（DR）、目标地址（数组）、搬多少”，一条命令就能把整批数据搬完，连 CPU 都不需要。</p>
+<p>关键：<strong>不管是哪种搬运工，数据最终都落在同一个数组里</strong>。所以不管是我在回调函数里用 <code>receiveData</code>，还是在 <code>while(1)</code> 里用 <code>readBuffer</code>，操作的都是同一块内存——程序逻辑完全不用区分数据是怎么进来的。</p>
+<hr>
+<h2 id="统一模型：所有通信外设一个套路"><a href="#统一模型：所有通信外设一个套路" class="headerlink" title="统一模型：所有通信外设一个套路"></a>统一模型：所有通信外设一个套路</h2><p>把 5 篇博客串起来，得到一个贯穿所有通信编程的模型：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">┌───────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    【通信统一模型】                              │</span><br><span class="line">│                                                               │</span><br><span class="line">│    ┌──────────────┐     搬运机制       ┌───────────────────┐   │</span><br><span class="line">│    │  数组 / 变量   │  ◄──────────────► │ 外设数据寄存器 DR   │   │</span><br><span class="line">│    │  (RAM 内存)   │                   │  (外设硬件内部)     │   │</span><br><span class="line">│    │              │  轮询: CPU 手动    │  USART_DR          │   │</span><br><span class="line">│    │ receiveData  │  中断: 硬件通知    │  I2C_DR            │   │</span><br><span class="line">│    │ sendBuffer   │  DMA: 硬件自动     │                    │   │</span><br><span class="line">│    │ readBuffer   │                   │                    │   │</span><br><span class="line">│    └──────────────┘                   └─────────┬─────────┘   │</span><br><span class="line">│              ▲                                 │              │</span><br><span class="line">│              │        TXE / RXNE 标志驱动       │              │</span><br><span class="line">│              └─────────────────────────────────┘              │</span><br><span class="line">│                                                               │</span><br><span class="line">└───────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>把 5 篇博客放进这个模型里看：</p>
+<table>
+<thead>
+<tr>
+<th align="left">博客</th>
+<th align="left">搬运工</th>
+<th align="left">数组在哪</th>
+<th align="left">DR → 数组由谁完成</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">串口轮询</td>
+<td align="left">CPU 查询 RXNE</td>
+<td align="left"><code>receiveData[2]</code> 局部变量</td>
+<td align="left">CPU 在 <code>HAL_UART_Receive</code> 里逐字节读 DR</td>
+</tr>
+<tr>
+<td align="left">串口中断</td>
+<td align="left">中断服务函数</td>
+<td align="left"><code>receiveData[2]</code> 全局变量</td>
+<td align="left">CPU 在 <code>UART_Receive_IT</code> 里读 DR</td>
+</tr>
+<tr>
+<td align="left">串口 DMA</td>
+<td align="left">DMA 硬件</td>
+<td align="left"><code>receiveData[50]</code> 全局变量</td>
+<td align="left">DMA 控制器直接从 DR 搬到数组</td>
+</tr>
+<tr>
+<td align="left">蓝牙（USART3+DMA）</td>
+<td align="left">DMA 硬件</td>
+<td align="left"><code>receiveData[50]</code> 全局变量</td>
+<td align="left">DMA 控制器直接从 DR 搬到数组</td>
+</tr>
+<tr>
+<td align="left">I2C 读 AHT20</td>
+<td align="left">CPU 查询 I2C 标志</td>
+<td align="left"><code>sendBuffer[3]</code> &#x2F; <code>readBuffer[6]</code> 局部变量</td>
+<td align="left">CPU 在 HAL_I2C 函数里搬运</td>
+</tr>
+</tbody></table>
+<p>所以可以看到，<strong>从 USART 到 I2C，从轮询到 DMA，底层永远是这个模型</strong>：</p>
+<blockquote>
+<p><strong>数组（RAM） ↔ 数据寄存器 DR（外设） ↔ 移位寄存器 ↔ 物理引脚</strong></p>
+</blockquote>
+<p>编程层面我只需要做两件事：</p>
+<ol>
+<li><strong>准备数组</strong>：发送前往数组里放数据；接收前准备一个空数组</li>
+<li><strong>调 HAL 函数</strong>：把数组首地址（指针）和长度告诉 HAL</li>
+</ol>
+<p>剩下的”数组↔DR 一来一回”的搬运，交给 HAL 库（轮询&#x2F;中断）或 DMA（硬件）。这也是为什么换一个通信外设（UART → I2C → 以后的 SPI&#x2F;CAN）学习成本很低——<strong>学会一个通信外设，就学会了一半</strong>。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">问题</th>
+<th align="left">答案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">数据到底存在哪？</td>
+<td align="left">存在<strong>我代码定义的数组里</strong>（RAM 内存），发送和接收都是</td>
+</tr>
+<tr>
+<td align="left">外设里存数据吗？</td>
+<td align="left">外设只有一个<strong>1 字节的数据寄存器 DR</strong>，只作”过手”用，不存数据</td>
+</tr>
+<tr>
+<td align="left">为什么用数组？</td>
+<td align="left">DR 一次只能装 1 字节，多字节数据必须有连续内存暂存</td>
+</tr>
+<tr>
+<td align="left">为什么传指针？</td>
+<td align="left">HAL 函数要直接读写我的内存，传首地址即可，避免复制</td>
+</tr>
+<tr>
+<td align="left">数据怎么进的数组？</td>
+<td align="left">轮询&#x2F;中断：CPU 逐字节搬；DMA：硬件整批搬——数组位置不变</td>
+</tr>
+<tr>
+<td align="left">换外设为什么套路一样？</td>
+<td align="left">USART、I2C（以及以后的 SPI&#x2F;CAN）都是”数组 ↔ DR ↔ 引脚”模型</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="/2026/08/01/STM32_I2C_AHT20/">上一篇：STM32——IIC通信，轮询模式读取温湿度传感器AHT20</a></li>
+<li><a href="/2026/07/29/STM32_USART_Serial_Communication/">串口轮询：STM32——串口通信，用电脑控制三色LED</a></li>
+<li><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断：STM32——串口中断模式通信，让CPU不再”傻等”</a></li>
+<li><a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/">DMA 不定长：STM32——串口DMA模式收发，与不定长数据接收</a></li>
+<li><a href="/2026/07/30/STM32_BLE_Bluetooth/">蓝牙：STM32——蓝牙BLE通信，用蓝牙无线控制小灯</a></li>
+<li>参考资料：STM32F103xx 参考手册（USART 数据寄存器 DR、I2C 数据寄存器 DR 章节）、AHT20 数据手册</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/USART/" rel="tag"># USART</a>
+              <a href="/tags/DMA/" rel="tag"># DMA</a>
+              <a href="/tags/I2C/" rel="tag"># I2C</a>
+              <a href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag"># 中断</a>
+              <a href="/tags/%E5%86%85%E5%AD%98/" rel="tag"># 内存</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/08/01/STM32_I2C_AHT20/" rel="prev" title="STM32——IIC通信，轮询模式读取温湿度传感器AHT20">
+      <i class="fa fa-chevron-left"></i> STM32——IIC通信，轮询模式读取温湿度传感器AHT20
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E4%B8%B2%E5%8F%A3%E5%88%B0-I2C%EF%BC%9A%E4%B8%80%E4%B8%AA%E5%8F%8D%E5%A4%8D%E5%87%BA%E7%8E%B0%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">1.</span> <span class="nav-text">从串口到 I2C：一个反复出现的问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%A4%E4%B8%AA%E5%AD%98%E5%82%A8%E5%9C%B0%E7%82%B9%EF%BC%9A%E6%95%B0%E7%BB%84%EF%BC%88RAM%EF%BC%89%E5%92%8C%E6%95%B0%E6%8D%AE%E5%AF%84%E5%AD%98%E5%99%A8%EF%BC%88DR%EF%BC%89"><span class="nav-number">2.</span> <span class="nav-text">两个存储地点：数组（RAM）和数据寄存器（DR）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%91%E9%80%81%EF%BC%9A%E6%95%B0%E6%8D%AE%E4%BB%8E%E5%93%AA%E6%9D%A5%EF%BC%8C%E5%88%B0%E5%93%AA%E5%8E%BB"><span class="nav-number">3.</span> <span class="nav-text">发送：数据从哪来，到哪去</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8E%A5%E6%94%B6%EF%BC%9A%E6%95%B0%E6%8D%AE%E4%BB%8E%E5%93%AA%E6%9D%A5%EF%BC%8C%E5%88%B0%E5%93%AA%E5%8E%BB"><span class="nav-number">4.</span> <span class="nav-text">接收：数据从哪来，到哪去</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AHT20-%E5%9C%A8%E9%93%BE%E8%B7%AF%E4%B8%AD%E7%9A%84%E5%93%AA%E4%B8%AA%E4%BD%8D%E7%BD%AE%EF%BC%9F"><span class="nav-number">5.</span> <span class="nav-text">AHT20 在链路中的哪个位置？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AHT20-%E5%AF%B9-STM32-%E6%9D%A5%E8%AF%B4%E6%98%AF%E4%B8%AA%E2%80%9D%E9%BB%91%E7%9B%92%E2%80%9D"><span class="nav-number">5.1.</span> <span class="nav-text">AHT20 对 STM32 来说是个”黑盒”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%B0%E5%9D%80%E5%8F%82%E6%95%B0%E5%B0%B1%E6%98%AF%E2%80%9D%E7%82%B9%E5%90%8D%E2%80%9D"><span class="nav-number">5.2.</span> <span class="nav-text">地址参数就是”点名”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E5%AD%98%E5%82%A8%E4%BD%8D%E7%BD%AE%E5%88%97%E8%A1%A8"><span class="nav-number">5.3.</span> <span class="nav-text">完整存储位置列表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%85%E9%A1%BB%E6%98%AF%E6%95%B0%E7%BB%84%EF%BC%9F"><span class="nav-number">6.</span> <span class="nav-text">为什么必须是数组？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88-HAL-%E5%87%BD%E6%95%B0%E8%A6%81%E4%BC%A0%E6%8C%87%E9%92%88%EF%BC%9F"><span class="nav-number">7.</span> <span class="nav-text">为什么 HAL 函数要传指针？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E7%A7%8D%E2%80%9D%E6%90%AC%E8%BF%90%E5%B7%A5%E2%80%9D%EF%BC%9A%E8%BD%AE%E8%AF%A2%E3%80%81%E4%B8%AD%E6%96%AD%E3%80%81DMA"><span class="nav-number">8.</span> <span class="nav-text">三种”搬运工”：轮询、中断、DMA</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%9F%E4%B8%80%E6%A8%A1%E5%9E%8B%EF%BC%9A%E6%89%80%E6%9C%89%E9%80%9A%E4%BF%A1%E5%A4%96%E8%AE%BE%E4%B8%80%E4%B8%AA%E5%A5%97%E8%B7%AF"><span class="nav-number">9.</span> <span class="nav-text">统一模型：所有通信外设一个套路</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">11.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">33</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">40</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">259k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">3:55</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
