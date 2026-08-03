@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本篇博客学习128×64 的 OLED 屏幕：先搞懂驱动芯片 CH1116 的页&#x2F;列&#x2F;显存原理，从点亮一个像素开始手写底层；再用上波特律动送的&quot;大礼包&quot;（OLED 驱动库 + LED 取模助手），画线画圆、显示图片、显示中文一行代码搞定。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——OLED屏幕：CH1116驱动原理与波特律动驱动库">
+<meta property="og:url" content="http://tristan1116.github.io/2026/08/03/STM32_OLED_Display/index.html">
+<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:description" content="本篇博客学习128×64 的 OLED 屏幕：先搞懂驱动芯片 CH1116 的页&#x2F;列&#x2F;显存原理，从点亮一个像素开始手写底层；再用上波特律动送的&quot;大礼包&quot;（OLED 驱动库 + LED 取模助手），画线画圆、显示图片、显示中文一行代码搞定。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_OLED_Display/image-20260803164922648.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_OLED_Display/image-20260803165228659.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_OLED_Display/image-20260803171108903.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_OLED_Display/78e624d8ae514f39a6997300d09c2663.jpg">
+<meta property="article:published_time" content="2026-08-03T16:50:00.000Z">
+<meta property="article:modified_time" content="2026-08-03T16:50:00.000Z">
+<meta property="article:author" content="点灯大王">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="I2C">
+<meta property="article:tag" content="OLED">
+<meta property="article:tag" content="CH1116">
+<meta property="article:tag" content="显存">
+<meta property="article:tag" content="取模">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_OLED_Display/image-20260803164922648.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/08/03/STM32_OLED_Display/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——OLED屏幕：CH1116驱动原理与波特律动驱动库 | 点灯大王的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">点灯大王的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/08/03/STM32_OLED_Display/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="点灯大王的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——OLED屏幕：CH1116驱动原理与波特律动驱动库
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-03 16:50:00" itemprop="dateCreated datePublished" datetime="2026-08-03T16:50:00+00:00">2026-08-03</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>9.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+            <div class="post-description">本篇博客学习128×64 的 OLED 屏幕：先搞懂驱动芯片 CH1116 的页/列/显存原理，从点亮一个像素开始手写底层；再用上波特律动送的"大礼包"（OLED 驱动库 + LED 取模助手），画线画圆、显示图片、显示中文一行代码搞定。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本篇主要学习：驱动一块 <strong>128×64 的 OLED 屏幕</strong>。它同样挂在 I2C1 总线上，所以我们之前学的 I2C 收发全部复用，本篇的核心增量是：</p>
+<table>
+<thead>
+<tr>
+<th align="left">和上一篇的区别</th>
+<th align="left">上一篇（AHT20）</th>
+<th align="left">本篇（OLED）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">数据方向</td>
+<td align="left">读传感器数据（Receive）</td>
+<td align="left">写屏幕数据（Transmit）</td>
+</tr>
+<tr>
+<td align="left">数据量</td>
+<td align="left">几字节</td>
+<td align="left">每帧 1KB（128×64 位）</td>
+</tr>
+<tr>
+<td align="left">编程模式</td>
+<td align="left">轮询→中断→DMA 状态机</td>
+<td align="left">显存（双缓冲思想）</td>
+</tr>
+<tr>
+<td align="left">关键知识</td>
+<td align="left">状态机、static、extern</td>
+<td align="left">页&#x2F;列寻址、取模、驱动库</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="硬件原理：屏幕是怎么亮起来的"><a href="#硬件原理：屏幕是怎么亮起来的" class="headerlink" title="硬件原理：屏幕是怎么亮起来的"></a>硬件原理：屏幕是怎么亮起来的</h2><h3 id="像素与分辨率"><a href="#像素与分辨率" class="headerlink" title="像素与分辨率"></a>像素与分辨率</h3><p>所谓屏幕，其实就是<strong>一个个发光小灯</strong>组成的阵列，每个小灯叫一个<strong>像素</strong>。屏幕上小灯的排列数目就是<strong>分辨率</strong>。这块 OLED 是 128×64——<strong>128 列 × 64 行</strong>，一共 8192 个像素。</p>
+<p>如果像控制 RGB 灯那样一个 IO 控制一个像素，得 8000 多个引脚——显然不可能。所以屏幕都带一颗<strong>驱动芯片</strong>：我们只需要通过 I2C&#x2F;SPI 和芯片通信，由它去操纵这 8000 多个小灯的亮灭。keysking学习板上用的是 <strong>CH1116</strong>，常见的还有 <strong>SSD1306</strong>，都能驱动 128×64 的 OLED，原理大同小异，只是部分指令和特殊功能有差异。</p>
+<blockquote>
+<p>类比：驱动芯片就像”包工头”——你只要给包工头下达指令（哪个灯亮），不用自己去一个个拉线。</p>
+</blockquote>
+<h3 id="页（Page）结构——1-字节管-8-个像素"><a href="#页（Page）结构——1-字节管-8-个像素" class="headerlink" title="页（Page）结构——1 字节管 8 个像素"></a>页（Page）结构——1 字节管 8 个像素</h3><p>CH1116 把屏幕划分为 <strong>8 个页（Page）</strong>，每页 128 列 × <strong>8 行</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">        列 0    列 1    列 2    ...  列 127</span><br><span class="line">页 0    ┌──────┬──────┬──────┬─────┬──────┐</span><br><span class="line">        │byte0 │byte1 │byte2 │ ... │byte127│  ← 8 行像素</span><br><span class="line">页 1    ├──────┼──────┼──────┼─────┼──────┤</span><br><span class="line">.       │ ...  │ ...  │ ...  │ ... │ ...  │</span><br><span class="line">.       ├──────┼──────┼──────┼─────┼──────┤</span><br><span class="line">页 7    │ ...  │ ...  │ ...  │ ... │ ...  │</span><br><span class="line">        └──────┴──────┴──────┴─────┴──────┘</span><br></pre></td></tr></table></figure>
+
+<p>为什么要分页？因为<strong>一个字节正好 8 位</strong>——一字节数据就能表示某一页某一列 8 个像素的亮灭。比如告诉芯片”第 0 页第 3 列设为 <code>0xC1</code>（1100 0001）”，那么这一列从上到下第 0、1、7 位对应的像素亮起，其余熄灭。</p>
+<h3 id="I2C-通信格式：指令-0x00-开头，数据-0x40-开头"><a href="#I2C-通信格式：指令-0x00-开头，数据-0x40-开头" class="headerlink" title="I2C 通信格式：指令 0x00 开头，数据 0x40 开头"></a>I2C 通信格式：指令 0x00 开头，数据 0x40 开头</h3><p>CH1116 的 I2C 地址是 <strong>0x7A</strong>。跟它通信分两类：</p>
+<ol>
+<li><strong>指令</strong>：I2C 地址 + <code>0x00</code> + 指令字节。比如：<ul>
+<li>设置页地址：<code>0xB0 ~ 0xB7</code>（第 0 页是 0xB0，第 7 页是 0xB7）</li>
+<li>设置列地址：<strong>分两次发送</strong>——先发低 4 位（如 <code>0x0A</code> 表示低 4 位是 A），再发高 4 位（如 <code>0x15</code> 表示高 4 位是 5），合起来列地址 &#x3D; 0x5A</li>
+</ul>
+</li>
+<li><strong>数据</strong>：I2C 地址 + <code>0x40</code> + 任意数量数据字节，芯片按当前的页&#x2F;列地址把数据代表的像素亮灭显示出来。</li>
+</ol>
+<blockquote>
+<p>记忆方法：<code>0x00</code> 是”命令门牌号”，<code>0x40</code> 是”数据门牌号”——告诉芯片接下来要进来的字节是干什么的。</p>
+</blockquote>
+<h3 id="列地址自动-1——“偷懒”神器"><a href="#列地址自动-1——“偷懒”神器" class="headerlink" title="列地址自动 +1——“偷懒”神器"></a>列地址自动 +1——“偷懒”神器</h3><p>CH1116 有个非常方便的特性：<strong>写完一字节的 8 个像素后，列地址自动加 1</strong>。这样我们只需要把页地址设为 0、列地址设为 0，然后一股脑发送 128 个字节，就完成了一整页的设置；页地址递增，循环 8 次，就点亮了整块屏幕。</p>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="1-I2C-提速：标准模式-→-快速模式"><a href="#1-I2C-提速：标准模式-→-快速模式" class="headerlink" title="1. I2C 提速：标准模式 → 快速模式"></a>1. I2C 提速：标准模式 → 快速模式</h3><p>I2C1 之前已经用过了，这集只需要做一个小改动：OLED 数据量大（每帧要发 1KB+），把 I2C 速度从<strong>标准模式（100K）改为快速模式（400K）</strong>。</p>
+<blockquote>
+<p><img src="/./../images/STM32_OLED_Display/image-20260803164922648.png" alt="image-20260803164922648"></p>
+</blockquote>
+<h3 id="2-时钟：把系统时钟配到-72MHz"><a href="#2-时钟：把系统时钟配到-72MHz" class="headerlink" title="2. 时钟：把系统时钟配到 72MHz"></a>2. 时钟：把系统时钟配到 72MHz</h3><p>截止到本集，我们的 STM32 一直跑在<strong>内部时钟 HSI 8MHz</strong> 上。为了跑得更快，这集要切换到学习板上的<strong>外部晶振（HSE 8MHz）</strong>并倍频到 72MHz：</p>
+<ol>
+<li><code>System Core</code> → <code>RCC</code> → 把 <code>High Speed Clock (HSE)</code> 设为 <strong>Crystal&#x2F;Ceramic Resonator</strong>（外部晶振）<img src="/./../images/STM32_OLED_Display/image-20260803165228659.png" alt="image-20260803165228659"></li>
+<li><code>Clock Configuration</code> → 把 <code>HCLK</code> 输入框改为 <strong>72</strong>![屏幕截图 2026-08-03 165239](.&#x2F;..&#x2F;images&#x2F;STM32_OLED_Display&#x2F;屏幕截图 2026-08-03 165239.png)</li>
+<li>CubeMX 自动配置时钟树：<strong>HSE 8MHz × PLL 倍频 9 &#x3D; 72MHz</strong></li>
+</ol>
+<blockquote>
+<p>注意：要先开 HSE 再改 HCLK。若顺序颠倒，CubeMX 只能用内部时钟 HSI（PLL 输入 4MHz、最大倍频 16 倍，极限 64MHz）配不出 72MHz，会弹出 “no solution found using 72MHz” 提示改用 64MHz。</p>
+</blockquote>
+<h3 id="3-代码生成设置"><a href="#3-代码生成设置" class="headerlink" title="3. 代码生成设置"></a>3. 代码生成设置</h3><p>老规矩：<code>Project Manager</code> → <code>Code Generator</code> → 勾选 **”Generate peripheral initialization as a pair of ‘.c&#x2F;.h’ files per peripheral”**，每个外设单独生成 .c&#x2F;.h 文件。</p>
+<hr>
+<h2 id="核心代码"><a href="#核心代码" class="headerlink" title="核心代码"></a>核心代码</h2><h3 id="1-底层发送函数"><a href="#1-底层发送函数" class="headerlink" title="1. 底层发送函数"></a>1. 底层发送函数</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// OLED器件地址</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> OLED_ADDRESS 0x7A</span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">OLED_Send</span><span class="params">(<span class="type">uint8_t</span> *data, <span class="type">uint8_t</span> len)</span> &#123;</span><br><span class="line">  HAL_I2C_Master_Transmit(&amp;hi2c1, OLED_ADDRESS, data, len, HAL_MAX_DELAY);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">OLED_SendCmd</span><span class="params">(<span class="type">uint8_t</span> cmd)</span> &#123;</span><br><span class="line">  <span class="type">static</span> <span class="type">uint8_t</span> sendBuffer[<span class="number">2</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">  sendBuffer[<span class="number">1</span>] = cmd;</span><br><span class="line">  OLED_Send(sendBuffer, <span class="number">2</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>OLED_SendCmd</code> 里：<code>sendBuffer[0]</code> 恒为 <code>0x00</code>（代表指令），<code>sendBuffer[1]</code> 放指令本体，一起通过 I2C 发出去。注意 <code>static</code>——非阻塞上下文的老朋友了，这里虽然是轮询发送，但 static 保证 buffer 不被栈反复分配。</p>
+<h3 id="2-显存（Frame-Buffer）——先在内存里”画画”"><a href="#2-显存（Frame-Buffer）——先在内存里”画画”" class="headerlink" title="2. 显存（Frame Buffer）——先在内存里”画画”"></a>2. 显存（Frame Buffer）——先在内存里”画画”</h3><p>思路转变：不要直接往屏幕写点，而是先在内存里维护一块”画布”（显存），画完再一次性刷到屏幕。显存大小正好对应屏幕：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> OLED_PAGE 8            <span class="comment">// OLED页数</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> OLED_COLUMN 128        <span class="comment">// OLED列数</span></span></span><br><span class="line"><span class="type">uint8_t</span> OLED_GRAM[OLED_PAGE][OLED_COLUMN];   <span class="comment">// 显存: 8页 × 128列</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>清空画布</strong>（用 <code>memset</code>，比手写双层 for 循环高效）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">OLED_NewFrame</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="built_in">memset</span>(OLED_GRAM, <span class="number">0</span>, <span class="keyword">sizeof</span>(OLED_GRAM));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>把画布刷到屏幕</strong>（利用列地址自动 +1 的特性）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">OLED_ShowFrame</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">static</span> <span class="type">uint8_t</span> sendBuffer[OLED_COLUMN + <span class="number">1</span>];</span><br><span class="line">  sendBuffer[<span class="number">0</span>] = <span class="number">0x40</span>;                       <span class="comment">// 数据门牌号</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">uint8_t</span> i = <span class="number">0</span>; i &lt; OLED_PAGE; i++) &#123;</span><br><span class="line">    OLED_SendCmd(<span class="number">0xB0</span> + i);                   <span class="comment">// 页地址: 第 i 页</span></span><br><span class="line">    OLED_SendCmd(<span class="number">0x02</span>);                       <span class="comment">// 列地址低4位</span></span><br><span class="line">    OLED_SendCmd(<span class="number">0x10</span>);                       <span class="comment">// 列地址高4位</span></span><br><span class="line">    <span class="built_in">memcpy</span>(sendBuffer + <span class="number">1</span>, OLED_GRAM[i], OLED_COLUMN);</span><br><span class="line">    OLED_Send(sendBuffer, OLED_COLUMN + <span class="number">1</span>);   <span class="comment">// 整页 128 字节一次发完</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>设置一个像素</strong>（写显存的核心）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">OLED_SetPixel</span><span class="params">(<span class="type">uint8_t</span> x, <span class="type">uint8_t</span> y, OLED_ColorMode color)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (x &gt;= OLED_COLUMN || y &gt;= OLED_ROW) <span class="keyword">return</span>;   <span class="comment">// 越界保护</span></span><br><span class="line">  <span class="keyword">if</span> (!color) &#123;</span><br><span class="line">    OLED_GRAM[y / <span class="number">8</span>][x] |= <span class="number">1</span> &lt;&lt; (y % <span class="number">8</span>);           <span class="comment">// 亮: 置1</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    OLED_GRAM[y / <span class="number">8</span>][x] &amp;= ~(<span class="number">1</span> &lt;&lt; (y % <span class="number">8</span>));        <span class="comment">// 灭: 清0</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>y / 8</code> 算出这个像素在第几页，<code>y % 8</code> 算出在页内第几位，然后移位操作这一位——和 AHT20 里”拆字节”的位运算套路一模一样。</p>
+<blockquote>
+<p>类比：显存就是一张草稿纸，<code>OLED_NewFrame</code> 翻新纸，<code>OLED_SetPixel</code> 往纸上打点，<code>OLED_ShowFrame</code> 把纸上的内容誊到屏幕。程序里再也不用”想显示什么就发什么”，<strong>统一先画到草稿纸，最后统一刷新</strong>——这就是双缓冲思想，后面做动画、做游戏全靠它。</p>
+</blockquote>
+<h3 id="3-图形与文字（波特律动驱动库）"><a href="#3-图形与文字（波特律动驱动库）" class="headerlink" title="3. 图形与文字（波特律动驱动库）"></a>3. 图形与文字（波特律动驱动库）</h3><p>上面是手写版原理。实际上这期视频的主角是 keysking 大佬自己写的工具：</p>
+<ul>
+<li><strong>波特律动 LED 取模助手</strong>：<a target="_blank" rel="noopener" href="https://led.baud-dance.com/">https://led.baud-dance.com</a> —— 在线工具，输入文字&#x2F;选图片，实时生成字模&#x2F;图模数据（支持列行式&#x2F;行列式&#x2F;逐列式&#x2F;逐行式四种取模方式、阴阳码切换、自定义模板）</li>
+<li><strong>波特律动 OLED 驱动库</strong>（MIT 协议，可闭源商用）：<code>oled.c</code> + <code>font.c</code>，封装好了全套绘制函数</li>
+</ul>
+<p>把库里的 <code>oled.c</code>、<code>font.c</code>、<code>oled.h</code>、<code>font.h</code> 拖进工程，注册一下（<code>OLED_Init</code> 之后调用），就能用了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">OLED_DrawLine(<span class="number">0</span>, <span class="number">0</span>, <span class="number">127</span>, <span class="number">63</span>, OLED_COLOR_NORMAL);        <span class="comment">// 画线</span></span><br><span class="line">OLED_DrawCircle(<span class="number">64</span>, <span class="number">32</span>, <span class="number">20</span>, OLED_COLOR_NORMAL);         <span class="comment">// 画圆</span></span><br><span class="line">OLED_DrawRectangle(<span class="number">10</span>, <span class="number">10</span>, <span class="number">50</span>, <span class="number">30</span>, OLED_COLOR_NORMAL);  <span class="comment">// 画矩形</span></span><br><span class="line">OLED_DrawEllipse(<span class="number">64</span>, <span class="number">32</span>, <span class="number">30</span>, <span class="number">15</span>, OLED_COLOR_NORMAL);    <span class="comment">// 画椭圆</span></span><br><span class="line">OLED_DrawImage(<span class="number">43</span>, <span class="number">0</span>, &amp;bilibiliImg, OLED_COLOR_NORMAL); <span class="comment">// 画图片</span></span><br><span class="line">OLED_PrintString(<span class="number">0</span>, <span class="number">32</span>, <span class="string">&quot;点灯大王的频道&quot;</span>, &amp;font16x16, OLED_COLOR_NORMAL); <span class="comment">// 直接打印中文!</span></span><br></pre></td></tr></table></figure>
+
+<p>驱动库里 <code>OLED_DrawLine</code> 用的是 <strong>Bresenham 直线算法</strong>（只做整数加减和移位，不碰浮点和乘法——单片机画图的经典算法），圆、椭圆也都是基于它的中点画圆法变体。</p>
+<h3 id="4-main-c-主程序"><a href="#4-main-c-主程序" class="headerlink" title="4. main.c 主程序"></a>4. main.c 主程序</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">HAL_Delay(<span class="number">20</span>);          <span class="comment">// OLED 上电比 STM32 慢，要等 20ms 再初始化</span></span><br><span class="line">OLED_Init();</span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  OLED_NewFrame();                                     <span class="comment">// 清空画布</span></span><br><span class="line">  OLED_PrintString(<span class="number">0</span>, <span class="number">32</span>, <span class="string">&quot;点灯大王的频道&quot;</span>, &amp;font16x16, OLED_COLOR_NORMAL);</span><br><span class="line">  OLED_ShowFrame();                                    <span class="comment">// 刷屏</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END WHILE */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="5-中文是怎么显示出来的（取模助手干了什么）"><a href="#5-中文是怎么显示出来的（取模助手干了什么）" class="headerlink" title="5. 中文是怎么显示出来的（取模助手干了什么）"></a>5. 中文是怎么显示出来的（取模助手干了什么）</h3><p>波特律动取模助手生成的中文字模，<strong>每个字模的前 4 个字节存的是这个字的 UTF-8 编码</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// &quot;道&quot; 的 UTF-8 编码是 0xE9 0x81 0x93，后面 32 字节是 16×16 的字模数据</span></span><br><span class="line">&#123;<span class="number">0xe9</span>, <span class="number">0x81</span>, <span class="number">0x93</span>, <span class="number">0x00</span>, <span class="number">0x40</span>, <span class="number">0x40</span>, <span class="number">0x42</span>, <span class="number">0xcc</span>, ...&#125;</span><br></pre></td></tr></table></figure>
+
+<p>驱动库的 <code>OLED_PrintString</code> 遍历字符串，用 <code>_OLED_GetUTF8Len</code> 识别每个中文字符的 UTF-8 编码长度（3 字节），在字库里逐条比对前 4 字节找到对应字模，再 <code>OLED_SetBlock</code> 画到显存。这就是为什么可以<strong>直接写中文字符串</strong>而不需要查表——前提是：</p>
+<ol>
+<li>编译器字符集设置为 <strong>UTF-8</strong></li>
+<li>字模用波特律动取模助手生成（带 UTF-8 前缀的格式）</li>
+</ol>
+<blockquote>
+<p>传统 PCtoLCD2002 之类软件没有这个设计，显示中文得一个一个字查坐标，这也是 keysking 写这个取模助手的初衷。</p>
+</blockquote>
+<hr>
+<h2 id="数据流全链路：一个字是怎么一步步显示到屏幕上的"><a href="#数据流全链路：一个字是怎么一步步显示到屏幕上的" class="headerlink" title="数据流全链路：一个字是怎么一步步显示到屏幕上的"></a>数据流全链路：一个字是怎么一步步显示到屏幕上的</h2><p>上面讲了一堆零件，现在把它们串起来看主线。就以 main.c 里这行代码为例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">OLED_PrintString(<span class="number">0</span>, <span class="number">32</span>, <span class="string">&quot;点灯大王的频道&quot;</span>, &amp;font16x16, OLED_COLOR_NORMAL);</span><br></pre></td></tr></table></figure>
+
+<p>“点”这个字从代码到屏幕，一共经过 <strong>6 步</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">&quot;点&quot;字 (UTF-8 编码: E7 82 B9)</span><br><span class="line">   │  ① 取模（离线，取模助手干的事）</span><br><span class="line">   │     字符 → 16×16 像素点阵 → 32 字节字模数据</span><br><span class="line">   ▼</span><br><span class="line">font.c: &#123;0xe7,0x82,0xb9,0x00, 0x00,0x7c,0x44,...&#125;   ← 前4字节是UTF-8码</span><br><span class="line">   │  ② 识别（OLED_PrintString 遍历字符串）</span><br><span class="line">   │     _OLED_GetUTF8Len 判断是3字节中文 → 字库里 memcmp 比对找到字模</span><br><span class="line">   ▼</span><br><span class="line">找到的字模数据（32字节像素数据）</span><br><span class="line">   │  ③ 写显存（OLED_SetBlock → OLED_SetBits 逐位写入）</span><br><span class="line">   │     OLED_GRAM[y/8][x] |= 1 &lt;&lt; (y%8)</span><br><span class="line">   ▼</span><br><span class="line">显存 OLED_GRAM[8][128]      ← 内存里的&quot;画布&quot;，此时屏幕毫无变化</span><br><span class="line">   │  ④ 刷屏（OLED_ShowFrame 逐页组织报文）</span><br><span class="line">   │     每页: 0xB0+i 设页地址 → 0x02/0x10 设列地址 → 0x40 + 128字节数据</span><br><span class="line">   ▼</span><br><span class="line">I2C 报文（8 页 × 129 字节）</span><br><span class="line">   │  ⑤ 传输（HAL_I2C_Master_Transmit 硬件时序）</span><br><span class="line">   │     起始位 → 从机地址0x7A → 数据 → 停止位，走 PB6/PB7 两根线</span><br><span class="line">   ▼</span><br><span class="line">CH1116 芯片内部显存</span><br><span class="line">   │  ⑥ 点亮（驱动芯片逐位映射）</span><br><span class="line">   │     每字节 8 位 → 当前页当前列从上到下 8 个像素的亮灭</span><br><span class="line">   ▼</span><br><span class="line">屏幕上出现&quot;点&quot;字 ✨</span><br></pre></td></tr></table></figure>
+
+<p><strong>图片的路径更短</strong>——没有第 ② 步的字符识别，因为图片自带位置信息：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">bilibiliImg（Image 结构体 &#123;w=43, h=26, data&#125;）</span><br><span class="line">   │  OLED_DrawImage(x, y, &amp;bilibiliImg, COLOR) → OLED_SetBlock</span><br><span class="line">   ▼</span><br><span class="line">显存 → 刷屏 → I2C → CH1116 → 屏幕</span><br></pre></td></tr></table></figure>
+
+<p><strong>体会一下这个设计</strong>：第 ① 步取模在电脑上离线完成，第 ②~⑤ 步全是内存搬运和通信，第 ⑥ 步由芯片硬件完成——**单片机的职责只是”把数据搬到该去的地方”**，真正把数据变成光的是驱动芯片。这也是”CPU 管逻辑、芯片管硬件”的典型分工。</p>
+<hr>
+<h2 id="实操：把文字和本地图片显示到屏幕上"><a href="#实操：把文字和本地图片显示到屏幕上" class="headerlink" title="实操：把文字和本地图片显示到屏幕上"></a>实操：把文字和本地图片显示到屏幕上</h2><h3 id="1-显示文字（以”点灯大王的频道”为例）"><a href="#1-显示文字（以”点灯大王的频道”为例）" class="headerlink" title="1. 显示文字（以”点灯大王的频道”为例）"></a>1. 显示文字（以”点灯大王的频道”为例）</h3><p><strong>第 1 步：取模</strong>——打开<a target="_blank" rel="noopener" href="https://led.baud-dance.com/">波特律动 LED 取模助手</a>，进入”字体取模”：</p>
+<ol>
+<li>选一个字体，设置宽高（如 <strong>16×16</strong>）</li>
+<li>取模方式选 <strong>列行式</strong></li>
+<li>阴阳码选 <strong>阴码</strong>（黑底白字）</li>
+<li><strong>生成模板一定要选”波特律动OLED驱动”</strong> ⚠️——只有这个模板会让字模前 4 字节带上字符的 UTF-8 编码，<code>OLED_PrintString</code> 才能直接识别中文字符串；用其他模板就得像传统库一样一个字符一个字符查坐标</li>
+<li>输入需要的文字（如”点灯大王的频道”），复制生成的字模数据</li>
+</ol>
+<blockquote>
+<p><img src="/./../images/STM32_OLED_Display/image-20260803171108903.png" alt="image-20260803171108903"></p>
+</blockquote>
+<p><strong>第 2 步：粘贴进工程</strong>——打开 <code>font.c</code>，把数据追加到中文字库数组里：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// font.c —— 追加新字模（16×16，每字模 = 4字节UTF-8码 + 32字节数据）</span></span><br><span class="line">&#123;<span class="number">0xe7</span>,<span class="number">0x82</span>,<span class="number">0xb9</span>,<span class="number">0x00</span>, <span class="number">0x00</span>,<span class="number">0x7c</span>,<span class="number">0x44</span>,...&#125;,   <span class="comment">// 点</span></span><br><span class="line">&#123;<span class="number">0xe7</span>,<span class="number">0x8e</span>,<span class="number">0x8b</span>,<span class="number">0x00</span>, ...&#125;,                  <span class="comment">// 看</span></span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p><strong>第 3 步：导出声明</strong>——在 <code>font.h</code> 中 <code>extern</code> 导出字体结构体：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// font.h</span></span><br><span class="line"><span class="keyword">extern</span> <span class="type">const</span> Font font16x16;   <span class="comment">// .w=16, .h=16, .chars=上面数组, .len=字数, .ascii=&amp;afont16x8</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>若新字体的宽高和已有字体<strong>相同</strong>（比如还是 16×16），数组名不能重复——要么沿用旧的数组，要么把旧的删掉换新的。若宽高不同，直接新建一个 Font 结构体即可（如 <code>font24x24</code>）。</p>
+</blockquote>
+<p><strong>第 4 步：调用</strong>——main.c 里直接写中文字符串：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">OLED_PrintString(<span class="number">0</span>, <span class="number">32</span>, <span class="string">&quot;点灯大王的频道&quot;</span>, &amp;font16x16, OLED_COLOR_NORMAL);</span><br></pre></td></tr></table></figure>
+
+<p><strong>第 5 步</strong>：编译烧录。记得<strong>编译器字符集设为 UTF-8</strong>（否则中文字符串在编译时就变成乱码，字库比对永远找不到）。</p>
+<h3 id="2-显示本地图片（以-B-站-logo-为例）"><a href="#2-显示本地图片（以-B-站-logo-为例）" class="headerlink" title="2. 显示本地图片（以 B 站 logo 为例）"></a>2. 显示本地图片（以 B 站 logo 为例）</h3><p><strong>第 1 步：取模</strong>——取模助手进入”图片取模”：</p>
+<ol>
+<li>选择电脑上的图片</li>
+<li>把图片缩放到合适大小（如 43×26），调节<strong>二值化阈值</strong>让黑白对比清晰</li>
+<li>取模方式选 <strong>列行式</strong>（和驱动库 <code>OLED_SetBlock</code> 的排列方式一致），阴阳码按效果切换</li>
+<li>复制生成的图模数据</li>
+</ol>
+<p><strong>第 2 步：粘贴 + 定义</strong>——数据粘贴到 <code>font.c</code>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// font.c</span></span><br><span class="line"><span class="type">const</span> <span class="type">uint8_t</span> bilibiliData[] = &#123;<span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, ...&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// font.h</span></span><br><span class="line"><span class="keyword">extern</span> <span class="type">const</span> Image bilibiliImg;   <span class="comment">// Image 结构体: &#123;.w=43, .h=26, .data=bilibiliData&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>第 3 步：调用</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">OLED_DrawImage(<span class="number">43</span>, <span class="number">0</span>, &amp;bilibiliImg, OLED_COLOR_NORMAL);</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="代码讲解：HAL-I2C-Master-Transmit-参数"><a href="#代码讲解：HAL-I2C-Master-Transmit-参数" class="headerlink" title="代码讲解：HAL_I2C_Master_Transmit 参数"></a>代码讲解：HAL_I2C_Master_Transmit 参数</h2><p>全篇最核心的 I2C 发送函数，老面孔但值得再复习一遍：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">含义</th>
+<th align="center">本项目填的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>I2C 句柄指针</strong></td>
+<td align="left">操作哪个 I2C 外设</td>
+<td align="center"><code>&amp;hi2c1</code></td>
+</tr>
+<tr>
+<td align="left"><strong>从机地址</strong></td>
+<td align="left">目标设备地址</td>
+<td align="center"><code>OLED_ADDRESS</code> (0x7A)</td>
+</tr>
+<tr>
+<td align="left"><strong>数据指针</strong></td>
+<td align="left">要发送的数据首地址</td>
+<td align="center"><code>sendBuffer</code></td>
+</tr>
+<tr>
+<td align="left"><strong>数据长度</strong></td>
+<td align="left">发送字节数</td>
+<td align="center">2（指令）或 129（整页数据）</td>
+</tr>
+<tr>
+<td align="left"><strong>超时时间</strong></td>
+<td align="left">等多久放弃（轮询模式）</td>
+<td align="center"><code>HAL_MAX_DELAY</code>（一直等）</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="解读初始化代码"><a href="#解读初始化代码" class="headerlink" title="解读初始化代码"></a>解读初始化代码</h2><h3 id="1-SystemClock-Config：72MHz-是怎么来的"><a href="#1-SystemClock-Config：72MHz-是怎么来的" class="headerlink" title="1. SystemClock_Config：72MHz 是怎么来的"></a>1. SystemClock_Config：72MHz 是怎么来的</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;</span><br><span class="line">RCC_OscInitStruct.HSEState = RCC_HSE_ON;                    <span class="comment">// 打开外部晶振</span></span><br><span class="line">RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;     <span class="comment">// 8MHz 不分频</span></span><br><span class="line">RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;        <span class="comment">// PLL 输入选 HSE</span></span><br><span class="line">RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;                <span class="comment">// ×9 → 72MHz</span></span><br><span class="line">...</span><br><span class="line">RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;   <span class="comment">// 系统时钟选 PLL</span></span><br><span class="line">RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;           <span class="comment">// APB1 = 36MHz</span></span><br><span class="line">RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;           <span class="comment">// APB2 = 72MHz</span></span><br><span class="line">HAL_RCC_ClockConfig(&amp;RCC_ClkInitStruct, FLASH_LATENCY_2);   <span class="comment">// 72MHz 需要 2 个等待周期</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>HSE 8MHz 不分频进 PLL，倍频 9 倍 → 72MHz</strong>。<code>FLASH_LATENCY_2</code> 是跑 72MHz 时必须的 Flash 等待周期（CPU 比 Flash 快，需要插入等待）。</p>
+<h3 id="2-MX-I2C1-Init：快速模式"><a href="#2-MX-I2C1-Init：快速模式" class="headerlink" title="2. MX_I2C1_Init：快速模式"></a>2. MX_I2C1_Init：快速模式</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">hi2c1.Init.ClockSpeed = <span class="number">400000</span>;              <span class="comment">// 400kHz 快速模式（之前是 100000）</span></span><br><span class="line">hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;  <span class="comment">// 7 位地址模式</span></span><br></pre></td></tr></table></figure>
+
+<p>I2C 时钟在 APB1 总线上（36MHz），400kHz 快速模式的占空比由 <code>I2C_DUTYCYCLE_2</code> 决定。</p>
+<h3 id="3-HAL-I2C-MspInit：引脚复用"><a href="#3-HAL-I2C-MspInit：引脚复用" class="headerlink" title="3. HAL_I2C_MspInit：引脚复用"></a>3. HAL_I2C_MspInit：引脚复用</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">__HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line">GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;     <span class="comment">// PB6 = SCL, PB7 = SDA</span></span><br><span class="line">GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;          <span class="comment">// 复用开漏（I2C 必须开漏 + 外部上拉）</span></span><br><span class="line">GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;    <span class="comment">// 高速</span></span><br><span class="line">__HAL_RCC_I2C1_CLK_ENABLE();</span><br></pre></td></tr></table></figure>
+
+<p><strong>复用开漏</strong>是 I2C 引脚的关键：I2C 协议靠”释放总线 &#x3D; 高电平”工作，开漏输出 + 外部上拉电阻实现线与逻辑。</p>
+<h3 id="配置对应关系表"><a href="#配置对应关系表" class="headerlink" title="配置对应关系表"></a>配置对应关系表</h3><table>
+<thead>
+<tr>
+<th align="left">CubeMX 设置</th>
+<th align="left">生成的代码</th>
+<th align="left">底层效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">HSE: Crystal&#x2F;Ceramic</td>
+<td align="left"><code>RCC_HSE_ON</code> + <code>PLL_MUL9</code></td>
+<td align="left">8MHz × 9 &#x3D; 72MHz 系统时钟</td>
+</tr>
+<tr>
+<td align="left">HCLK &#x3D; 72</td>
+<td align="left"><code>AHBCLKDivider = DIV1</code></td>
+<td align="left">AHB &#x3D; 72MHz</td>
+</tr>
+<tr>
+<td align="left">I2C1 Clock Speed 400K</td>
+<td align="left"><code>ClockSpeed = 400000</code></td>
+<td align="left">I2C 快速模式</td>
+</tr>
+<tr>
+<td align="left">PB6&#x2F;PB7 I2C1</td>
+<td align="left"><code>GPIO_MODE_AF_OD</code></td>
+<td align="left">复用开漏引脚</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>VS Code + CMake 工程，老流程：编译 → 烧录。确认 <code>font.h</code> &#x2F; <code>oled.h</code> 被 include、<code>font.c</code> &#x2F; <code>oled.c</code> 参与编译即可。</p>
+<blockquote>
+<p>注意：<strong>编译器字符集必须设为 UTF-8</strong>，否则 main.c 里的中文字符串会乱码，<code>OLED_PrintString</code> 就找不到字模了（这是驱动库官方注释里反复强调的）。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>屏幕正中显示”点灯大王的频道”，16×16 中文字模。</p>
+<blockquote>
+<p><img src="/./../images/STM32_OLED_Display/78e624d8ae514f39a6997300d09c2663.jpg" alt="78e624d8ae514f39a6997300d09c2663"></p>
+</blockquote>
+<hr>
+<h2 id="踩坑记录"><a href="#踩坑记录" class="headerlink" title="踩坑记录"></a>踩坑记录</h2><h3 id="🕳️-坑-1：OLED-上电比-STM32-慢"><a href="#🕳️-坑-1：OLED-上电比-STM32-慢" class="headerlink" title="🕳️ 坑 1：OLED 上电比 STM32 慢"></a>🕳️ 坑 1：OLED 上电比 STM32 慢</h3><p>STM32 启动（毫秒级）比 OLED 上电快，初始化太早 OLED 没准备好会白屏。所以 <code>OLED_Init()</code> 前加 <code>HAL_Delay(20)</code>。</p>
+<h3 id="🕳️-坑-2：刚上电”花屏”"><a href="#🕳️-坑-2：刚上电”花屏”" class="headerlink" title="🕳️ 坑 2：刚上电”花屏”"></a>🕳️ 坑 2：刚上电”花屏”</h3><p>CH1116 显存里的数据是随机的——数据为 1 的地方像素亮、为 0 的地方熄灭，所以刚点亮时屏幕是杂乱的花屏。<code>OLED_NewFrame()</code>（清显存）+ <code>OLED_ShowFrame()</code> 刷一帧全 0 就干净了。</p>
+<h3 id="🕳️-坑-3：列地址偏移-2-位"><a href="#🕳️-坑-3：列地址偏移-2-位" class="headerlink" title="🕳️ 坑 3：列地址偏移 2 位"></a>🕳️ 坑 3：列地址偏移 2 位</h3><p>学习板上的屏幕为了滚屏等操作，<strong>列地址整体左移了 2 位</strong>：想点亮”第 0 列”，实际要设置列地址 0x02。所以 <code>OLED_ShowFrame</code> 里列地址低 4 位写的是 <code>0x02</code> 而不是 <code>0x00</code>，第一次手写驱动的人很容易栽在这。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="新知识点"><a href="#新知识点" class="headerlink" title="新知识点"></a>新知识点</h3><table>
+<thead>
+<tr>
+<th align="left">知识点</th>
+<th align="left">一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">驱动芯片 CH1116</td>
+<td align="left">通过 I2C 指令操纵 8192 个像素的”包工头”</td>
+</tr>
+<tr>
+<td align="left">页结构</td>
+<td align="left">8 页 × 128 列 × 8 行，1 字节 &#x3D; 一列 8 像素</td>
+</tr>
+<tr>
+<td align="left">指令&#x2F;数据格式</td>
+<td align="left">0x00 开头是指令，0x40 开头是数据</td>
+</tr>
+<tr>
+<td align="left">列地址自动 +1</td>
+<td align="left">设好页&#x2F;列后连续发 128 字节 &#x3D; 刷完一页</td>
+</tr>
+<tr>
+<td align="left">显存（双缓冲）</td>
+<td align="left">先画草稿纸，再一次性刷屏</td>
+</tr>
+<tr>
+<td align="left">Bresenham 算法</td>
+<td align="left">只用整数运算的画线算法</td>
+</tr>
+<tr>
+<td align="left">取模助手</td>
+<td align="left">波特律动 LED 取模助手生成字模&#x2F;图模，带 UTF-8 前缀</td>
+</tr>
+<tr>
+<td align="left">时钟树</td>
+<td align="left">HSE 8MHz × PLL9 &#x3D; 72MHz，HSI 极限 64MHz</td>
+</tr>
+</tbody></table>
+<h3 id="与上一篇的对比"><a href="#与上一篇的对比" class="headerlink" title="与上一篇的对比"></a>与上一篇的对比</h3><p>上篇的 AHT20 是”读”数据（Receive + 状态机），本篇的 OLED 是”写”数据（Transmit + 显存）；上篇解决”数据怎么来”，本篇解决”数据怎么展示”。两者共用 I2C1 总线——<strong>I2C 是一个多从机总线，设备地址不冲突就可以挂在同一条线上</strong>，这也是将来温湿度上屏（AHT20 读到 → OLED 显示）的伏笔。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV19u4y197df/">B站视频：STM32入门教程2025版 第14集 如何在OLED屏幕上挥毫</a></li>
+<li><a target="_blank" rel="noopener" href="https://led.baud-dance.com/">波特律动 LED 取模助手</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/baud-dance">波特律动 OLED 驱动库（GitHub）</a></li>
+<li><a href="/2026/08/02/STM32_I2C_Interrupt_DMA/">上一篇：STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度</a></li>
+<li>波特律动文档站：<a target="_blank" rel="noopener" href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
+<li>CH1116 数据手册</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/I2C/" rel="tag"># I2C</a>
+              <a href="/tags/OLED/" rel="tag"># OLED</a>
+              <a href="/tags/CH1116/" rel="tag"># CH1116</a>
+              <a href="/tags/%E6%98%BE%E5%AD%98/" rel="tag"># 显存</a>
+              <a href="/tags/%E5%8F%96%E6%A8%A1/" rel="tag"># 取模</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/08/02/STM32_I2C_Interrupt_DMA/" rel="prev" title="STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度">
+      <i class="fa fa-chevron-left"></i> STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E5%8E%9F%E7%90%86%EF%BC%9A%E5%B1%8F%E5%B9%95%E6%98%AF%E6%80%8E%E4%B9%88%E4%BA%AE%E8%B5%B7%E6%9D%A5%E7%9A%84"><span class="nav-number">1.</span> <span class="nav-text">硬件原理：屏幕是怎么亮起来的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%83%8F%E7%B4%A0%E4%B8%8E%E5%88%86%E8%BE%A8%E7%8E%87"><span class="nav-number">1.1.</span> <span class="nav-text">像素与分辨率</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A1%B5%EF%BC%88Page%EF%BC%89%E7%BB%93%E6%9E%84%E2%80%94%E2%80%941-%E5%AD%97%E8%8A%82%E7%AE%A1-8-%E4%B8%AA%E5%83%8F%E7%B4%A0"><span class="nav-number">1.2.</span> <span class="nav-text">页（Page）结构——1 字节管 8 个像素</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#I2C-%E9%80%9A%E4%BF%A1%E6%A0%BC%E5%BC%8F%EF%BC%9A%E6%8C%87%E4%BB%A4-0x00-%E5%BC%80%E5%A4%B4%EF%BC%8C%E6%95%B0%E6%8D%AE-0x40-%E5%BC%80%E5%A4%B4"><span class="nav-number">1.3.</span> <span class="nav-text">I2C 通信格式：指令 0x00 开头，数据 0x40 开头</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%97%E5%9C%B0%E5%9D%80%E8%87%AA%E5%8A%A8-1%E2%80%94%E2%80%94%E2%80%9C%E5%81%B7%E6%87%92%E2%80%9D%E7%A5%9E%E5%99%A8"><span class="nav-number">1.4.</span> <span class="nav-text">列地址自动 +1——“偷懒”神器</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E9%85%8D%E7%BD%AE"><span class="nav-number">2.</span> <span class="nav-text">CubeMX 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-I2C-%E6%8F%90%E9%80%9F%EF%BC%9A%E6%A0%87%E5%87%86%E6%A8%A1%E5%BC%8F-%E2%86%92-%E5%BF%AB%E9%80%9F%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.1.</span> <span class="nav-text">1. I2C 提速：标准模式 → 快速模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E6%97%B6%E9%92%9F%EF%BC%9A%E6%8A%8A%E7%B3%BB%E7%BB%9F%E6%97%B6%E9%92%9F%E9%85%8D%E5%88%B0-72MHz"><span class="nav-number">2.2.</span> <span class="nav-text">2. 时钟：把系统时钟配到 72MHz</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E4%BB%A3%E7%A0%81%E7%94%9F%E6%88%90%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.3.</span> <span class="nav-text">3. 代码生成设置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">3.</span> <span class="nav-text">核心代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%BA%95%E5%B1%82%E5%8F%91%E9%80%81%E5%87%BD%E6%95%B0"><span class="nav-number">3.1.</span> <span class="nav-text">1. 底层发送函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E6%98%BE%E5%AD%98%EF%BC%88Frame-Buffer%EF%BC%89%E2%80%94%E2%80%94%E5%85%88%E5%9C%A8%E5%86%85%E5%AD%98%E9%87%8C%E2%80%9D%E7%94%BB%E7%94%BB%E2%80%9D"><span class="nav-number">3.2.</span> <span class="nav-text">2. 显存（Frame Buffer）——先在内存里”画画”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E5%9B%BE%E5%BD%A2%E4%B8%8E%E6%96%87%E5%AD%97%EF%BC%88%E6%B3%A2%E7%89%B9%E5%BE%8B%E5%8A%A8%E9%A9%B1%E5%8A%A8%E5%BA%93%EF%BC%89"><span class="nav-number">3.3.</span> <span class="nav-text">3. 图形与文字（波特律动驱动库）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-main-c-%E4%B8%BB%E7%A8%8B%E5%BA%8F"><span class="nav-number">3.4.</span> <span class="nav-text">4. main.c 主程序</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E4%B8%AD%E6%96%87%E6%98%AF%E6%80%8E%E4%B9%88%E6%98%BE%E7%A4%BA%E5%87%BA%E6%9D%A5%E7%9A%84%EF%BC%88%E5%8F%96%E6%A8%A1%E5%8A%A9%E6%89%8B%E5%B9%B2%E4%BA%86%E4%BB%80%E4%B9%88%EF%BC%89"><span class="nav-number">3.5.</span> <span class="nav-text">5. 中文是怎么显示出来的（取模助手干了什么）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%B5%81%E5%85%A8%E9%93%BE%E8%B7%AF%EF%BC%9A%E4%B8%80%E4%B8%AA%E5%AD%97%E6%98%AF%E6%80%8E%E4%B9%88%E4%B8%80%E6%AD%A5%E6%AD%A5%E6%98%BE%E7%A4%BA%E5%88%B0%E5%B1%8F%E5%B9%95%E4%B8%8A%E7%9A%84"><span class="nav-number">4.</span> <span class="nav-text">数据流全链路：一个字是怎么一步步显示到屏幕上的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E6%93%8D%EF%BC%9A%E6%8A%8A%E6%96%87%E5%AD%97%E5%92%8C%E6%9C%AC%E5%9C%B0%E5%9B%BE%E7%89%87%E6%98%BE%E7%A4%BA%E5%88%B0%E5%B1%8F%E5%B9%95%E4%B8%8A"><span class="nav-number">5.</span> <span class="nav-text">实操：把文字和本地图片显示到屏幕上</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E6%98%BE%E7%A4%BA%E6%96%87%E5%AD%97%EF%BC%88%E4%BB%A5%E2%80%9D%E7%82%B9%E7%81%AF%E5%A4%A7%E7%8E%8B%E7%9A%84%E9%A2%91%E9%81%93%E2%80%9D%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="nav-number">5.1.</span> <span class="nav-text">1. 显示文字（以”点灯大王的频道”为例）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E6%98%BE%E7%A4%BA%E6%9C%AC%E5%9C%B0%E5%9B%BE%E7%89%87%EF%BC%88%E4%BB%A5-B-%E7%AB%99-logo-%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="nav-number">5.2.</span> <span class="nav-text">2. 显示本地图片（以 B 站 logo 为例）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E8%AE%B2%E8%A7%A3%EF%BC%9AHAL-I2C-Master-Transmit-%E5%8F%82%E6%95%B0"><span class="nav-number">6.</span> <span class="nav-text">代码讲解：HAL_I2C_Master_Transmit 参数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB%E5%88%9D%E5%A7%8B%E5%8C%96%E4%BB%A3%E7%A0%81"><span class="nav-number">7.</span> <span class="nav-text">解读初始化代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-SystemClock-Config%EF%BC%9A72MHz-%E6%98%AF%E6%80%8E%E4%B9%88%E6%9D%A5%E7%9A%84"><span class="nav-number">7.1.</span> <span class="nav-text">1. SystemClock_Config：72MHz 是怎么来的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-MX-I2C1-Init%EF%BC%9A%E5%BF%AB%E9%80%9F%E6%A8%A1%E5%BC%8F"><span class="nav-number">7.2.</span> <span class="nav-text">2. MX_I2C1_Init：快速模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-HAL-I2C-MspInit%EF%BC%9A%E5%BC%95%E8%84%9A%E5%A4%8D%E7%94%A8"><span class="nav-number">7.3.</span> <span class="nav-text">3. HAL_I2C_MspInit：引脚复用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E5%AF%B9%E5%BA%94%E5%85%B3%E7%B3%BB%E8%A1%A8"><span class="nav-number">7.4.</span> <span class="nav-text">配置对应关系表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91-%E7%83%A7%E5%BD%95"><span class="nav-number">8.</span> <span class="nav-text">编译 &amp; 烧录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E5%B1%95%E7%A4%BA"><span class="nav-number">9.</span> <span class="nav-text">效果展示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B8%A9%E5%9D%91%E8%AE%B0%E5%BD%95"><span class="nav-number">10.</span> <span class="nav-text">踩坑记录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%F0%9F%95%B3%EF%B8%8F-%E5%9D%91-1%EF%BC%9AOLED-%E4%B8%8A%E7%94%B5%E6%AF%94-STM32-%E6%85%A2"><span class="nav-number">10.1.</span> <span class="nav-text">🕳️ 坑 1：OLED 上电比 STM32 慢</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%F0%9F%95%B3%EF%B8%8F-%E5%9D%91-2%EF%BC%9A%E5%88%9A%E4%B8%8A%E7%94%B5%E2%80%9D%E8%8A%B1%E5%B1%8F%E2%80%9D"><span class="nav-number">10.2.</span> <span class="nav-text">🕳️ 坑 2：刚上电”花屏”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%F0%9F%95%B3%EF%B8%8F-%E5%9D%91-3%EF%BC%9A%E5%88%97%E5%9C%B0%E5%9D%80%E5%81%8F%E7%A7%BB-2-%E4%BD%8D"><span class="nav-number">10.3.</span> <span class="nav-text">🕳️ 坑 3：列地址偏移 2 位</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">11.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">11.1.</span> <span class="nav-text">新知识点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E%E4%B8%8A%E4%B8%80%E7%AF%87%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">11.2.</span> <span class="nav-text">与上一篇的对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">12.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">35</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">45</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">282k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">4:16</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
