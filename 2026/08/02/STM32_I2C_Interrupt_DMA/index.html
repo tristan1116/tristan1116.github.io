@@ -29,6 +29,7 @@
 <meta property="og:site_name" content="点灯大王的博客">
 <meta property="og:description" content="上篇用 I2C 轮询模式读取了 AHT20 温湿度，本篇改造为中断模式：非阻塞的收发函数 + 状态机编程，CPU 不再傻等。同时踩了两个大坑——非阻塞函数里局部数组会被回收（要用 static）、跨文件共享变量 extern 的正确姿势。最后把中断版一行改成 DMA 版。">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_I2C_Interrupt_DMA/i2c1-nvic-settings.png">
 <meta property="og:image" content="http://tristan1116.github.io/images/STM32_I2C_Interrupt_DMA/image-20260802182354106.png">
 <meta property="article:published_time" content="2026-08-02T18:30:00.000Z">
 <meta property="article:modified_time" content="2026-08-02T18:30:00.000Z">
@@ -42,7 +43,7 @@
 <meta property="article:tag" content="AHT20">
 <meta property="article:tag" content="状态机">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_I2C_Interrupt_DMA/image-20260802182354106.png">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_I2C_Interrupt_DMA/i2c1-nvic-settings.png">
 
 <link rel="canonical" href="http://tristan1116.github.io/2026/08/02/STM32_I2C_Interrupt_DMA/">
 
@@ -365,7 +366,7 @@
 <li><strong>I2C1 event interrupt</strong>（事件中断，本篇主要用这个）</li>
 <li><strong>I2C1 error interrupt</strong>（错误中断）</li>
 </ul>
-<p>![屏幕截图 2026-08-02 182142](.&#x2F;..&#x2F;images&#x2F;STM32_I2C_Interrupt_DMA&#x2F;屏幕截图 2026-08-02 182142.png)</p>
+<p><img src="/./../images/STM32_I2C_Interrupt_DMA/i2c1-nvic-settings.png" alt="i2c1 NVIC 中断配置"></p>
 <p>Ctrl+S 保存并生成代码后，<code>stm32f1xx_it.c</code> 里会自动多出两个中断服务函数：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">I2C1_EV_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 事件中断：发送/接收完成、地址匹配等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_EV_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">I2C1_ER_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 错误中断：总线错误、仲裁丢失等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_ER_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
@@ -967,12 +968,12 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">287k</span>
+    <span title="站点总字数">286k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">4:21</span>
+    <span title="站点阅读时长">4:20</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>

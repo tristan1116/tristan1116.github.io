@@ -29,15 +29,16 @@
 <meta property="og:site_name" content="点灯大王的博客">
 <meta property="og:description" content="从零开始，搭建 VS Code + STM32CubeMX 的嵌入式开发工具链，生成第一段代码，编译烧录，点亮第一盏灯。记录整个过程中遇到的所有坑和解决方法。">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202119625.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202248835.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202524255.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202648342.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724203047284.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-device-list.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-launch-gdb.png">
-<meta property="og:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-continue-button.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/image-20260724202056262.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/image-20260724202119625.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/image-20260724202248835.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/image-20260724202524255.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/image-20260724202648342.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/20260724_211145.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/image-20260724203047284.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/stlink-device-list.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/stlink-launch-gdb.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/stlink-continue-button.png">
 <meta property="article:published_time" content="2026-07-24T20:30:00.000Z">
 <meta property="article:modified_time" content="2026-07-24T20:30:00.000Z">
 <meta property="article:author" content="点灯大王">
@@ -47,7 +48,7 @@
 <meta property="article:tag" content="CubeMX">
 <meta property="article:tag" content="GPIO">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://tristan1116.github.io/images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/stm32-restart-vscode-cubemx/image-20260724202056262.png">
 
 <link rel="canonical" href="http://tristan1116.github.io/2026/07/24/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/">
 
@@ -253,7 +254,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>6.6k</span>
+              <span>6.5k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -346,27 +347,27 @@
 <li>在搜索框输入 <strong>STM32F103C8T6</strong>（我用的是 Keysking大佬开发的集成开发板），双击选中</li>
 <li>弹窗问是否初始化外设，点 <strong>“No”</strong></li>
 </ol>
-<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
+<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
 <p><strong>配置 LED 灯引脚（PA7）：</strong></p>
 <ol>
 <li><p>在芯片图上找到 <strong>PA7</strong>，点击它</p>
 </li>
-<li><p>选择 <strong>GPIO_Output</strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202119625.png" alt="image-20260724202119625"></p>
+<li><p>选择 <strong>GPIO_Output</strong><img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202119625.png" alt="image-20260724202119625"></p>
 </li>
 <li><p>在左侧的 Categories面板下面的System Core里找到 GPIO 设置，点击后中间会跳出Configuration界面，如下图所示</p>
 </li>
-<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202248835.png" alt="image-20260724202248835"></p>
+<li><p><img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202248835.png" alt="image-20260724202248835"></p>
 </li>
-<li><p>选中PA7引脚，下方跳出具体的设置界面<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202524255.png" alt="image-20260724202524255"></p>
+<li><p>选中PA7引脚，下方跳出具体的设置界面<img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202524255.png" alt="image-20260724202524255"></p>
 </li>
 <li><p>此处本来GPIO output level是low，也就是低电平，把它改成High,高电平即可</p>
 </li>
-<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202648342.png" alt="image-20260724202648342"></p>
+<li><p><img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202648342.png" alt="image-20260724202648342"></p>
 </li>
 <li><p>其他保持默认：推挽输出、无上下拉、低速度</p>
 </li>
 </ol>
-<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：![屏幕截图 2026-07-24 211145](.&#x2F;..&#x2F;images&#x2F;stm32再出发-从keil转到vscode+cubemx&#x2F;屏幕截图 2026-07-24 211145.png)</p>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：<img src="/./../images/stm32-restart-vscode-cubemx/20260724_211145.png" alt="屏幕截图 2026-07-24 211145"></p>
 <ul>
 <li><strong>Debug</strong> 选择 <strong>Serial Wire</strong></li>
 <li>这样 PA13&#x2F;SWDIO 和 PA14&#x2F;SWCLK 会被自动配置，用于 ST-Link 调试</li>
@@ -374,7 +375,7 @@
 <blockquote>
 <p>这一步很重要！否则烧录一次后，下次 SWD 就被禁用了，再也烧不进新程序。</p>
 </blockquote>
-<h3 id="选择工具链"><a href="#选择工具链" class="headerlink" title="选择工具链"></a>选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
+<h3 id="选择工具链"><a href="#选择工具链" class="headerlink" title="选择工具链"></a>选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32-restart-vscode-cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
 <table>
 <thead>
 <tr>
@@ -625,10 +626,10 @@
 <h3 id="烧录到开发板"><a href="#烧录到开发板" class="headerlink" title="烧录到开发板"></a>烧录到开发板</h3><p>驱动正常后，在 VS Code 中：</p>
 <ol>
 <li>点击左侧的 <strong>运行和调试</strong> 图标（🦖 或 <code>Ctrl+Shift+D</code>），打开运行和调试面板</li>
-<li>确认下方 <strong>STM32Cube设备与开发板</strong> 列表中能看到 <code>STM32 STLink</code>（<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-device-list.png" alt="STM32设备列表"></li>
-<li>点击上方的 <strong>运行和调试</strong> 按钮，选择 <strong><code>STM32Cube:STM32 Launch STLink GDB Server</code></strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-launch-gdb.png" alt="选择Launch STLink GDB Server"></li>
+<li>确认下方 <strong>STM32Cube设备与开发板</strong> 列表中能看到 <code>STM32 STLink</code>（<img src="/./../images/stm32-restart-vscode-cubemx/stlink-device-list.png" alt="STM32设备列表"></li>
+<li>点击上方的 <strong>运行和调试</strong> 按钮，选择 <strong><code>STM32Cube:STM32 Launch STLink GDB Server</code></strong><img src="/./../images/stm32-restart-vscode-cubemx/stlink-launch-gdb.png" alt="选择Launch STLink GDB Server"></li>
 <li>此时 ST-Link 开始连接开发板，终端会输出连接日志</li>
-<li>点击 VS Code 上方调试工具栏中的 <strong>继续</strong> 按钮（▶️ 图标）<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-continue-button.png" alt="点击继续按钮运行程序"></li>
+<li>点击 VS Code 上方调试工具栏中的 <strong>继续</strong> 按钮（▶️ 图标）<img src="/./../images/stm32-restart-vscode-cubemx/stlink-continue-button.png" alt="点击继续按钮运行程序"></li>
 <li>程序开始运行，LED 灯闪烁 🎉</li>
 </ol>
 <h3 id="如何确认烧录成功"><a href="#如何确认烧录成功" class="headerlink" title="如何确认烧录成功"></a>如何确认烧录成功</h3><p>烧录完成后，如果代码写的是闪烁逻辑，会看到：</p>
@@ -868,12 +869,12 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">287k</span>
+    <span title="站点总字数">286k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">4:21</span>
+    <span title="站点阅读时长">4:20</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>

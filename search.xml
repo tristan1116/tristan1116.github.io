@@ -171,12 +171,12 @@
 </ul>
 <hr>
 <h3 id="🎬-配置完成后你将会看到的"><a href="#🎬-配置完成后你将会看到的" class="headerlink" title="🎬 配置完成后你将会看到的"></a>🎬 配置完成后你将会看到的</h3><p>按照下面的步骤全部配置好后，在终端里输入 <code>claude</code> 按回车，再信任它查看当前的目录，你会看到这样的界面：</p>
-<p><img src="/./../images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722191348760.png" alt="image-20260722191348760"></p>
+<p><img src="/./../images/claude-code-guide/image-20260722191348760.png" alt="image-20260722191348760"></p>
 <p><strong>这个界面就是你的 AI 搭档——它已经准备好在你的文件夹里工作了。</strong></p>
 <p>具体来说：</p>
 <ul>
 <li>🔹 <strong>顶部</strong>显示 Claude Code 的版本号</li>
-<li>🔹 <strong>中间 <code>&gt;</code> 提示符</strong>后面就是你的对话框，可以直接打字，就像跟一个工作伙伴聊天一样<img src="/./../images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722191558318.png" alt="image-20260722191558318"></li>
+<li>🔹 <strong>中间 <code>&gt;</code> 提示符</strong>后面就是你的对话框，可以直接打字，就像跟一个工作伙伴聊天一样<img src="/./../images/claude-code-guide/image-20260722191558318.png" alt="image-20260722191558318"></li>
 <li>🔹 它会读取你文件夹里的文件，帮你分析、修改、创建</li>
 <li>🔹 修改完的文件直接保存在原地，不需要手动下载覆盖</li>
 </ul>
@@ -186,7 +186,7 @@
 <li><strong>打字</strong>：在 <code>&gt;</code> 后面输入你想说的话</li>
 <li><strong>回车</strong>：按回车键发送消息</li>
 <li>如果看到权限提示（询问”是否允许某个操作”），用 <strong>上下箭头键</strong> 选择「Yes」或「No」，再按<strong>回车</strong>确认,下图就是个例子。</li>
-<li><img src="/./../images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722191842282.png" alt="image-20260722191842282"></li>
+<li><img src="/./../images/claude-code-guide/image-20260722191842282.png" alt="image-20260722191842282"></li>
 <li><strong>取消</strong>：如果你觉得当前claude code干活的方向不对，你可以在它干活的任何时候按下键盘左上角的Esc键来终止它的任务。</li>
 </ul>
 </blockquote>
@@ -249,9 +249,9 @@
 <p>💡 方法二的好处是终端打开后就在你想要的文件夹里，不用再输 <code>cd</code> 命令跳转。当然你用方法一也完全没问题，你想让claude code操作哪个目录，你就把那个目录的绝对路径复制粘贴到对话框里就行。</p>
 <p>不知道怎么找绝对路径？没关系，很简单，下面两张图解释清楚</p>
 <p>首先先进入你想要操作的文件夹，我这里以claude-demo文件夹为例。找到文件夹上方的路径框，左键单击空白部分</p>
-<p><img src="/./../images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722193410592.png" alt="image-20260722193410592"></p>
+<p><img src="/./../images/claude-code-guide/image-20260722193410592.png" alt="image-20260722193410592"></p>
 <p>然后原来左边的文字就变成了这个，被蓝色框起来的绝对路径，此时再在这个框里右键就可以复制了</p>
-<p><img src="/./../images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260722193506011.png" alt="image-20260722193506011"></p>
+<p><img src="/./../images/claude-code-guide/image-20260722193506011.png" alt="image-20260722193506011"></p>
 </blockquote>
 <p><strong>Mac：</strong></p>
 <ol>
@@ -358,7 +358,7 @@
 <h3 id="一、前置准备：安装-Git"><a href="#一、前置准备：安装-Git" class="headerlink" title="一、前置准备：安装 Git"></a>一、前置准备：安装 Git</h3><p>Claude Code 的版本管理、工作区隔离等功能依赖 Git，必须先装好。</p>
 <p><strong>Windows 用户</strong>：</p>
 <ol>
-<li>访问 <a href="https://git-scm.com/downloads/win">https://git-scm.com/downloads/win</a>，下载 64-bit 版本<img src="/./../images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/git%E5%AE%89%E8%A3%85.png" alt="git安装"></li>
+<li>访问 <a href="https://git-scm.com/downloads/win">https://git-scm.com/downloads/win</a>，下载 64-bit 版本<img src="/./../images/claude-code-guide/git-install.png" alt="git安装"></li>
 <li>双击安装包，一路点 Next（所有选项用默认即可）</li>
 <li>安装完成后，在终端输入以下命令验证：</li>
 </ol>
@@ -375,7 +375,7 @@
 <li><code>LTS</code>：长期支持版，推荐大多数用户使用的稳定版</li>
 <li><code>Current</code>：包含最新功能的开发版，适合想要尝试新功能的用户</li>
 </ul>
-<p><img src="/./../images/Claude-Code-%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97-%E6%99%AE%E9%80%9A%E4%BA%BA%E4%B9%9F%E8%83%BD%E6%8B%A5%E6%9C%89%E7%9A%84AI%E7%BC%96%E7%A8%8B%E4%BC%99%E4%BC%B4/image-20260718211203223.png" alt="image-20260718211203223"></p>
+<p><img src="/./../images/claude-code-guide/image-20260718211203223.png" alt="image-20260718211203223"></p>
 <p>如图所示，点击左下角的安装程序安装即可</p>
 <h4 id="1-2-安装-Node-js"><a href="#1-2-安装-Node-js" class="headerlink" title="1.2 安装 Node.js"></a>1.2 安装 Node.js</h4><p>Windows 用户：</p>
 <ol>
@@ -2969,348 +2969,6 @@
       </tags>
   </entry>
   <entry>
-    <title>STM32——按键输入控制小灯亮灭</title>
-    <url>/2026/07/26/STM32_Key_Input/</url>
-    <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="按键电路"><a href="#按键电路" class="headerlink" title="按键电路"></a>按键电路</h3><p>开发板上的两个按键分别连接在以下引脚：</p>
-<table>
-<thead>
-<tr>
-<th align="left">按键</th>
-<th align="center">引脚</th>
-<th align="center">信号</th>
-<th align="left">说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">KEY1</td>
-<td align="center">PB12</td>
-<td align="center">按下&#x3D;低电平，松开&#x3D;高电平</td>
-<td align="left">板载上拉电阻</td>
-</tr>
-<tr>
-<td align="left">KEY2</td>
-<td align="center">PB13</td>
-<td align="center">按下&#x3D;低电平，松开&#x3D;高电平</td>
-<td align="left">内部上拉（芯片内部准备好了，只需要在CubeMX中配置，无需外加电阻）</td>
-</tr>
-</tbody></table>
-<p>按键电路原理：一端接地，另一端通过上拉电阻连接到GPIO引脚。按下时引脚读到低电平，松开时读到高电平。</p>
-<blockquote>
-<p><img src="/./../images/STM32_Key_Input/image-20260726221901495.png" alt="image-20260726221901495"></p>
-</blockquote>
-<h3 id="LED-电路"><a href="#LED-电路" class="headerlink" title="LED 电路"></a>LED 电路</h3><table>
-<thead>
-<tr>
-<th align="left">LED</th>
-<th align="center">引脚</th>
-<th align="center">控制信号</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">🟢 绿色</td>
-<td align="center">PA7</td>
-<td align="center">GPIO 高电平亮</td>
-</tr>
-<tr>
-<td align="left">🔴 红色</td>
-<td align="center">PB0</td>
-<td align="center">GPIO 高电平亮</td>
-</tr>
-</tbody></table>
-<p><img src="/./../images/STM32_Key_Input/key_schematic.png" alt="key_schematic"></p>
-<hr>
-<h2 id="CubeMX-引脚配置"><a href="#CubeMX-引脚配置" class="headerlink" title="CubeMX 引脚配置"></a>CubeMX 引脚配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤与之前一样，略。</p>
-<h3 id="配置-GPIO-引脚"><a href="#配置-GPIO-引脚" class="headerlink" title="配置 GPIO 引脚"></a>配置 GPIO 引脚</h3><p>一共四个引脚需要配置：两个LED（输出）、两个按键（输入）。</p>
-<p><strong>LED 引脚（输出）：</strong></p>
-<table>
-<thead>
-<tr>
-<th align="center">引脚</th>
-<th align="center">功能</th>
-<th align="center">User Label</th>
-<th align="left">其他参数</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">PA7</td>
-<td align="center">GPIO_Output</td>
-<td align="center"><code>LED_GREEN</code></td>
-<td align="left">推挽输出、无上下拉、低速</td>
-</tr>
-<tr>
-<td align="center">PB0</td>
-<td align="center">GPIO_Output</td>
-<td align="center"><code>LED_RED</code></td>
-<td align="left">推挽输出、无上下拉、低速</td>
-</tr>
-</tbody></table>
-<blockquote>
-<p><img src="/./../images/STM32_Key_Input/led_output.png" alt="led_output"></p>
-<p><img src="/./../images/STM32_Key_Input/led_output_2.png" alt="led_output_2"></p>
-</blockquote>
-<p><strong>按键引脚（输入）：</strong></p>
-<table>
-<thead>
-<tr>
-<th align="center">引脚</th>
-<th align="center">功能</th>
-<th align="center">User Label</th>
-<th align="center">上下拉</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">PB12</td>
-<td align="center">GPIO_Input</td>
-<td align="center"><code>KEY1</code></td>
-<td align="center">无（板载已有上拉）</td>
-</tr>
-<tr>
-<td align="center">PB13</td>
-<td align="center">GPIO_Input</td>
-<td align="center"><code>KEY2</code></td>
-<td align="center"><strong>Pull-up</strong>（内部上拉）</td>
-</tr>
-</tbody></table>
-<p><img src="/./../images/STM32_Key_Input/pullup_setting.png" alt="pullup_setting"></p>
-<p><img src="/./../images/STM32_Key_Input/image-20260726222710822.png" alt="image-20260726222710822"></p>
-<p><strong>两个关键点</strong>：</p>
-<ol>
-<li><strong>KEY1（PB12）</strong>——板子自带了外部上拉电阻，所以 CubeMX 里 <code>Pull</code> 选 <code>No pull</code></li>
-<li><strong>KEY2（PB13）</strong>——这个引脚板子没有外部上拉，需要在 CubeMX 里把 <code>Pull</code> 设为 <strong>Pull-up</strong>，这样芯片内部会开启上拉电阻</li>
-</ol>
-<blockquote>
-<p><img src="/./../images/STM32_Key_Input/pinout_overview.png" alt="pinout_overview"></p>
-<p><img src="/./../images/STM32_Key_Input/image-20260726222919932.png" alt="image-20260726222919932"></p>
-</blockquote>
-<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p><strong>这一步绝对不能忘！</strong>——System Core → SYS → Debug → <strong>Serial Wire</strong>。否则烧录一次后 SWD 就被禁用了。</p>
-<h3 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h3><p><strong>Project Manager</strong> 设置：</p>
-<table>
-<thead>
-<tr>
-<th>设置项</th>
-<th>值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Project Name</strong></td>
-<td><code>KEY</code></td>
-</tr>
-<tr>
-<td><strong>Toolchain &#x2F; IDE</strong></td>
-<td><strong>CMake</strong></td>
-</tr>
-</tbody></table>
-<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
-<hr>
-<h2 id="VS-Code-中编写代码"><a href="#VS-Code-中编写代码" class="headerlink" title="VS Code 中编写代码"></a>VS Code 中编写代码</h2><h3 id="认识-main-h-中的宏定义"><a href="#认识-main-h-中的宏定义" class="headerlink" title="认识 main.h 中的宏定义"></a>认识 main.h 中的宏定义</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// LED</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 按键</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_Pin GPIO_PIN_12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_GPIO_Port GPIOB</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY2_Pin GPIO_PIN_13</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY2_GPIO_Port GPIOB</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="核心逻辑设计"><a href="#核心逻辑设计" class="headerlink" title="核心逻辑设计"></a>核心逻辑设计</h3><p>这次要实现两种不同的按键逻辑：</p>
-<table>
-<thead>
-<tr>
-<th align="left">按键</th>
-<th align="left">功能</th>
-<th align="left">实现方式</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>KEY1</strong></td>
-<td align="left">按下→绿灯亮，松开→绿灯灭</td>
-<td align="left">每个循环读取 KEY1 电平，直接控制绿灯</td>
-</tr>
-<tr>
-<td align="left"><strong>KEY2</strong></td>
-<td align="left">每按一次→红灯翻转（亮↔灭）</td>
-<td align="left">检测到按键后翻转红灯，等待松开再继续</td>
-</tr>
-</tbody></table>
-<h3 id="main-c-代码"><a href="#main-c-代码" class="headerlink" title="main.c 代码"></a>main.c 代码</h3><p>打开 <code>main.c</code>，在 <code>while(1)</code> 中编写：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">// ===== KEY1：按下亮，松开灭 =====</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">  &#123;</span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">  &#123;</span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// ===== KEY2：按一下翻转红灯 =====</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET)</span><br><span class="line">  &#123;</span><br><span class="line">      HAL_Delay(<span class="number">10</span>);  <span class="comment">// 消抖</span></span><br><span class="line">      <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET)</span><br><span class="line">      &#123;</span><br><span class="line">          HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);</span><br><span class="line"></span><br><span class="line">          <span class="comment">// 等待按键松开</span></span><br><span class="line">          <span class="keyword">while</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET) &#123;&#125;</span><br><span class="line">      &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 3 */</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h3><p><strong>用到的函数：</strong></p>
-<table>
-<thead>
-<tr>
-<th align="left">函数</th>
-<th align="left">作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><code>HAL_GPIO_ReadPin(端口, 引脚)</code></td>
-<td align="left">读取引脚电平：<code>GPIO_PIN_SET</code>（高）或 <code>GPIO_PIN_RESET</code>（低）</td>
-</tr>
-<tr>
-<td align="left"><code>HAL_GPIO_WritePin(端口, 引脚, 电平)</code></td>
-<td align="left">设置引脚高&#x2F;低电平</td>
-</tr>
-<tr>
-<td align="left"><code>HAL_GPIO_TogglePin(端口, 引脚)</code></td>
-<td align="left">翻转引脚电平</td>
-</tr>
-</tbody></table>
-<p><strong>KEY1 的逻辑——直接读取直接控制：</strong></p>
-<p>每次 while 循环都判断 KEY1 的电平。按下就读到低电平→亮，松开读到高电平→灭。反应很及时，适合开关类控制。</p>
-<p><strong>KEY2 的逻辑——边缘触发（按一下变一次）：</strong></p>
-<p>KEY2 要的是”按一下变一次”，而不是”按住的时候一直变”。所以多了三步：</p>
-<ol>
-<li><strong>消抖</strong>——机械按键按下瞬间会有抖动（几ms内电平反复跳变），加 10ms 延时后再读一次确认，防止误触发</li>
-<li><strong>翻转</strong>——确认按下后执行一次 <code>TogglePin</code></li>
-<li><strong>等待松手</strong>——用 while 循环等待按键恢复高电平，防止一次按压被 while 循环反复检测到，造成很短的时间内多次翻转，肉眼看上去效果很差。</li>
-</ol>
-<hr>
-<h2 id="解读-MX-GPIO-Init-——-输出与输入引脚的配置"><a href="#解读-MX-GPIO-Init-——-输出与输入引脚的配置" class="headerlink" title="解读 MX_GPIO_Init —— 输出与输入引脚的配置"></a>解读 MX_GPIO_Init —— 输出与输入引脚的配置</h2><p>这个项目有四种引脚（两个输出、两个输入），<code>MX_GPIO_Init()</code> 比前两篇复杂了不少：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始电平：两个 LED 默认熄灭 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* ========== 输出引脚配置（与前两篇相同） ========== */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* ========== 输入引脚配置（新内容） ========== */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* KEY1 (PB12) —— 输入，外部已有上拉，内部不配 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;     <span class="comment">// ← 输入模式</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;          <span class="comment">// ← 外部已有上拉电阻</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* KEY2 (PB13) —— 输入，开启内部上拉 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY2_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;     <span class="comment">// ← 输入模式</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_PULLUP;          <span class="comment">// ← 内部上拉！关键区别</span></span><br><span class="line">    HAL_GPIO_Init(KEY2_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="新知识点：输入模式配置"><a href="#新知识点：输入模式配置" class="headerlink" title="新知识点：输入模式配置"></a>新知识点：输入模式配置</h3><p>输出引脚没什么新内容，重点是两个<strong>输入引脚</strong>的配置：</p>
-<h4 id="GPIO-MODE-INPUT-——-输入模式"><a href="#GPIO-MODE-INPUT-——-输入模式" class="headerlink" title="GPIO_MODE_INPUT —— 输入模式"></a><code>GPIO_MODE_INPUT</code> —— 输入模式</h4><p>之前两篇都是 <code>GPIO_MODE_OUTPUT_PP</code>（输出），这次改成了 <code>GPIO_MODE_INPUT</code>（输入）。输入模式下，GPIO 不再输出电压，而是读取外部信号的电平高低，通过 <code>HAL_GPIO_ReadPin()</code> 获取。</p>
-<h4 id="Pull-参数-——-上下拉电阻的选择"><a href="#Pull-参数-——-上下拉电阻的选择" class="headerlink" title="Pull 参数 —— 上下拉电阻的选择"></a><code>Pull</code> 参数 —— 上下拉电阻的选择</h4><p>这是本次最有价值的部分——<strong>两种按键的上拉电阻配置方式不同</strong>：</p>
-<table>
-<thead>
-<tr>
-<th align="left">按键</th>
-<th align="center">Pull 参数</th>
-<th>原理</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>KEY1 (PB12)</strong></td>
-<td align="center"><code>GPIO_NOPULL</code></td>
-<td>板子自带了<strong>外部上拉电阻</strong>，芯片内部不需要再配</td>
-</tr>
-<tr>
-<td align="left"><strong>KEY2 (PB13)</strong></td>
-<td align="center"><code>GPIO_PULLUP</code></td>
-<td>板子没有外部上拉，需要开启芯片<strong>内部上拉电阻</strong></td>
-</tr>
-</tbody></table>
-<p>为什么需要上拉？看按键电路：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">无上拉：  PB12 -------- 按键 ---- GND</span><br><span class="line">          │</span><br><span class="line">          悬空！→ 电平不确定，按下是低电平，松开就不知道了</span><br><span class="line"></span><br><span class="line">有上拉：  VCC 3.3V</span><br><span class="line">          │</span><br><span class="line">         电阻(10kΩ)</span><br><span class="line">          │</span><br><span class="line">          PB12 -------- 按键 ---- GND</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><strong>按键松开</strong>：上拉电阻把电平拉到 3.3V，读到高电平</li>
-<li><strong>按键按下</strong>：引脚直接接 GND，读到低电平（电流经过按键到地，不走电阻）</li>
-</ul>
-<p>如果没有上拉电阻，按键松开时引脚悬空，电平是浮动的，读到的值可能随机变化。</p>
-<h4 id="内部上拉-vs-外部上拉"><a href="#内部上拉-vs-外部上拉" class="headerlink" title="内部上拉 vs 外部上拉"></a>内部上拉 vs 外部上拉</h4><table>
-<thead>
-<tr>
-<th>对比</th>
-<th>外部上拉</th>
-<th>内部上拉</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>实现</td>
-<td>板子上焊接电阻</td>
-<td>芯片内部集成，通过软件配置开启</td>
-</tr>
-<tr>
-<td>阻值</td>
-<td>可按需选择（通常 4.7kΩ~10kΩ）</td>
-<td>固定约 40kΩ（STM32F1）</td>
-</tr>
-<tr>
-<td>优点</td>
-<td>阻值精确、驱动能力强</td>
-<td>省元件、省PCB空间</td>
-</tr>
-<tr>
-<td>缺点</td>
-<td>占PCB空间、增加BOM成本</td>
-<td>阻值偏大、抗干扰稍弱</td>
-</tr>
-</tbody></table>
-<p>KEY1 使用外部上拉是因为外部上拉相比内部上拉能提供更稳定的高电平，而 KEY2 使用内部上拉则是为了节省板子空间和成本。</p>
-<h3 id="GPIO-模式表（更新版）"><a href="#GPIO-模式表（更新版）" class="headerlink" title="GPIO 模式表（更新版）"></a>GPIO 模式表（更新版）</h3><p>加上输入模式后，现在接触到的 GPIO 模式更丰富了：</p>
-<table>
-<thead>
-<tr>
-<th>模式</th>
-<th>含义</th>
-<th align="center">本篇中的用途</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>GPIO_MODE_OUTPUT_PP</code></td>
-<td>推挽输出</td>
-<td align="center">驱动 LED</td>
-</tr>
-<tr>
-<td><code>GPIO_MODE_INPUT</code></td>
-<td>数字输入</td>
-<td align="center">读取按键状态</td>
-</tr>
-<tr>
-<td><code>GPIO_NOPULL</code></td>
-<td>无上下拉</td>
-<td align="center">输出引脚 &#x2F; 外部已有上拉的输入引脚</td>
-</tr>
-<tr>
-<td><code>GPIO_PULLUP</code></td>
-<td>内部上拉</td>
-<td align="center">没有外部上拉的输入引脚</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
-<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
-<li>连接 ST-Link，点击<strong>运行和调试</strong> → 选择 STM32Cube:STM32 Launch STLink GDB Server</li>
-<li>点击<strong>继续</strong>按钮</li>
-</ol>
-<blockquote>
-<p>如果遇到烧录问题（连不上芯片），参考<a href="https://docs.baud-dance.com/docs/stm32/FAQ/CompilationFailed">波特律动 FAQ</a> 的解决方法。</p>
-</blockquote>
-<hr>
-<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后：</p>
-<ul>
-<li><strong>按下 KEY1</strong> → 🟢 绿灯亮</li>
-<li><strong>松开 KEY1</strong> → 🟢 绿灯灭</li>
-<li><strong>按一下 KEY2</strong> → 🔴 红灯翻转（亮↔灭），每按一次变一次</li>
-</ul>
-<blockquote>
-<p>效果展示视频链接：</p>
-<p><a href="https://www.bilibili.com/video/BV1dFg96MEJq/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1dFg96MEJq/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
-</blockquote>
-<hr>
-<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><h3 id="当前代码的局限性"><a href="#当前代码的局限性" class="headerlink" title="当前代码的局限性"></a>当前代码的局限性</h3><p>仔细观察 KEY2 的处理逻辑，会发现一个问题：<strong>按下 KEY2 还没松开的时候，程序卡死在 while 循环里了。</strong></p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET) &#123;&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这行代码的意思是”在这里空转，直到 KEY2 松开”。在这期间：</p>
-<ul>
-<li>❌ KEY1 按了没反应（while 循环不检测 KEY1）</li>
-<li>❌ 其他任何外设都无法响应</li>
-<li>❌ 如果一直不松手，程序就一直卡着</li>
-</ul>
-<p>这在只有两个按键、两个LED的 demo 里问题不大，但如果在实际项目里——比如同时要检测多个传感器、控制电机、处理通信——这种”阻塞式等待”的方式就行不通了。</p>
-<h3 id="怎么解决？"><a href="#怎么解决？" class="headerlink" title="怎么解决？"></a>怎么解决？</h3><p>有以下几种方案，由简单到专业：</p>
-<p><strong>方案一：状态机 + 非阻塞延时</strong></p>
-<p>不用 <code>while</code> 傻等，而是用变量记录按键状态和时间，每次循环只检查”按键是不是还被按着”。这样即使 KEY2 没松开，main loop 也能去干别的事。</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 伪代码思路</span></span><br><span class="line"><span class="keyword">if</span> (key2_pressed &amp;&amp; !key2_released) &#123;</span><br><span class="line">    <span class="keyword">if</span> (当前时间 - 按下时间 &gt; 消抖时间 &amp;&amp; 按键已松开) &#123;</span><br><span class="line">        翻转红灯;</span><br><span class="line">        key2_pressed = <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 同时还能检测 KEY1、处理其他任务……</span></span><br></pre></td></tr></table></figure>
-
-<p><strong>方案二：定时器轮询</strong></p>
-<p>把按键检测放到定时器中断里，每隔 10ms 采样一次电平，用状态机判断按下和松开。主循环完全解放出来做正事。</p>
-<p><strong>方案三：外部中断（EXTI）</strong></p>
-<p>最专业的方法。按键按下时触发中断，CPU 暂停当前任务来处理按键，处理完再回去。不需要任何轮询，效率最高。</p>
-<p>这也是嵌入式开发的典型学习路径——先学会在 main loop 里轮询，遇到阻塞问题后，自然就会去学中断和定时器。</p>
-<hr>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
-<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
-<li><a href="/2026/07/26/STM32_RGB_LED/">上一篇：STM32三色LED流水灯</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>STM32</tag>
-        <tag>嵌入式</tag>
-        <tag>CubeMX</tag>
-        <tag>GPIO</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>STM32——I2C中断与DMA模式，状态机编程读取AHT20温湿度</title>
     <url>/2026/08/02/STM32_I2C_Interrupt_DMA/</url>
     <content><![CDATA[<h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上篇我们学习了 I2C 轮询模式读取 AHT20：用 <code>HAL_I2C_Master_Transmit</code> 发送测量命令、<code>HAL_I2C_Master_Receive</code> 读取 6 字节数据，再拼接换算成温湿度。</p>
@@ -3410,7 +3068,7 @@
 <li><strong>I2C1 event interrupt</strong>（事件中断，本篇主要用这个）</li>
 <li><strong>I2C1 error interrupt</strong>（错误中断）</li>
 </ul>
-<p>![屏幕截图 2026-08-02 182142](.&#x2F;..&#x2F;images&#x2F;STM32_I2C_Interrupt_DMA&#x2F;屏幕截图 2026-08-02 182142.png)</p>
+<p><img src="/./../images/STM32_I2C_Interrupt_DMA/i2c1-nvic-settings.png" alt="i2c1 NVIC 中断配置"></p>
 <p>Ctrl+S 保存并生成代码后，<code>stm32f1xx_it.c</code> 里会自动多出两个中断服务函数：</p>
 <figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">I2C1_EV_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 事件中断：发送/接收完成、地址匹配等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_EV_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">I2C1_ER_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>   <span class="comment">// 错误中断：总线错误、仲裁丢失等</span></span><br><span class="line">&#123;</span><br><span class="line">  HAL_I2C_ER_IRQHandler(&amp;hi2c1);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
@@ -3873,6 +3531,348 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——按键输入控制小灯亮灭</title>
+    <url>/2026/07/26/STM32_Key_Input/</url>
+    <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="按键电路"><a href="#按键电路" class="headerlink" title="按键电路"></a>按键电路</h3><p>开发板上的两个按键分别连接在以下引脚：</p>
+<table>
+<thead>
+<tr>
+<th align="left">按键</th>
+<th align="center">引脚</th>
+<th align="center">信号</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">KEY1</td>
+<td align="center">PB12</td>
+<td align="center">按下&#x3D;低电平，松开&#x3D;高电平</td>
+<td align="left">板载上拉电阻</td>
+</tr>
+<tr>
+<td align="left">KEY2</td>
+<td align="center">PB13</td>
+<td align="center">按下&#x3D;低电平，松开&#x3D;高电平</td>
+<td align="left">内部上拉（芯片内部准备好了，只需要在CubeMX中配置，无需外加电阻）</td>
+</tr>
+</tbody></table>
+<p>按键电路原理：一端接地，另一端通过上拉电阻连接到GPIO引脚。按下时引脚读到低电平，松开时读到高电平。</p>
+<blockquote>
+<p><img src="/./../images/STM32_Key_Input/image-20260726221901495.png" alt="image-20260726221901495"></p>
+</blockquote>
+<h3 id="LED-电路"><a href="#LED-电路" class="headerlink" title="LED 电路"></a>LED 电路</h3><table>
+<thead>
+<tr>
+<th align="left">LED</th>
+<th align="center">引脚</th>
+<th align="center">控制信号</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">🟢 绿色</td>
+<td align="center">PA7</td>
+<td align="center">GPIO 高电平亮</td>
+</tr>
+<tr>
+<td align="left">🔴 红色</td>
+<td align="center">PB0</td>
+<td align="center">GPIO 高电平亮</td>
+</tr>
+</tbody></table>
+<p><img src="/./../images/STM32_Key_Input/key_schematic.png" alt="key_schematic"></p>
+<hr>
+<h2 id="CubeMX-引脚配置"><a href="#CubeMX-引脚配置" class="headerlink" title="CubeMX 引脚配置"></a>CubeMX 引脚配置</h2><h3 id="新建项目"><a href="#新建项目" class="headerlink" title="新建项目"></a>新建项目</h3><p>芯片选择 <strong>STM32F103C8T6</strong>，步骤与之前一样，略。</p>
+<h3 id="配置-GPIO-引脚"><a href="#配置-GPIO-引脚" class="headerlink" title="配置 GPIO 引脚"></a>配置 GPIO 引脚</h3><p>一共四个引脚需要配置：两个LED（输出）、两个按键（输入）。</p>
+<p><strong>LED 引脚（输出）：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="center">引脚</th>
+<th align="center">功能</th>
+<th align="center">User Label</th>
+<th align="left">其他参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">PA7</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_GREEN</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+<tr>
+<td align="center">PB0</td>
+<td align="center">GPIO_Output</td>
+<td align="center"><code>LED_RED</code></td>
+<td align="left">推挽输出、无上下拉、低速</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><img src="/./../images/STM32_Key_Input/led_output.png" alt="led_output"></p>
+<p><img src="/./../images/STM32_Key_Input/led_output_2.png" alt="led_output_2"></p>
+</blockquote>
+<p><strong>按键引脚（输入）：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="center">引脚</th>
+<th align="center">功能</th>
+<th align="center">User Label</th>
+<th align="center">上下拉</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">PB12</td>
+<td align="center">GPIO_Input</td>
+<td align="center"><code>KEY1</code></td>
+<td align="center">无（板载已有上拉）</td>
+</tr>
+<tr>
+<td align="center">PB13</td>
+<td align="center">GPIO_Input</td>
+<td align="center"><code>KEY2</code></td>
+<td align="center"><strong>Pull-up</strong>（内部上拉）</td>
+</tr>
+</tbody></table>
+<p><img src="/./../images/STM32_Key_Input/pullup_setting.png" alt="pullup_setting"></p>
+<p><img src="/./../images/STM32_Key_Input/image-20260726222710822.png" alt="image-20260726222710822"></p>
+<p><strong>两个关键点</strong>：</p>
+<ol>
+<li><strong>KEY1（PB12）</strong>——板子自带了外部上拉电阻，所以 CubeMX 里 <code>Pull</code> 选 <code>No pull</code></li>
+<li><strong>KEY2（PB13）</strong>——这个引脚板子没有外部上拉，需要在 CubeMX 里把 <code>Pull</code> 设为 <strong>Pull-up</strong>，这样芯片内部会开启上拉电阻</li>
+</ol>
+<blockquote>
+<p><img src="/./../images/STM32_Key_Input/pinout_overview.png" alt="pinout_overview"></p>
+<p><img src="/./../images/STM32_Key_Input/image-20260726222919932.png" alt="image-20260726222919932"></p>
+</blockquote>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p><strong>这一步绝对不能忘！</strong>——System Core → SYS → Debug → <strong>Serial Wire</strong>。否则烧录一次后 SWD 就被禁用了。</p>
+<h3 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h3><p><strong>Project Manager</strong> 设置：</p>
+<table>
+<thead>
+<tr>
+<th>设置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project Name</strong></td>
+<td><code>KEY</code></td>
+</tr>
+<tr>
+<td><strong>Toolchain &#x2F; IDE</strong></td>
+<td><strong>CMake</strong></td>
+</tr>
+</tbody></table>
+<p>点击 <strong>Generate Code</strong>，用 VS Code 打开。</p>
+<hr>
+<h2 id="VS-Code-中编写代码"><a href="#VS-Code-中编写代码" class="headerlink" title="VS Code 中编写代码"></a>VS Code 中编写代码</h2><h3 id="认识-main-h-中的宏定义"><a href="#认识-main-h-中的宏定义" class="headerlink" title="认识 main.h 中的宏定义"></a>认识 main.h 中的宏定义</h3><p>CubeMX 根据 User Label 生成了以下宏：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// LED</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_Pin GPIO_PIN_7</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_GREEN_GPIO_Port GPIOA</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_Pin GPIO_PIN_0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> LED_RED_GPIO_Port GPIOB</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 按键</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_Pin GPIO_PIN_12</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY1_GPIO_Port GPIOB</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY2_Pin GPIO_PIN_13</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> KEY2_GPIO_Port GPIOB</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="核心逻辑设计"><a href="#核心逻辑设计" class="headerlink" title="核心逻辑设计"></a>核心逻辑设计</h3><p>这次要实现两种不同的按键逻辑：</p>
+<table>
+<thead>
+<tr>
+<th align="left">按键</th>
+<th align="left">功能</th>
+<th align="left">实现方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>KEY1</strong></td>
+<td align="left">按下→绿灯亮，松开→绿灯灭</td>
+<td align="left">每个循环读取 KEY1 电平，直接控制绿灯</td>
+</tr>
+<tr>
+<td align="left"><strong>KEY2</strong></td>
+<td align="left">每按一次→红灯翻转（亮↔灭）</td>
+<td align="left">检测到按键后翻转红灯，等待松开再继续</td>
+</tr>
+</tbody></table>
+<h3 id="main-c-代码"><a href="#main-c-代码" class="headerlink" title="main.c 代码"></a>main.c 代码</h3><p>打开 <code>main.c</code>，在 <code>while(1)</code> 中编写：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">// ===== KEY1：按下亮，松开灭 =====</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin) == GPIO_PIN_RESET)</span><br><span class="line">  &#123;</span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">  &#123;</span><br><span class="line">      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// ===== KEY2：按一下翻转红灯 =====</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET)</span><br><span class="line">  &#123;</span><br><span class="line">      HAL_Delay(<span class="number">10</span>);  <span class="comment">// 消抖</span></span><br><span class="line">      <span class="keyword">if</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET)</span><br><span class="line">      &#123;</span><br><span class="line">          HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);</span><br><span class="line"></span><br><span class="line">          <span class="comment">// 等待按键松开</span></span><br><span class="line">          <span class="keyword">while</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET) &#123;&#125;</span><br><span class="line">      &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/* USER CODE END WHILE */</span></span><br><span class="line">  <span class="comment">/* USER CODE BEGIN 3 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 3 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h3><p><strong>用到的函数：</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_GPIO_ReadPin(端口, 引脚)</code></td>
+<td align="left">读取引脚电平：<code>GPIO_PIN_SET</code>（高）或 <code>GPIO_PIN_RESET</code>（低）</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_GPIO_WritePin(端口, 引脚, 电平)</code></td>
+<td align="left">设置引脚高&#x2F;低电平</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_GPIO_TogglePin(端口, 引脚)</code></td>
+<td align="left">翻转引脚电平</td>
+</tr>
+</tbody></table>
+<p><strong>KEY1 的逻辑——直接读取直接控制：</strong></p>
+<p>每次 while 循环都判断 KEY1 的电平。按下就读到低电平→亮，松开读到高电平→灭。反应很及时，适合开关类控制。</p>
+<p><strong>KEY2 的逻辑——边缘触发（按一下变一次）：</strong></p>
+<p>KEY2 要的是”按一下变一次”，而不是”按住的时候一直变”。所以多了三步：</p>
+<ol>
+<li><strong>消抖</strong>——机械按键按下瞬间会有抖动（几ms内电平反复跳变），加 10ms 延时后再读一次确认，防止误触发</li>
+<li><strong>翻转</strong>——确认按下后执行一次 <code>TogglePin</code></li>
+<li><strong>等待松手</strong>——用 while 循环等待按键恢复高电平，防止一次按压被 while 循环反复检测到，造成很短的时间内多次翻转，肉眼看上去效果很差。</li>
+</ol>
+<hr>
+<h2 id="解读-MX-GPIO-Init-——-输出与输入引脚的配置"><a href="#解读-MX-GPIO-Init-——-输出与输入引脚的配置" class="headerlink" title="解读 MX_GPIO_Init —— 输出与输入引脚的配置"></a>解读 MX_GPIO_Init —— 输出与输入引脚的配置</h2><p>这个项目有四种引脚（两个输出、两个输入），<code>MX_GPIO_Init()</code> 比前两篇复杂了不少：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">MX_GPIO_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    GPIO_InitTypeDef GPIO_InitStruct = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* GPIO Ports Clock Enable */</span></span><br><span class="line">    __HAL_RCC_GPIOA_CLK_ENABLE();</span><br><span class="line">    __HAL_RCC_GPIOB_CLK_ENABLE();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始电平：两个 LED 默认熄灭 */</span></span><br><span class="line">    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);</span><br><span class="line">    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* ========== 输出引脚配置（与前两篇相同） ========== */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* LED_GREEN (PA7) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_GREEN_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* LED_RED (PB0) —— 推挽输出 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = LED_RED_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;</span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;</span><br><span class="line">    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;</span><br><span class="line">    HAL_GPIO_Init(LED_RED_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* ========== 输入引脚配置（新内容） ========== */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* KEY1 (PB12) —— 输入，外部已有上拉，内部不配 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY1_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;     <span class="comment">// ← 输入模式</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_NOPULL;          <span class="comment">// ← 外部已有上拉电阻</span></span><br><span class="line">    HAL_GPIO_Init(KEY1_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* KEY2 (PB13) —— 输入，开启内部上拉 */</span></span><br><span class="line">    GPIO_InitStruct.Pin = KEY2_Pin;</span><br><span class="line">    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;     <span class="comment">// ← 输入模式</span></span><br><span class="line">    GPIO_InitStruct.Pull = GPIO_PULLUP;          <span class="comment">// ← 内部上拉！关键区别</span></span><br><span class="line">    HAL_GPIO_Init(KEY2_GPIO_Port, &amp;GPIO_InitStruct);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="新知识点：输入模式配置"><a href="#新知识点：输入模式配置" class="headerlink" title="新知识点：输入模式配置"></a>新知识点：输入模式配置</h3><p>输出引脚没什么新内容，重点是两个<strong>输入引脚</strong>的配置：</p>
+<h4 id="GPIO-MODE-INPUT-——-输入模式"><a href="#GPIO-MODE-INPUT-——-输入模式" class="headerlink" title="GPIO_MODE_INPUT —— 输入模式"></a><code>GPIO_MODE_INPUT</code> —— 输入模式</h4><p>之前两篇都是 <code>GPIO_MODE_OUTPUT_PP</code>（输出），这次改成了 <code>GPIO_MODE_INPUT</code>（输入）。输入模式下，GPIO 不再输出电压，而是读取外部信号的电平高低，通过 <code>HAL_GPIO_ReadPin()</code> 获取。</p>
+<h4 id="Pull-参数-——-上下拉电阻的选择"><a href="#Pull-参数-——-上下拉电阻的选择" class="headerlink" title="Pull 参数 —— 上下拉电阻的选择"></a><code>Pull</code> 参数 —— 上下拉电阻的选择</h4><p>这是本次最有价值的部分——<strong>两种按键的上拉电阻配置方式不同</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="left">按键</th>
+<th align="center">Pull 参数</th>
+<th>原理</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>KEY1 (PB12)</strong></td>
+<td align="center"><code>GPIO_NOPULL</code></td>
+<td>板子自带了<strong>外部上拉电阻</strong>，芯片内部不需要再配</td>
+</tr>
+<tr>
+<td align="left"><strong>KEY2 (PB13)</strong></td>
+<td align="center"><code>GPIO_PULLUP</code></td>
+<td>板子没有外部上拉，需要开启芯片<strong>内部上拉电阻</strong></td>
+</tr>
+</tbody></table>
+<p>为什么需要上拉？看按键电路：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">无上拉：  PB12 -------- 按键 ---- GND</span><br><span class="line">          │</span><br><span class="line">          悬空！→ 电平不确定，按下是低电平，松开就不知道了</span><br><span class="line"></span><br><span class="line">有上拉：  VCC 3.3V</span><br><span class="line">          │</span><br><span class="line">         电阻(10kΩ)</span><br><span class="line">          │</span><br><span class="line">          PB12 -------- 按键 ---- GND</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>按键松开</strong>：上拉电阻把电平拉到 3.3V，读到高电平</li>
+<li><strong>按键按下</strong>：引脚直接接 GND，读到低电平（电流经过按键到地，不走电阻）</li>
+</ul>
+<p>如果没有上拉电阻，按键松开时引脚悬空，电平是浮动的，读到的值可能随机变化。</p>
+<h4 id="内部上拉-vs-外部上拉"><a href="#内部上拉-vs-外部上拉" class="headerlink" title="内部上拉 vs 外部上拉"></a>内部上拉 vs 外部上拉</h4><table>
+<thead>
+<tr>
+<th>对比</th>
+<th>外部上拉</th>
+<th>内部上拉</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>实现</td>
+<td>板子上焊接电阻</td>
+<td>芯片内部集成，通过软件配置开启</td>
+</tr>
+<tr>
+<td>阻值</td>
+<td>可按需选择（通常 4.7kΩ~10kΩ）</td>
+<td>固定约 40kΩ（STM32F1）</td>
+</tr>
+<tr>
+<td>优点</td>
+<td>阻值精确、驱动能力强</td>
+<td>省元件、省PCB空间</td>
+</tr>
+<tr>
+<td>缺点</td>
+<td>占PCB空间、增加BOM成本</td>
+<td>阻值偏大、抗干扰稍弱</td>
+</tr>
+</tbody></table>
+<p>KEY1 使用外部上拉是因为外部上拉相比内部上拉能提供更稳定的高电平，而 KEY2 使用内部上拉则是为了节省板子空间和成本。</p>
+<h3 id="GPIO-模式表（更新版）"><a href="#GPIO-模式表（更新版）" class="headerlink" title="GPIO 模式表（更新版）"></a>GPIO 模式表（更新版）</h3><p>加上输入模式后，现在接触到的 GPIO 模式更丰富了：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>含义</th>
+<th align="center">本篇中的用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPIO_MODE_OUTPUT_PP</code></td>
+<td>推挽输出</td>
+<td align="center">驱动 LED</td>
+</tr>
+<tr>
+<td><code>GPIO_MODE_INPUT</code></td>
+<td>数字输入</td>
+<td align="center">读取按键状态</td>
+</tr>
+<tr>
+<td><code>GPIO_NOPULL</code></td>
+<td>无上下拉</td>
+<td align="center">输出引脚 &#x2F; 外部已有上拉的输入引脚</td>
+</tr>
+<tr>
+<td><code>GPIO_PULLUP</code></td>
+<td>内部上拉</td>
+<td align="center">没有外部上拉的输入引脚</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><ol>
+<li>VS Code 底部工具栏点击<strong>齿轮图标</strong> → 生成</li>
+<li>连接 ST-Link，点击<strong>运行和调试</strong> → 选择 STM32Cube:STM32 Launch STLink GDB Server</li>
+<li>点击<strong>继续</strong>按钮</li>
+</ol>
+<blockquote>
+<p>如果遇到烧录问题（连不上芯片），参考<a href="https://docs.baud-dance.com/docs/stm32/FAQ/CompilationFailed">波特律动 FAQ</a> 的解决方法。</p>
+</blockquote>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><p>烧录成功后：</p>
+<ul>
+<li><strong>按下 KEY1</strong> → 🟢 绿灯亮</li>
+<li><strong>松开 KEY1</strong> → 🟢 绿灯灭</li>
+<li><strong>按一下 KEY2</strong> → 🔴 红灯翻转（亮↔灭），每按一次变一次</li>
+</ul>
+<blockquote>
+<p>效果展示视频链接：</p>
+<p><a href="https://www.bilibili.com/video/BV1dFg96MEJq/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1dFg96MEJq/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+</blockquote>
+<hr>
+<h2 id="进阶思路"><a href="#进阶思路" class="headerlink" title="进阶思路"></a>进阶思路</h2><h3 id="当前代码的局限性"><a href="#当前代码的局限性" class="headerlink" title="当前代码的局限性"></a>当前代码的局限性</h3><p>仔细观察 KEY2 的处理逻辑，会发现一个问题：<strong>按下 KEY2 还没松开的时候，程序卡死在 while 循环里了。</strong></p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> (HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin) == GPIO_PIN_RESET) &#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这行代码的意思是”在这里空转，直到 KEY2 松开”。在这期间：</p>
+<ul>
+<li>❌ KEY1 按了没反应（while 循环不检测 KEY1）</li>
+<li>❌ 其他任何外设都无法响应</li>
+<li>❌ 如果一直不松手，程序就一直卡着</li>
+</ul>
+<p>这在只有两个按键、两个LED的 demo 里问题不大，但如果在实际项目里——比如同时要检测多个传感器、控制电机、处理通信——这种”阻塞式等待”的方式就行不通了。</p>
+<h3 id="怎么解决？"><a href="#怎么解决？" class="headerlink" title="怎么解决？"></a>怎么解决？</h3><p>有以下几种方案，由简单到专业：</p>
+<p><strong>方案一：状态机 + 非阻塞延时</strong></p>
+<p>不用 <code>while</code> 傻等，而是用变量记录按键状态和时间，每次循环只检查”按键是不是还被按着”。这样即使 KEY2 没松开，main loop 也能去干别的事。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 伪代码思路</span></span><br><span class="line"><span class="keyword">if</span> (key2_pressed &amp;&amp; !key2_released) &#123;</span><br><span class="line">    <span class="keyword">if</span> (当前时间 - 按下时间 &gt; 消抖时间 &amp;&amp; 按键已松开) &#123;</span><br><span class="line">        翻转红灯;</span><br><span class="line">        key2_pressed = <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 同时还能检测 KEY1、处理其他任务……</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>方案二：定时器轮询</strong></p>
+<p>把按键检测放到定时器中断里，每隔 10ms 采样一次电平，用状态机判断按下和松开。主循环完全解放出来做正事。</p>
+<p><strong>方案三：外部中断（EXTI）</strong></p>
+<p>最专业的方法。按键按下时触发中断，CPU 暂停当前任务来处理按键，处理完再回去。不需要任何轮询，效率最高。</p>
+<p>这也是嵌入式开发的典型学习路径——先学会在 main loop 里轮询，遇到阻塞问题后，自然就会去学中断和定时器。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="https://www.bilibili.com/video/BV12v4y1y7uV">keysking STM32 教程（B站）</a></li>
+<li><a href="https://docs.baud-dance.com/docs/stm32/intro">波特律动文档站</a></li>
+<li><a href="/2026/07/26/STM32_RGB_LED/">上一篇：STM32三色LED流水灯</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>GPIO</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——OLED屏幕：CH1116驱动原理与波特律动驱动库</title>
     <url>/2026/08/03/STM32_OLED_Display/</url>
     <content><![CDATA[<p>本篇主要学习：驱动一块 <strong>128×64 的 OLED 屏幕</strong>。它同样挂在 I2C1 总线上，所以我们之前学的 I2C 收发全部复用，本篇的核心增量是：</p>
@@ -3936,7 +3936,7 @@
 <h3 id="2-时钟：把系统时钟配到-72MHz"><a href="#2-时钟：把系统时钟配到-72MHz" class="headerlink" title="2. 时钟：把系统时钟配到 72MHz"></a>2. 时钟：把系统时钟配到 72MHz</h3><p>截止到本集，我们的 STM32 一直跑在<strong>内部时钟 HSI 8MHz</strong> 上。为了跑得更快，这集要切换到学习板上的<strong>外部晶振（HSE 8MHz）</strong>并倍频到 72MHz：</p>
 <ol>
 <li><code>System Core</code> → <code>RCC</code> → 把 <code>High Speed Clock (HSE)</code> 设为 <strong>Crystal&#x2F;Ceramic Resonator</strong>（外部晶振）<img src="/./../images/STM32_OLED_Display/image-20260803165228659.png" alt="image-20260803165228659"></li>
-<li><code>Clock Configuration</code> → 把 <code>HCLK</code> 输入框改为 <strong>72</strong>![屏幕截图 2026-08-03 165239](.&#x2F;..&#x2F;images&#x2F;STM32_OLED_Display&#x2F;屏幕截图 2026-08-03 165239.png)</li>
+<li><code>Clock Configuration</code> → 把 <code>HCLK</code> 输入框改为 <strong>72</strong><img src="/./../images/STM32_OLED_Display/20260803_165239.png" alt="屏幕截图 2026-08-03 165239"></li>
 <li>CubeMX 自动配置时钟树：<strong>HSE 8MHz × PLL 倍频 9 &#x3D; 72MHz</strong></li>
 </ol>
 <blockquote>
@@ -5680,24 +5680,6 @@
       </tags>
   </entry>
   <entry>
-    <title>Hello World</title>
-    <url>/2026/07/06/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
-  </entry>
-  <entry>
     <title>STM32——串口通信，用电脑控制三色LED</title>
     <url>/2026/07/29/STM32_USART_Serial_Communication/</url>
     <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="串口通信基础"><a href="#串口通信基础" class="headerlink" title="串口通信基础"></a>串口通信基础</h3><p>串口（UART，Universal Asynchronous Receiver&#x2F;Transmitter）是嵌入式领域最常用的通信方式之一。它的原理其实很简单——<strong>用两根数据线就能实现两个设备之间的双向通信</strong>。</p>
@@ -6341,6 +6323,24 @@
         <tag>USART</tag>
         <tag>串口</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>Hello World</title>
+    <url>/2026/07/06/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
   </entry>
   <entry>
     <title>hexo博客静态网站项目总结回顾深挖</title>
@@ -10368,27 +10368,27 @@
 <li>在搜索框输入 <strong>STM32F103C8T6</strong>（我用的是 Keysking大佬开发的集成开发板），双击选中</li>
 <li>弹窗问是否初始化外设，点 <strong>“No”</strong></li>
 </ol>
-<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
+<h3 id="配置引脚"><a href="#配置引脚" class="headerlink" title="配置引脚"></a>配置引脚</h3><p>在 CubeMX 的 Pinout View视图中，芯片的每个引脚都可以点击配置。<img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202056262.png" alt="image-20260724202056262"></p>
 <p><strong>配置 LED 灯引脚（PA7）：</strong></p>
 <ol>
 <li><p>在芯片图上找到 <strong>PA7</strong>，点击它</p>
 </li>
-<li><p>选择 <strong>GPIO_Output</strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202119625.png" alt="image-20260724202119625"></p>
+<li><p>选择 <strong>GPIO_Output</strong><img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202119625.png" alt="image-20260724202119625"></p>
 </li>
 <li><p>在左侧的 Categories面板下面的System Core里找到 GPIO 设置，点击后中间会跳出Configuration界面，如下图所示</p>
 </li>
-<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202248835.png" alt="image-20260724202248835"></p>
+<li><p><img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202248835.png" alt="image-20260724202248835"></p>
 </li>
-<li><p>选中PA7引脚，下方跳出具体的设置界面<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202524255.png" alt="image-20260724202524255"></p>
+<li><p>选中PA7引脚，下方跳出具体的设置界面<img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202524255.png" alt="image-20260724202524255"></p>
 </li>
 <li><p>此处本来GPIO output level是low，也就是低电平，把它改成High,高电平即可</p>
 </li>
-<li><p><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724202648342.png" alt="image-20260724202648342"></p>
+<li><p><img src="/./../images/stm32-restart-vscode-cubemx/image-20260724202648342.png" alt="image-20260724202648342"></p>
 </li>
 <li><p>其他保持默认：推挽输出、无上下拉、低速度</p>
 </li>
 </ol>
-<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：![屏幕截图 2026-07-24 211145](.&#x2F;..&#x2F;images&#x2F;stm32再出发-从keil转到vscode+cubemx&#x2F;屏幕截图 2026-07-24 211145.png)</p>
+<h3 id="配置调试接口"><a href="#配置调试接口" class="headerlink" title="配置调试接口"></a>配置调试接口</h3><p>依旧是Categories面板下面的System Core，找到 SYS 设置，点击后中间会跳出SYS Mode and Configuration界面，如下图所示：<img src="/./../images/stm32-restart-vscode-cubemx/20260724_211145.png" alt="屏幕截图 2026-07-24 211145"></p>
 <ul>
 <li><strong>Debug</strong> 选择 <strong>Serial Wire</strong></li>
 <li>这样 PA13&#x2F;SWDIO 和 PA14&#x2F;SWCLK 会被自动配置，用于 ST-Link 调试</li>
@@ -10396,7 +10396,7 @@
 <blockquote>
 <p>这一步很重要！否则烧录一次后，下次 SWD 就被禁用了，再也烧不进新程序。</p>
 </blockquote>
-<h3 id="选择工具链"><a href="#选择工具链" class="headerlink" title="选择工具链"></a>选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
+<h3 id="选择工具链"><a href="#选择工具链" class="headerlink" title="选择工具链"></a>选择工具链</h3><p>切换到 <strong>Project Manager</strong> 标签页：<img src="/./../images/stm32-restart-vscode-cubemx/image-20260724203047284.png" alt="image-20260724203047284"></p>
 <table>
 <thead>
 <tr>
@@ -10647,10 +10647,10 @@
 <h3 id="烧录到开发板"><a href="#烧录到开发板" class="headerlink" title="烧录到开发板"></a>烧录到开发板</h3><p>驱动正常后，在 VS Code 中：</p>
 <ol>
 <li>点击左侧的 <strong>运行和调试</strong> 图标（🦖 或 <code>Ctrl+Shift+D</code>），打开运行和调试面板</li>
-<li>确认下方 <strong>STM32Cube设备与开发板</strong> 列表中能看到 <code>STM32 STLink</code>（<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-device-list.png" alt="STM32设备列表"></li>
-<li>点击上方的 <strong>运行和调试</strong> 按钮，选择 <strong><code>STM32Cube:STM32 Launch STLink GDB Server</code></strong><img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-launch-gdb.png" alt="选择Launch STLink GDB Server"></li>
+<li>确认下方 <strong>STM32Cube设备与开发板</strong> 列表中能看到 <code>STM32 STLink</code>（<img src="/./../images/stm32-restart-vscode-cubemx/stlink-device-list.png" alt="STM32设备列表"></li>
+<li>点击上方的 <strong>运行和调试</strong> 按钮，选择 <strong><code>STM32Cube:STM32 Launch STLink GDB Server</code></strong><img src="/./../images/stm32-restart-vscode-cubemx/stlink-launch-gdb.png" alt="选择Launch STLink GDB Server"></li>
 <li>此时 ST-Link 开始连接开发板，终端会输出连接日志</li>
-<li>点击 VS Code 上方调试工具栏中的 <strong>继续</strong> 按钮（▶️ 图标）<img src="/./../images/stm32%E5%86%8D%E5%87%BA%E5%8F%91-%E4%BB%8Ekeil%E8%BD%AC%E5%88%B0vscode+cubemx/stlink-continue-button.png" alt="点击继续按钮运行程序"></li>
+<li>点击 VS Code 上方调试工具栏中的 <strong>继续</strong> 按钮（▶️ 图标）<img src="/./../images/stm32-restart-vscode-cubemx/stlink-continue-button.png" alt="点击继续按钮运行程序"></li>
 <li>程序开始运行，LED 灯闪烁 🎉</li>
 </ol>
 <h3 id="如何确认烧录成功"><a href="#如何确认烧录成功" class="headerlink" title="如何确认烧录成功"></a>如何确认烧录成功</h3><p>烧录完成后，如果代码写的是闪烁逻辑，会看到：</p>
@@ -11748,28 +11748,28 @@
 
 <h4 id="1-2-安装-Hexo-CLI-并初始化项目"><a href="#1-2-安装-Hexo-CLI-并初始化项目" class="headerlink" title="1.2 安装 Hexo CLI 并初始化项目"></a>1.2 安装 Hexo CLI 并初始化项目</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 安装 Hexo CLI</span></span><br><span class="line">npm install -g hexo-cli</span><br><span class="line">hexo -v</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建博客目录并初始化</span></span><br><span class="line"><span class="built_in">mkdir</span> D:\Blog &amp;&amp; <span class="built_in">cd</span> D:\Blog</span><br><span class="line">hexo init my-blog</span><br><span class="line"><span class="built_in">cd</span> my-blog</span><br><span class="line">npm install</span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/Node.js%E5%92%8CHexo%E5%AE%89%E8%A3%85.png" alt="Node.js 和 Hexo 安装"></p>
+<p><img src="/./../images/exp-report/nodejs-hexo-install.png" alt="Node.js 和 Hexo 安装"></p>
 <p><em>图1：Node.js 和 Hexo CLI 安装过程截图，展示 node -v、npm -v 和 hexo -v 版本验证结果。</em></p>
 <h4 id="1-3-项目目录结构"><a href="#1-3-项目目录结构" class="headerlink" title="1.3 项目目录结构"></a>1.3 项目目录结构</h4><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">my-blog/</span><br><span class="line">├── _config.yml          # 站点配置文件（核心）</span><br><span class="line">├── package.json         # 依赖管理</span><br><span class="line">├── scaffolds/           # 文章模板（draft/page/post）</span><br><span class="line">├── source/              # 源文件目录</span><br><span class="line">│   ├── _drafts/         # 草稿</span><br><span class="line">│   └── _posts/          # 已发布文章</span><br><span class="line">├── themes/              # 主题目录</span><br><span class="line">└── node_modules/        # 依赖包</span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/Hexo%E9%A1%B9%E7%9B%AE%E6%BA%90%E6%96%87%E4%BB%B6%E7%BB%93%E6%9E%84.png" alt="Hexo 项目源文件结构"></p>
+<p><img src="/./../images/exp-report/hexo-project-structure.png" alt="Hexo 项目源文件结构"></p>
 <p><em>图2：Hexo 博客项目完整目录结构，包含 scaffolds&#x2F;、source&#x2F;_posts&#x2F;、themes&#x2F; 等核心目录和配置文件。</em></p>
 <h4 id="1-4-启动本地预览"><a href="#1-4-启动本地预览" class="headerlink" title="1.4 启动本地预览"></a>1.4 启动本地预览</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo server      <span class="comment"># 简写: hexo s</span></span><br><span class="line"><span class="comment"># 浏览器访问 http://localhost:4000</span></span><br><span class="line"><span class="comment"># 端口冲突时: hexo server -p 4001</span></span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/hexo%E5%8D%9A%E5%AE%A2%E6%9C%AC%E5%9C%B0%E8%BF%90%E8%A1%8C%E6%88%90%E5%8A%9F.png" alt="Hexo 博客本地运行成功"></p>
+<p><img src="/./../images/exp-report/hexo-local-run-success.png" alt="Hexo 博客本地运行成功"></p>
 <p><em>图3：Hexo 博客本地运行成功，浏览器访问 <a href="http://localhost:4000/">http://localhost:4000</a> 展示默认主页。</em></p>
 <h4 id="1-5-创建文章"><a href="#1-5-创建文章" class="headerlink" title="1.5 创建文章"></a>1.5 创建文章</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 创建第一篇文章</span></span><br><span class="line">hexo new <span class="string">&quot;Hello World&quot;</span></span><br></pre></td></tr></table></figure>
 
 <p>文章 Front-matter 示例：</p>
 <figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">title:</span> <span class="string">Hello</span> <span class="string">World</span></span><br><span class="line"><span class="attr">date:</span> <span class="number">2026-07-07 10:00:00</span></span><br><span class="line"><span class="attr">updated:</span> <span class="number">2026-07-14 14:50:27</span></span><br><span class="line"><span class="attr">tags:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">Hexo</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">入门</span></span><br><span class="line"><span class="attr">categories:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">教程</span></span><br><span class="line"><span class="meta">---</span></span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/%E5%88%9B%E5%BB%BA%E6%96%B0%E6%96%87%E7%AB%A0.png" alt="创建新文章"></p>
+<p><img src="/./../images/exp-report/hexo-new-post.png" alt="创建新文章"></p>
 <p><em>图4：使用 hexo new 命令创建新文章，Markdown 文件自动生成在 source&#x2F;_posts&#x2F; 目录下。</em></p>
-<p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/%E5%9C%A8%E5%8D%9A%E5%AE%A2%E7%95%8C%E9%9D%A2%E6%98%BE%E7%A4%BA%E6%96%87%E7%AB%A0.png" alt="在博客界面显示文章"></p>
+<p><img src="/./../images/exp-report/hexo-post-displayed.png" alt="在博客界面显示文章"></p>
 <p><em>图5：创建的博客文章在本地预览中正常展示，包含标题、日期、标签和正文内容。</em></p>
 <h4 id="1-6-安装与配置-NexT-主题"><a href="#1-6-安装与配置-NexT-主题" class="headerlink" title="1.6 安装与配置 NexT 主题"></a>1.6 安装与配置 NexT 主题</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 安装 NexT 主题</span></span><br><span class="line">git <span class="built_in">clone</span> https://github.com/theme-next/hexo-theme-next themes/next</span><br><span class="line"></span><br><span class="line"><span class="comment"># 修改 _config.yml 中 theme 字段</span></span><br><span class="line"><span class="comment"># theme: next</span></span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/%E9%85%8D%E7%BD%AEnext%E4%B8%BB%E9%A2%98.png" alt="配置 NexT 主题"></p>
+<p><img src="/./../images/exp-report/hexo-next-theme-config.png" alt="配置 NexT 主题"></p>
 <p><em>图6：NexT 主题配置。</em></p>
 <h4 id="1-7-站点配置（-config-yml）"><a href="#1-7-站点配置（-config-yml）" class="headerlink" title="1.7 站点配置（_config.yml）"></a>1.7 站点配置（<code>_config.yml</code>）</h4><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="comment"># Site</span></span><br><span class="line"><span class="attr">title:</span> <span class="string">软件开发工具实践</span> <span class="bullet">-</span> <span class="string">个人博客</span></span><br><span class="line"><span class="attr">subtitle:</span> <span class="string">&#x27;Software Development Tools Practice&#x27;</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">&#x27;学习使用Hexo搭建静态博客，掌握SSG、CI/CD等现代开发工具&#x27;</span></span><br><span class="line"><span class="attr">author:</span> <span class="string">Student</span></span><br><span class="line"><span class="attr">language:</span> <span class="string">zh-CN</span></span><br><span class="line"><span class="attr">timezone:</span> <span class="string">&#x27;Asia/Shanghai&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># URL</span></span><br><span class="line"><span class="attr">url:</span> <span class="string">https://&lt;username&gt;.github.io</span></span><br><span class="line"><span class="attr">root:</span> <span class="string">/</span></span><br><span class="line"><span class="attr">permalink:</span> <span class="string">:year/:month/:day/:title/</span></span><br></pre></td></tr></table></figure>
 
@@ -11924,13 +11924,13 @@
 <h4 id="3-6-部署流程示意"><a href="#3-6-部署流程示意" class="headerlink" title="3.6 部署流程示意"></a>3.6 部署流程示意</h4><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[本地] Markdown 文章</span><br><span class="line">    │</span><br><span class="line">    ├── hexo generate ──→ public/ (HTML/CSS/JS)</span><br><span class="line">    │</span><br><span class="line">    └── hexo deploy ──→ GitHub Pages 仓库</span><br><span class="line">                              │</span><br><span class="line">                              └── https://&lt;username&gt;.github.io</span><br></pre></td></tr></table></figure>
 
 <hr>
-<h3 id="四、博客功能展示"><a href="#四、博客功能展示" class="headerlink" title="四、博客功能展示"></a>四、博客功能展示</h3><h3 id="4-1-分类功能"><a href="#4-1-分类功能" class="headerlink" title="4.1 分类功能"></a>4.1 分类功能</h3><p><img src="/./../images/exp2-4/hexo%E5%8D%9A%E5%AE%A2%E5%88%86%E7%B1%BB%E5%8A%9F%E8%83%BD.png" alt="Hexo 博客分类功能"></p>
+<h3 id="四、博客功能展示"><a href="#四、博客功能展示" class="headerlink" title="四、博客功能展示"></a>四、博客功能展示</h3><h3 id="4-1-分类功能"><a href="#4-1-分类功能" class="headerlink" title="4.1 分类功能"></a>4.1 分类功能</h3><p><img src="/./../images/exp2-4/hexo-blog-categories.png" alt="Hexo 博客分类功能"></p>
 <p><em>图7：Hexo 博客的分类功能页面，文章按 categories 归类展示，方便读者按主题浏览。</em></p>
-<h3 id="4-2-标签功能"><a href="#4-2-标签功能" class="headerlink" title="4.2 标签功能"></a>4.2 标签功能</h3><p><img src="/./../images/exp2-4/hexo%E5%8D%9A%E5%AE%A2%E6%A0%87%E7%AD%BE%E5%8A%9F%E8%83%BD.png" alt="Hexo 博客标签功能"></p>
+<h3 id="4-2-标签功能"><a href="#4-2-标签功能" class="headerlink" title="4.2 标签功能"></a>4.2 标签功能</h3><p><img src="/./../images/exp2-4/hexo-blog-tags.png" alt="Hexo 博客标签功能"></p>
 <p><em>图8：Hexo 博客的标签云功能页面，文章按 tags 关键词聚合，点击标签即可筛选相关文章。</em></p>
-<h3 id="4-3-归档功能"><a href="#4-3-归档功能" class="headerlink" title="4.3 归档功能"></a>4.3 归档功能</h3><p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/hexo%E5%8D%9A%E5%AE%A2%E5%BD%92%E6%A1%A3%E5%8A%9F%E8%83%BD.png" alt="Hexo 博客归档功能"></p>
+<h3 id="4-3-归档功能"><a href="#4-3-归档功能" class="headerlink" title="4.3 归档功能"></a>4.3 归档功能</h3><p><img src="/./../images/exp-report/hexo-archives.png" alt="Hexo 博客归档功能"></p>
 <p><em>图9：Hexo 博客的归档功能页面，按时间线排列所有文章，方便按年份&#x2F;月份回溯。</em></p>
-<h3 id="4-4-搜索功能"><a href="#4-4-搜索功能" class="headerlink" title="4.4 搜索功能"></a>4.4 搜索功能</h3><p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/hexo%E5%8D%9A%E5%AE%A2%E6%90%9C%E7%B4%A2%E5%8A%9F%E8%83%BD.png" alt="Hexo 博客搜索功能"></p>
+<h3 id="4-4-搜索功能"><a href="#4-4-搜索功能" class="headerlink" title="4.4 搜索功能"></a>4.4 搜索功能</h3><p><img src="/./../images/exp-report/hexo-search.png" alt="Hexo 博客搜索功能"></p>
 <p><em>图10：Hexo 博客的本地搜索功能，输入关键词即可快速检索文章标题和内容。</em></p>
 <hr>
 <h3 id="五、实验结果"><a href="#五、实验结果" class="headerlink" title="五、实验结果"></a>五、实验结果</h3><h3 id="成功标准"><a href="#成功标准" class="headerlink" title="成功标准"></a>成功标准</h3><ul>
@@ -12248,13 +12248,13 @@
 <h3 id="步骤8：配置克隆节点"><a href="#步骤8：配置克隆节点" class="headerlink" title="步骤8：配置克隆节点"></a>步骤8：配置克隆节点</h3><p>在每个克隆节点上修改主机名和 IP 地址：</p>
 <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># ====== node1 ======</span></span><br><span class="line"><span class="built_in">sudo</span> hostnamectl set-hostname node1</span><br><span class="line"><span class="built_in">sudo</span> nano /etc/netplan/50-cloud-init.yaml  <span class="comment"># 将 IP 改为 192.168.56.102</span></span><br><span class="line"><span class="built_in">sudo</span> netplan apply</span><br><span class="line"></span><br><span class="line"><span class="comment"># ====== node2 ======</span></span><br><span class="line"><span class="built_in">sudo</span> hostnamectl set-hostname node2</span><br><span class="line"><span class="built_in">sudo</span> nano /etc/netplan/50-cloud-init.yaml  <span class="comment"># 将 IP 改为 192.168.56.103</span></span><br><span class="line"><span class="built_in">sudo</span> netplan apply</span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A%E5%AE%8C%E6%95%B4%E7%89%88/%E9%85%8D%E7%BD%AEnode1%E9%9D%99%E6%80%81ip.png" alt="配置 node1 静态 IP"></p>
+<p><img src="/./../images/exp-report/node1-static-ip.png" alt="配置 node1 静态 IP"></p>
 <p><em>图11：node1 节点 Netplan 配置文件编辑，设置静态 IP 为 192.168.56.102&#x2F;24。</em></p>
-<p><img src="/./../images/exp5/%E9%85%8D%E7%BD%AEnode2%E9%9D%99%E6%80%81ip.png" alt="配置 node2 静态 IP"></p>
+<p><img src="/./../images/exp5/node2-static-ip.png" alt="配置 node2 静态 IP"></p>
 <p><em>图12：node2 节点 Netplan 配置文件编辑，设置静态 IP 为 192.168.56.103&#x2F;24。</em></p>
 <h3 id="步骤9：连通性全面测试"><a href="#步骤9：连通性全面测试" class="headerlink" title="步骤9：连通性全面测试"></a>步骤9：连通性全面测试</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 1. 测试外网（NAT 网卡是否正常工作）</span></span><br><span class="line">ping -c 3 8.8.8.8</span><br><span class="line">ping -c 3 baidu.com</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 测试宿主机（Host-Only 网卡是否正常工作）</span></span><br><span class="line">ping -c 3 192.168.56.1</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 测试节点间通信（内部网络是否正常）</span></span><br><span class="line">ping -c 3 node1     <span class="comment"># 或 ping 192.168.56.102</span></span><br><span class="line">ping -c 3 node2     <span class="comment"># 或 ping 192.168.56.103</span></span><br><span class="line">ping -c 3 node3     <span class="comment"># 或 ping 192.168.56.104</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. 查看当前网络配置</span></span><br><span class="line">ip a</span><br><span class="line">ip route</span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/exp5/%E8%99%9A%E6%8B%9F%E6%9C%BA%E9%9B%86%E7%BE%A4%E8%BF%9E%E9%80%9A%E6%80%A7%E6%B5%8B%E8%AF%95%E7%BB%93%E6%9E%9C.png" alt="虚拟机连通性测试"></p>
+<p><img src="/./../images/exp5/vm-cluster-connectivity-test.png" alt="虚拟机连通性测试"></p>
 <p><em>图13：虚拟机集群连通性测试结果，展示 node1 ping 外网 (8.8.8.8)和 node2（192.168.56.103）都成功。</em></p>
 <hr>
 <h3 id="四、实验结果"><a href="#四、实验结果" class="headerlink" title="四、实验结果"></a>四、实验结果</h3><h3 id="成功标准-1"><a href="#成功标准-1" class="headerlink" title="成功标准"></a>成功标准</h3><ul>
@@ -12612,7 +12612,7 @@
 
 <h3 id="步骤7：环境变量配置"><a href="#步骤7：环境变量配置" class="headerlink" title="步骤7：环境变量配置"></a>步骤7：环境变量配置</h3><h4 id="会话级（临时，关闭终端失效）"><a href="#会话级（临时，关闭终端失效）" class="headerlink" title="会话级（临时，关闭终端失效）"></a>会话级（临时，关闭终端失效）</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">export</span> MY_VAR=<span class="string">&quot;Hello World&quot;</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:/home/dev/mybin</span><br><span class="line"><span class="built_in">echo</span> <span class="variable">$MY_VAR</span>              <span class="comment"># 查看变量</span></span><br><span class="line"><span class="built_in">unset</span> MY_VAR              <span class="comment"># 删除变量</span></span><br><span class="line"><span class="built_in">env</span> | grep MY_VAR         <span class="comment"># 在环境变量列表中搜索</span></span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/exp6/linux%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE.png" alt="Linux 环境配置"></p>
+<p><img src="/./../images/exp6/linux-env-config.png" alt="Linux 环境配置"></p>
 <p><em>图14：Linux 环境配置操作截图，展示系统信息查看、文件操作、权限管理和环境变量配置等命令执行结果。</em></p>
 <h4 id="用户级（持久化，仅当前用户生效）"><a href="#用户级（持久化，仅当前用户生效）" class="headerlink" title="用户级（持久化，仅当前用户生效）"></a>用户级（持久化，仅当前用户生效）</h4><p>编辑 <code>~/.bashrc</code>：</p>
 <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">nano ~/.bashrc</span><br></pre></td></tr></table></figure>
@@ -13209,7 +13209,7 @@
 <hr>
 <h3 id="三、实验步骤-4"><a href="#三、实验步骤-4" class="headerlink" title="三、实验步骤"></a>三、实验步骤</h3><h3 id="方案A：GitHub-Actions-→-GitHub-Pages（全自动）"><a href="#方案A：GitHub-Actions-→-GitHub-Pages（全自动）" class="headerlink" title="方案A：GitHub Actions → GitHub Pages（全自动）"></a>方案A：GitHub Actions → GitHub Pages（全自动）</h3><h4 id="步骤1：将-Hexo-源码推送到-GitHub"><a href="#步骤1：将-Hexo-源码推送到-GitHub" class="headerlink" title="步骤1：将 Hexo 源码推送到 GitHub"></a>步骤1：将 Hexo 源码推送到 GitHub</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">cd</span> ~/my-blog</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化 Git 仓库</span></span><br><span class="line">git init</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 .gitignore</span></span><br><span class="line"><span class="built_in">cat</span> &gt; .gitignore &lt;&lt; <span class="string">&#x27;EOF&#x27;</span></span><br><span class="line">node_modules/</span><br><span class="line">.DS_Store</span><br><span class="line">public/</span><br><span class="line">.deploy_git/</span><br><span class="line">*.<span class="built_in">log</span></span><br><span class="line">db.json</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"><span class="comment"># 添加远程仓库</span></span><br><span class="line">git remote add origin https://github.com/&lt;username&gt;/my-blog-source.git</span><br><span class="line"></span><br><span class="line"><span class="comment"># 提交并推送</span></span><br><span class="line">git add .</span><br><span class="line">git commit -m <span class="string">&quot;初始化 Hexo 博客源码&quot;</span></span><br><span class="line">git branch -M main</span><br><span class="line">git push -u origin main</span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/exp8/Github%E6%BA%90%E7%A0%81%E4%BB%93%E5%BA%93.png" alt="GitHub 源码仓库"></p>
+<p><img src="/./../images/exp8/github-source-repo.png" alt="GitHub 源码仓库"></p>
 <p><em>图15：GitHub 上创建的 Hexo 博客源码仓库 my-blog-source，展示项目文件结构和提交历史。</em></p>
 <h4 id="步骤2：创建-GitHub-Actions-Workflow"><a href="#步骤2：创建-GitHub-Actions-Workflow" class="headerlink" title="步骤2：创建 GitHub Actions Workflow"></a>步骤2：创建 GitHub Actions Workflow</h4><p>创建 <code>.github/workflows/deploy.yml</code>：</p>
 <figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">Deploy</span> <span class="string">to</span> <span class="string">GitHub</span> <span class="string">Pages</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># -------- 触发条件 --------</span></span><br><span class="line"><span class="attr">on:</span></span><br><span class="line">  <span class="attr">push:</span></span><br><span class="line">    <span class="attr">branches:</span> [<span class="string">main</span>]          <span class="comment"># main 分支有推送时触发</span></span><br><span class="line">  <span class="attr">workflow_dispatch:</span>          <span class="comment"># 允许手动触发</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># -------- 部署任务 --------</span></span><br><span class="line"><span class="attr">jobs:</span></span><br><span class="line">  <span class="attr">deploy:</span></span><br><span class="line">    <span class="attr">runs-on:</span> <span class="string">ubuntu-latest</span></span><br><span class="line"></span><br><span class="line">    <span class="attr">steps:</span></span><br><span class="line">      <span class="comment"># Step 1: 检出源代码</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">📥</span> <span class="string">Checkout</span> <span class="string">source</span> <span class="string">code</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">actions/checkout@v3</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">submodules:</span> <span class="literal">true</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># Step 2: 设置 Node.js 环境</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">🔧</span> <span class="string">Setup</span> <span class="string">Node.js</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">actions/setup-node@v3</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">node-version:</span> <span class="string">&#x27;20&#x27;</span></span><br><span class="line">          <span class="attr">cache:</span> <span class="string">&#x27;npm&#x27;</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># Step 3: 缓存 npm 依赖（加速后续构建）</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">📦</span> <span class="string">Cache</span> <span class="string">npm</span> <span class="string">dependencies</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">actions/cache@v3</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">path:</span> <span class="string">~/.npm</span></span><br><span class="line">          <span class="attr">key:</span> <span class="string">$&#123;&#123;</span> <span class="string">runner.os</span> <span class="string">&#125;&#125;-node-$&#123;&#123;</span> <span class="string">hashFiles(&#x27;**/package-lock.json&#x27;)</span> <span class="string">&#125;&#125;</span></span><br><span class="line">          <span class="attr">restore-keys:</span> <span class="string">|</span></span><br><span class="line"><span class="string">            $&#123;&#123; runner.os &#125;&#125;-node-</span></span><br><span class="line"><span class="string"></span></span><br><span class="line">      <span class="comment"># Step 4: 安装依赖</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">📥</span> <span class="string">Install</span> <span class="string">dependencies</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">npm</span> <span class="string">install</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># Step 5: 生成静态文件</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">🏗️</span> <span class="string">Generate</span> <span class="string">static</span> <span class="string">files</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">npx</span> <span class="string">hexo</span> <span class="string">generate</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># Step 6: 创建 .nojekyll（禁用 GitHub Pages 的 Jekyll 处理）</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">📄</span> <span class="string">Create</span> <span class="string">.nojekyll</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">echo</span> <span class="string">&quot;&quot;</span> <span class="string">&gt;</span> <span class="string">public/.nojekyll</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># Step 7: 部署到 GitHub Pages</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">🚀</span> <span class="string">Deploy</span> <span class="string">to</span> <span class="string">GitHub</span> <span class="string">Pages</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">peaceiris/actions-gh-pages@v3</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">personal_token:</span> <span class="string">$&#123;&#123;</span> <span class="string">secrets.PERSONAL_TOKEN</span> <span class="string">&#125;&#125;</span></span><br><span class="line">          <span class="attr">publish_dir:</span> <span class="string">./public</span></span><br><span class="line">          <span class="attr">publish_branch:</span> <span class="string">main</span></span><br><span class="line">          <span class="attr">external_repository:</span> <span class="string">&lt;username&gt;/&lt;username&gt;.github.io</span></span><br><span class="line">          <span class="attr">user_name:</span> <span class="string">&#x27;github-actions[bot]&#x27;</span></span><br><span class="line">          <span class="attr">user_email:</span> <span class="string">&#x27;github-actions[bot]@users.noreply.github.com&#x27;</span></span><br><span class="line">          <span class="attr">commit_message:</span> <span class="string">&#x27;Deploy: $&#123;&#123; github.event.head_commit.message &#125;&#125;&#x27;</span></span><br></pre></td></tr></table></figure>
@@ -13283,7 +13283,7 @@
 </ul>
 <h4 id="步骤5：测试自动部署"><a href="#步骤5：测试自动部署" class="headerlink" title="步骤5：测试自动部署"></a>步骤5：测试自动部署</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 修改文章</span></span><br><span class="line">hexo new <span class="string">&quot;测试CI/CD&quot;</span></span><br><span class="line"><span class="comment"># 编辑文章内容...</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 提交并推送</span></span><br><span class="line">git add .</span><br><span class="line">git commit -m <span class="string">&quot;测试 GitHub Actions 自动部署&quot;</span></span><br><span class="line">git push</span><br><span class="line"></span><br><span class="line"><span class="comment"># 在 GitHub → Actions 标签页查看构建进度</span></span><br><span class="line"><span class="comment"># 构建成功后访问 https://&lt;username&gt;.github.io 验证更新</span></span><br></pre></td></tr></table></figure>
 
-<p>![GitHub Pages 公网博客](images&#x2F;exp8&#x2F;Github Pages公网博客.png)</p>
+<p><img src="/images/exp8/github-pages-public-blog.png" alt="GitHub Pages 公网博客"></p>
 <p><em>图23：部署成功后通过 https:&#x2F;&#x2F;<username>.github.io 访问的博客公网页面，展示 NexT 主题和文章列表。</em></p>
 <hr>
 <h3 id="方案B：Nginx-rsync-部署（自有服务器）"><a href="#方案B：Nginx-rsync-部署（自有服务器）" class="headerlink" title="方案B：Nginx + rsync 部署（自有服务器）"></a>方案B：Nginx + rsync 部署（自有服务器）</h3><p>适用于部署到自有 Ubuntu Server 的场景。</p>
@@ -13295,20 +13295,20 @@
 <p>启用站点：</p>
 <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">sudo</span> <span class="built_in">ln</span> -s /etc/nginx/sites-available/blog /etc/nginx/sites-enabled/</span><br><span class="line"><span class="built_in">sudo</span> <span class="built_in">rm</span> /etc/nginx/sites-enabled/default   <span class="comment"># 移除默认站点（可选）</span></span><br><span class="line"><span class="built_in">sudo</span> nginx -t                               <span class="comment"># 测试配置语法</span></span><br><span class="line"><span class="built_in">sudo</span> systemctl reload nginx                 <span class="comment"># 重载配置</span></span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/exp8/Nginx%E6%9C%8D%E5%8A%A1%E9%85%8D%E7%BD%AE.png" alt="Nginx 服务配置"></p>
+<p><img src="/./../images/exp8/nginx-service-config.png" alt="Nginx 服务配置"></p>
 <p><em>图16：Nginx 站点配置文件。</em></p>
 <h4 id="步骤3：创建-rsync-部署脚本"><a href="#步骤3：创建-rsync-部署脚本" class="headerlink" title="步骤3：创建 rsync 部署脚本"></a>步骤3：创建 rsync 部署脚本</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line"><span class="comment"># deploy.sh — Hexo 博客自动部署脚本</span></span><br><span class="line"><span class="built_in">set</span> -e</span><br><span class="line"></span><br><span class="line"><span class="comment"># -------- 配置区 --------</span></span><br><span class="line">HEXO_DIR=<span class="string">&quot;<span class="variable">$HOME</span>/my-blog&quot;</span></span><br><span class="line">REMOTE_USER=<span class="string">&quot;dev&quot;</span></span><br><span class="line">REMOTE_HOST=<span class="string">&quot;192.168.56.101&quot;</span></span><br><span class="line">REMOTE_PATH=<span class="string">&quot;/var/www/blog/&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;==========================================&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;   Hexo Blog 部署脚本&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;==========================================&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 1. 进入 Hexo 项目目录</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;[1/3] 进入 Hexo 项目目录...&quot;</span></span><br><span class="line"><span class="built_in">cd</span> <span class="string">&quot;<span class="variable">$HEXO_DIR</span>&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 清理并生成静态文件</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;[2/3] 清理缓存并生成静态文件...&quot;</span></span><br><span class="line">hexo clean</span><br><span class="line">hexo generate</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;      静态文件生成完成！&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. rsync 同步到远程 Nginx 服务器</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;[3/3] 增量同步到远程服务器...&quot;</span></span><br><span class="line">rsync -avz --delete \</span><br><span class="line">    --exclude=<span class="string">&#x27;*.log&#x27;</span> \</span><br><span class="line">    --exclude=<span class="string">&#x27;.git/&#x27;</span> \</span><br><span class="line">    -e <span class="string">&quot;ssh&quot;</span> \</span><br><span class="line">    <span class="string">&quot;<span class="variable">$HEXO_DIR</span>/public/&quot;</span> \</span><br><span class="line">    <span class="string">&quot;<span class="variable">$&#123;REMOTE_USER&#125;</span>@<span class="variable">$&#123;REMOTE_HOST&#125;</span>:<span class="variable">$&#123;REMOTE_PATH&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;==========================================&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;   部署完成！&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;   访问地址: http://<span class="variable">$&#123;REMOTE_HOST&#125;</span>&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;==========================================&quot;</span></span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/exp8/%E5%86%85%E7%BD%91%E5%8D%9A%E5%AE%A2%E8%87%AA%E5%8A%A8%E5%8C%96%E8%84%9A%E6%9C%AC%E9%83%A8%E7%BD%B2.png" alt="内网博客自动化脚本部署"></p>
+<p><img src="/./../images/exp8/intranet-blog-auto-deploy.png" alt="内网博客自动化脚本部署"></p>
 <p><em>图17：rsync 自动化部署脚本 deploy.sh 的内容编辑截图，展示 Hexo clean → generate → rsync 的完整部署流程。</em></p>
 <p>运行部署：</p>
 <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">chmod</span> +x deploy.sh</span><br><span class="line">./deploy.sh</span><br></pre></td></tr></table></figure>
 
-<p><img src="/./../images/exp8/%E5%86%85%E7%BD%91%E5%8D%9A%E5%AE%A2%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B1.png" alt="内网博客脚本执行过程1"></p>
+<p><img src="/./../images/exp8/intranet-blog-script-run-1.png" alt="内网博客脚本执行过程1"></p>
 <p><em>图18：部署脚本执行过程截图（第一部分），展示 hexo clean 清理缓存和 hexo generate 生成静态文件的过程。</em></p>
-<p><img src="/./../images/exp8/%E5%86%85%E7%BD%91%E5%8D%9A%E5%AE%A2%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B2.png" alt="内网博客脚本执行过程2"></p>
+<p><img src="/./../images/exp8/intranet-blog-script-run-2.png" alt="内网博客脚本执行过程2"></p>
 <p><em>图19：部署脚本执行过程截图（第二部分），展示 rsync 增量同步文件到远程 Nginx 服务器的详细输出。</em></p>
-<p><img src="/./../images/exp8/%E5%86%85%E7%BD%91%E5%8D%9A%E5%AE%A2%E8%AE%BF%E9%97%AE%E6%88%90%E5%8A%9F.png" alt="内网博客访问成功"></p>
+<p><img src="/./../images/exp8/intranet-blog-access-success.png" alt="内网博客访问成功"></p>
 <p><em>图20：部署完成后通过浏览器访问 <a href="http://192.168.56.101/">http://192.168.56.101</a> 的内网博客页面，验证部署成功。</em></p>
 <hr>
 <h3 id="四、实验结果-3"><a href="#四、实验结果-3" class="headerlink" title="四、实验结果"></a>四、实验结果</h3><h3 id="成功标准-4"><a href="#成功标准-4" class="headerlink" title="成功标准"></a>成功标准</h3><ul>
@@ -13486,11 +13486,6 @@
         <tag>Git</tag>
         <tag>Nginx</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>我的第一篇hexo博客！</title>
-    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
-    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>我们是如何创建这个博客网站的</title>
@@ -14612,6 +14607,11 @@
         <tag>Git</tag>
         <tag>Nginx</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>我的第一篇hexo博客！</title>
+    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
+    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>数据结构 —— 顺序表</title>
