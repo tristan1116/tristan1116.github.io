@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="番外篇综合实战：把前几篇学的 I2C 读传感器（AHT20 温湿度）和 OLED 显示（CH1116 驱动库）组合起来，做出一台能实时显示温度湿度的温湿度计。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32番外篇——oled温湿度计">
+<meta property="og:url" content="http://tristan1116.github.io/2026/08/05/STM32_OLED_Temperature_Humidity_Meter/index.html">
+<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:description" content="番外篇综合实战：把前几篇学的 I2C 读传感器（AHT20 温湿度）和 OLED 显示（CH1116 驱动库）组合起来，做出一台能实时显示温度湿度的温湿度计。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_OLED_Temperature_Humidity_Meter/IMG_20260805_215509.jpg">
+<meta property="article:published_time" content="2026-08-05T22:30:00.000Z">
+<meta property="article:modified_time" content="2026-08-05T22:30:00.000Z">
+<meta property="article:author" content="点灯大王">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="I2C">
+<meta property="article:tag" content="AHT20">
+<meta property="article:tag" content="OLED">
+<meta property="article:tag" content="取模">
+<meta property="article:tag" content="sprintf">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_OLED_Temperature_Humidity_Meter/IMG_20260805_215509.jpg">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/08/05/STM32_OLED_Temperature_Humidity_Meter/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32番外篇——oled温湿度计 | 点灯大王的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">点灯大王的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/08/05/STM32_OLED_Temperature_Humidity_Meter/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="点灯大王的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32番外篇——oled温湿度计
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-05 22:30:00" itemprop="dateCreated datePublished" datetime="2026-08-05T22:30:00+00:00">2026-08-05</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>4 分钟</span>
+            </span>
+            <div class="post-description">番外篇综合实战：把前几篇学的 I2C 读传感器（AHT20 温湿度）和 OLED 显示（CH1116 驱动库）组合起来，做出一台能实时显示温度湿度的温湿度计。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上篇我们点亮了 <strong>OLED 屏幕</strong>（CH1116 驱动芯片 + 波特律动驱动库，学了页&#x2F;列寻址、取模、帧缓冲）；再往前，我们学会了用 <strong>I2C 读 AHT20 温湿度传感器</strong></p>
+<p>学完这两个，把 AHT20 的数据直接显示在 OLED 上，就是一台温湿度计。</p>
+<table>
+<thead>
+<tr>
+<th align="left">和上一篇的区别</th>
+<th align="left">上一篇（OLED）</th>
+<th align="left">本篇（温湿度计）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">总线上挂几个从机</td>
+<td align="left">1 个（OLED，0x7A）</td>
+<td align="left"><strong>2 个（AHT20，0x70 + OLED，0x7A）</strong></td>
+</tr>
+<tr>
+<td align="left">数据方向</td>
+<td align="left">只写屏幕</td>
+<td align="left"><strong>读传感器 + 写屏幕</strong></td>
+</tr>
+<tr>
+<td align="left">关键新知识</td>
+<td align="left">显存、取模</td>
+<td align="left"><strong>多从机共线、sprintf 浮点、组合工程</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="硬件原理：一条总线，两个从机"><a href="#硬件原理：一条总线，两个从机" class="headerlink" title="硬件原理：一条总线，两个从机"></a>硬件原理：一条总线，两个从机</h2><h3 id="温湿度计的系统组成"><a href="#温湿度计的系统组成" class="headerlink" title="温湿度计的系统组成"></a>温湿度计的系统组成</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">            ┌────────────────────────────┐</span><br><span class="line">            │         STM32F103          │</span><br><span class="line">            │   (72MHz, I2C1 快速模式)    │</span><br><span class="line">            └────────────┬───────────────┘</span><br><span class="line">                         │ I2C1: SCL=PB6  SDA=PB7</span><br><span class="line">         ┌───────────────┴───────────────┐</span><br><span class="line">         ▼                               ▼</span><br><span class="line">┌────────────────┐             ┌────────────────┐</span><br><span class="line">│  AHT20 传感器    │             │  OLED 屏幕      │</span><br><span class="line">│ 地址 0x70       │             │  地址 0x7A      │</span><br><span class="line">│ 读温度+湿度      │             │  显示文字/图形    │</span><br><span class="line">└────────────────┘             └────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="新知识点：I2C-总线的”多从机共线”"><a href="#新知识点：I2C-总线的”多从机共线”" class="headerlink" title="新知识点：I2C 总线的”多从机共线”"></a>新知识点：I2C 总线的”多从机共线”</h3><p>之前我们只在一根 I2C 总线上挂过一个设备。I2C 天生支持<strong>一条总线上挂多个从机</strong>——只要每个从机的<strong>7 位地址不同</strong>即可：</p>
+<ul>
+<li>AHT20 的 I2C 地址是 <strong>0x70</strong></li>
+<li>OLED（CH1116）的 I2C 地址是 <strong>0x7A</strong></li>
+</ul>
+<blockquote>
+<p>类比：I2C 总线像一根”电话线”，从机是”座机”，地址是”电话号码”。STM32 给 0x70 打电话，AHT20 应答；给 0x7A 打电话，OLED 应答。互不干扰。</p>
+</blockquote>
+<p>主设备发送数据时，第 8 位是读&#x2F;写标志位，所以实际发送的字节是 <code>地址&lt;&lt;1 | R/W</code>——但 HAL 库的 <code>HAL_I2C_Master_Transmit(&amp;hi2c1, 地址, ...)</code> 已经帮我们处理了移位，直接填 0x70 &#x2F; 0x7A 就行。</p>
+<p>两个设备共用总线还有个细节：<strong>AHT20 是”读”（MCU 收数据），OLED 是”写”（MCU 发数据）</strong>——一读一写，总线在时间上分时使用，不会冲突。</p>
+<hr>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><p>配置和上篇 OLED 完全一样（SYS 的 Debug 选 Serial Wire、RCC 开 HSE、时钟树改 72MHz）</p>
+<table>
+<thead>
+<tr>
+<th align="left">设置项</th>
+<th align="left">值</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">I2C1 开关</td>
+<td align="left">I2C（快速模式）</td>
+<td align="left">学习板上温湿度模块与 OLED <strong>都挂在 I2C1 上</strong></td>
+</tr>
+<tr>
+<td align="left">Clock Speed</td>
+<td align="left">400000</td>
+<td align="left">快速模式 400kHz，比默认 100kHz 快 4 倍，刷屏更流畅</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>时钟树 72MHz 的配置和上一篇 OLED 博客完全一致（先 RCC 开 HSE，再把 HCLK 改成 72MHz），这里不再重复截图，可参考 <a href="/2026/08/03/STM32_OLED_Display/">上一篇：OLED屏幕</a>。</p>
+</blockquote>
+<p>另外别忘了 Project Manager → Code generator → 勾选 **”为每个外设生成一对 .c&#x2F;.h 文件”**，方便我们后续手动添加驱动文件。</p>
+<hr>
+<h2 id="实操步骤"><a href="#实操步骤" class="headerlink" title="实操步骤"></a>实操步骤</h2><ol>
+<li><p><strong>CubeMX 新建工程</strong>：选芯片（学习板是 STM32F103C8T6）→ SYS 的 Debug 选 Serial Wire → RCC 开 HSE（Crystal&#x2F;Ceramic Resonator）→ 时钟树改 72MHz → I2C1 开快速模式 → 生成代码</p>
+</li>
+<li><p><strong>下载 OLED 驱动</strong>：打开<a target="_blank" rel="noopener" href="https://docs.baud-dance.com/">波特律动文档站</a> → 驱动库 → 下载 <strong>CH1116 版 OLED 驱动</strong> → 解压后把 <code>oled.c</code>、<code>font.c</code> 复制到 <code>Core/Src/</code>，<code>oled.h</code>、<code>font.h</code> 复制到 <code>Core/Inc/</code></p>
+</li>
+<li><p><strong>下载 AHT20 驱动</strong>：同样在驱动库下载 <strong>AHT20 驱动</strong> → <code>aht20.c</code> → <code>Core/Src/</code>，<code>aht20.h</code> → <code>Core/Inc/</code></p>
+</li>
+<li><p><strong>修改 CMakeLists.txt</strong>（VS Code 工程专属，漏了会报 undefined reference）：在 <code>target_sources</code> 中手动添加三个驱动文件，并在末尾加上浮点格式化链接参数（否则 <code>%.1f</code> 小数显示不出来，原因见下文”代码讲解·sprintf”）：</p>
+<figure class="highlight cmake"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">target_sources</span>(<span class="variable">$&#123;CMAKE_PROJECT_NAME&#125;</span> PRIVATE</span><br><span class="line">    Core/Src/font.c</span><br><span class="line">    Core/Src/oled.c</span><br><span class="line">    Core/Src/aht20.c</span><br><span class="line">)</span><br><span class="line"><span class="keyword">target_link_options</span>(<span class="variable">$&#123;CMAKE_PROJECT_NAME&#125;</span> PRIVATE -u _printf_float)</span><br></pre></td></tr></table></figure></li>
+<li><p><strong>编写 main.c</strong>：按下面的”核心代码”部分填写</p>
+</li>
+<li><p><strong>中文取模</strong>：用波特律动<strong>取模助手</strong>输入”温湿度计”等文字 → 生成 16×16 字模 → 粘贴到 <code>font.c</code> 的字模数组中</p>
+</li>
+<li><p><strong>编译烧录</strong>：<code>cmake --build build</code> 编译，成功后用 ST-Link 烧录</p>
+</li>
+</ol>
+<hr>
+<h2 id="核心代码（main-c）"><a href="#核心代码（main-c）" class="headerlink" title="核心代码（main.c）"></a>核心代码（main.c）</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN Includes */</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;oled.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;aht20.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span>        <span class="comment">// sprintf 需要</span></span></span><br><span class="line"><span class="comment">/* USER CODE END Includes */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">HAL_Delay(<span class="number">20</span>);            <span class="comment">// OLED 上电比 STM32 慢，等它&quot;睡醒&quot;</span></span><br><span class="line">OLED_Init();              <span class="comment">// 初始化屏幕</span></span><br><span class="line">AHT20_Init();             <span class="comment">// 初始化传感器</span></span><br><span class="line"><span class="type">float</span> tem, humi;          <span class="comment">// 存放温度、湿度</span></span><br><span class="line"><span class="type">char</span> message[<span class="number">50</span>];         <span class="comment">// 存放格式化后的字符串</span></span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* USER CODE BEGIN WHILE */</span></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">  AHT20_Measure();                    <span class="comment">// 触发一次测量</span></span><br><span class="line">  tem = AHT20_Temperature();          <span class="comment">// 取温度</span></span><br><span class="line">  humi = AHT20_Humidity();            <span class="comment">// 取湿度</span></span><br><span class="line"></span><br><span class="line">  OLED_NewFrame();                    <span class="comment">// 新建一帧画面（清空显存）</span></span><br><span class="line">  OLED_PrintString(<span class="number">0</span>, <span class="number">0</span>, <span class="string">&quot;温湿度计&quot;</span>, &amp;font16x16, OLED_COLOR_NORMAL);   <span class="comment">// 标题（中文）</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">sprintf</span>(message, <span class="string">&quot;T:%.1f&quot;</span>, tem);    <span class="comment">// 格式化：保留 1 位小数</span></span><br><span class="line">  OLED_PrintString(<span class="number">32</span>, <span class="number">16</span>, message, &amp;font16x16, OLED_COLOR_NORMAL);      <span class="comment">// 温度</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">sprintf</span>(message, <span class="string">&quot;H:%.1f&quot;</span>, humi);   <span class="comment">// 湿度同理</span></span><br><span class="line">  OLED_PrintString(<span class="number">32</span>, <span class="number">32</span>, message, &amp;font16x16, OLED_COLOR_NORMAL);</span><br><span class="line">  OLED_ShowFrame();                   <span class="comment">// 把这一帧刷到屏幕上</span></span><br><span class="line"></span><br><span class="line">  HAL_Delay(<span class="number">1000</span>);                    <span class="comment">// 1 秒刷新一次，不用刷太快</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END WHILE */</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h2><h3 id="1-初始化：先屏幕后传感器"><a href="#1-初始化：先屏幕后传感器" class="headerlink" title="1. 初始化：先屏幕后传感器"></a>1. 初始化：先屏幕后传感器</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">HAL_Delay(<span class="number">20</span>);</span><br><span class="line">OLED_Init();</span><br><span class="line">AHT20_Init();</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>**<code>HAL_Delay(20)</code>**：OLED 上电速度比单片机慢，立刻初始化可能没响应，先等 20ms</li>
+<li><code>OLED_Init()</code>：发一串 CH1116 初始化指令（关显示 → 设页&#x2F;列 → 开电荷泵 → 开显示）</li>
+<li><code>AHT20_Init()</code>：上电等 40ms，读状态寄存器，若 bit3 为 0（未校准）则发送 0xBE 校准命令</li>
+</ul>
+<h3 id="2-主循环：读一次，画一帧，刷一次"><a href="#2-主循环：读一次，画一帧，刷一次" class="headerlink" title="2. 主循环：读一次，画一帧，刷一次"></a>2. 主循环：读一次，画一帧，刷一次</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">AHT20_Measure();          <span class="comment">// ① 触发测量</span></span><br><span class="line">tem = AHT20_Temperature();</span><br><span class="line">humi = AHT20_Humidity();</span><br></pre></td></tr></table></figure>
+
+<p>AHT20 驱动内部：发送测量命令 <code>&#123;0xAC, 0x33, 0x00&#125;</code> → <code>HAL_Delay(75)</code> 等转换完成 → 读回 6 字节 → 用移位拼出 20 位湿度、20 位温度原始值 → 套换算公式：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Humidity = humi * <span class="number">100</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>);            <span class="comment">// 20bit 湿度：0~2^20 映射到 0~100%</span></span><br><span class="line">Temperature = temp * <span class="number">200</span> / (<span class="number">1</span> &lt;&lt; <span class="number">20</span>) - <span class="number">50</span>;    <span class="comment">// 20bit 温度：映射到 -50~150℃</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="3-显示：帧缓冲三板斧"><a href="#3-显示：帧缓冲三板斧" class="headerlink" title="3. 显示：帧缓冲三板斧"></a>3. 显示：帧缓冲三板斧</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">OLED_NewFrame();                                                  <span class="comment">// 清空显存</span></span><br><span class="line">OLED_PrintString(<span class="number">0</span>, <span class="number">0</span>, <span class="string">&quot;温湿度计：&quot;</span>, &amp;font16x16, OLED_COLOR_NORMAL);</span><br><span class="line">...</span><br><span class="line">OLED_ShowFrame();                                                 <span class="comment">// 刷屏</span></span><br></pre></td></tr></table></figure>
+
+<p><code>OLED_PrintString</code> 是驱动库封装好的”画字”函数，它会把每个字符&#x2F;汉字去 <code>font.c</code> 里查字模，逐字节写入 1KB 的显存 <code>OLED_GRAM</code>。<strong>注意三个细节</strong>：</p>
+<ul>
+<li>中文必须存在于 <code>font.c</code> 的字模里（用取模助手生成后粘贴进去），不能随便写</li>
+<li>字体变量要<strong>取地址</strong> <code>&amp;font16x16</code></li>
+<li>坐标：标题在 (0,0)，温度在 (32,16)，湿度在 (32,32)——16×16 字体一行 16 像素高，错开 16 像素正好不重叠</li>
+</ul>
+<h3 id="4-sprintf：把数字变成字符串"><a href="#4-sprintf：把数字变成字符串" class="headerlink" title="4. sprintf：把数字变成字符串"></a>4. sprintf：把数字变成字符串</h3><p>OLED 只能显示字符，不能直接显示数字，所以要把 float 转成字符串：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sprintf</span>(message, <span class="string">&quot;T:%.1f&quot;</span>, tem);</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>%.1f</code>：保留一位小数的浮点格式，比如 28.3</li>
+<li><strong>newlib-nano 默认不链接浮点格式化代码</strong>（为了省 Flash）——编译不报错，但 <code>%f</code> 显示空白&#x2F;0.0，需要在 <code>CMakeLists.txt</code> 加一行 <code>-u _printf_float</code> 强制拉回（见实操步骤第 4 步）</li>
+<li><code>message</code> 是 <code>char[50]</code>——<strong>必须用 char 数组，不能用 uint8_t</strong>，否则 sprintf 的类型警告烦死你</li>
+</ul>
+<hr>
+<h2 id="数据流全链路"><a href="#数据流全链路" class="headerlink" title="数据流全链路"></a>数据流全链路</h2><p>从传感器读数到屏幕亮字，完整走一遍：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">AHT20 内部寄存器（温度20bit/湿度20bit）</span><br><span class="line">   │ ① AHT20_Measure() 发送 0xAC 测量命令，等待 75ms</span><br><span class="line">   ▼</span><br><span class="line">HAL_I2C_Master_Receive 读回 6 字节（从机 0x70）</span><br><span class="line">   │ ② 移位拼接 + 换算公式（×100/2²⁰、×200/2²⁰-50）</span><br><span class="line">   ▼</span><br><span class="line">float tem/humi（程序内存）</span><br><span class="line">   │ ③ sprintf(&quot;T:%.1f&quot;) 格式化</span><br><span class="line">   ▼</span><br><span class="line">char message[50] 字符串</span><br><span class="line">   │ ④ OLED_PrintString 查 font.c 字模表（16×16 点阵）</span><br><span class="line">   ▼</span><br><span class="line">OLED_GRAM 显存（128×8 字节帧缓冲）</span><br><span class="line">   │ ⑤ OLED_ShowFrame 遍历显存</span><br><span class="line">   ▼</span><br><span class="line">HAL_I2C_Master_Transmit（从机 0x7A，0x40 数据门牌）</span><br><span class="line">   │ ⑥ CH1116 芯片按页/列寻址点亮像素</span><br><span class="line">   ▼</span><br><span class="line">OLED 屏幕显示「温湿度计：T:28.3 H:65.2」</span><br></pre></td></tr></table></figure>
+
+<p>总结：<strong>传感器读原始数据 → 解析成物理量 → 格式化字符串 → 查字模写显存 → 刷屏点亮</strong></p>
+<hr>
+<h2 id="编译-烧录"><a href="#编译-烧录" class="headerlink" title="编译 &amp; 烧录"></a>编译 &amp; 烧录</h2><p>老样子，此处不再赘述。</p>
+<hr>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><blockquote>
+<p><img src="/./../images/STM32_OLED_Temperature_Humidity_Meter/IMG_20260805_215509.jpg" alt="IMG_20260805_215509"></p>
+</blockquote>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>和上一篇（OLED）相比，本篇没有新外设，但把 I2C 的”读”与”写”、驱动库的”画字”与”刷屏”组合成了真正有用的东西。</p>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li>视频：<a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV18u4y1e7PR/">【STM32入门教程-2025】番外篇 挑战5分钟做一个温湿度计</a></li>
+<li>波特律动文档站：<a target="_blank" rel="noopener" href="https://docs.baud-dance.com/">驱动库下载</a></li>
+<li>上一篇：<a href="/2026/08/03/STM32_OLED_Display/">STM32——OLED屏幕：CH1116驱动原理与波特律动驱动库</a></li>
+<li>前篇：<a href="/2026/08/01/STM32_I2C_AHT20/">STM32——IIC通信，轮询模式读取温湿度传感器AHT20</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/I2C/" rel="tag"># I2C</a>
+              <a href="/tags/AHT20/" rel="tag"># AHT20</a>
+              <a href="/tags/OLED/" rel="tag"># OLED</a>
+              <a href="/tags/%E5%8F%96%E6%A8%A1/" rel="tag"># 取模</a>
+              <a href="/tags/sprintf/" rel="tag"># sprintf</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/08/03/STM32_OLED_Display/" rel="prev" title="STM32——OLED屏幕：CH1116驱动原理与波特律动驱动库">
+      <i class="fa fa-chevron-left"></i> STM32——OLED屏幕：CH1116驱动原理与波特律动驱动库
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E4%B8%8A%E4%B8%80%E7%AF%87%E5%88%B0%E8%BF%99%E7%AF%87"><span class="nav-number">1.</span> <span class="nav-text">从上一篇到这篇</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E5%8E%9F%E7%90%86%EF%BC%9A%E4%B8%80%E6%9D%A1%E6%80%BB%E7%BA%BF%EF%BC%8C%E4%B8%A4%E4%B8%AA%E4%BB%8E%E6%9C%BA"><span class="nav-number">2.</span> <span class="nav-text">硬件原理：一条总线，两个从机</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B8%A9%E6%B9%BF%E5%BA%A6%E8%AE%A1%E7%9A%84%E7%B3%BB%E7%BB%9F%E7%BB%84%E6%88%90"><span class="nav-number">2.1.</span> <span class="nav-text">温湿度计的系统组成</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E7%9F%A5%E8%AF%86%E7%82%B9%EF%BC%9AI2C-%E6%80%BB%E7%BA%BF%E7%9A%84%E2%80%9D%E5%A4%9A%E4%BB%8E%E6%9C%BA%E5%85%B1%E7%BA%BF%E2%80%9D"><span class="nav-number">2.2.</span> <span class="nav-text">新知识点：I2C 总线的”多从机共线”</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E9%85%8D%E7%BD%AE"><span class="nav-number">3.</span> <span class="nav-text">CubeMX 配置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E6%93%8D%E6%AD%A5%E9%AA%A4"><span class="nav-number">4.</span> <span class="nav-text">实操步骤</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81%EF%BC%88main-c%EF%BC%89"><span class="nav-number">5.</span> <span class="nav-text">核心代码（main.c）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E8%AE%B2%E8%A7%A3"><span class="nav-number">6.</span> <span class="nav-text">代码讲解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%88%9D%E5%A7%8B%E5%8C%96%EF%BC%9A%E5%85%88%E5%B1%8F%E5%B9%95%E5%90%8E%E4%BC%A0%E6%84%9F%E5%99%A8"><span class="nav-number">6.1.</span> <span class="nav-text">1. 初始化：先屏幕后传感器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%BB%E5%BE%AA%E7%8E%AF%EF%BC%9A%E8%AF%BB%E4%B8%80%E6%AC%A1%EF%BC%8C%E7%94%BB%E4%B8%80%E5%B8%A7%EF%BC%8C%E5%88%B7%E4%B8%80%E6%AC%A1"><span class="nav-number">6.2.</span> <span class="nav-text">2. 主循环：读一次，画一帧，刷一次</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E6%98%BE%E7%A4%BA%EF%BC%9A%E5%B8%A7%E7%BC%93%E5%86%B2%E4%B8%89%E6%9D%BF%E6%96%A7"><span class="nav-number">6.3.</span> <span class="nav-text">3. 显示：帧缓冲三板斧</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-sprintf%EF%BC%9A%E6%8A%8A%E6%95%B0%E5%AD%97%E5%8F%98%E6%88%90%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-number">6.4.</span> <span class="nav-text">4. sprintf：把数字变成字符串</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%B5%81%E5%85%A8%E9%93%BE%E8%B7%AF"><span class="nav-number">7.</span> <span class="nav-text">数据流全链路</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91-%E7%83%A7%E5%BD%95"><span class="nav-number">8.</span> <span class="nav-text">编译 &amp; 烧录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E5%B1%95%E7%A4%BA"><span class="nav-number">9.</span> <span class="nav-text">效果展示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">11.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">36</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">287k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">4:21</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
