@@ -1318,6 +1318,315 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——浅析时钟源与时钟树理论知识</title>
+    <url>/2026/08/06/STM32_Clock_Tree/</url>
+    <content><![CDATA[<h1 id="STM32——时钟源与时钟树：单片机的心脏与动脉"><a href="#STM32——时钟源与时钟树：单片机的心脏与动脉" class="headerlink" title="STM32——时钟源与时钟树：单片机的心脏与动脉"></a>STM32——时钟源与时钟树：单片机的心脏与动脉</h1><h2 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h2><p><strong>STM32 为什么能”有条不紊”地工作？为什么芯片内部的电路不会乱套？</strong></p>
+<p>在每一篇博客的代码里，都有这么一行永远存在的代码，之前没有深究：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">SystemClock_Config();</span><br></pre></td></tr></table></figure>
+
+<p>这行代码在配置什么？为什么 GPIO、I2C、串口能正常工作的前提，都是先执行它？答案就是本期的主角——<strong>时钟源与时钟树</strong>，单片机的”心脏与动脉”。</p>
+<p>这一集是纯理论讲解，不写任何新代码。但它是理解后续所有外设（定时器、ADC、DMA……）的<strong>地基</strong>——因为每个外设的时钟频率，都是从这颗时钟树上”摘”下来的。</p>
+<h2 id="为什么单片机需要”心跳”"><a href="#为什么单片机需要”心跳”" class="headerlink" title="为什么单片机需要”心跳”"></a>为什么单片机需要”心跳”</h2><h3 id="微观视角：门电路的”运算延时”"><a href="#微观视角：门电路的”运算延时”" class="headerlink" title="微观视角：门电路的”运算延时”"></a>微观视角：门电路的”运算延时”</h3><p>芯片内部是庞杂的逻辑电路组成的，我们假设 STM32 内部有这样一套电路：一个<strong>与门</strong> + 一个<strong>异或门</strong>，异或门的输出连接到了某个寄存器的某一位：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">A ──┬─────┐</span><br><span class="line">    │ 与门  ├── 与门输出 ──┐</span><br><span class="line">B ──┴─────┘              ├─► 异或门 ──► 寄存器某一位 ──► 程序可读到</span><br><span class="line">B ───────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>与门</strong>：A 和 B 都是高电平 1 时输出 1，其他情况输出 0</li>
+<li><strong>异或门</strong>：两个输入不一致时输出 1，一致时输出 0</li>
+</ul>
+<p>寄存器是”程序与电路之间的桥梁”——程序读寄存器获取电路状态，写寄存器控制电路运行。</p>
+<p>假设当前 A、B 都是高电平：与门输出 1，异或门两输入都是 1 → 输出 0，寄存器存储 0。</p>
+<p>现在 B 突然从高电平变为低电平（比如某个 GPIO 输入的电平变了），理想情况下：与门输出变 0，异或门两输入都变 0 → 输出还是 0，寄存器安然无恙。</p>
+<p>但<strong>实际情况有出入</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">B 电平变化瞬间到达异或门输入端</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">与门还在&quot;运算&quot;中！（MOS 管充放电需要时间，虽然对人类是瞬间，但相对光速是&quot;龟速&quot;）</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">异或门看到的是：A=1（与门还没算完，输出还是 1）、B=0</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">异或门两输入不一致 → 输出 1 → 寄存器短暂读到错误值 1！</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">与门运算完成，输出 0，异或门恢复输出 0，寄存器恢复正确值</span><br></pre></td></tr></table></figure>
+
+<p>寄存器中出现了一段<strong>由门电路运算延时产生的错误状态</strong>——这段错误虽然短暂，但可能导致依赖此寄存器的程序、其他逻辑电路出现更严重的连锁错误。芯片内部电路比这个例子复杂成千上万倍，每个信号经过的门电路数量不一、错综复杂，如果放任不管，<strong>芯片内部电信号将乱成一锅粥</strong>。</p>
+<h3 id="解决办法：边沿触发器-方波"><a href="#解决办法：边沿触发器-方波" class="headerlink" title="解决办法：边沿触发器 + 方波"></a>解决办法：边沿触发器 + 方波</h3><p>解决方法其实很简单——在寄存器前放一个<strong>边沿触发器</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">D端(数据输入)                    Q端(数据输出)</span><br><span class="line">      │                             │</span><br><span class="line">      └────► 边沿触发器 ◄──────┘</span><br><span class="line">                  │</span><br><span class="line">            控制端 ◄──── 一定频率的方波（时钟信号）</span><br></pre></td></tr></table></figure>
+
+<p>边沿触发器的特性：<strong>当控制端出现由低到高的上升沿时，输出端才采样 D 端的值</strong>，其他时候输出保持不变。</p>
+<p>于是，只要给控制端接入一个一定频率的方波信号：</p>
+<ol>
+<li>方波一个周期内，门电路运算产生的任何”毛刺”都无法进入寄存器</li>
+<li>等一切运算都稳定后，方波的上升沿到达，<strong>把最终稳定结果锁存进寄存器</strong></li>
+</ol>
+<p>这个好似脉搏的方波信号，就是<strong>时钟信号</strong>。它在单片机中由”心脏”——时钟源产生，通过”动脉”——时钟树传播到整个芯片。这也是”单片机离开了时钟源就无法存活”的原因。</p>
+<blockquote>
+<p>💡 这就是数字电路里的经典概念：<strong>同步时序逻辑</strong>。时钟就是全芯片的”节拍器”，让所有电路在同一个节拍下协同工作，避免异步混乱。还记得 STM32 – I2C 中断与 DMA 里讲的”同步&#x2F;异步”吗？硬件层面的同步，就是靠这根时钟线实现的。</p>
+</blockquote>
+<h3 id="宏观视角：外设也需要时钟"><a href="#宏观视角：外设也需要时钟" class="headerlink" title="宏观视角：外设也需要时钟"></a>宏观视角：外设也需要时钟</h3><p>除了微观层面，宏观的外设层面同样需要精确的时钟脉冲：</p>
+<ul>
+<li><strong>串口</strong>需要固定的波特率进行通信</li>
+<li><strong>定时器</strong>需要计时，得知道时间流逝了多少</li>
+<li><strong>ADC</strong> 需要采样时序</li>
+</ul>
+<p>这些都需要时钟脉冲告诉外设”时间在流逝”。</p>
+<h2 id="数据流全链路：时钟从晶振走到外设"><a href="#数据流全链路：时钟从晶振走到外设" class="headerlink" title="数据流全链路：时钟从晶振走到外设"></a>数据流全链路：时钟从晶振走到外设</h2><p>理解了”为什么需要时钟”，我们来看时钟是怎么从源头一步步传到每个外设的。这就是<strong>数据流全链路</strong>，也是本篇的核心：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                 ┌─────────┐</span><br><span class="line">HSE 晶振 8MHz ──►│ 预分频器  │──┐ 8MHz</span><br><span class="line">                 │  ÷1 / ÷2  │  │</span><br><span class="line">                 └─────────┘  │        ┌─────────┐   ×9 = 72MHz</span><br><span class="line">                 ┌─────────┐  └──────►│ PLL锁相环 │──────────┐</span><br><span class="line">HSI 内部 8MHz ──►│ 固定 ÷2  │────────►│ ×2~×16  │          │</span><br><span class="line">                 └─────────┘          └─────────┘          ▼</span><br><span class="line">                                 ┌─────────────── SYSCLK 系统时钟 72MHz</span><br><span class="line">                                 │  (三选一: HSI / HSE / PLLCLK)</span><br><span class="line">                                 ▼</span><br><span class="line">                       ┌──────────────────────┐</span><br><span class="line">                       │  AHB 预分频器 ÷1       │ ← AHB = 先进高性能总线</span><br><span class="line">                       └──────────────────────┘</span><br><span class="line">                                 ▼</span><br><span class="line">                     ┌────────────────────────┐</span><br><span class="line">                     │  HCLK = 72MHz           │</span><br><span class="line">                     │  连接: CPU / 内存 / DMA  │</span><br><span class="line">                     └───┬──────────┬──────┬───┘</span><br><span class="line">                         │          │      │</span><br><span class="line">              APB1 预分频 ÷2      APB2 预分频 ÷1</span><br><span class="line">                         │          │      │</span><br><span class="line">                         ▼          │      └──────► SysTick 系统滴答</span><br><span class="line">                PCLK1 = 36MHz       │          (自带分频器 ÷1 / ÷8)</span><br><span class="line">           (除定时器外APB1外设)        │      HAL_Delay 的时间基准!</span><br><span class="line">                         │          │</span><br><span class="line">               定时器倍频器 ×2       │</span><br><span class="line">                         │          │</span><br><span class="line">                         ▼          ▼</span><br><span class="line">          APB1 定时器 = 72MHz   PCLK2 = 72MHz</span><br><span class="line">          (TIM2~5等)          (GPIO/串口1/ADC等)</span><br><span class="line">                                 │</span><br><span class="line">                       定时器倍频器 ×1</span><br><span class="line">                                 │</span><br><span class="line">                                 ▼</span><br><span class="line">                     APB2 定时器 = 72MHz</span><br><span class="line">                     (高级定时器 TIM1/TIM8)</span><br></pre></td></tr></table></figure>
+
+<p>一句话概括这条链路：<strong>8MHz 晶振 ÷1 → PLL ×9 → SYSCLK 72MHz → AHB ÷1 → HCLK 72MHz → APB1 ÷2 &#x2F; APB2 ÷1 → PCLK1 36MHz &#x2F; PCLK2 72MHz</strong>。</p>
+<p>下面把每个节点拆开讲。</p>
+<h2 id="时钟树各节点详解"><a href="#时钟树各节点详解" class="headerlink" title="时钟树各节点详解"></a>时钟树各节点详解</h2><h3 id="主干道：AHB-总线与-HCLK"><a href="#主干道：AHB-总线与-HCLK" class="headerlink" title="主干道：AHB 总线与 HCLK"></a>主干道：AHB 总线与 HCLK</h3><p>STM32 芯片内部有一个 <strong>AHB 总线</strong>（Advanced High-performance Bus，先进高性能总线），它就像芯片的主干道。处理器、内存、DMA 以及各种外设都连接到这条总线上，通过它进行数据通信。</p>
+<p><strong>HCLK 就是这条 AHB 总线上的时钟线</strong>，直接连入处理器内核、内存和 DMA，为它们带来时钟信号。如果 HCLK 是 72MHz，那这些部件的时钟频率就都是 72MHz。</p>
+<blockquote>
+<p>72MHz 是什么概念？赫兹是频率单位，1Hz &#x3D; 每秒 1 次，72MHz &#x3D; 每秒 7200 万次运算。</p>
+</blockquote>
+<h3 id="SysTick：系统滴答"><a href="#SysTick：系统滴答" class="headerlink" title="SysTick：系统滴答"></a>SysTick：系统滴答</h3><p>在处理器内核中有一个 <strong>SysTick（系统滴答）定时器</strong>，为程序提供时间基准——之前学外部中断时提过，<code>HAL_Delay()</code> 的延时功能就是靠它实现的。</p>
+<p>与 HCLK 的”直连”不同，SysTick 前多了一个<strong>分频器</strong>（÷1 或 ÷8）：HCLK&#x3D;72MHz 时设 ÷1 则 SysTick 也是 72MHz，设 ÷8 则降为 9MHz。</p>
+<h3 id="外设分支：APB1-APB2-总线"><a href="#外设分支：APB1-APB2-总线" class="headerlink" title="外设分支：APB1 &#x2F; APB2 总线"></a>外设分支：APB1 &#x2F; APB2 总线</h3><p>像 GPIO、串口、I2C 这些外设，并没有直接挂在 AHB 总线上，而是分门别类连接到两个 <strong>APB 总线</strong>（Advanced Peripheral Bus，先进外设总线）上，再通过桥接器与 AHB 上的处理器、DMA 通信：</p>
+<table>
+<thead>
+<tr>
+<th align="left">总线</th>
+<th align="left">挂载的外设</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>APB1</strong>（低速）</td>
+<td align="left">TIM2~TIM5、SPI3、I2C、USB、CAN、通用&#x2F;基本定时器等</td>
+</tr>
+<tr>
+<td align="left"><strong>APB2</strong>（高速）</td>
+<td align="left">ADC、串口1、SPI1、高级定时器 TIM1&#x2F;TIM8、所有 GPIO、中断等</td>
+</tr>
+</tbody></table>
+<p>（详细清单见 STM32 中文参考手册第 25 页的系统结构图。）</p>
+<p>两个 APB 总线的时钟都来自 HCLK，经过各自<strong>可设置的预分频器</strong>分频后，分频后的时钟叫 <strong>PCLK</strong>，下面是一个例子：</p>
+<ul>
+<li>APB1 预分频 ÷2 → <strong>PCLK1 &#x3D; 36MHz</strong>（APB1 上除定时器外的外设）</li>
+<li>APB2 预分频 ÷1 → <strong>PCLK2 &#x3D; 72MHz</strong></li>
+</ul>
+<h3 id="定时器的”特权”：倍频器"><a href="#定时器的”特权”：倍频器" class="headerlink" title="定时器的”特权”：倍频器"></a>定时器的”特权”：倍频器</h3><p>定时器比较特殊——它前面多了一个<strong>倍频器</strong>，用来把频率”再提上去”。这个倍频器有 ×1 和 ×2 两个值，<strong>由预分频器自动决定，我们无法手动设置</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="center">APB 预分频值</th>
+<th align="center">定时器倍频</th>
+<th align="center">定时器时钟</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">÷1</td>
+<td align="center">×1</td>
+<td align="center">&#x3D; PCLK</td>
+</tr>
+<tr>
+<td align="center">÷2 &#x2F; ÷4 &#x2F; ÷8 &#x2F; ÷16</td>
+<td align="center">×2</td>
+<td align="center">&#x3D; 2 × PCLK</td>
+</tr>
+</tbody></table>
+<p>规则背后的意图：<strong>让定时器尽可能保持较高频率</strong>。比如 APB1 预分频 ÷2 时 PCLK1&#x3D;36MHz，但定时器倍频 ×2 后仍是 72MHz——这正是我们代码里看到的配置，也让马上要学的定时器能有最高的 72MHz 时基。</p>
+<h3 id="ADC-的专属预分频器"><a href="#ADC-的专属预分频器" class="headerlink" title="ADC 的专属预分频器"></a>ADC 的专属预分频器</h3><p>ADC 还有一套<strong>专属的预分频器</strong>：ADC 采样需要采集一段时间才能更准确地获取电压值，所以它的时钟频率需要慢下来。比如 ADC 预分频 ÷6 → ADC 时钟 &#x3D; 12MHz。</p>
+<h3 id="时钟源（树的根）：HSI-与-HSE"><a href="#时钟源（树的根）：HSI-与-HSE" class="headerlink" title="时钟源（树的根）：HSI 与 HSE"></a>时钟源（树的根）：HSI 与 HSE</h3><p>前面的部分让时钟树有了枝叶，而根茎从哪来？HCLK 上的频率源头有两个时钟源：</p>
+<table>
+<thead>
+<tr>
+<th align="left">时钟源</th>
+<th align="left">全称</th>
+<th align="center">频率</th>
+<th align="left">特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>HSI</strong></td>
+<td align="left">高速内部时钟</td>
+<td align="center">8MHz</td>
+<td align="left">内置在芯片内部，无需外接电路，默认使用，简单方便但精度稍差</td>
+</tr>
+<tr>
+<td align="left"><strong>HSE</strong></td>
+<td align="left">高速外部时钟</td>
+<td align="center">8MHz</td>
+<td align="left">需要从外部电路接入晶振，脉冲精度遥遥领先</td>
+</tr>
+</tbody></table>
+<p>HSE 依赖的<strong>晶振</strong>内部有石英晶体，可以发出一定频率的脉冲信号——大家常用的石英表就是相同原理（这就是为什么石英表走时准）。</p>
+<p>HSI 或 HSE 二选一接入时钟树后，这个接入的数值叫做 <strong>SYSCLK 系统时钟</strong>。</p>
+<blockquote>
+<p>⚠️ 注意：别把 <strong>SYSCLK（系统时钟）</strong> 和前面说的 <strong>SysTick（系统滴答）</strong> 搞混了！SysTick 是内核里的一个定时器，SYSCLK 是时钟树顶端的时钟源，只是名字像。</p>
+</blockquote>
+<p>8MHz 经过分频器只能变小，怎么也不可能是 72MHz——所以 SYSCLK 还有第三个选项：<strong>PLLCLK</strong>。</p>
+<h3 id="PLL：锁相环（倍频器）"><a href="#PLL：锁相环（倍频器）" class="headerlink" title="PLL：锁相环（倍频器）"></a>PLL：锁相环（倍频器）</h3><p>PLL 锁相环的具体原理很深，我们不去深究，只需要知道：<strong>它在此处起到倍频器的作用</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PLL 输入前分频:  HSI → 固定 ÷2 (4MHz)</span><br><span class="line">                HSE → 可选择 ÷1 或 ÷2</span><br><span class="line">PLL 倍频:        ×2 ~ ×16 (可选)</span><br></pre></td></tr></table></figure>
+
+<p>于是：<strong>HSE 8MHz ÷1 ×9 &#x3D; 72MHz</strong>，只要 AHB 预分频 ÷1，HCLK 就是 72MHz——这就是我们代码中配置的完整路径。</p>
+<h3 id="剩余的分支"><a href="#剩余的分支" class="headerlink" title="剩余的分支"></a>剩余的分支</h3><p>时钟树讲到这里，对照 CubeMX 的时钟树页面还差几样东西：</p>
+<ul>
+<li><strong>FCLK（自由运行时钟）</strong>：当 STM32 进入低功耗的停止模式时，AHB 总线停止运行、HCLK 停止传输脉冲，所有挂载外设全部停摆。但休眠只是暂时的省电手段，还得靠<strong>外部中断</strong>唤醒——此时 FCLK 继续运行，为中断采样提供时钟。在 CubeMX 上看它来自 HCLK，只是表示两者同步、频率一致，真正的来源是 AHB 预分频器。</li>
+<li><strong>Flash 编程接口时钟</strong>：永远来自 HSI。</li>
+<li><strong>USB 时钟</strong>：来自 PLL（48MHz）。</li>
+<li><strong>CSS（时钟安全系统）</strong>：当系统时钟源选择 HSE（或经过 PLL 倍频的 HSE）时，可以开启 CSS。它在 HSE 发生故障时立刻把时钟源切换回 HSI，并产生中断，让我们可以进行紧急制动等处理——相当于时钟的”安全气囊”。</li>
+<li><strong>RTC 与看门狗</strong>：一个独立的小时钟树，时钟源是 LSI（低速内部时钟）&#x2F; LSE（低速外部时钟）&#x2F; HSE 的 128 分频。结构非常简单，等学到 RTC 和看门狗时再详细了解。</li>
+<li><strong>MCO（时钟输出）</strong>：在 CubeMX 勾选 Master Clock Output 后，PA8 引脚被设置为 MCO 功能，可以把某个时钟信号从引脚输出出来，方便外部测量&#x2F;调试。一般用不上。</li>
+</ul>
+<p>至此，时钟树全部讲解完成。</p>
+<h2 id="解读初始化代码：SystemClock-Config"><a href="#解读初始化代码：SystemClock-Config" class="headerlink" title="解读初始化代码：SystemClock_Config"></a>解读初始化代码：SystemClock_Config</h2><p>说了这么多，回到每篇博客都有的 <code>SystemClock_Config()</code>——它就是把上面的时钟树用代码配置一遍。以温湿度计项目为例，逐行解析：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">SystemClock_Config</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  RCC_OscInitTypeDef RCC_OscInitStruct = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 振荡器配置结构体</span></span><br><span class="line">  RCC_ClkInitTypeDef RCC_ClkInitStruct = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 总线时钟配置结构体</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">/* ① 配置振荡器：选哪个时钟源、开不开 PLL */</span></span><br><span class="line">  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;  <span class="comment">// 要配置的振荡器类型：HSE</span></span><br><span class="line">  RCC_OscInitStruct.HSEState = RCC_HSE_ON;                    <span class="comment">// 打开 HSE（外部晶振）</span></span><br><span class="line">  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;     <span class="comment">// HSE 预分频 ÷1 → 8MHz</span></span><br><span class="line">  RCC_OscInitStruct.HSIState = RCC_HSI_ON;                    <span class="comment">// HSI 保持开启（备用时钟源）</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                <span class="comment">// 打开 PLL</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;        <span class="comment">// PLL 的输入源 = HSE</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;                <span class="comment">// PLL 倍频 ×9 → 8×9=72MHz</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_RCC_OscConfig(&amp;RCC_OscInitStruct) != HAL_OK)        <span class="comment">// 写入 RCC 寄存器</span></span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* ② 配置总线时钟：SYSCLK 选谁、各总线分频多少 */</span></span><br><span class="line">  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK</span><br><span class="line">                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;  <span class="comment">// 要配置的时钟种类</span></span><br><span class="line">  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;   <span class="comment">// SYSCLK 来源 = PLLCLK</span></span><br><span class="line">  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;          <span class="comment">// AHB 预分频 ÷1 → HCLK = 72MHz</span></span><br><span class="line">  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;           <span class="comment">// APB1 ÷2 → PCLK1 = 36MHz</span></span><br><span class="line">  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;           <span class="comment">// APB2 ÷1 → PCLK2 = 72MHz</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (HAL_RCC_ClockConfig(&amp;RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)  <span class="comment">// 写入寄存器</span></span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="各配置项与时钟树的对应关系"><a href="#各配置项与时钟树的对应关系" class="headerlink" title="各配置项与时钟树的对应关系"></a>各配置项与时钟树的对应关系</h3><table>
+<thead>
+<tr>
+<th align="left">代码配置</th>
+<th align="left">对应时钟树节点</th>
+<th align="center">本项目的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HSEState = RCC_HSE_ON</code></td>
+<td align="left">打开 HSE 晶振（RCC_CR.HSEON）</td>
+<td align="center">开启</td>
+</tr>
+<tr>
+<td align="left"><code>HSEPredivValue = DIV1</code></td>
+<td align="left">HSE 预分频（RCC_CFGR.PLLXTPRE）</td>
+<td align="center">÷1 → 8MHz</td>
+</tr>
+<tr>
+<td align="left"><code>PLL.PLLSource = PLLSOURCE_HSE</code></td>
+<td align="left">PLL 输入源选择（RCC_CFGR.PLLSRC）</td>
+<td align="center">HSE</td>
+</tr>
+<tr>
+<td align="left"><code>PLL.PLLMUL = MUL9</code></td>
+<td align="left">PLL 倍频（RCC_CFGR.PLLMUL）</td>
+<td align="center">×9 → 72MHz</td>
+</tr>
+<tr>
+<td align="left"><code>SYSCLKSource = PLLCLK</code></td>
+<td align="left">SYSCLK 三选一（RCC_CFGR.SW）</td>
+<td align="center">PLLCLK</td>
+</tr>
+<tr>
+<td align="left"><code>AHBCLKDivider = DIV1</code></td>
+<td align="left">AHB 预分频（RCC_CFGR.HPRE）</td>
+<td align="center">÷1 → HCLK 72MHz</td>
+</tr>
+<tr>
+<td align="left"><code>APB1CLKDivider = DIV2</code></td>
+<td align="left">APB1 预分频（RCC_CFGR.PPRE1）</td>
+<td align="center">÷2 → PCLK1 36MHz</td>
+</tr>
+<tr>
+<td align="left"><code>APB2CLKDivider = DIV1</code></td>
+<td align="left">APB2 预分频（RCC_CFGR.PPRE2）</td>
+<td align="center">÷1 → PCLK2 72MHz</td>
+</tr>
+<tr>
+<td align="left"><code>FLASH_LATENCY_2</code></td>
+<td align="left">Flash 等待周期（FLASH_ACR.LATENCY）</td>
+<td align="center">2 个等待周期</td>
+</tr>
+</tbody></table>
+<p>两个值得注意的点：</p>
+<ol>
+<li><p><strong>HSI 为什么要保持开启（<code>RCC_HSI_ON</code>）？</strong> 即使不用它做系统时钟，HSI 也是 Flash 编程接口时钟的唯一来源，并且是 CSS 时钟安全系统切换的备用时钟——所以不能关。</p>
+</li>
+<li><p><strong><code>FLASH_LATENCY_2</code> 是什么？</strong> Flash 读数据比 CPU 运算慢。CPU 频率越高，等待周期就越多：72MHz 需要 2 个等待周期（每读一次 Flash 等 2 个周期）。这也是 HAL_RCC_ClockConfig 的第二个参数，CubeMX 会根据 HCLK 自动算好。</p>
+</li>
+</ol>
+<h3 id="HAL-层与寄存器的关系"><a href="#HAL-层与寄存器的关系" class="headerlink" title="HAL 层与寄存器的关系"></a>HAL 层与寄存器的关系</h3><p>整个 <code>SystemClock_Config</code> 是 HAL 封装层，最终写入的是 RCC 外设的寄存器：</p>
+<ul>
+<li><code>HAL_RCC_OscConfig()</code> → 写 <strong>RCC_CR</strong>（HSEON&#x2F;HSERDY、PLLON&#x2F;PLLRDY）和 <strong>RCC_CFGR</strong>（PLLSRC、PLLMUL）</li>
+<li><code>HAL_RCC_ClockConfig()</code> → 写 <strong>RCC_CFGR</strong>（SW&#x2F;SWS、HPRE、PPRE1、PPRE2）和 <strong>FLASH_ACR</strong>（LATENCY）</li>
+</ul>
+<p>这也再次印证博客开头的观点：每个外设运行前，都得先让这颗时钟树”枝繁叶茂”。</p>
+<h2 id="实操步骤：CubeMX-配置-72MHz"><a href="#实操步骤：CubeMX-配置-72MHz" class="headerlink" title="实操步骤：CubeMX 配置 72MHz"></a>实操步骤：CubeMX 配置 72MHz</h2><p>说了这么多理论，实操其实非常简单——CubeMX 图形化界面就是替我们操作上面的时钟树。正确流程：</p>
+<p><strong>① 在 RCC 配置页打开 HSE</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">System Core → RCC → High Speed Clock (HSE) → Crystal/Ceramic Resonator</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><img src="/./../images/STM32_Clock_Tree/image-20260806105659838.png" alt="image-20260806105659838"></p>
+</blockquote>
+<p><strong>② 在 Clock Configuration 页把 HCLK 改为 72MHz</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Clock Configuration 页面 → HCLK 输入 72 → 回车</span><br><span class="line">CubeMX 自动帮我们算好所有预分频和倍频参数（弹出对话框直接点 OK）</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><img src="/./../images/STM32_Clock_Tree/image-20260806105812668.png" alt="image-20260806105812668"></p>
+</blockquote>
+<p>配置完成后，对照 Clock Configuration 页面应该能看到与我们代码一致的参数：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">HSE 8MHz ──÷1──► PLL ×9 ──► SYSCLK 72MHz ──÷1──► HCLK 72MHz</span><br><span class="line">                         │                     ├──÷2──► PCLK1 36MHz（定时器自动 ×2 → 72MHz）</span><br><span class="line">                         │                     └──÷1──► PCLK2 72MHz（定时器 ×1）</span><br><span class="line">                         └──► APB2 定时器 72MHz</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>💡 顺序提醒：<strong>务必先开 HSE，再改 HCLK</strong>。如果没开 HSE 就改 72MHz，CubeMX 会弹窗提示只能配到 64MHz（原因见下节踩坑记录）。</p>
+</blockquote>
+<p><strong>③ 生成代码</strong>，<code>SystemClock_Config()</code> 会自动出现在 <code>main.c</code> 里——就是上面解读的那段代码。</p>
+<h2 id="踩坑记录：72MHz-弹窗-“no-solution-found”-的真相"><a href="#踩坑记录：72MHz-弹窗-“no-solution-found”-的真相" class="headerlink" title="踩坑记录：72MHz 弹窗 “no solution found” 的真相"></a>踩坑记录：72MHz 弹窗 “no solution found” 的真相</h2><p>刚接触这块时很容易遇到这个弹窗：</p>
+<blockquote>
+<p>改 HCLK&#x3D;72MHz 时弹出 “no solution found using 72MHz, do you want to use 64MHz?”</p>
+</blockquote>
+<p><strong>原因</strong>：没开 HSE 时，系统只能用 HSI（8MHz）作为 PLL 输入。HSI 经过固定的 ÷2 变成 4MHz，PLL 最大 ×16 → 4 × 16 &#x3D; <strong>64MHz，这就是 HSI 路线的极限</strong>，再怎么配也到不了 72MHz。</p>
+<p><strong>解决</strong>：回到 RCC 配置页打开 HSE（Crystal&#x2F;Ceramic Resonator），HSE 8MHz ÷1 ×9 &#x3D; 72MHz，完美。这也是上一节”先开 HSE，再改 HCLK”的原因。</p>
+<p>这个坑的通用价值在于：<strong>理解时钟树各节点的频率上下限，就能看懂 CubeMX 的报错</strong>。HSI 只能跑到 64MHz、PCLK1 最大 36MHz、APB2 定时器是 72MHz……这些限制全部写在这棵树上。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">概念</th>
+<th align="left">一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>时钟信号</strong></td>
+<td align="left">一定频率的方波，让门电路稳定后才锁存进寄存器，全芯片的”节拍器”</td>
+</tr>
+<tr>
+<td align="left"><strong>时钟源</strong></td>
+<td align="left">心脏：HSI（内部 8MHz）&#x2F; HSE（外部晶振 8MHz，精度高）</td>
+</tr>
+<tr>
+<td align="left"><strong>PLL</strong></td>
+<td align="left">倍频器：×2~×16，HSE ÷1 ×9 &#x3D; 72MHz</td>
+</tr>
+<tr>
+<td align="left"><strong>SYSCLK</strong></td>
+<td align="left">系统时钟：HSI &#x2F; HSE &#x2F; PLLCLK 三选一</td>
+</tr>
+<tr>
+<td align="left"><strong>AHB &#x2F; HCLK</strong></td>
+<td align="left">主干道：CPU、内存、DMA 的时钟线</td>
+</tr>
+<tr>
+<td align="left"><strong>APB1 &#x2F; PCLK1</strong></td>
+<td align="left">外设低速总线：÷2 &#x3D; 36MHz（定时器自动倍频回 72MHz）</td>
+</tr>
+<tr>
+<td align="left"><strong>APB2 &#x2F; PCLK2</strong></td>
+<td align="left">外设高速总线：÷1 &#x3D; 72MHz（GPIO、串口1、ADC、TIM1&#x2F;TIM8）</td>
+</tr>
+<tr>
+<td align="left"><strong>SysTick</strong></td>
+<td align="left">内核定时器：HCLK 分频（÷1&#x2F;÷8），<code>HAL_Delay</code> 的基准</td>
+</tr>
+<tr>
+<td align="left"><strong>CSS</strong></td>
+<td align="left">时钟安全系统：HSE 故障自动切回 HSI + 中断</td>
+</tr>
+<tr>
+<td align="left"><strong>FCLK</strong></td>
+<td align="left">自由运行时钟：停止模式时继续跑，供中断唤醒</td>
+</tr>
+</tbody></table>
+<p>这一集涉及的概念很多，有不少是后面才学到的（定时器、RTC、看门狗……）。但就像 keysking 说的”常看常新”——现在把时钟树这张地图装进脑子里，后面每学一个外设，都能在树上找到它的位置。</p>
+<p>下一集就要进入定时器的学习了，有了时钟树的知识打底，定时器的分频&#x2F;计数原理会好理解很多——因为定时器的 72MHz 时基，正是从 APB1&#x2F;APB2 这条分支上摘下来的。</p>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li>视频：【STM32】超清晰STM32时钟树动画讲解（keysking）</li>
+<li>STM32 中文参考手册：第 25 页”系统结构图”（APB1&#x2F;APB2 外设挂载清单）</li>
+<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
+<li><a href="/2026/08/05/STM32_OLED_Temperature_Humidity_Meter/">上一篇：STM32番外篇——oled温湿度计</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>STM32</tag>
+        <tag>嵌入式</tag>
+        <tag>CubeMX</tag>
+        <tag>RCC</tag>
+        <tag>时钟树</tag>
+        <tag>PLL</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>深入stm32的底层通信模型--数据的存储与传输</title>
     <url>/2026/08/02/STM32_Data_Buffer_Mechanism/</url>
     <content><![CDATA[<h2 id="从串口到-I2C：一个反复出现的问题"><a href="#从串口到-I2C：一个反复出现的问题" class="headerlink" title="从串口到 I2C：一个反复出现的问题"></a>从串口到 I2C：一个反复出现的问题</h2><p>回顾一下我们这一路学过的通信博客：</p>
@@ -5680,6 +5989,24 @@
       </tags>
   </entry>
   <entry>
+    <title>Hello World</title>
+    <url>/2026/07/06/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
+  </entry>
+  <entry>
     <title>STM32——串口通信，用电脑控制三色LED</title>
     <url>/2026/07/29/STM32_USART_Serial_Communication/</url>
     <content><![CDATA[<h2 id="硬件原理"><a href="#硬件原理" class="headerlink" title="硬件原理"></a>硬件原理</h2><h3 id="串口通信基础"><a href="#串口通信基础" class="headerlink" title="串口通信基础"></a>串口通信基础</h3><p>串口（UART，Universal Asynchronous Receiver&#x2F;Transmitter）是嵌入式领域最常用的通信方式之一。它的原理其实很简单——<strong>用两根数据线就能实现两个设备之间的双向通信</strong>。</p>
@@ -6323,24 +6650,6 @@
         <tag>USART</tag>
         <tag>串口</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>Hello World</title>
-    <url>/2026/07/06/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
   </entry>
   <entry>
     <title>hexo博客静态网站项目总结回顾深挖</title>
@@ -13488,6 +13797,11 @@
       </tags>
   </entry>
   <entry>
+    <title>我的第一篇hexo博客！</title>
+    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
+    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
+  </entry>
+  <entry>
     <title>我们是如何创建这个博客网站的</title>
     <url>/2026/07/07/%E6%88%91%E4%BB%AC%E6%98%AF%E5%A6%82%E4%BD%95%E5%88%9B%E5%BB%BA%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%BD%91%E7%AB%99%E7%9A%84/</url>
     <content><![CDATA[<h1 id="《软件开发工具实践》实验手册"><a href="#《软件开发工具实践》实验手册" class="headerlink" title="《软件开发工具实践》实验手册"></a>《软件开发工具实践》实验手册</h1><h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><p><strong><a href="#%E5%AE%9E%E9%AA%8C%E4%BA%8C-web%E8%BD%AF%E4%BB%B6%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83">实验二 Web软件开发环境</a></strong> …………………… 5</p>
@@ -14607,11 +14921,6 @@
         <tag>Git</tag>
         <tag>Nginx</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>我的第一篇hexo博客！</title>
-    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
-    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>数据结构 —— 顺序表</title>
