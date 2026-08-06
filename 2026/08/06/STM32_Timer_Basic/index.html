@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="从&quot;定时器就是计数器&quot;的本质出发，讲解定时器的三个核心部件（预分频器、计数器、自动重装载计数器）与更新中断，用 TIM4 实现每 1 秒通过串口发送一次数据，附 CubeMX 配置与 MX_TIM4_Init 初始化代码逐行解析。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STM32——定时器入门：定时器就是计数器">
+<meta property="og:url" content="http://tristan1116.github.io/2026/08/06/STM32_Timer_Basic/index.html">
+<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:description" content="从&quot;定时器就是计数器&quot;的本质出发，讲解定时器的三个核心部件（预分频器、计数器、自动重装载计数器）与更新中断，用 TIM4 实现每 1 秒通过串口发送一次数据，附 CubeMX 配置与 MX_TIM4_Init 初始化代码逐行解析。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_Timer_Basic/image-20260806214008514.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/STM32_Timer_Basic/image-20260806214104527.png">
+<meta property="article:published_time" content="2026-08-06T21:40:00.000Z">
+<meta property="article:modified_time" content="2026-08-06T21:40:00.000Z">
+<meta property="article:author" content="点灯大王">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="CubeMX">
+<meta property="article:tag" content="中断">
+<meta property="article:tag" content="定时器">
+<meta property="article:tag" content="TIM">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_Timer_Basic/image-20260806214008514.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/08/06/STM32_Timer_Basic/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>STM32——定时器入门：定时器就是计数器 | 点灯大王的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">点灯大王的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/08/06/STM32_Timer_Basic/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="点灯大王的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          STM32——定时器入门：定时器就是计数器
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-06 21:40:00" itemprop="dateCreated datePublished" datetime="2026-08-06T21:40:00+00:00">2026-08-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>7.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>7 分钟</span>
+            </span>
+            <div class="post-description">从"定时器就是计数器"的本质出发，讲解定时器的三个核心部件（预分频器、计数器、自动重装载计数器）与更新中断，用 TIM4 实现每 1 秒通过串口发送一次数据，附 CubeMX 配置与 MX_TIM4_Init 初始化代码逐行解析。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上一篇我们研究了单片机的”心脏与动脉”——时钟源与时钟树。当时埋了个伏笔：时钟树上 <strong>APB1 定时器分支</strong>经过预分频 + 倍频，给定时器送来了 72MHz 的时钟。</p>
+<p>为什么定时器值得单独一条分支、还专门配一个倍频器把频率”补”回 72MHz？从本篇开始，我们就来研究单片机中另一个非常重要的概念——<strong>定时器 TIM</strong>。</p>
+<p>如果你以为定时器的作用只是”设定一个时间，时间到了执行程序”——恭喜你猜对了一半，但也正是被”定时器”这个名字误导了。请记住这句贯穿后续好几期的话：</p>
+<blockquote>
+<p><strong>定时器就是计数器。</strong></p>
+</blockquote>
+<p>身为计数器，通过不同的”计数姿势”的巧妙组合，定时器除了实现普通的定时功能，还可以捕获脉冲宽度、计算 PWM 占空比、输出 PWM 波形、编码器计数……功能非常丰富。</p>
+<h2 id="定时器家族：三类定时器"><a href="#定时器家族：三类定时器" class="headerlink" title="定时器家族：三类定时器"></a>定时器家族：三类定时器</h2><p>STM32F103 系列最多有 8 个定时器（TIM1~TIM8），按功能强弱分三类：</p>
+<table>
+<thead>
+<tr>
+<th align="left">类别</th>
+<th align="left">成员</th>
+<th align="left">功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>基本定时器</strong></td>
+<td align="left">TIM6、TIM7</td>
+<td align="left">功能最弱，只有简单的定时功能</td>
+</tr>
+<tr>
+<td align="left"><strong>通用定时器</strong></td>
+<td align="left">TIM2~TIM5</td>
+<td align="left">在基本定时器基础上扩展，功能丰富，是学习重点</td>
+</tr>
+<tr>
+<td align="left"><strong>高级定时器</strong></td>
+<td align="left">TIM1、TIM8</td>
+<td align="left">最强，多了刹车信号、输入捕获、互补输出等工业电机功能</td>
+</tr>
+</tbody></table>
+<p>高级定时器的那些电机功能需要提前学习许多电机知识，当前阶段我们把它当通用定时器用即可。</p>
+<blockquote>
+<p>⚠️ 注意：我们使用的 <strong>STM32F103C8T6 上只有 TIM1~TIM4</strong>（1 个高级 + 3 个通用），并没有基本定时器。不过没关系——通用&#x2F;高级定时器都是从基本定时器的结构上扩展出来的，<strong>包含基本定时器的全部功能</strong>，所以把任意一个通用定时器当基本定时器用就行。本集我们用 <strong>TIM4</strong>。</p>
+</blockquote>
+<h2 id="定时器就是计数器"><a href="#定时器就是计数器" class="headerlink" title="定时器就是计数器"></a>定时器就是计数器</h2><h3 id="计时原理：恒定频率方波-计数器"><a href="#计时原理：恒定频率方波-计数器" class="headerlink" title="计时原理：恒定频率方波 + 计数器"></a>计时原理：恒定频率方波 + 计数器</h3><p>如何计时？其实非常简单：<strong>一个恒定频率的方波信号 + 一个寄存器</strong>，每当方波的上升沿到达，寄存器存储的数就 +1，就能完成计时。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">        ┌──┐  ┌──┐  ┌──┐</span><br><span class="line">方波 ────┘  └──┘  └──┘  └── ...  100Hz = 每秒 100 个脉冲</span><br><span class="line">       ↑  ↑  ↑  ↑</span><br><span class="line">       │  │  │  └─ 计数到 100 → 我们知道过了一秒</span><br><span class="line">       │  │  └─ 3</span><br><span class="line">       │  └─ 2</span><br><span class="line">       └─ 1</span><br><span class="line">       计数器: 0 → 1 → 2 → 3 → ... → 100</span><br></pre></td></tr></table></figure>
+
+<p>恒定频率的方波从哪来？就是上篇时钟树讲过的：<strong>APB1 定时器分支，72MHz</strong>。也就是计数器每数到 7200 万，就是一秒。</p>
+<p>可惜计数器寄存器只有 <strong>16 位</strong>，最多数 65536 个数——72MHz 下 0.0009 秒就数满了，这太少了。所以定时器在计数器前加了一个<strong>预分频器</strong>。</p>
+<h3 id="预分频器：给方波”减速”"><a href="#预分频器：给方波”减速”" class="headerlink" title="预分频器：给方波”减速”"></a>预分频器：给方波”减速”</h3><p>预分频器本质也是个计数器（通过计数来分频）：</p>
+<table>
+<thead>
+<tr>
+<th align="center">预分频器设置值</th>
+<th align="left">行为</th>
+<th align="center">等效分频</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="left">不分频，脉冲原样输出</td>
+<td align="center">÷1</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="left">数 0、1，每 2 个脉冲输出 1 个</td>
+<td align="center">÷2</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">数 0、1、2，每 3 个脉冲输出 1 个</td>
+<td align="center">÷3</td>
+</tr>
+</tbody></table>
+<p>规律：<strong>想要 N 分频，就设置 N-1</strong>（因为从 0 开始计数）。</p>
+<p>预分频器也是 16 位，最多 65536 分频。72MHz ÷ 65536 ≈ 1098Hz，即最多可以定时 59 秒多——对于绝大多数需要高精度定时的任务足够用了。</p>
+<blockquote>
+<p>💡 想要更长时间的定时？定时器可以<strong>串联</strong>——一个定时器作为另一个的输入时钟。两个定时器组合可以实现 8124 年（当然，晶振存在误差，长时间定时会有累积误差，追求极致精确的话需要卫星授时校准等方案）。</p>
+</blockquote>
+<h3 id="自动重装载计数器：实现”定时”"><a href="#自动重装载计数器：实现”定时”" class="headerlink" title="自动重装载计数器：实现”定时”"></a>自动重装载计数器：实现”定时”</h3><p>有了预分频器和计数器，我们已经能”计时”（读计数器值知道过了多久），但怎么实现”<strong>每 1 秒提醒我发送一次数据</strong>“这种”定时”功能？</p>
+<p>靠第三个部件——<strong>自动重装载计数器（ARR）</strong>：</p>
+<ul>
+<li>它实时监控计数器的值是否与自己相同</li>
+<li>当计数器数到与它相同 → <strong>把计数器清零，重新开始计数</strong></li>
+<li>同时可根据设置<strong>触发一次更新中断</strong>，通知 STM32”时间到了”</li>
+</ul>
+<p>和预分频器一样，因为从 0 开始计数，想定时 M 个脉冲就设置 <strong>M-1</strong>。于是计数器从 0 数到 M-1，共 M 个数，然后重置并触发中断。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">┌────────────┐    ┌────────────┐    ┌────────────┐</span><br><span class="line">│ 预分频器 PSC │──►│ 计数器 CNT  │──►│重装载计数器ARR│──► 相等时:</span><br><span class="line">│   ÷7200     │    │ 0~9999     │    │  = 9999     │   ① 计数器清零重新计数</span><br><span class="line">└────────────┘    └────────────┘    └────────────┘   ② 触发更新中断</span><br></pre></td></tr></table></figure>
+
+<h2 id="数据流全链路：从-72MHz-到每秒一次的串口数据"><a href="#数据流全链路：从-72MHz-到每秒一次的串口数据" class="headerlink" title="数据流全链路：从 72MHz 到每秒一次的串口数据"></a>数据流全链路：从 72MHz 到每秒一次的串口数据</h2><p>理解了三个部件，把本集项目的完整数据流串起来——从时钟树到串口助手：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">APB1 定时器分支 72MHz (来自上篇的时钟树, HSE 8MHz ×PLL9)</span><br><span class="line">   │</span><br><span class="line">   ▼</span><br><span class="line">┌────────────────┐    ÷7200 (设置 7200-1)   ┌────────────────┐</span><br><span class="line">│ 预分频器 PSC    │ ──────────────────────► │ 10kHz 脉冲      │</span><br><span class="line">│ (幕后: 影子寄存器)│     每7200个脉冲输出1个   │ 每秒10000个脉冲  │</span><br><span class="line">└────────────────┘                         └───────┬────────┘</span><br><span class="line">                                                    │</span><br><span class="line">                                                    ▼</span><br><span class="line">                                    ┌────────────────┐</span><br><span class="line">                                    │ 计数器 CNT (16位)│</span><br><span class="line">                                    │ 0→1→2→…→9999   │</span><br><span class="line">                                    └───────┬────────┘</span><br><span class="line">                                            │ 实时比较</span><br><span class="line">                                            ▼</span><br><span class="line">                                    ┌────────────────┐</span><br><span class="line">                                    │ 重装载 ARR=9999 │──相等→ 清零 + 更新中断</span><br><span class="line">                                    │ (10000-1)      │</span><br><span class="line">                                    └────────────────┘</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                         HAL_TIM_PeriodElapsedCallback (中断回调)</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                            HAL_UART_Transmit_IT 中断发送</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                        串口助手: 每秒收到一次数据 ✅</span><br></pre></td></tr></table></figure>
+
+<p>关键计算：<strong>72MHz ÷ 7200 &#x3D; 10kHz</strong>（每秒 10000 个脉冲），<strong>计数 10000 次 &#x3D; 正好 1 秒</strong>。</p>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="①-基础配置（老流程）"><a href="#①-基础配置（老流程）" class="headerlink" title="① 基础配置（老流程）"></a>① 基础配置（老流程）</h3><ul>
+<li>创建工程（STM32F103C8T6），打开<strong>串口2</strong>（USART2，115200），并打开串口中断（后面用中断发送）</li>
+<li>RCC 配置页打开 <strong>HSE（Crystal&#x2F;Ceramic Resonator）</strong></li>
+<li>Clock Configuration 页 HCLK 改为 <strong>72MHz</strong></li>
+<li>注意时钟树页面：<strong>APB1 定时器分支已经是 72MHz</strong>（APB1 ÷2 &#x3D; 36MHz，定时器自动倍频 ×2 &#x3D; 72MHz）——上一篇的知识在这里直接落地</li>
+</ul>
+<h3 id="②-TIM4-定时器配置"><a href="#②-TIM4-定时器配置" class="headerlink" title="② TIM4 定时器配置"></a>② TIM4 定时器配置</h3><p>打开 <strong>Timers → TIM4</strong>，把 Clock Source 选为 <strong>Internal Clock</strong>（内部时钟，即来自 APB1 的 72MHz），就算打开了定时器：</p>
+<blockquote>
+<p><img src="/./../images/STM32_Timer_Basic/image-20260806214008514.png" alt="image-20260806214008514"></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th align="left">配置项</th>
+<th align="center">填的值</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Prescaler</strong>（预分频器）</td>
+<td align="center"><code>7200-1</code></td>
+<td align="left">想 7200 分频就填 7199（N-1）</td>
+</tr>
+<tr>
+<td align="left"><strong>Counter Mode</strong></td>
+<td align="center">Up</td>
+<td align="left">向上计数（默认）</td>
+</tr>
+<tr>
+<td align="left"><strong>Counter Period</strong>（自动重装载）</td>
+<td align="center"><code>10000-1</code></td>
+<td align="left">想定时 1 秒就填 9999（M-1）</td>
+</tr>
+</tbody></table>
+<p>72MHz ÷ 7200 &#x3D; 10kHz，数 10000 次 &#x3D; 1 秒，每 1 秒触发一次更新中断。</p>
+<h3 id="③-打开更新中断"><a href="#③-打开更新中断" class="headerlink" title="③ 打开更新中断"></a>③ 打开更新中断</h3><p>在 TIM4 配置页切到 <strong>NVIC Settings</strong> 选项卡，勾选 <strong>TIM4 global interrupt</strong>：</p>
+<blockquote>
+<p><img src="/./../images/STM32_Timer_Basic/image-20260806214104527.png" alt="image-20260806214104527"></p>
+</blockquote>
+<p>保存并生成代码。打开 main.c，可以看到 main 函数调用了一个新的初始化函数 <code>MX_TIM4_Init()</code>。</p>
+<h2 id="核心代码"><a href="#核心代码" class="headerlink" title="核心代码"></a>核心代码</h2><h3 id="1-启动定时器（main-函数-USER-CODE-2）"><a href="#1-启动定时器（main-函数-USER-CODE-2）" class="headerlink" title="1. 启动定时器（main 函数 USER CODE 2）"></a>1. 启动定时器（main 函数 USER CODE 2）</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">HAL_TIM_Base_Start_IT(&amp;htim4);   <span class="comment">// 启动 TIM4，并使能更新中断</span></span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-更新中断回调（USER-CODE-0）"><a href="#2-更新中断回调（USER-CODE-0）" class="headerlink" title="2. 更新中断回调（USER CODE 0）"></a>2. 更新中断回调（USER CODE 0）</h3><p>定时器的”时间到”是通过<strong>更新中断</strong>通知的——每次计数器数到与重装载值相同、被清零重新计数时触发。中断发生后要执行什么，靠重写回调函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 0 */</span></span><br><span class="line"><span class="type">char</span> data[] = <span class="string">&quot;😊😂🤣😍😘🙌&quot;</span>;   <span class="comment">// 要发送的数据（随便示意一下）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_TIM_PeriodElapsedCallback</span><span class="params">(TIM_HandleTypeDef *htim)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span> (htim == &amp;htim4)                          <span class="comment">// 好习惯:先确认是本定时器的中断</span></span><br><span class="line">  &#123;</span><br><span class="line">    HAL_UART_Transmit_IT(&amp;huart2, data, <span class="built_in">strlen</span>(data));  <span class="comment">// 串口中断发送</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 0 */</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>💡 这个回调函数是 HAL 库定义的<strong>弱函数（weak）</strong>，默认空实现，我们在自己的代码里重写即可。它会被所有定时器（TIM1~TIM4）共用，所以<strong>第一个动作就是判断是哪个定时器</strong>——<code>htim == &amp;htim4</code>。</p>
+</blockquote>
+<h2 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h2><table>
+<thead>
+<tr>
+<th align="left">HAL 函数</th>
+<th align="left">作用</th>
+<th align="left">本项目中参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_TIM_Base_Start_IT</code></td>
+<td align="left">启动定时器（Base&#x3D;基本用法），并使能更新中断（IT&#x3D;Interrupt）</td>
+<td align="left"><code>&amp;htim4</code> 定时器句柄指针</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_TIM_PeriodElapsedCallback</code></td>
+<td align="left">更新中断回调（重写）</td>
+<td align="left">无参数，靠 <code>htim</code> 判断来源</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_UART_Transmit_IT</code></td>
+<td align="left">串口<strong>中断</strong>发送（非阻塞）</td>
+<td align="left"><code>&amp;huart2</code>、<code>data</code>、<code>strlen(data)</code></td>
+</tr>
+</tbody></table>
+<p>另外，定时器还有一些<strong>名称全大写、以双下划线开头</strong>的函数——这类在 HAL 库中其实是<strong>宏定义</strong>，比较偏底层，倾向于直接操作寄存器。可以用它们随时读写定时器的核心部件，方便调试或动态改参数：</p>
+<ul>
+<li><code>__HAL_TIM_GET_COUNTER</code> &#x2F; <code>__HAL_TIM_SET_COUNTER</code>：获取&#x2F;设置计数器的值</li>
+<li><code>__HAL_TIM_GET_AUTORELOAD</code> &#x2F; <code>__HAL_TIM_SET_AUTORELOAD</code>：获取&#x2F;设置重装载寄存器的值</li>
+<li><code>__HAL_TIM_SET_PRESCALER</code>：设置预分频器的值</li>
+</ul>
+<p>可以自己设计实验试试这些函数。</p>
+<h2 id="解读初始化代码：MX-TIM4-Init"><a href="#解读初始化代码：MX-TIM4-Init" class="headerlink" title="解读初始化代码：MX_TIM4_Init"></a>解读初始化代码：MX_TIM4_Init</h2><p>CubeMX 生成的定时器初始化代码，逐行解析（这是本集必做的深度解读章节）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">MX_TIM4_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  TIM_ClockConfigTypeDef sClockSourceConfig = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 时钟源配置结构体</span></span><br><span class="line">  TIM_MasterConfigTypeDef sMasterConfig = &#123;<span class="number">0</span>&#125;;       <span class="comment">// 主模式配置结构体</span></span><br><span class="line"></span><br><span class="line">  htim4.Instance = TIM4;                             <span class="comment">// 指定外设: TIM4</span></span><br><span class="line">  htim4.Init.Prescaler = <span class="number">7200</span><span class="number">-1</span>;                     <span class="comment">// 预分频: ÷7200 (对应CubeMX Prescaler)</span></span><br><span class="line">  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;       <span class="comment">// 计数模式: 向上计数</span></span><br><span class="line">  htim4.Init.Period = <span class="number">10000</span><span class="number">-1</span>;                       <span class="comment">// 自动重装载: 数到9999清零 (对应Counter Period)</span></span><br><span class="line">  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1; <span class="comment">// 时钟分频: 用于输入滤波, 定时功能用不到</span></span><br><span class="line">  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;  <span class="comment">// 重装载影子寄存器: 关闭</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_Base_Init(&amp;htim4) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 时钟源: 内部时钟 (APB1定时器分支 72MHz) */</span></span><br><span class="line">  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_ConfigClockSource(&amp;htim4, &amp;sClockSourceConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 主模式配置: 本集用不到, 保持默认 */</span></span><br><span class="line">  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;</span><br><span class="line">  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIMEx_MasterConfigSynchronization(&amp;htim4, &amp;sMasterConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="各配置项与-CubeMX-寄存器的对应关系"><a href="#各配置项与-CubeMX-寄存器的对应关系" class="headerlink" title="各配置项与 CubeMX &#x2F; 寄存器的对应关系"></a>各配置项与 CubeMX &#x2F; 寄存器的对应关系</h3><table>
+<thead>
+<tr>
+<th align="left">代码配置</th>
+<th align="left">对应 CubeMX 设置</th>
+<th align="left">对应寄存器</th>
+<th align="center">本项目值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>Init.Prescaler</code></td>
+<td align="left">Prescaler</td>
+<td align="left">TIM_PSC</td>
+<td align="center">7200-1</td>
+</tr>
+<tr>
+<td align="left"><code>Init.CounterMode</code></td>
+<td align="left">Counter Mode</td>
+<td align="left">TIM_CR1.DIR</td>
+<td align="center">UP</td>
+</tr>
+<tr>
+<td align="left"><code>Init.Period</code></td>
+<td align="left">Counter Period</td>
+<td align="left">TIM_ARR</td>
+<td align="center">10000-1</td>
+</tr>
+<tr>
+<td align="left"><code>Init.ClockDivision</code></td>
+<td align="left">Clock Division</td>
+<td align="left">TIM_CR1.CKD</td>
+<td align="center">÷1</td>
+</tr>
+<tr>
+<td align="left"><code>AutoReloadPreload</code></td>
+<td align="left">auto-reload preload</td>
+<td align="left">TIM_CR1.ARPE</td>
+<td align="center">DISABLE</td>
+</tr>
+<tr>
+<td align="left"><code>ClockSource = INTERNAL</code></td>
+<td align="left">Clock Source</td>
+<td align="left">TIM_SMCR.SMS</td>
+<td align="center">内部时钟</td>
+</tr>
+</tbody></table>
+<h3 id="MSP-初始化：时钟使能与中断"><a href="#MSP-初始化：时钟使能与中断" class="headerlink" title="MSP 初始化：时钟使能与中断"></a>MSP 初始化：时钟使能与中断</h3><p>定时器初始化的另一半在 <code>HAL_TIM_Base_MspInit()</code> 里（MSP &#x3D; MCU Support Package，即”与 MCU 相关的部分”：时钟、引脚、中断）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_TIM_Base_MspInit</span><span class="params">(TIM_HandleTypeDef* tim_baseHandle)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span> (tim_baseHandle-&gt;Instance == TIM4)</span><br><span class="line">  &#123;</span><br><span class="line">    __HAL_RCC_TIM4_CLK_ENABLE();          <span class="comment">// ① 打开 TIM4 的外设时钟(挂钟!)</span></span><br><span class="line">    HAL_NVIC_SetPriority(TIM4_IRQn, <span class="number">0</span>, <span class="number">0</span>);  <span class="comment">// ② 设置 TIM4 中断优先级: 抢占0 子0</span></span><br><span class="line">    HAL_NVIC_EnableIRQ(TIM4_IRQn);        <span class="comment">// ③ 使能 TIM4 中断</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>三步缺一不可：<strong>不打开外设时钟（挂钟），定时器根本不工作；不设置优先级、不使能中断，更新中断永远不会触发。</strong></p>
+<h3 id="中断链路"><a href="#中断链路" class="headerlink" title="中断链路"></a>中断链路</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">计数器数到 ARR → 硬件置位更新标志 → 触发 TIM4_IRQn</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">TIM4_IRQHandler (stm32f1xx_it.c, 中断服务函数)</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">HAL_TIM_IRQHandler(&amp;htim4)  (HAL库, 判断中断来源)</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">HAL_TIM_PeriodElapsedCallback(&amp;htim4)  (我们重写的回调)</span><br></pre></td></tr></table></figure>
+
+<p>和串口中断的套路一模一样：<strong>中断服务函数 → HAL 通用处理函数 → 我们重写的回调</strong>。</p>
+<h2 id="影子寄存器机制：幕后老板与一线员工"><a href="#影子寄存器机制：幕后老板与一线员工" class="headerlink" title="影子寄存器机制：幕后老板与一线员工"></a>影子寄存器机制：幕后老板与一线员工</h2><p>前面讲预分频器和重装载时，代码里有两个容易被忽略的设置，它们背后是定时器一个精巧的设计——<strong>影子寄存器</strong>。</p>
+<p><strong>预分频器</strong>：真正工作在分频一线的，其实是预分频寄存器的<strong>影子寄存器</strong>，而预分频寄存器本人更像”运筹帷幄的幕后老板”。我们通过 <code>__HAL_TIM_SET_PRESCALER</code> 设置的新预分频值，会<strong>等到当前计数周期结束（计数器数到重装载值、重新从零开始）时才传递给影子寄存器生效</strong>——简而言之，新值下个计数周期才生效。</p>
+<p><strong>自动重装载计数器</strong>：同样有影子寄存器，作用相同（新值下个周期生效）。不同之处在于——<strong>重装载的影子机制可以开关</strong>（<code>AutoReloadPreload</code>，默认关闭）：</p>
+<ul>
+<li>关闭（本项目）：改 ARR 立即写进寄存器，但注意——如果把重装载值<strong>调小</strong>到小于当前计数器的值，它们会”错过”，计数器一路数到最大值 65535 才会触发更新</li>
+<li>开启（CubeMX 里勾选 auto-reload preload）：新值在影子寄存器里等下个周期，绝对安全</li>
+</ul>
+<p>有了影子寄存器机制，就可以随时修改预分频器&#x2F;重装载寄存器，而不必担心影响当前的计数周期。</p>
+<h2 id="实操步骤"><a href="#实操步骤" class="headerlink" title="实操步骤"></a>实操步骤</h2><h3 id="1-CubeMX-配置"><a href="#1-CubeMX-配置" class="headerlink" title="1. CubeMX 配置"></a>1. CubeMX 配置</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">① 串口2: Mode → Asynchronous, 波特率 115200, NVIC 勾选 USART2 global interrupt</span><br><span class="line">② RCC → HSE → Crystal/Ceramic Resonator</span><br><span class="line">③ Clock Configuration → HCLK = 72MHz → 回车 → OK</span><br><span class="line">④ Timers → TIM4 → Clock Source = Internal Clock</span><br><span class="line">   Prescaler = 7200-1, Counter Period = 10000-1</span><br><span class="line">⑤ NVIC Settings → 勾选 TIM4 global interrupt</span><br><span class="line">⑥ 保存生成代码</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-写代码"><a href="#2-写代码" class="headerlink" title="2. 写代码"></a>2. 写代码</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">① USER CODE 2:  HAL_TIM_Base_Start_IT(&amp;htim4) 启动定时器</span><br><span class="line">② USER CODE 0:  重写 HAL_TIM_PeriodElapsedCallback, 判断 htim==&amp;htim4 后</span><br><span class="line">                 HAL_UART_Transmit_IT(&amp;huart2, data, strlen(data))</span><br><span class="line">③ 头文件:        #include &lt;string.h&gt; (strlen)</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-编译下载-查看效果"><a href="#3-编译下载-查看效果" class="headerlink" title="3. 编译下载 &amp; 查看效果"></a>3. 编译下载 &amp; 查看效果</h3><p>编译下载，连上串口线，打开波特律动串口助手连接串口。刚下载完程序会慢几拍，<strong>按下板上的复位键</strong>让程序重新开始运行。</p>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1Cnup68E8Z/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1Cnup68E8Z/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+</blockquote>
+<p>串口助手每秒收到一次数据（emoji）</p>
+<h2 id="踩坑记录"><a href="#踩坑记录" class="headerlink" title="踩坑记录"></a>踩坑记录</h2><h3 id="1-中断发送和主循环发送会”打架”"><a href="#1-中断发送和主循环发送会”打架”" class="headerlink" title="1. 中断发送和主循环发送会”打架”"></a>1. 中断发送和主循环发送会”打架”</h3><p><code>HAL_UART_Transmit_IT</code> 是非阻塞发送。如果中断里的发送和主循环里的发送间隔太小，<strong>上次的数据还没发完，下次发送就把缓冲区覆盖掉了</strong>。所以发送逻辑尽量集中在一处——本项目把发送全部放在定时器中断回调里，主循环只留给自己的业务逻辑。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="复习结构图"><a href="#复习结构图" class="headerlink" title="复习结构图"></a>复习结构图</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"> 时钟源 (内部时钟 72MHz)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">预分频器 PSC ──► 计数器 CNT ──► 重装载 ARR ──► 更新中断</span><br><span class="line">(÷7200)        (0~9999)        (=9999)</span><br></pre></td></tr></table></figure>
+
+<h3 id="本集要点"><a href="#本集要点" class="headerlink" title="本集要点"></a>本集要点</h3><table>
+<thead>
+<tr>
+<th align="left">要点</th>
+<th align="left">内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>定时器就是计数器</strong></td>
+<td align="left">一切功能的本质</td>
+</tr>
+<tr>
+<td align="left"><strong>N-1 原则</strong></td>
+<td align="left">预分频想 N 分频填 N-1；重装载想定时 M 个脉冲填 M-1</td>
+</tr>
+<tr>
+<td align="left"><strong>三个核心寄存器</strong></td>
+<td align="left">PSC（预分频）、CNT（计数器）、ARR（重装载）</td>
+</tr>
+<tr>
+<td align="left"><strong>更新中断</strong></td>
+<td align="left">计数器数到 ARR → 清零 → 触发中断 → 回调发数据</td>
+</tr>
+<tr>
+<td align="left"><strong>三步配置</strong></td>
+<td align="left">勾 Internal Clock + 设 PSC&#x2F;ARR + 开 NVIC 中断</td>
+</tr>
+<tr>
+<td align="left"><strong>两个函数</strong></td>
+<td align="left"><code>HAL_TIM_Base_Start_IT</code> 启动、<code>HAL_TIM_PeriodElapsedCallback</code> 回调</td>
+</tr>
+<tr>
+<td align="left"><strong>影子寄存器</strong></td>
+<td align="left">预分频&#x2F;重装载新值下个周期生效；重装载可开关</td>
+</tr>
+</tbody></table>
+<p>本期只用了基本定时器功能。接下来的几期会在这张结构图的基础上不断扩展——万变不离其宗，<strong>定时器就是计数器</strong>。</p>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li>视频：【STM32】第16集 动画告诉你, STM32的定时器到底怎么回事（keysking）</li>
+<li>STM32 中文参考手册：定时器章节（TIM1-8 寄存器详解）</li>
+<li><a href="/2026/08/06/STM32_Clock_Tree/">上一篇：STM32——浅析时钟源与时钟树理论知识</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
+              <a href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag"># 中断</a>
+              <a href="/tags/%E5%AE%9A%E6%97%B6%E5%99%A8/" rel="tag"># 定时器</a>
+              <a href="/tags/TIM/" rel="tag"># TIM</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/08/06/STM32_Clock_Tree/" rel="prev" title="STM32——浅析时钟源与时钟树理论知识">
+      <i class="fa fa-chevron-left"></i> STM32——浅析时钟源与时钟树理论知识
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E4%B8%8A%E4%B8%80%E7%AF%87%E5%88%B0%E8%BF%99%E7%AF%87"><span class="nav-number">1.</span> <span class="nav-text">从上一篇到这篇</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E5%AE%B6%E6%97%8F%EF%BC%9A%E4%B8%89%E7%B1%BB%E5%AE%9A%E6%97%B6%E5%99%A8"><span class="nav-number">2.</span> <span class="nav-text">定时器家族：三类定时器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E5%B0%B1%E6%98%AF%E8%AE%A1%E6%95%B0%E5%99%A8"><span class="nav-number">3.</span> <span class="nav-text">定时器就是计数器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A1%E6%97%B6%E5%8E%9F%E7%90%86%EF%BC%9A%E6%81%92%E5%AE%9A%E9%A2%91%E7%8E%87%E6%96%B9%E6%B3%A2-%E8%AE%A1%E6%95%B0%E5%99%A8"><span class="nav-number">3.1.</span> <span class="nav-text">计时原理：恒定频率方波 + 计数器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%84%E5%88%86%E9%A2%91%E5%99%A8%EF%BC%9A%E7%BB%99%E6%96%B9%E6%B3%A2%E2%80%9D%E5%87%8F%E9%80%9F%E2%80%9D"><span class="nav-number">3.2.</span> <span class="nav-text">预分频器：给方波”减速”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E9%87%8D%E8%A3%85%E8%BD%BD%E8%AE%A1%E6%95%B0%E5%99%A8%EF%BC%9A%E5%AE%9E%E7%8E%B0%E2%80%9D%E5%AE%9A%E6%97%B6%E2%80%9D"><span class="nav-number">3.3.</span> <span class="nav-text">自动重装载计数器：实现”定时”</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%B5%81%E5%85%A8%E9%93%BE%E8%B7%AF%EF%BC%9A%E4%BB%8E-72MHz-%E5%88%B0%E6%AF%8F%E7%A7%92%E4%B8%80%E6%AC%A1%E7%9A%84%E4%B8%B2%E5%8F%A3%E6%95%B0%E6%8D%AE"><span class="nav-number">4.</span> <span class="nav-text">数据流全链路：从 72MHz 到每秒一次的串口数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CubeMX-%E9%85%8D%E7%BD%AE"><span class="nav-number">5.</span> <span class="nav-text">CubeMX 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E2%91%A0-%E5%9F%BA%E7%A1%80%E9%85%8D%E7%BD%AE%EF%BC%88%E8%80%81%E6%B5%81%E7%A8%8B%EF%BC%89"><span class="nav-number">5.1.</span> <span class="nav-text">① 基础配置（老流程）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E2%91%A1-TIM4-%E5%AE%9A%E6%97%B6%E5%99%A8%E9%85%8D%E7%BD%AE"><span class="nav-number">5.2.</span> <span class="nav-text">② TIM4 定时器配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E2%91%A2-%E6%89%93%E5%BC%80%E6%9B%B4%E6%96%B0%E4%B8%AD%E6%96%AD"><span class="nav-number">5.3.</span> <span class="nav-text">③ 打开更新中断</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="nav-number">6.</span> <span class="nav-text">核心代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%90%AF%E5%8A%A8%E5%AE%9A%E6%97%B6%E5%99%A8%EF%BC%88main-%E5%87%BD%E6%95%B0-USER-CODE-2%EF%BC%89"><span class="nav-number">6.1.</span> <span class="nav-text">1. 启动定时器（main 函数 USER CODE 2）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E6%9B%B4%E6%96%B0%E4%B8%AD%E6%96%AD%E5%9B%9E%E8%B0%83%EF%BC%88USER-CODE-0%EF%BC%89"><span class="nav-number">6.2.</span> <span class="nav-text">2. 更新中断回调（USER CODE 0）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E8%AE%B2%E8%A7%A3"><span class="nav-number">7.</span> <span class="nav-text">代码讲解</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%AF%BB%E5%88%9D%E5%A7%8B%E5%8C%96%E4%BB%A3%E7%A0%81%EF%BC%9AMX-TIM4-Init"><span class="nav-number">8.</span> <span class="nav-text">解读初始化代码：MX_TIM4_Init</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%84%E9%85%8D%E7%BD%AE%E9%A1%B9%E4%B8%8E-CubeMX-%E5%AF%84%E5%AD%98%E5%99%A8%E7%9A%84%E5%AF%B9%E5%BA%94%E5%85%B3%E7%B3%BB"><span class="nav-number">8.1.</span> <span class="nav-text">各配置项与 CubeMX &#x2F; 寄存器的对应关系</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MSP-%E5%88%9D%E5%A7%8B%E5%8C%96%EF%BC%9A%E6%97%B6%E9%92%9F%E4%BD%BF%E8%83%BD%E4%B8%8E%E4%B8%AD%E6%96%AD"><span class="nav-number">8.2.</span> <span class="nav-text">MSP 初始化：时钟使能与中断</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E9%93%BE%E8%B7%AF"><span class="nav-number">8.3.</span> <span class="nav-text">中断链路</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BD%B1%E5%AD%90%E5%AF%84%E5%AD%98%E5%99%A8%E6%9C%BA%E5%88%B6%EF%BC%9A%E5%B9%95%E5%90%8E%E8%80%81%E6%9D%BF%E4%B8%8E%E4%B8%80%E7%BA%BF%E5%91%98%E5%B7%A5"><span class="nav-number">9.</span> <span class="nav-text">影子寄存器机制：幕后老板与一线员工</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E6%93%8D%E6%AD%A5%E9%AA%A4"><span class="nav-number">10.</span> <span class="nav-text">实操步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-CubeMX-%E9%85%8D%E7%BD%AE"><span class="nav-number">10.1.</span> <span class="nav-text">1. CubeMX 配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E5%86%99%E4%BB%A3%E7%A0%81"><span class="nav-number">10.2.</span> <span class="nav-text">2. 写代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E7%BC%96%E8%AF%91%E4%B8%8B%E8%BD%BD-%E6%9F%A5%E7%9C%8B%E6%95%88%E6%9E%9C"><span class="nav-number">10.3.</span> <span class="nav-text">3. 编译下载 &amp; 查看效果</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%88%E6%9E%9C%E5%B1%95%E7%A4%BA"><span class="nav-number">11.</span> <span class="nav-text">效果展示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B8%A9%E5%9D%91%E8%AE%B0%E5%BD%95"><span class="nav-number">12.</span> <span class="nav-text">踩坑记录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E4%B8%AD%E6%96%AD%E5%8F%91%E9%80%81%E5%92%8C%E4%B8%BB%E5%BE%AA%E7%8E%AF%E5%8F%91%E9%80%81%E4%BC%9A%E2%80%9D%E6%89%93%E6%9E%B6%E2%80%9D"><span class="nav-number">12.1.</span> <span class="nav-text">1. 中断发送和主循环发送会”打架”</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">13.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%8D%E4%B9%A0%E7%BB%93%E6%9E%84%E5%9B%BE"><span class="nav-number">13.1.</span> <span class="nav-text">复习结构图</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%AC%E9%9B%86%E8%A6%81%E7%82%B9"><span class="nav-number">13.2.</span> <span class="nav-text">本集要点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="nav-number">14.</span> <span class="nav-text">参考资源</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">38</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">51</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">303k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">4:35</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
