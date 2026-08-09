@@ -38,8 +38,8 @@
 <meta property="article:tag" content="嵌入式">
 <meta property="article:tag" content="CubeMX">
 <meta property="article:tag" content="中断">
-<meta property="article:tag" content="定时器">
 <meta property="article:tag" content="TIM">
+<meta property="article:tag" content="定时器">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://tristan1116.github.io/images/STM32_Timer_Basic/image-20260806214008514.png">
 
@@ -269,7 +269,7 @@
       
         <h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上一篇我们研究了单片机的”心脏与动脉”——时钟源与时钟树。当时埋了个伏笔：时钟树上 <strong>APB1 定时器分支</strong>经过预分频 + 倍频，给定时器送来了 72MHz 的时钟。</p>
 <p>为什么定时器值得单独一条分支、还专门配一个倍频器把频率”补”回 72MHz？从本篇开始，我们就来研究单片机中另一个非常重要的概念——<strong>定时器 TIM</strong>。</p>
-<p>如果你以为定时器的作用只是”设定一个时间，时间到了执行程序”——恭喜你猜对了一半，但也正是被”定时器”这个名字误导了。请记住这句贯穿后续好几期的话：</p>
+<p>如果你以为定时器的作用是”设定一个时间，时间到了执行程序”——恭喜你猜对了一半，但也正是被”定时器”这个名字误导了。请记住这句贯穿后续好几期的话：</p>
 <blockquote>
 <p><strong>定时器就是计数器。</strong></p>
 </blockquote>
@@ -562,8 +562,8 @@
               <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
               <a href="/tags/CubeMX/" rel="tag"># CubeMX</a>
               <a href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag"># 中断</a>
-              <a href="/tags/%E5%AE%9A%E6%97%B6%E5%99%A8/" rel="tag"># 定时器</a>
               <a href="/tags/TIM/" rel="tag"># TIM</a>
+              <a href="/tags/%E5%AE%9A%E6%97%B6%E5%99%A8/" rel="tag"># 定时器</a>
           </div>
 
         
@@ -575,7 +575,10 @@
     <a href="/2026/08/06/STM32_Clock_Tree/" rel="prev" title="STM32——浅析时钟源与时钟树理论知识">
       <i class="fa fa-chevron-left"></i> STM32——浅析时钟源与时钟树理论知识
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2026/08/09/STM32_TIM_ExternalClock/" rel="next" title="STM32——定时器外部时钟：让GPIO脉冲驱动计数器，给传送带测距测速">
+      STM32——定时器外部时钟：让GPIO脉冲驱动计数器，给传送带测距测速 <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -650,7 +653,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">38</span>
+          <span class="site-state-item-count">39</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -663,7 +666,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">51</span>
+        <span class="site-state-item-count">53</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -699,12 +702,12 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">303k</span>
+    <span title="站点总字数">312k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">4:35</span>
+    <span title="站点阅读时长">4:43</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>
