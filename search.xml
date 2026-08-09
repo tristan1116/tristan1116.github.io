@@ -5210,9 +5210,9 @@
 </tr>
 </tbody></table>
 <blockquote>
-<p>是不是发现：<strong>代码和上篇几乎一模一样</strong>？区别只是定时器句柄从 <code>htim4</code> 换成 <code>htim2</code>、显示从串口换成 OLED。这就是 HAL 库的魅力——底层时钟源怎么接是 CubeMX 的事，上层代码逻辑完全不用变。</p>
+<p><strong>代码和上篇几乎一模一样</strong>区别只是定时器句柄从 <code>htim4</code> 换成 <code>htim2</code>、显示从串口换成 OLED。这就是 HAL 库的魅力——底层时钟源怎么接是 CubeMX 的事，上层代码逻辑完全不用变。</p>
 </blockquote>
-<h2 id="七、解读初始化代码（CubeMX-生成）"><a href="#七、解读初始化代码（CubeMX-生成）" class="headerlink" title="七、解读初始化代码（CubeMX 生成）"></a>七、解读初始化代码（CubeMX 生成）</h2><h3 id="1-MX-TIM2-Init-——-定时器本体配置"><a href="#1-MX-TIM2-Init-——-定时器本体配置" class="headerlink" title="1. MX_TIM2_Init() —— 定时器本体配置"></a>1. <code>MX_TIM2_Init()</code> —— 定时器本体配置</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">MX_TIM2_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  TIM_ClockConfigTypeDef sClockSourceConfig = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">  htim2.Instance = TIM2;</span><br><span class="line">  htim2.Init.Prescaler = <span class="number">0</span>;                        <span class="comment">/* 不分频：一个脉冲都不能丢 */</span></span><br><span class="line">  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;     <span class="comment">/* 向上计数 */</span></span><br><span class="line">  htim2.Init.Period = <span class="number">65535</span>;                       <span class="comment">/* ARR = 最大值 */</span></span><br><span class="line">  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;</span><br><span class="line">  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_Base_Init(&amp;htim2) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 外部时钟源配置：关键！ */</span></span><br><span class="line">  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_ETRMODE2;  <span class="comment">/* 外部时钟模式2 */</span></span><br><span class="line">  sClockSourceConfig.ClockPolarity = TIM_CLOCKPOLARITY_NONINVERTED;  <span class="comment">/* 极性不翻转 = 上升沿计数 */</span></span><br><span class="line">  sClockSourceConfig.ClockPrescaler = TIM_CLOCKPRESCALER_DIV1;      <span class="comment">/* ETR 不分频 */</span></span><br><span class="line">  sClockSourceConfig.ClockFilter = <span class="number">0</span>;              <span class="comment">/* 滤波器（改成 15 后这里会变成 0x0F） */</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_ConfigClockSource(&amp;htim2, &amp;sClockSourceConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="七、解读初始化代码（CubeMX-生成）"><a href="#七、解读初始化代码（CubeMX-生成）" class="headerlink" title="七、解读初始化代码（CubeMX 生成）"></a>七、解读初始化代码（CubeMX 生成）</h2><h3 id="1-MX-TIM2-Init-——-定时器本体配置"><a href="#1-MX-TIM2-Init-——-定时器本体配置" class="headerlink" title="1. MX_TIM2_Init() —— 定时器本体配置"></a>1. <code>MX_TIM2_Init()</code> —— 定时器本体配置</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">MX_TIM2_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  TIM_ClockConfigTypeDef sClockSourceConfig = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">  htim2.Instance = TIM2;</span><br><span class="line">  htim2.Init.Prescaler = <span class="number">0</span>;                        <span class="comment">/* 不分频：一个脉冲都不能丢 */</span></span><br><span class="line">  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;     <span class="comment">/* 向上计数 */</span></span><br><span class="line">  htim2.Init.Period = <span class="number">10</span>;                          <span class="comment">/* ARR = 10：故意调小便于观察溢出 */</span></span><br><span class="line">  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;</span><br><span class="line">  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_Base_Init(&amp;htim2) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 外部时钟源配置：关键！ */</span></span><br><span class="line">  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_ETRMODE2;  <span class="comment">/* 外部时钟模式2 */</span></span><br><span class="line">  sClockSourceConfig.ClockPolarity = TIM_CLOCKPOLARITY_NONINVERTED;  <span class="comment">/* 极性不翻转 = 上升沿计数 */</span></span><br><span class="line">  sClockSourceConfig.ClockPrescaler = TIM_CLOCKPRESCALER_DIV1;      <span class="comment">/* ETR 不分频 */</span></span><br><span class="line">  sClockSourceConfig.ClockFilter = <span class="number">0</span>;              <span class="comment">/* 滤波器（改成 15 后这里会变成 0x0F） */</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_ConfigClockSource(&amp;htim2, &amp;sClockSourceConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
 <p><code>HAL_TIM_ConfigClockSource()</code> 在外部时钟模式2 时，本质是写 <strong>SMCR（从模式控制）寄存器</strong>：</p>
 <table>
@@ -5287,11 +5287,7 @@
 <td align="center">普通输入、无上下拉</td>
 </tr>
 </tbody></table>
-<h2 id="八、效果展示"><a href="#八、效果展示" class="headerlink" title="八、效果展示"></a>八、效果展示</h2><p>编译烧录后，把黑白条纹纸在循迹模块下方慢慢平移，OLED 上计数随脉冲递增。</p>
-<blockquote>
-<p>注意：由于 Counter Period&#x3D;10，扫到第 11 个脉冲时计数会<strong>溢出归零循环</strong>——这是正常的，下一章用更新中断解决。</p>
-</blockquote>
-<p>效果视频：</p>
+<h2 id="八、效果展示"><a href="#八、效果展示" class="headerlink" title="八、效果展示"></a>八、效果展示</h2><p>效果视频：</p>
 <blockquote>
 <p><a href="https://www.bilibili.com/video/BV1j7u26SE3b/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1j7u26SE3b/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
 </blockquote>
@@ -5317,7 +5313,7 @@
 </ul>
 <p>如果你确实想要 72MHz 主频，也<strong>不是不行</strong>：可以调节 APB 预分频器，让<strong>输入到定时器的时钟频率</strong>不要那么快（滤波器的采样频率 F 跟着降下来），抖动就又能被滤掉了。</p>
 <h2 id="十、计数器溢出：用更新中断解决"><a href="#十、计数器溢出：用更新中断解决" class="headerlink" title="十、计数器溢出：用更新中断解决"></a>十、计数器溢出：用更新中断解决</h2><h3 id="现象-1"><a href="#现象-1" class="headerlink" title="现象"></a>现象</h3><p>抖动脉冲被滤波器干掉后，一格一个数，计数很准——<strong>但注意：Counter Period 我们故意设成了 10</strong>。每数 11 个脉冲，CNT 就从 10 溢出归零，OLED 上的数字在 0~10 之间循环，<strong>数到上限就再也上不去了</strong>。</p>
-<p>这暴露了之前代码的短板：<code>__HAL_TIM_GET_COUNTER</code> 只读 CNT 的当前值，CNT 溢出归零后，<strong>溢出的部分直接丢了</strong>。</p>
+<p><code>__HAL_TIM_GET_COUNTER</code> 只读 CNT 的当前值，CNT 溢出归零后，<strong>溢出的部分直接丢了</strong>。</p>
 <h3 id="思路：更新中断记圈数"><a href="#思路：更新中断记圈数" class="headerlink" title="思路：更新中断记圈数"></a>思路：更新中断记圈数</h3><p>定时器在 CNT 溢出时会做两件事：</p>
 <ol>
 <li>置位<strong>更新标志 UIF</strong>（SR 寄存器第 0 位）</li>
@@ -5331,13 +5327,8 @@
 <p>keysking 视频里用的是简化公式 <code>loop × Period + CNT</code>（Period&#x3D;10），每圈会少算 1 个脉冲；本篇统一使用严格版 <code>loop × (Period + 1) + CNT</code>。</p>
 </blockquote>
 <p>圈数不丢，计数就不丢——上限从”一个 ARR”变成”loop 个 ARR”，随便数。</p>
-<h3 id="三处改动"><a href="#三处改动" class="headerlink" title="三处改动"></a>三处改动</h3><p><strong>① CubeMX 打开更新中断</strong>（第三章第 4 步已配好：NVIC 勾选 <code>TIM2 global interrupt</code>）</p>
-<p><strong>② 启动方式改中断模式</strong>：<code>HAL_TIM_Base_Start(&amp;htim2)</code> → <code>HAL_TIM_Base_Start_IT(&amp;htim2)</code></p>
-<p><strong>③ 加全局变量和回调</strong>：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> loop = <span class="number">-1</span>;   <span class="comment">/* 圈数;初始化为-1:STM32配置完TIM后会立即触发一次中断,先抵消掉 */</span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_TIM_PeriodElapsedCallback</span><span class="params">(TIM_HandleTypeDef *htim)</span> &#123;</span><br><span class="line">    <span class="keyword">if</span>(htim == &amp;htim2) &#123;</span><br><span class="line">        loop += <span class="number">1</span>;   <span class="comment">/* 每溢出一次,圈数+1 */</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
 <blockquote>
-<p><strong>为什么 loop 初始化为 -1？</strong> STM32 在初始化定时器（<code>MX_TIM2_Init</code>）时，更新标志 UIF 会被意外置位——第一次使能中断后，这个”残留”的更新事件会立刻触发一次回调。初始化为 -1 正好把这多出来的 1 次抵消掉，让 <code>loop</code> 从 0 开始记。</p>
+<p><strong>为什么 loop 初始化为 -1？</strong> 回看第五章的代码：STM32 在初始化定时器（<code>MX_TIM2_Init</code>）时，更新标志 UIF 会被意外置位——第一次使能中断后，这个”残留”的更新事件会立刻触发一次回调。<code>loop</code> 初始化为 -1 正好把这多出来的 1 次抵消掉，从 0 开始记。</p>
 </blockquote>
 <h3 id="效果"><a href="#效果" class="headerlink" title="效果"></a>效果</h3><p>编译烧录再扫条纹：计数<strong>突破 10 继续累加</strong>，不再循环——计数上限从 10 扩展到了任意大。这也是后面做电机测速、编码器计数的基础。✓</p>
 <h2 id="十一、数据流全链路"><a href="#十一、数据流全链路" class="headerlink" title="十一、数据流全链路"></a>十一、数据流全链路</h2><p>从黑白条纹到屏幕上的数字，数据一路是这样走的：</p>
