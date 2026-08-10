@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="用 VS Code + EIDE 插件把 Keil5 的 STM32F103 标准库工程完整迁移到 GCC 工具链，源代码一行不改：EIDE 直接导入 .uvprojx、自动解析宏和头文件路径、ARM GCC 编译、ST-Link 烧录。含 4 个遇到的坑：STM32F10X_MD 设备选择宏、启动文件 ARMCC 与 GNU 语法差异、老 CMSIS 与 GCC14 的兼容问题、中文路径导致链接">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Keil 工程一键迁移到 VS Code + EIDE——智能小车项目前置准备">
+<meta property="og:url" content="http://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/index.html">
+<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:description" content="用 VS Code + EIDE 插件把 Keil5 的 STM32F103 标准库工程完整迁移到 GCC 工具链，源代码一行不改：EIDE 直接导入 .uvprojx、自动解析宏和头文件路径、ARM GCC 编译、ST-Link 烧录。含 4 个遇到的坑：STM32F10X_MD 设备选择宏、启动文件 ARMCC 与 GNU 语法差异、老 CMSIS 与 GCC14 的兼容问题、中文路径导致链接">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/Keil_to_VSCode_EIDE_Migration/image-20260810193532935.png">
+<meta property="article:published_time" content="2026-08-10T20:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-10T20:00:00.000Z">
+<meta property="article:author" content="点灯大王">
+<meta property="article:tag" content="VS Code">
+<meta property="article:tag" content="嵌入式">
+<meta property="article:tag" content="EIDE">
+<meta property="article:tag" content="Keil">
+<meta property="article:tag" content="STM32">
+<meta property="article:tag" content="工具链">
+<meta property="article:tag" content="GCC">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/Keil_to_VSCode_EIDE_Migration/image-20260810193532935.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Keil 工程一键迁移到 VS Code + EIDE——智能小车项目前置准备 | 点灯大王的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">点灯大王的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="点灯大王的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Keil 工程一键迁移到 VS Code + EIDE——智能小车项目前置准备
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-10 20:00:00" itemprop="dateCreated datePublished" datetime="2026-08-10T20:00:00+00:00">2026-08-10</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%B5%8C%E5%85%A5%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">嵌入式</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>6.6k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+            <div class="post-description">用 VS Code + EIDE 插件把 Keil5 的 STM32F103 标准库工程完整迁移到 GCC 工具链，源代码一行不改：EIDE 直接导入 .uvprojx、自动解析宏和头文件路径、ARM GCC 编译、ST-Link 烧录。含 4 个遇到的坑：STM32F10X_MD 设备选择宏、启动文件 ARMCC 与 GNU 语法差异、老 CMSIS 与 GCC14 的兼容问题、中文路径导致链接失败。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h2><p>我在b站获取了up主“陈加油嗯”的 STM32F103C8T6 智能小车项目（蓝牙遥控 + 循迹 + 避障三合一），他是用 <strong>Keil5 + 标准外设库</strong>写的。但我平时的主力编辑器是 VS Code，所以目标很明确：</p>
+<p><strong>在 VS Code 里把这个 Keil 工程编译、烧录、跑起来，源代码一行不改。</strong></p>
+<p>折腾了半天，搜索了一些教程，最终用 <strong>EIDE 插件</strong>顺利跑通：导入工程 → GCC 编译 → ST-Link 烧录，全程图形化点击。这篇文章把完整流程和 4 个遇到的坑记录下来，以后任何 Keil 工程想迁移都能照搬。</p>
+<h2 id="一、为什么要从-Keil-搬到-VS-Code"><a href="#一、为什么要从-Keil-搬到-VS-Code" class="headerlink" title="一、为什么要从 Keil 搬到 VS Code"></a>一、为什么要从 Keil 搬到 VS Code</h2><table>
+<thead>
+<tr>
+<th align="left">对比项</th>
+<th align="left">Keil5</th>
+<th align="left">VS Code + EIDE</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">编辑器体验</td>
+<td align="left">编辑器老、代码补全弱</td>
+<td align="left">现代编辑器，补全&#x2F;跳转&#x2F;主题好</td>
+</tr>
+<tr>
+<td align="left">编译器</td>
+<td align="left">ARMCC（Keil 专用）</td>
+<td align="left">ARM GCC（开源，通用）</td>
+</tr>
+<tr>
+<td align="left">烧录</td>
+<td align="left">内置</td>
+<td align="left">支持 ST-Link&#x2F;J-Link&#x2F;OpenOCD</td>
+</tr>
+<tr>
+<td align="left">跨平台</td>
+<td align="left">仅 Windows</td>
+<td align="left">Windows&#x2F;Linux&#x2F;Mac</td>
+</tr>
+<tr>
+<td align="left">版本管理</td>
+<td align="left">弱</td>
+<td align="left">原生 Git 集成</td>
+</tr>
+<tr>
+<td align="left">学习成本</td>
+<td align="left">工程文件是黑盒</td>
+<td align="left">构建过程透明可见</td>
+</tr>
+</tbody></table>
+<p>标准外设库（SPL）工程的结构非常规整，天然适合迁移：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">工程目录/</span><br><span class="line">├── User/          # main.c、中断处理</span><br><span class="line">├── System/        # 延时、sys</span><br><span class="line">├── HARDWARE/      # 各外设驱动（LED/电机/OLED/串口…）</span><br><span class="line">├── Library/       # 标准外设库（SPL）</span><br><span class="line">├── Start/         # 启动文件 + CMSIS 核心</span><br><span class="line">└── Project.uvprojx  # Keil 工程文件（配置的源头）</span><br></pre></td></tr></table></figure>
+
+<h2 id="二、两条路线怎么选：EIDE-vs-CMake"><a href="#二、两条路线怎么选：EIDE-vs-CMake" class="headerlink" title="二、两条路线怎么选：EIDE vs CMake"></a>二、两条路线怎么选：EIDE vs CMake</h2><p>把 Keil 工程搬到 VS Code 有两条主流路线，我先走的 CMake 手写迁移，后来发现 EIDE 更省事：</p>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">EIDE 插件</th>
+<th align="left">手写 CMake</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">移植工作量</td>
+<td align="left"><strong>零</strong>（直接导入 .uvprojx）</td>
+<td align="left">写 CMakeLists + 链接脚本 + 换启动文件</td>
+</tr>
+<tr>
+<td align="left">操作方式</td>
+<td align="left">图形化按钮</td>
+<td align="left">命令行</td>
+</tr>
+<tr>
+<td align="left">宏&#x2F;头文件路径</td>
+<td align="left">自动从 Keil 工程解析</td>
+<td align="left">手动照抄</td>
+</tr>
+<tr>
+<td align="left">适合人群</td>
+<td align="left">想快速跑通</td>
+<td align="left">想深入理解构建流程 &#x2F; 做 CI</td>
+</tr>
+</tbody></table>
+<p><strong>结论：学习阶段选 EIDE 最快</strong>，它只是编译工具，不影响你读代码理解代码。CMake 方案留作进阶（做 CI、复杂工程时再用）。</p>
+<h2 id="三、环境搭建"><a href="#三、环境搭建" class="headerlink" title="三、环境搭建"></a>三、环境搭建</h2><h3 id="1-安装-ARM-GCC-编译器"><a href="#1-安装-ARM-GCC-编译器" class="headerlink" title="1. 安装 ARM GCC 编译器"></a>1. 安装 ARM GCC 编译器</h3><p>EIDE 编译需要 ARM 交叉编译器（GCC 的 ARM 版本，替代 Keil 的 ARMCC）。</p>
+<ul>
+<li>下载：ARM 官方 GNU 工具链（搜索 “Arm GNU Toolchain Downloads”），Windows 版选 <code>arm-none-eabi</code> 目标</li>
+<li>安装：一路 Next，安装时勾选 “Add path to environment variable”（以后终端直接敲 <code>arm-none-eabi-gcc</code>）</li>
+<li>安装路径默认在：<code>C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\&lt;版本&gt;</code><ul>
+<li>⚠️ 注意版本目录名是 <code>14.2 rel1</code>（<strong>空格</strong>），不是 <code>14.2.rel1</code>（点）</li>
+</ul>
+</li>
+</ul>
+<p>验证安装（新开终端）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">arm-none-eabi-gcc --version</span><br><span class="line"><span class="comment"># arm-none-eabi-gcc.exe (Arm GNU Toolchain 14.2.Rel1 (Build arm-14.52)) 14.2.1</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-安装-EIDE-插件"><a href="#2-安装-EIDE-插件" class="headerlink" title="2. 安装 EIDE 插件"></a>2. 安装 EIDE 插件</h3><p>VS Code 扩展市场搜 <strong>Embedded IDE</strong>（<code>cl.eide</code>），或命令行安装：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">code --install-extension cl.eide</span><br></pre></td></tr></table></figure>
+
+<p>EIDE 需要 .NET 运行时（首次启动会自动检测，缺了会提示安装）。</p>
+<h3 id="3-指定编译器路径（关键）"><a href="#3-指定编译器路径（关键）" class="headerlink" title="3. 指定编译器路径（关键）"></a>3. 指定编译器路径（关键）</h3><p>EIDE 默认不知道 GCC 装在哪，在 VS Code 用户设置（settings.json）里配置：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">&quot;EIDE.ARM.GCC.InstallDirectory&quot;</span><span class="punctuation">:</span> <span class="string">&quot;C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\14.2 rel1&quot;</span><span class="punctuation">,</span></span><br><span class="line"><span class="attr">&quot;EIDE.ARM.Option.AxfToElf&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span></span><br></pre></td></tr></table></figure>
+
+<h2 id="四、导入-Keil-工程"><a href="#四、导入-Keil-工程" class="headerlink" title="四、导入 Keil 工程"></a>四、导入 Keil 工程</h2><h3 id="第-1-步：VS-Code-打开工程目录"><a href="#第-1-步：VS-Code-打开工程目录" class="headerlink" title="第 1 步：VS Code 打开工程目录"></a>第 1 步：VS Code 打开工程目录</h3><p>VS Code → 文件 → 打开文件夹，选中<strong>包含 <code>Project.uvprojx</code> 的那个目录</strong>（不是打开 .uvprojx 文件本身，是打开它所在的文件夹）。</p>
+<blockquote>
+<p>💡 <strong>先给工程目录起个纯英文名</strong>：比如 <code>D:\projects\car\</code>。这一步很重要，坑④会解释为什么——中文路径会导致链接失败，现在养成习惯最省事。</p>
+</blockquote>
+<h3 id="第-2-步：找到-EIDE-面板"><a href="#第-2-步：找到-EIDE-面板" class="headerlink" title="第 2 步：找到 EIDE 面板"></a>第 2 步：找到 EIDE 面板</h3><p>安装 EIDE 插件后，<strong>左侧活动栏</strong>会出现一个新的图标（嵌入式芯片图案，⚠️ 不是资源管理器那个文件图标）。点击它，EIDE 面板就展开了。</p>
+<h3 id="第-3-步：导入-Keil-工程"><a href="#第-3-步：导入-Keil-工程" class="headerlink" title="第 3 步：导入 Keil 工程"></a>第 3 步：导入 Keil 工程</h3><ol>
+<li>在 EIDE 面板顶部找到 <strong>“导入工程”</strong> 按钮（Import），点击</li>
+<li>弹出菜单选择 **”Keil”**，再选择 <strong>“Keil ARM project (.uvprojx)”</strong><ul>
+<li>这里有两个选项：**”ARM 还是 C51？”**——答案是 <strong>ARM</strong>。Keil MDK 就是 ARM 版本（Microcontroller Development Kit），我们的 STM32F103 是 Cortex-M3 内核，属于 ARM；C51 是给 8051 单片机用的，选错后面全乱</li>
+</ul>
+</li>
+<li>在弹出的文件选择框中，选中工程目录下的 <code>Project.uvprojx</code>，确认</li>
+</ol>
+<h3 id="第-4-步：等待自动解析，EIDE-在做”配置搬运”"><a href="#第-4-步：等待自动解析，EIDE-在做”配置搬运”" class="headerlink" title="第 4 步：等待自动解析，EIDE 在做”配置搬运”"></a>第 4 步：等待自动解析，EIDE 在做”配置搬运”</h3><p>导入瞬间 EIDE 会<strong>只读解析</strong> <code>Project.uvprojx</code>（Keil 工程文件本质是 XML，记录了全部配置），自动生成：</p>
+<table>
+<thead>
+<tr>
+<th align="left">从 uvprojx 读出的内容</th>
+<th align="left">EIDE 的处理</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">源文件清单（40 个 .c&#x2F;.s）</td>
+<td align="left">构建列表</td>
+</tr>
+<tr>
+<td align="left">头文件路径（IncludePath）</td>
+<td align="left">编译选项</td>
+</tr>
+<tr>
+<td align="left">宏定义（Defines）</td>
+<td align="left">预处理器定义</td>
+</tr>
+<tr>
+<td align="left">芯片型号（STM32F103C8）</td>
+<td align="left">芯片支持包</td>
+</tr>
+</tbody></table>
+<p><strong>这个过程只读，不会破坏原 Keil 工程</strong>——uvprojx 原封不动，原工程随时还能用 Keil 打开。EIDE 只是生成自己的一套工程配置（<code>.eide/</code> 目录），两边共存互不干扰。</p>
+<h3 id="第-5-步：安装推荐扩展（可选）"><a href="#第-5-步：安装推荐扩展（可选）" class="headerlink" title="第 5 步：安装推荐扩展（可选）"></a>第 5 步：安装推荐扩展（可选）</h3><p>导入完成后 VS Code 右下角可能弹窗推荐扩展（来自 dan-c-underwood 等的），直接点<strong>安装</strong>——ARM 汇编语法高亮、C&#x2F;C++ 等。</p>
+<h3 id="第-6-步：切换编译器为-GCC"><a href="#第-6-步：切换编译器为-GCC" class="headerlink" title="第 6 步：切换编译器为 GCC"></a>第 6 步：切换编译器为 GCC</h3><p>导入后 EIDE 默认沿用 Keil 工程的编译器设置 <strong>AC5</strong>（ARMCC）。注意：<strong>即使电脑上装了 Keil5</strong>，EIDE 也不知道 ARMCC 装在哪——它需要额外的路径配置（<code>EIDE.ARM.ARMCC5.InstallDirectory</code> 指向 Keil 的 ARM\ARMCC 目录），没配置的话此时点编译会报：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">无法找到编译器 &#x27;AC5&#x27; 的位置！[path]: &#x27;null\bin&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>（<code>null\bin</code> 就是”路径没配置”的痕迹）</p>
+<p><strong>我的操作</strong>：在 EIDE 面板<strong>顶部工具栏</strong>找到编译器选择框（此时显示 “AC5”），点击弹出下拉，选择 **”GCC”**（GNU Arm Embedded Toolchain）。切换后 EIDE 会读取我们在第三章配置的 <code>EIDE.ARM.GCC.InstallDirectory</code> 路径，弹出确认框时点确定即可。<img src="/./../images/Keil_to_VSCode_EIDE_Migration/image-20260810193532935.png" alt="image-20260810193532935"></p>
+<p><strong>另一个选择</strong>：如果你想让 EIDE 直接用 Keil 的 ARMCC 编译，也可以在 VS Code 设置里配置 <code>EIDE.ARM.ARMCC5.InstallDirectory</code> 指向 Keil 安装目录。但推荐用 <strong>GCC</strong>——开源免费不依赖 Keil 安装、命令行通用、构建过程透明，本文后面的坑也都是按 GCC 写的。</p>
+<blockquote>
+<p>判断标准：<strong>AC5&#x2F;AC6 是 Keil 的编译器（ARMCC），GCC 是 ARM 官方工具链</strong>。EIDE 下拉框里显示哪个就点哪个，关键是让 EIDE 能找到对应编译器的真实路径。</p>
+</blockquote>
+<h3 id="第-7-步：认识-EIDE-面板"><a href="#第-7-步：认识-EIDE-面板" class="headerlink" title="第 7 步：认识 EIDE 面板"></a>第 7 步：认识 EIDE 面板</h3><p>切换完成后，EIDE 面板展开成这样的结构：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">📁 stdperiph (Target 1)</span><br><span class="line">├── 项目资源           # 源文件树（点击可查看/添加/删除文件）</span><br><span class="line">├── 芯片支持包         # 芯片型号、CPU 类型、链接脚本</span><br><span class="line">├── 构建配置           # 链接脚本路径、烧录配置 ← 坑④和烧录都在这</span><br><span class="line">└── C/C++ 属性         # 预处理器定义、编译选项 ← 坑①在这</span><br></pre></td></tr></table></figure>
+
+<p>到这里导入就完成了。接下来点编译按钮（锤子图标），会依次踩到坑①~④——别慌，都是工具链差异的小修补，下面逐个解决。</p>
+<h2 id="五、坑-①：编译报错-“Please-select-first-the-target-STM32F10x-device”"><a href="#五、坑-①：编译报错-“Please-select-first-the-target-STM32F10x-device”" class="headerlink" title="五、坑 ①：编译报错 “Please select first the target STM32F10x device”"></a>五、坑 ①：编译报错 “Please select first the target STM32F10x device”</h2><p>标准外设库的 <code>stm32f10x.h</code> 第 96 行有个设备检查：<strong>必须定义芯片型号宏</strong>，否则 <code>#error</code> 直接拒绝编译：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">if</span> !defined(STM32F10X_LD) &amp;&amp; !defined(STM32F10X_MD) &amp;&amp; ...</span></span><br><span class="line"> <span class="meta">#<span class="keyword">error</span> <span class="string">&quot;Please select first the target STM32F10x device used in your application&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<p>Keil 工程里只有 <code>USE_STDPERIPH_DRIVER</code> 一个宏（uvprojx 里没写型号宏），EIDE 原样搬过来了 → 编译全报错。</p>
+<p><strong>解法</strong>：EIDE → C&#x2F;C++ 属性 → <strong>预处理器定义</strong>，改为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">USE_STDPERIPH_DRIVER;STM32F10X_MD</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>STM32F10X_MD</code> &#x3D; Medium Density 中容量 &#x3D; F103C8&#x2F;CB 系列（HD 是高容量 F103ZE，LD 是低容量 F103C6）</li>
+<li>⚠️ 分号分隔，不能有任何空格，否则报 <code>cannot have whitespace on either side of &#39;=&#39;</code>，这里我直接点修改，老是报这个错误，然后我删掉原本的定义，重新添加，就不报错了，很神奇的bug。</li>
+</ul>
+<p>这一个宏修好后，后面连带的 <code>TIM4_IRQn</code>、<code>USART1_IRQn</code> 未定义错误也全消失了——它们都是没定义型号宏导致的连锁反应。</p>
+<h2 id="六、坑-②：启动文件汇编语法不兼容"><a href="#六、坑-②：启动文件汇编语法不兼容" class="headerlink" title="六、坑 ②：启动文件汇编语法不兼容"></a>六、坑 ②：启动文件汇编语法不兼容</h2><p>39 个 C 文件全过了，栽在启动文件上：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Error: bad instruction `stack_size EQU 0x00000400&#x27;</span><br><span class="line">Error: bad instruction `__vectors DCD __initial_sp&#x27;</span><br></pre></td></tr></table></figure>
+
+<p><strong>原因</strong>：Keil 工程里的 <code>startup_stm32f10x_md.s</code> 是 <strong>ARMCC 汇编语法</strong>（<code>EQU</code>&#x2F;<code>AREA</code>&#x2F;<code>DCD</code>&#x2F;<code>PROC</code> 是 Keil 汇编器的指令），而 EIDE 用的是 <strong>GNU 汇编器</strong>（arm-none-eabi-as），两者语法不通用。</p>
+<p><strong>解法</strong>：换成 GNU 语法的启动文件。ST 官方标准外设库里其实自带 GNU 版（RIDE7 工具链版），长这样：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">.syntax unified</span><br><span class="line">.thumb</span><br><span class="line">.word   _sidata          @ 数据段起始</span><br><span class="line">.word   _sdata</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>从 GitHub 的 STM32F103 GCC 模板仓库（如 <code>0x0E86/STM32F103C8T6</code>）拉一份即可，文件名不变，直接覆盖 <code>Start/startup_stm32f10x_md.s</code>。<strong>原文件先备份</strong>（改名 <code>.bak</code>），哪天回 Keil 还能还原。</p>
+<blockquote>
+<p>判断启动文件是什么语法：看到 <code>.syntax</code>&#x2F;<code>.word</code>&#x2F;<code>.section</code> 是 GNU 版；看到 <code>EQU</code>&#x2F;<code>AREA</code>&#x2F;<code>DCD</code> 是 ARMCC 版。</p>
+</blockquote>
+<h2 id="七、坑-③：老-CMSIS-与-GCC-14-的兼容问题"><a href="#七、坑-③：老-CMSIS-与-GCC-14-的兼容问题" class="headerlink" title="七、坑 ③：老 CMSIS 与 GCC 14 的兼容问题"></a>七、坑 ③：老 CMSIS 与 GCC 14 的兼容问题</h2><p>编译 <code>core_cm3.c</code> 时报汇编错误：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Error: registers may not be the same -- `strexb r0,r0,[r1]&#x27;</span><br></pre></td></tr></table></figure>
+
+<p><strong>原因</strong>：2011 年的老版 CMSIS 内联汇编写死了寄存器（ARMCC 的写法），GCC 14 的寄存器分配检查更严格，目标寄存器与源寄存器相同直接报错。</p>
+<p><strong>解法</strong>：替换为 GCC 兼容版 <code>core_cm3.c</code>&#x2F;<code>core_cm3.h</code>（同上，模板仓库里有现成的）。新版里 GCC 分支用标准约束模板写法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">__ASM <span class="title function_">volatile</span> <span class="params">(<span class="string">&quot;strexb %0, %2, [%1]&quot;</span> : <span class="string">&quot;=&amp;r&quot;</span> (result) : <span class="string">&quot;r&quot;</span> (addr), <span class="string">&quot;r&quot;</span> (value))</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这种编译器差异的问题，<code>stm32f10x.h</code> 等库文件本身一般兼容（内部有 <code>#if defined(__GNUC__)</code> 分支），<strong>只有老汇编和 CMSIS 内核文件需要换</strong>。</p>
+<h2 id="八、坑-④：中文路径导致链接失败"><a href="#八、坑-④：中文路径导致链接失败" class="headerlink" title="八、坑 ④：中文路径导致链接失败"></a>八、坑 ④：中文路径导致链接失败</h2><p>编译全过，链接报：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ld.exe: cannot open linker script file ...1.STM32F1????...v1.1/...stm32f103c8.lds: Invalid argument</span><br></pre></td></tr></table></figure>
+
+<p>注意是 <code>Invalid argument</code>（不是 No such file）—— <strong>Windows + GCC 的经典编码问题</strong>：链接器收到中文路径时编码损坏（<code>????</code>），文件明明存在却打不开。编译能过是因为 EIDE 编译用相对路径，而链接脚本存的是<strong>绝对路径</strong>，就踩雷了。</p>
+<p><strong>解法</strong>：<strong>工程目录必须全英文</strong>。把工程复制一份到纯英文路径（如 <code>D:\stm32project\smartcar\stdperiph\</code>），重新导入即可。</p>
+<blockquote>
+<p>这条经验很重要：<strong>嵌入式工程路径永远用纯英文</strong>，中文路径在 OpenOCD 烧录、调试器、脚本里还会继续捣乱，趁早搬走。</p>
+</blockquote>
+<h2 id="九、编译-烧录"><a href="#九、编译-烧录" class="headerlink" title="九、编译 &amp; 烧录"></a>九、编译 &amp; 烧录</h2><p>配置完以上四点，点编译，输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">[ INFO ] start compiling (jobs: 16) ...</span><br><span class="line">[ INFO ] start linking ...</span><br><span class="line">Memory region         Used Size  Region Size  %age Used</span><br><span class="line">           FLASH:       13792 B        64 KB     21.04%</span><br><span class="line">             RAM:        1452 B        20 KB      7.09%</span><br><span class="line">[ DONE ] build successfully !</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>链接时出现的 <code>_close is not implemented and will always fail</code> 等 warning 是裸机环境的正常提示（没有文件系统），无视即可。</p>
+</blockquote>
+<p>烧录前把<strong>烧录配置从默认的 JLink 改为 ST-Link</strong>（构建配置里），第一次用会提示自动下载 STM32CubeProgrammer 烧录工具。接好 ST-Link（SWD 四线：3.3V&#x2F;SWDIO&#x2F;SWCLK&#x2F;GND），点烧录按钮：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">STM32CubeProgrammer v2.8.0</span><br><span class="line">Device: STM32F103C8T6  Flash: 64 KB</span><br><span class="line">Download verified successfully ✅</span><br><span class="line">RUNNING Program... Start operation achieved successfully</span><br></pre></td></tr></table></figure>
+
+<p><strong>烧录验证通过，程序跑起来了。</strong></p>
+<h2 id="十、总结：迁移-Checklist，可直接照搬"><a href="#十、总结：迁移-Checklist，可直接照搬" class="headerlink" title="十、总结：迁移 Checklist，可直接照搬"></a>十、总结：迁移 Checklist，可直接照搬</h2><p>以后任何 Keil 标准库工程迁移，按这个清单走：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">□ 1. 装 ARM GCC（勾选加 PATH），settings.json 配 EIDE.ARM.GCC.InstallDirectory</span><br><span class="line">□ 2. 装 EIDE 插件，导入 .uvprojx（选 ARM 不是 C51）</span><br><span class="line">□ 3. 编译器切换为 GCC</span><br><span class="line">□ 4. 预处理器定义补芯片型号宏：USE_STDPERIPH_DRIVER;STM32F10X_MD</span><br><span class="line">□ 5. 启动文件换 GNU 语法版（备份原文件）</span><br><span class="line">□ 6. core_cm3.c/h 换 GCC 兼容版（老 CMSIS + GCC14 才需要）</span><br><span class="line">□ 7. 工程放纯英文路径（中文路径链接必挂）</span><br><span class="line">□ 8. 构建配置指定链接脚本（.lds，64K Flash/20K RAM 等按芯片规格）</span><br><span class="line">□ 9. 烧录配置选 ST-Link/J-Link，接线烧录</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心思路</strong>：EIDE 帮你自动完成 90% 的配置搬运（源文件、宏、路径都从 uvprojx 解析），剩下 10% 是<strong>工具链差异</strong>的修补——启动文件语法、CMSIS 版本、编码问题，都是换文件&#x2F;换路径的事，<strong>你的业务代码一行都不用动</strong>。</p>
+<hr>
+<p><strong>参考资料</strong>：</p>
+<ul>
+<li><p>B站视频：再见了，Keil君！我已经爱上了EIDE插件（vscode+嵌入式开发）<a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1XGLozvEJf/?spm_id_from=333.337.search-card.all.click&vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1XGLozvEJf/?spm_id_from=333.337.search-card.all.click&amp;vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+</li>
+<li><p>模板仓库：<code>github.com/0x0E86/STM32F103C8T6</code>（GNU startup + 兼容 CMSIS）</p>
+</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/VS-Code/" rel="tag"># VS Code</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/" rel="tag"># 嵌入式</a>
+              <a href="/tags/EIDE/" rel="tag"># EIDE</a>
+              <a href="/tags/Keil/" rel="tag"># Keil</a>
+              <a href="/tags/STM32/" rel="tag"># STM32</a>
+              <a href="/tags/%E5%B7%A5%E5%85%B7%E9%93%BE/" rel="tag"># 工具链</a>
+              <a href="/tags/GCC/" rel="tag"># GCC</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/08/09/STM32_TIM_ExternalClock/" rel="prev" title="STM32——定时器外部时钟：让GPIO脉冲驱动计数器，给传送带测距测速">
+      <i class="fa fa-chevron-left"></i> STM32——定时器外部时钟：让GPIO脉冲驱动计数器，给传送带测距测速
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%80%E7%AF%87"><span class="nav-number">1.</span> <span class="nav-text">开篇</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E4%BB%8E-Keil-%E6%90%AC%E5%88%B0-VS-Code"><span class="nav-number">2.</span> <span class="nav-text">一、为什么要从 Keil 搬到 VS Code</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%A4%E6%9D%A1%E8%B7%AF%E7%BA%BF%E6%80%8E%E4%B9%88%E9%80%89%EF%BC%9AEIDE-vs-CMake"><span class="nav-number">3.</span> <span class="nav-text">二、两条路线怎么选：EIDE vs CMake</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA"><span class="nav-number">4.</span> <span class="nav-text">三、环境搭建</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%AE%89%E8%A3%85-ARM-GCC-%E7%BC%96%E8%AF%91%E5%99%A8"><span class="nav-number">4.1.</span> <span class="nav-text">1. 安装 ARM GCC 编译器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E5%AE%89%E8%A3%85-EIDE-%E6%8F%92%E4%BB%B6"><span class="nav-number">4.2.</span> <span class="nav-text">2. 安装 EIDE 插件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E6%8C%87%E5%AE%9A%E7%BC%96%E8%AF%91%E5%99%A8%E8%B7%AF%E5%BE%84%EF%BC%88%E5%85%B3%E9%94%AE%EF%BC%89"><span class="nav-number">4.3.</span> <span class="nav-text">3. 指定编译器路径（关键）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%AF%BC%E5%85%A5-Keil-%E5%B7%A5%E7%A8%8B"><span class="nav-number">5.</span> <span class="nav-text">四、导入 Keil 工程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC-1-%E6%AD%A5%EF%BC%9AVS-Code-%E6%89%93%E5%BC%80%E5%B7%A5%E7%A8%8B%E7%9B%AE%E5%BD%95"><span class="nav-number">5.1.</span> <span class="nav-text">第 1 步：VS Code 打开工程目录</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC-2-%E6%AD%A5%EF%BC%9A%E6%89%BE%E5%88%B0-EIDE-%E9%9D%A2%E6%9D%BF"><span class="nav-number">5.2.</span> <span class="nav-text">第 2 步：找到 EIDE 面板</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC-3-%E6%AD%A5%EF%BC%9A%E5%AF%BC%E5%85%A5-Keil-%E5%B7%A5%E7%A8%8B"><span class="nav-number">5.3.</span> <span class="nav-text">第 3 步：导入 Keil 工程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC-4-%E6%AD%A5%EF%BC%9A%E7%AD%89%E5%BE%85%E8%87%AA%E5%8A%A8%E8%A7%A3%E6%9E%90%EF%BC%8CEIDE-%E5%9C%A8%E5%81%9A%E2%80%9D%E9%85%8D%E7%BD%AE%E6%90%AC%E8%BF%90%E2%80%9D"><span class="nav-number">5.4.</span> <span class="nav-text">第 4 步：等待自动解析，EIDE 在做”配置搬运”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC-5-%E6%AD%A5%EF%BC%9A%E5%AE%89%E8%A3%85%E6%8E%A8%E8%8D%90%E6%89%A9%E5%B1%95%EF%BC%88%E5%8F%AF%E9%80%89%EF%BC%89"><span class="nav-number">5.5.</span> <span class="nav-text">第 5 步：安装推荐扩展（可选）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC-6-%E6%AD%A5%EF%BC%9A%E5%88%87%E6%8D%A2%E7%BC%96%E8%AF%91%E5%99%A8%E4%B8%BA-GCC"><span class="nav-number">5.6.</span> <span class="nav-text">第 6 步：切换编译器为 GCC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC-7-%E6%AD%A5%EF%BC%9A%E8%AE%A4%E8%AF%86-EIDE-%E9%9D%A2%E6%9D%BF"><span class="nav-number">5.7.</span> <span class="nav-text">第 7 步：认识 EIDE 面板</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%9D%91-%E2%91%A0%EF%BC%9A%E7%BC%96%E8%AF%91%E6%8A%A5%E9%94%99-%E2%80%9CPlease-select-first-the-target-STM32F10x-device%E2%80%9D"><span class="nav-number">6.</span> <span class="nav-text">五、坑 ①：编译报错 “Please select first the target STM32F10x device”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%9D%91-%E2%91%A1%EF%BC%9A%E5%90%AF%E5%8A%A8%E6%96%87%E4%BB%B6%E6%B1%87%E7%BC%96%E8%AF%AD%E6%B3%95%E4%B8%8D%E5%85%BC%E5%AE%B9"><span class="nav-number">7.</span> <span class="nav-text">六、坑 ②：启动文件汇编语法不兼容</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E5%9D%91-%E2%91%A2%EF%BC%9A%E8%80%81-CMSIS-%E4%B8%8E-GCC-14-%E7%9A%84%E5%85%BC%E5%AE%B9%E9%97%AE%E9%A2%98"><span class="nav-number">8.</span> <span class="nav-text">七、坑 ③：老 CMSIS 与 GCC 14 的兼容问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E5%9D%91-%E2%91%A3%EF%BC%9A%E4%B8%AD%E6%96%87%E8%B7%AF%E5%BE%84%E5%AF%BC%E8%87%B4%E9%93%BE%E6%8E%A5%E5%A4%B1%E8%B4%A5"><span class="nav-number">9.</span> <span class="nav-text">八、坑 ④：中文路径导致链接失败</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E7%BC%96%E8%AF%91-%E7%83%A7%E5%BD%95"><span class="nav-number">10.</span> <span class="nav-text">九、编译 &amp; 烧录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E6%80%BB%E7%BB%93%EF%BC%9A%E8%BF%81%E7%A7%BB-Checklist%EF%BC%8C%E5%8F%AF%E7%9B%B4%E6%8E%A5%E7%85%A7%E6%90%AC"><span class="nav-number">11.</span> <span class="nav-text">十、总结：迁移 Checklist，可直接照搬</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">40</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">320k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">4:51</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
