@@ -7782,7 +7782,7 @@
   <entry>
     <title>STM32智能小车——标准库工程整体架构解析</title>
     <url>/2026/08/12/SmartCar_StdPeriph_Architecture/</url>
-    <content><![CDATA[<h2 id="一、从上一篇到这篇"><a href="#一、从上一篇到这篇" class="headerlink" title="一、从上一篇到这篇"></a>一、从上一篇到这篇</h2><p>上一篇《<a href="%E9%93%BE%E6%8E%A5%E5%8D%A0%E4%BD%8D%E2%80%94%E2%80%94%E4%B8%8A%E4%B8%80%E7%AF%87%E5%8D%9A%E5%AE%A2%E5%9C%B0%E5%9D%80">Keil 工程迁移到 VS Code + EIDE</a>&#96;》完成了把 Keil 标准库工程迁移到 VS Code 里编译烧录。接下来我一步步组装部件，把程序烧录到小车上，让小车成功跑了起来。<img src="/./../images/SmartCar_StdPeriph_Architecture/50b02f84e45a5d75b09044f0c7f524eb.jpg" alt="50b02f84e45a5d75b09044f0c7f524eb"></p>
+    <content><![CDATA[<h2 id="一、从上一篇到这篇"><a href="#一、从上一篇到这篇" class="headerlink" title="一、从上一篇到这篇"></a>一、从上一篇到这篇</h2><p>上一篇《<a href="https://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">Keil 工程迁移到 VS Code + EIDE</a>》完成了把 Keil 标准库工程迁移到 VS Code 里编译烧录。接下来我一步步组装部件，把程序烧录到小车上，让小车成功跑了起来。<img src="/./../images/SmartCar_StdPeriph_Architecture/50b02f84e45a5d75b09044f0c7f524eb.jpg" alt="50b02f84e45a5d75b09044f0c7f524eb"></p>
 <p>但”能跑”和”看懂”是两回事。标准库工程虽然只有十几二十个文件，但对外设的调用像一张网——这篇博客就把这张网完整地拆开：</p>
 <ul>
 <li>工程怎么分层？每个文件夹是干什么的？</li>
