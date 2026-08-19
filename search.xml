@@ -764,6 +764,572 @@
       </tags>
   </entry>
   <entry>
+    <title>Keil 工程迁移到 VS Code + EIDE——智能小车项目前置准备</title>
+    <url>/2026/08/10/Keil_to_VSCode_EIDE_Migration/</url>
+    <content><![CDATA[<h2 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h2><p>我在b站获取了up主“陈加油嗯”的 STM32F103C8T6 智能小车项目（蓝牙遥控 + 循迹 + 避障三合一），他是用 <strong>Keil5 + 标准外设库</strong>写的。但我平时的主力编辑器是 VS Code，所以目标很明确：</p>
+<p><strong>在 VS Code 里把这个 Keil 工程编译、烧录、跑起来，源代码一行不改。</strong></p>
+<p>折腾了半天，搜索了一些教程，最终用 <strong>EIDE 插件</strong>顺利跑通：导入工程 → GCC 编译 → ST-Link 烧录，全程图形化点击。这篇文章把完整流程和 4 个遇到的坑记录下来，以后任何 Keil 工程想迁移都能照搬。</p>
+<h2 id="一、为什么要从-Keil-搬到-VS-Code"><a href="#一、为什么要从-Keil-搬到-VS-Code" class="headerlink" title="一、为什么要从 Keil 搬到 VS Code"></a>一、为什么要从 Keil 搬到 VS Code</h2><table>
+<thead>
+<tr>
+<th align="left">对比项</th>
+<th align="left">Keil5</th>
+<th align="left">VS Code + EIDE</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">编辑器体验</td>
+<td align="left">编辑器老、代码补全弱</td>
+<td align="left">现代编辑器，补全&#x2F;跳转&#x2F;主题好</td>
+</tr>
+<tr>
+<td align="left">编译器</td>
+<td align="left">ARMCC（Keil 专用）</td>
+<td align="left">ARM GCC（开源，通用）</td>
+</tr>
+<tr>
+<td align="left">烧录</td>
+<td align="left">内置</td>
+<td align="left">支持 ST-Link&#x2F;J-Link&#x2F;OpenOCD</td>
+</tr>
+<tr>
+<td align="left">跨平台</td>
+<td align="left">仅 Windows</td>
+<td align="left">Windows&#x2F;Linux&#x2F;Mac</td>
+</tr>
+<tr>
+<td align="left">版本管理</td>
+<td align="left">弱</td>
+<td align="left">原生 Git 集成</td>
+</tr>
+<tr>
+<td align="left">学习成本</td>
+<td align="left">工程文件是黑盒</td>
+<td align="left">构建过程透明可见</td>
+</tr>
+</tbody></table>
+<p>标准外设库（SPL）工程的结构非常规整，天然适合迁移：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">工程目录/</span><br><span class="line">├── User/          # main.c、中断处理</span><br><span class="line">├── System/        # 延时、sys</span><br><span class="line">├── HARDWARE/      # 各外设驱动（LED/电机/OLED/串口…）</span><br><span class="line">├── Library/       # 标准外设库（SPL）</span><br><span class="line">├── Start/         # 启动文件 + CMSIS 核心</span><br><span class="line">└── Project.uvprojx  # Keil 工程文件（配置的源头）</span><br></pre></td></tr></table></figure>
+
+<h2 id="二、三条路线怎么选"><a href="#二、三条路线怎么选" class="headerlink" title="二、三条路线怎么选"></a>二、三条路线怎么选</h2><p>把 Keil 工程搬到 VS Code，我研究后有<strong>三条</strong>路线：EIDE 插件、手写 CMake、ST 官方扩展。</p>
+<h3 id="1-主路线：EIDE-插件（我选的）"><a href="#1-主路线：EIDE-插件（我选的）" class="headerlink" title="1. 主路线：EIDE 插件（我选的）"></a>1. 主路线：EIDE 插件（我选的）</h3><table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">EIDE 插件</th>
+<th align="left">手写 CMake</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">移植工作量</td>
+<td align="left"><strong>零</strong>（直接导入 .uvprojx）</td>
+<td align="left">写 CMakeLists + 链接脚本 + 换启动文件</td>
+</tr>
+<tr>
+<td align="left">操作方式</td>
+<td align="left">图形化按钮</td>
+<td align="left">命令行</td>
+</tr>
+<tr>
+<td align="left">宏&#x2F;头文件路径</td>
+<td align="left">自动从 Keil 工程解析</td>
+<td align="left">手动照抄</td>
+</tr>
+<tr>
+<td align="left">适合人群</td>
+<td align="left">想快速跑通</td>
+<td align="left">想深入理解构建流程 &#x2F; 做 CI</td>
+</tr>
+</tbody></table>
+<p><strong>学习阶段选 EIDE 最快</strong>——它只是编译工具，不影响你读代码理解代码。CMake 方案留作进阶（做 CI、复杂工程时再用）。</p>
+<h3 id="2-为什么不选-ST-官方扩展？"><a href="#2-为什么不选-ST-官方扩展？" class="headerlink" title="2. 为什么不选 ST 官方扩展？"></a>2. 为什么不选 ST 官方扩展？</h3><p>keysking的stm32教程中安装的是stm32Cube插件，<strong>为什么不用它，用第三方 EIDE？</strong> 关键区别在这里：</p>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">STM32 官方扩展</th>
+<th align="left">EIDE</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">出身</td>
+<td align="left">ST 官方</td>
+<td align="left">第三方</td>
+</tr>
+<tr>
+<td align="left">支持的芯片</td>
+<td align="left">仅 STM32</td>
+<td align="left">几乎所有单片机</td>
+</tr>
+<tr>
+<td align="left">支持的工程格式</td>
+<td align="left">仅 CubeMX 生成（.cproject）</td>
+<td align="left"><strong>Keil(.uvprojx)、CubeMX、ESP-IDF…</strong></td>
+</tr>
+<tr>
+<td align="left">支持的库</td>
+<td align="left">仅 HAL 库</td>
+<td align="left"><strong>标准库(SPL) + HAL 库都行</strong></td>
+</tr>
+<tr>
+<td align="left">编译器</td>
+<td align="left">armclang &#x2F; GCC</td>
+<td align="left">GCC &#x2F; ARMCC &#x2F; IAR</td>
+</tr>
+<tr>
+<td align="left">导入别人现成的 Keil 工程</td>
+<td align="left">❌ 不认</td>
+<td align="left">✅ 一键导入</td>
+</tr>
+</tbody></table>
+<p>ST 官方扩展是<strong>ST 生态的延伸</strong>：它的世界只有”CubeMX 生成的 HAL 工程”这一种工作流。而我们的目标是导入<strong>别人用 Keil + 标准外设库写的现成工程</strong>，官方扩展根本不认这种格式——EIDE 是通用工程管理器，芯片、工程格式、编译器都”来者不拒”。</p>
+<p>所以不是官方扩展不好，是它只管自己生态，管不了别人的 Keil 工程。而EIDE 是超集。</p>
+<h2 id="三、环境搭建"><a href="#三、环境搭建" class="headerlink" title="三、环境搭建"></a>三、环境搭建</h2><h3 id="1-安装-ARM-GCC-编译器"><a href="#1-安装-ARM-GCC-编译器" class="headerlink" title="1. 安装 ARM GCC 编译器"></a>1. 安装 ARM GCC 编译器</h3><p>EIDE 编译需要 ARM 交叉编译器（GCC 的 ARM 版本，替代 Keil 的 ARMCC）。</p>
+<ul>
+<li>下载：ARM 官方 GNU 工具链（搜索 “Arm GNU Toolchain Downloads”），Windows 版选 <code>arm-none-eabi</code> 目标</li>
+<li>安装：一路 Next，安装时勾选 “Add path to environment variable”（以后终端直接敲 <code>arm-none-eabi-gcc</code>）</li>
+<li>安装路径默认在：<code>C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\&lt;版本&gt;</code><ul>
+<li>⚠️ 注意版本目录名是 <code>14.2 rel1</code>（<strong>空格</strong>），不是 <code>14.2.rel1</code>（点）</li>
+</ul>
+</li>
+</ul>
+<p>验证安装（新开终端）：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">arm-none-eabi-gcc --version</span><br><span class="line"><span class="comment"># arm-none-eabi-gcc.exe (Arm GNU Toolchain 14.2.Rel1 (Build arm-14.52)) 14.2.1</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-安装-EIDE-插件"><a href="#2-安装-EIDE-插件" class="headerlink" title="2. 安装 EIDE 插件"></a>2. 安装 EIDE 插件</h3><p>VS Code 扩展市场搜 <strong>Embedded IDE</strong>（<code>cl.eide</code>），或命令行安装：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">code --install-extension cl.eide</span><br></pre></td></tr></table></figure>
+
+<p>EIDE 需要 .NET 运行时（首次启动会自动检测，缺了会提示安装）。</p>
+<h3 id="3-指定编译器路径（关键）"><a href="#3-指定编译器路径（关键）" class="headerlink" title="3. 指定编译器路径（关键）"></a>3. 指定编译器路径（关键）</h3><p>EIDE 默认不知道 GCC 装在哪，在 VS Code 用户设置（settings.json）里配置：</p>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="attr">&quot;EIDE.ARM.GCC.InstallDirectory&quot;</span><span class="punctuation">:</span> <span class="string">&quot;C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\14.2 rel1&quot;</span><span class="punctuation">,</span></span><br><span class="line"><span class="attr">&quot;EIDE.ARM.Option.AxfToElf&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span></span><br></pre></td></tr></table></figure>
+
+<h2 id="四、导入-Keil-工程"><a href="#四、导入-Keil-工程" class="headerlink" title="四、导入 Keil 工程"></a>四、导入 Keil 工程</h2><h3 id="第-1-步：VS-Code-打开工程目录"><a href="#第-1-步：VS-Code-打开工程目录" class="headerlink" title="第 1 步：VS Code 打开工程目录"></a>第 1 步：VS Code 打开工程目录</h3><p>VS Code → 文件 → 打开文件夹，选中<strong>包含 <code>Project.uvprojx</code> 的那个目录</strong>（不是打开 .uvprojx 文件本身，是打开它所在的文件夹）。</p>
+<blockquote>
+<p>💡 <strong>先给工程目录起个纯英文名</strong>：比如 <code>D:\projects\car\</code>。这一步很重要，坑④会解释为什么——中文路径会导致链接失败，现在养成习惯最省事。</p>
+</blockquote>
+<h3 id="第-2-步：找到-EIDE-面板"><a href="#第-2-步：找到-EIDE-面板" class="headerlink" title="第 2 步：找到 EIDE 面板"></a>第 2 步：找到 EIDE 面板</h3><p>安装 EIDE 插件后，<strong>左侧活动栏</strong>会出现一个新的图标（嵌入式芯片图案，⚠️ 不是资源管理器那个文件图标）。点击它，EIDE 面板就展开了。</p>
+<h3 id="第-3-步：导入-Keil-工程"><a href="#第-3-步：导入-Keil-工程" class="headerlink" title="第 3 步：导入 Keil 工程"></a>第 3 步：导入 Keil 工程</h3><ol>
+<li>在 EIDE 面板顶部找到 <strong>“导入工程”</strong> 按钮（Import），点击</li>
+<li>弹出菜单选择 **”Keil”**，再选择 <strong>“Keil ARM project (.uvprojx)”</strong><ul>
+<li>这里有两个选项：**”ARM 还是 C51？”**——答案是 <strong>ARM</strong>。Keil MDK 就是 ARM 版本（Microcontroller Development Kit），我们的 STM32F103 是 Cortex-M3 内核，属于 ARM；C51 是给 8051 单片机用的，选错后面全乱</li>
+</ul>
+</li>
+<li>在弹出的文件选择框中，选中工程目录下的 <code>Project.uvprojx</code>，确认</li>
+</ol>
+<h3 id="第-4-步：等待自动解析，EIDE-在做”配置搬运”"><a href="#第-4-步：等待自动解析，EIDE-在做”配置搬运”" class="headerlink" title="第 4 步：等待自动解析，EIDE 在做”配置搬运”"></a>第 4 步：等待自动解析，EIDE 在做”配置搬运”</h3><p>导入瞬间 EIDE 会<strong>只读解析</strong> <code>Project.uvprojx</code>（Keil 工程文件本质是 XML，记录了全部配置），自动生成：</p>
+<table>
+<thead>
+<tr>
+<th align="left">从 uvprojx 读出的内容</th>
+<th align="left">EIDE 的处理</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">源文件清单（40 个 .c&#x2F;.s）</td>
+<td align="left">构建列表</td>
+</tr>
+<tr>
+<td align="left">头文件路径（IncludePath）</td>
+<td align="left">编译选项</td>
+</tr>
+<tr>
+<td align="left">宏定义（Defines）</td>
+<td align="left">预处理器定义</td>
+</tr>
+<tr>
+<td align="left">芯片型号（STM32F103C8）</td>
+<td align="left">芯片支持包</td>
+</tr>
+</tbody></table>
+<p><strong>这个过程只读，不会破坏原 Keil 工程</strong>——uvprojx 原封不动，原工程随时还能用 Keil 打开。EIDE 只是生成自己的一套工程配置（<code>.eide/</code> 目录），两边共存互不干扰。</p>
+<h3 id="第-5-步：安装推荐扩展（可选）"><a href="#第-5-步：安装推荐扩展（可选）" class="headerlink" title="第 5 步：安装推荐扩展（可选）"></a>第 5 步：安装推荐扩展（可选）</h3><p>导入完成后 VS Code 右下角可能弹窗推荐扩展（来自 dan-c-underwood 等的），直接点<strong>安装</strong>——ARM 汇编语法高亮、C&#x2F;C++ 等。</p>
+<h3 id="第-6-步：切换编译器为-GCC"><a href="#第-6-步：切换编译器为-GCC" class="headerlink" title="第 6 步：切换编译器为 GCC"></a>第 6 步：切换编译器为 GCC</h3><p>导入后 EIDE 默认沿用 Keil 工程的编译器设置 <strong>AC5</strong>（ARMCC）。注意：<strong>即使电脑上装了 Keil5</strong>，EIDE 也不知道 ARMCC 装在哪——它需要额外的路径配置（<code>EIDE.ARM.ARMCC5.InstallDirectory</code> 指向 Keil 的 ARM\ARMCC 目录），没配置的话此时点编译会报：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">无法找到编译器 &#x27;AC5&#x27; 的位置！[path]: &#x27;null\bin&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>（<code>null\bin</code> 就是”路径没配置”的痕迹）</p>
+<p><strong>我的操作</strong>：在 EIDE 面板<strong>顶部工具栏</strong>找到编译器选择框（此时显示 “AC5”），点击弹出下拉，选择 **”GCC”**（GNU Arm Embedded Toolchain）。切换后 EIDE 会读取我们在第三章配置的 <code>EIDE.ARM.GCC.InstallDirectory</code> 路径，弹出确认框时点确定即可。<img src="/./../images/Keil_to_VSCode_EIDE_Migration/image-20260810193532935.png" alt="image-20260810193532935"></p>
+<p><strong>另一个选择</strong>：如果你想让 EIDE 直接用 Keil 的 ARMCC 编译，也可以在 VS Code 设置里配置 <code>EIDE.ARM.ARMCC5.InstallDirectory</code> 指向 Keil 安装目录。但推荐用 <strong>GCC</strong>——开源免费不依赖 Keil 安装、命令行通用、构建过程透明，本文后面的坑也都是按 GCC 写的。</p>
+<blockquote>
+<p>判断标准：<strong>AC5&#x2F;AC6 是 Keil 的编译器（ARMCC），GCC 是 ARM 官方工具链</strong>。EIDE 下拉框里显示哪个就点哪个，关键是让 EIDE 能找到对应编译器的真实路径。</p>
+</blockquote>
+<h3 id="第-7-步：认识-EIDE-面板"><a href="#第-7-步：认识-EIDE-面板" class="headerlink" title="第 7 步：认识 EIDE 面板"></a>第 7 步：认识 EIDE 面板</h3><p>切换完成后，EIDE 面板展开成这样的结构：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">📁 stdperiph (Target 1)</span><br><span class="line">├── 项目资源           # 源文件树（点击可查看/添加/删除文件）</span><br><span class="line">├── 芯片支持包         # 芯片型号、CPU 类型、链接脚本</span><br><span class="line">├── 构建配置           # 链接脚本路径、烧录配置 ← 坑④和烧录都在这</span><br><span class="line">└── C/C++ 属性         # 预处理器定义、编译选项 ← 坑①在这</span><br></pre></td></tr></table></figure>
+
+<p>到这里导入就完成了。接下来点编译按钮（锤子图标），会依次踩到坑①~④——别慌，都是工具链差异的小修补，下面逐个解决。</p>
+<h2 id="五、坑-①：编译报错-“Please-select-first-the-target-STM32F10x-device”"><a href="#五、坑-①：编译报错-“Please-select-first-the-target-STM32F10x-device”" class="headerlink" title="五、坑 ①：编译报错 “Please select first the target STM32F10x device”"></a>五、坑 ①：编译报错 “Please select first the target STM32F10x device”</h2><p>标准外设库的 <code>stm32f10x.h</code> 第 96 行有个设备检查：<strong>必须定义芯片型号宏</strong>，否则 <code>#error</code> 直接拒绝编译：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">if</span> !defined(STM32F10X_LD) &amp;&amp; !defined(STM32F10X_MD) &amp;&amp; ...</span></span><br><span class="line"> <span class="meta">#<span class="keyword">error</span> <span class="string">&quot;Please select first the target STM32F10x device used in your application&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<p>Keil 工程里只有 <code>USE_STDPERIPH_DRIVER</code> 一个宏（uvprojx 里没写型号宏），EIDE 原样搬过来了 → 编译全报错。</p>
+<p><strong>解法</strong>：EIDE → C&#x2F;C++ 属性 → <strong>预处理器定义</strong>，改为：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">USE_STDPERIPH_DRIVER;STM32F10X_MD</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>STM32F10X_MD</code> &#x3D; Medium Density 中容量 &#x3D; F103C8&#x2F;CB 系列（HD 是高容量 F103ZE，LD 是低容量 F103C6）</li>
+<li>⚠️ 分号分隔，不能有任何空格，否则报 <code>cannot have whitespace on either side of &#39;=&#39;</code>，这里我直接点修改，老是报这个错误，然后我删掉原本的定义，重新添加，就不报错了，很神奇的bug。</li>
+</ul>
+<p>这一个宏修好后，后面连带的 <code>TIM4_IRQn</code>、<code>USART1_IRQn</code> 未定义错误也全消失了——它们都是没定义型号宏导致的连锁反应。</p>
+<h2 id="六、坑-②：启动文件汇编语法不兼容"><a href="#六、坑-②：启动文件汇编语法不兼容" class="headerlink" title="六、坑 ②：启动文件汇编语法不兼容"></a>六、坑 ②：启动文件汇编语法不兼容</h2><p>39 个 C 文件全过了，栽在启动文件上：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Error: bad instruction `stack_size EQU 0x00000400&#x27;</span><br><span class="line">Error: bad instruction `__vectors DCD __initial_sp&#x27;</span><br></pre></td></tr></table></figure>
+
+<p><strong>原因</strong>：Keil 工程里的 <code>startup_stm32f10x_md.s</code> 是 <strong>ARMCC 汇编语法</strong>（<code>EQU</code>&#x2F;<code>AREA</code>&#x2F;<code>DCD</code>&#x2F;<code>PROC</code> 是 Keil 汇编器的指令），而 EIDE 用的是 <strong>GNU 汇编器</strong>（arm-none-eabi-as），两者语法不通用。</p>
+<p><strong>解法</strong>：换成 GNU 语法的启动文件。ST 官方标准外设库里其实自带 GNU 版（RIDE7 工具链版），长这样：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">.syntax unified</span><br><span class="line">.thumb</span><br><span class="line">.word   _sidata          @ 数据段起始</span><br><span class="line">.word   _sdata</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>从 GitHub 的 STM32F103 GCC 模板仓库（如 <code>0x0E86/STM32F103C8T6</code>）拉一份即可，文件名不变，直接覆盖 <code>Start/startup_stm32f10x_md.s</code>。<strong>原文件先备份</strong>（改名 <code>.bak</code>），哪天回 Keil 还能还原。</p>
+<blockquote>
+<p>判断启动文件是什么语法：看到 <code>.syntax</code>&#x2F;<code>.word</code>&#x2F;<code>.section</code> 是 GNU 版；看到 <code>EQU</code>&#x2F;<code>AREA</code>&#x2F;<code>DCD</code> 是 ARMCC 版。</p>
+</blockquote>
+<h2 id="七、坑-③：老-CMSIS-与-GCC-14-的兼容问题"><a href="#七、坑-③：老-CMSIS-与-GCC-14-的兼容问题" class="headerlink" title="七、坑 ③：老 CMSIS 与 GCC 14 的兼容问题"></a>七、坑 ③：老 CMSIS 与 GCC 14 的兼容问题</h2><p>编译 <code>core_cm3.c</code> 时报汇编错误：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Error: registers may not be the same -- `strexb r0,r0,[r1]&#x27;</span><br></pre></td></tr></table></figure>
+
+<p><strong>原因</strong>：2011 年的老版 CMSIS 内联汇编写死了寄存器（ARMCC 的写法），GCC 14 的寄存器分配检查更严格，目标寄存器与源寄存器相同直接报错。</p>
+<p><strong>解法</strong>：替换为 GCC 兼容版 <code>core_cm3.c</code>&#x2F;<code>core_cm3.h</code>（同上，模板仓库里有现成的）。新版里 GCC 分支用标准约束模板写法：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">__ASM <span class="title function_">volatile</span> <span class="params">(<span class="string">&quot;strexb %0, %2, [%1]&quot;</span> : <span class="string">&quot;=&amp;r&quot;</span> (result) : <span class="string">&quot;r&quot;</span> (addr), <span class="string">&quot;r&quot;</span> (value))</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这种编译器差异的问题，<code>stm32f10x.h</code> 等库文件本身一般兼容（内部有 <code>#if defined(__GNUC__)</code> 分支），<strong>只有老汇编和 CMSIS 内核文件需要换</strong>。</p>
+<h2 id="八、坑-④：中文路径导致链接失败"><a href="#八、坑-④：中文路径导致链接失败" class="headerlink" title="八、坑 ④：中文路径导致链接失败"></a>八、坑 ④：中文路径导致链接失败</h2><p>编译全过，链接报：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">ld.exe: cannot open linker script file ...1.STM32F1????...v1.1/...stm32f103c8.lds: Invalid argument</span><br></pre></td></tr></table></figure>
+
+<p>注意是 <code>Invalid argument</code>（不是 No such file）—— <strong>Windows + GCC 的经典编码问题</strong>：链接器收到中文路径时编码损坏（<code>????</code>），文件明明存在却打不开。编译能过是因为 EIDE 编译用相对路径，而链接脚本存的是<strong>绝对路径</strong>，就踩雷了。</p>
+<p><strong>解法</strong>：<strong>工程目录必须全英文</strong>。把工程复制一份到纯英文路径（如 <code>D:\stm32project\smartcar\stdperiph\</code>），重新导入即可。</p>
+<blockquote>
+<p>这条经验很重要：<strong>嵌入式工程路径永远用纯英文</strong>，中文路径在 OpenOCD 烧录、调试器、脚本里还会继续捣乱，趁早搬走。</p>
+</blockquote>
+<h2 id="九、编译-烧录"><a href="#九、编译-烧录" class="headerlink" title="九、编译 &amp; 烧录"></a>九、编译 &amp; 烧录</h2><p>配置完以上四点，点编译，输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[ INFO ] start compiling (jobs: 16) ...</span><br><span class="line">[ INFO ] start linking ...</span><br><span class="line">Memory region         Used Size  Region Size  %age Used</span><br><span class="line">           FLASH:       13792 B        64 KB     21.04%</span><br><span class="line">             RAM:        1452 B        20 KB      7.09%</span><br><span class="line">[ DONE ] build successfully !</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>链接时出现的 <code>_close is not implemented and will always fail</code> 等 warning 是裸机环境的正常提示（没有文件系统），无视即可。</p>
+</blockquote>
+<p>烧录前把<strong>烧录配置从默认的 JLink 改为 ST-Link</strong>（构建配置里），第一次用会提示自动下载 STM32CubeProgrammer 烧录工具。接好 ST-Link（SWD 四线：3.3V&#x2F;SWDIO&#x2F;SWCLK&#x2F;GND），点烧录按钮：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">STM32CubeProgrammer v2.8.0</span><br><span class="line">Device: STM32F103C8T6  Flash: 64 KB</span><br><span class="line">Download verified successfully ✅</span><br><span class="line">RUNNING Program... Start operation achieved successfully</span><br></pre></td></tr></table></figure>
+
+<p><strong>烧录验证通过，程序跑起来了。</strong></p>
+<h2 id="十、总结：迁移-Checklist，可直接照搬"><a href="#十、总结：迁移-Checklist，可直接照搬" class="headerlink" title="十、总结：迁移 Checklist，可直接照搬"></a>十、总结：迁移 Checklist，可直接照搬</h2><p>以后任何 Keil 标准库工程迁移，按这个清单走：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">□ 1. 装 ARM GCC（勾选加 PATH），settings.json 配 EIDE.ARM.GCC.InstallDirectory</span><br><span class="line">□ 2. 装 EIDE 插件，导入 .uvprojx（选 ARM 不是 C51）</span><br><span class="line">□ 3. 编译器切换为 GCC</span><br><span class="line">□ 4. 预处理器定义补芯片型号宏：USE_STDPERIPH_DRIVER;STM32F10X_MD</span><br><span class="line">□ 5. 启动文件换 GNU 语法版（备份原文件）</span><br><span class="line">□ 6. core_cm3.c/h 换 GCC 兼容版（老 CMSIS + GCC14 才需要）</span><br><span class="line">□ 7. 工程放纯英文路径（中文路径链接必挂）</span><br><span class="line">□ 8. 构建配置指定链接脚本（.lds，64K Flash/20K RAM 等按芯片规格）</span><br><span class="line">□ 9. 烧录配置选 ST-Link/J-Link，接线烧录</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心思路</strong>：EIDE 帮你自动完成 90% 的配置搬运（源文件、宏、路径都从 uvprojx 解析），剩下 10% 是<strong>工具链差异</strong>的修补——启动文件语法、CMSIS 版本、编码问题，都是换文件&#x2F;换路径的事，<strong>你的业务代码一行都不用动</strong>。</p>
+<hr>
+<p><strong>参考资料</strong>：</p>
+<ul>
+<li><p>B站视频：再见了，Keil君！我已经爱上了EIDE插件（vscode+嵌入式开发）<a href="https://www.bilibili.com/video/BV1XGLozvEJf/?spm_id_from=333.337.search-card.all.click&vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1XGLozvEJf/?spm_id_from=333.337.search-card.all.click&amp;vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+</li>
+<li><p>模板仓库：<code>github.com/0x0E86/STM32F103C8T6</code>（GNU startup + 兼容 CMSIS）</p>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>VS Code</tag>
+        <tag>嵌入式</tag>
+        <tag>EIDE</tag>
+        <tag>Keil</tag>
+        <tag>STM32</tag>
+        <tag>工具链</tag>
+        <tag>GCC</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>数据结构 —— 链表</title>
+    <url>/2026/08/19/LinkList_DataStructure/</url>
+    <content><![CDATA[<h2 id="什么是链表"><a href="#什么是链表" class="headerlink" title="什么是链表"></a>什么是链表</h2><p><strong>链表</strong>是线性表的另一种存储方式。与顺序表（数组）不同，链表的每个元素都是<strong>独立申请的一块内存</strong>（称为<strong>节点</strong>），通过指针把它们”串”起来。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">顺序表：data → [ 1 | 2 | 3 | 4 | 5 ]    内存连续，一格挨着一格</span><br><span class="line"></span><br><span class="line">链表：  节点1 → 节点2 → 节点3 → 节点4 → 节点5 → NULL</span><br><span class="line">        [1|●]   [2|●]   [3|●]   [4|●]   [5|●]</span><br><span class="line">        内存是零散的，靠指针(next)把它们连成一条链</span><br></pre></td></tr></table></figure>
+
+<p>两者核心区别：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>顺序表</th>
+<th>链表</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内存</td>
+<td>连续</td>
+<td>离散（靠指针相连）</td>
+</tr>
+<tr>
+<td>访问</td>
+<td>随机访问 O(1)，按下标直接取</td>
+<td>只能从头<strong>顺序访问</strong> O(n)</td>
+</tr>
+<tr>
+<td>插入/删除</td>
+<td>O(n)，要移动大量元素</td>
+<td>**O(1)**（改指针即可，前提是已找到位置）</td>
+</tr>
+<tr>
+<td>扩容</td>
+<td>需要拷贝整个数据区</td>
+<td>天然”扩容”，随时 new 一个节点</td>
+</tr>
+</tbody></table>
+<p>一句话总结：**顺序表适合”查多改少”，链表适合”改多查少”**。</p>
+<hr>
+<h2 id="一、单向链表的结构定义"><a href="#一、单向链表的结构定义" class="headerlink" title="一、单向链表的结构定义"></a>一、单向链表的结构定义</h2><p>链式结构的代码套路是固定的：<strong>先定义节点结构，再定义表头结构，最后定义操作接口</strong>。</p>
+<h3 id="1-1-节点结构"><a href="#1-1-节点结构" class="headerlink" title="1.1 节点结构"></a>1.1 节点结构</h3><figure class="highlight c"><figcaption><span>linkList.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="type">int</span> ElemType;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 定义单链表节点的结构</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">LinkListNode</span> {</span></span><br><span class="line">    ElemType val;                 <span class="comment">// 数据域：存元素</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">LinkListNode</span>* <span class="title">next</span>;</span>    <span class="comment">// 指针域：指向下一个节点</span></span><br><span class="line">} LinkListNode;</span><br></pre></td></tr></table></figure>
+
+<p>节点 = <strong>数据域 + 指针域</strong>。指针域存的是下一个节点的地址，这就是”链”的由来。</p>
+<blockquote>
+<p>注意结构体里的写法是 <code>struct LinkListNode* next</code> 而不是 <code>LinkListNode* next</code>——因为此时 typedef 的名字 <code>LinkListNode</code> 还没有生效，必须用完整的 <code>struct LinkListNode</code>。</p>
+</blockquote>
+<h3 id="1-2-表头结构（含哨兵头节点）"><a href="#1-2-表头结构（含哨兵头节点）" class="headerlink" title="1.2 表头结构（含哨兵头节点）"></a>1.2 表头结构（含哨兵头节点）</h3><figure class="highlight c"><figcaption><span>linkList.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    LinkListNode header;  <span class="comment">// 头节点（哨兵），不存数据，保证操作统一</span></span><br><span class="line">    <span class="type">int</span> num;              <span class="comment">// 存储链表节点的个数</span></span><br><span class="line">} LinkListHeader;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意：这里的 <code>header</code> 是一个节点结构体的”实体”（不是指针）</strong>，它作为<strong>哨兵头节点</strong>存在。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">LinkListHeader (表头)</span><br><span class="line">┌──────────────┐</span><br><span class="line">│ header节点    │     节点1      节点2      节点3</span><br><span class="line">│ val=0,next───┼──→ [1|●] ──→ [2|●] ──→ [3|●] ──→ NULL</span><br><span class="line">│ num=3        │</span><br><span class="line">└──────────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么需要这个哨兵头节点？</strong></p>
+<p>因为有了它，<strong>所有插入删除的代码逻辑完全统一</strong>：</p>
+<ul>
+<li>没有哨兵时：插入到头部要改”头指针本身”，插入到中间要改”某个节点的 next”，<strong>两种情况的代码不一样</strong>，需要特判</li>
+<li>有哨兵时：插入位置的前置节点<strong>永远是某个节点的 next 字段</strong>（头插时前置节点就是哨兵 header），一套代码通吃</li>
+</ul>
+<p>这就是”<strong>用空间换逻辑统一</strong>“的思想，也是 STL 里 list 等容器的常见做法。</p>
+<hr>
+<h2 id="二、创建与释放"><a href="#二、创建与释放" class="headerlink" title="二、创建与释放"></a>二、创建与释放</h2><h3 id="2-1-创建表头"><a href="#2-1-创建表头" class="headerlink" title="2.1 创建表头"></a>2.1 创建表头</h3><figure class="highlight c"><figcaption><span>linkList.c - createLinkListHeader</span></figcaption><table><tr><td class="code"><pre><span class="line">LinkListHeader* <span class="title function_">createLinkListHeader</span><span class="params">()</span> {</span><br><span class="line">    <span class="comment">// 1. 在堆区申请表头结构体空间</span></span><br><span class="line">    LinkListHeader* res = (LinkListHeader*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkListHeader));</span><br><span class="line">    <span class="keyword">if</span> (res == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"申请表头失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 初始化：哨兵节点的 next 指向 NULL（空链表），计数为 0</span></span><br><span class="line">    res-&gt;header.next = <span class="literal">NULL</span>;</span><br><span class="line">    res-&gt;header.val = <span class="number">0</span>;</span><br><span class="line">    res-&gt;num = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> res;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>和顺序表一样，<strong>表头在堆区申请，返回指针</strong>。空链表的状态就是 <code>header.next = NULL</code>。</p>
+<h3 id="2-2-释放链表"><a href="#2-2-释放链表" class="headerlink" title="2.2 释放链表"></a>2.2 释放链表</h3><figure class="highlight c"><figcaption><span>linkList.c - releaseLinkList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">releaseLinkList</span><span class="params">(LinkListHeader* linklist_header)</span> {</span><br><span class="line">    <span class="keyword">if</span> (linklist_header) {</span><br><span class="line">        LinkListNode* p = linklist_header-&gt;header.next;  <span class="comment">// 从第一个真实节点开始</span></span><br><span class="line">        LinkListNode* temp;</span><br><span class="line">        <span class="comment">// 一路向前：先备份，再前移，最后释放</span></span><br><span class="line">        <span class="keyword">while</span> (p) {</span><br><span class="line">            temp = p;</span><br><span class="line">            p = p-&gt;next;</span><br><span class="line">            <span class="built_in">free</span>(temp);</span><br><span class="line">            linklist_header-&gt;num--;   <span class="comment">// 每释放一个，计数减一</span></span><br><span class="line">        }</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"Release success ! LinkList has %d values\n"</span>, linklist_header-&gt;num);</span><br><span class="line">        <span class="built_in">free</span>(linklist_header);        <span class="comment">// 最后释放表头</span></span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>释放的三大要点</strong>：</p>
+<ol>
+<li><strong>先备份再释放</strong>：<code>temp = p; p = p-&gt;next; free(temp);</code>——释放 p 之前必须先拿到下一个节点的地址，否则就”断链找不到了”</li>
+<li><strong>哨兵节点先不释放</strong>：遍历从 <code>header.next</code> 开始，哨兵 header 本身随表头一起释放</li>
+<li><strong>释放顺序与创建相反</strong>：先释放所有节点，再释放表头</li>
+</ol>
+<hr>
+<h2 id="三、插入操作"><a href="#三、插入操作" class="headerlink" title="三、插入操作"></a>三、插入操作</h2><h3 id="3-1-头插法（insertLinkListHeader）"><a href="#3-1-头插法（insertLinkListHeader）" class="headerlink" title="3.1 头插法（insertLinkListHeader）"></a>3.1 头插法（insertLinkListHeader）</h3><figure class="highlight c"><figcaption><span>linkList.c - insertLinkListHeader</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertLinkListHeader</span><span class="params">(LinkListHeader* linklist_header, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 创建辅助指针，指向前置节点</span></span><br><span class="line">    <span class="comment">// 头插法的前置节点就是哨兵头节点，天然自带</span></span><br><span class="line">    LinkListNode* p = &amp;linklist_header-&gt;header;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 创建新节点，创建之后第一步先初始化</span></span><br><span class="line">    LinkListNode* new_node = (LinkListNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkListNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 核心操作：先把新节点接上，再让前置节点跟上</span></span><br><span class="line">    new_node-&gt;next = p-&gt;next;   <span class="comment">// ① 新节点的 next 指向原来第一个节点</span></span><br><span class="line">    p-&gt;next = new_node;         <span class="comment">// ② 前置节点的 next 指向新节点</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 4. 更新表头计数</span></span><br><span class="line">    ++linklist_header-&gt;num;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心两行，顺序不能反</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">① new_node-&gt;next = p-&gt;next;</span><br><span class="line">             ┌─────────┐</span><br><span class="line">   header ──→│ 新节点   │──→ 原第一个节点 ──→ ...</span><br><span class="line">             └─────────┘</span><br><span class="line">   ①先把新节点"挂在"原链上（此时原第一个节点还被 header 指着，没丢）</span><br><span class="line"></span><br><span class="line">② p-&gt;next = new_node;</span><br><span class="line">             ┌─────────┐</span><br><span class="line">   header ──→│ 新节点   │──→ 原第一个节点 ──→ ...</span><br><span class="line">             └─────────┘</span><br><span class="line">   ②再让 header 指向新节点，新节点正式"上位"</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么先①后②？</strong> 如果先写 <code>p-&gt;next = new_node</code>，原链就断了——<code>new_node-&gt;next = p-&gt;next</code> 拿到的将是新节点自己（自环），原节点全部丢失。**”先接新，再改旧”是链表插入的铁律。**</p>
+<blockquote>
+<p>头插法的特点：插入顺序和最终顺序<strong>相反</strong>。循环头插 1~10，链里是 10 9 8 … 1。</p>
+</blockquote>
+<h3 id="3-2-任意位置插入（insertLinkListPos）"><a href="#3-2-任意位置插入（insertLinkListPos）" class="headerlink" title="3.2 任意位置插入（insertLinkListPos）"></a>3.2 任意位置插入（insertLinkListPos）</h3><figure class="highlight c"><figcaption><span>linkList.c - insertLinkListPos</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// pos 的取值范围：0 ~ num（pos=num 等价于尾插）</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">insertLinkListPos</span><span class="params">(LinkListHeader* linklist_header, <span class="type">int</span> pos, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 判断位置是否合法</span></span><br><span class="line">    <span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; linklist_header-&gt;num) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"insert pos invalid\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 创建辅助指针，指向前置节点</span></span><br><span class="line">    <span class="comment">// 头节点位置约定为 -1（哨兵下标）</span></span><br><span class="line">    LinkListNode* p = &amp;linklist_header-&gt;header;</span><br><span class="line">    <span class="type">int</span> index = <span class="number">-1</span>;</span><br><span class="line">    <span class="comment">// 当 index 为 pos-1 时，就找到了前置节点</span></span><br><span class="line">    <span class="keyword">while</span> (p &amp;&amp; (index &lt; pos - <span class="number">1</span>)) {</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        index++;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">if</span> (p == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 创建插入的节点空间，先操作新节点，再操作老节点</span></span><br><span class="line">    LinkListNode* new_node = (LinkListNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkListNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;next = p-&gt;next;   <span class="comment">// 同头插法，先接新</span></span><br><span class="line">    p-&gt;next = new_node;         <span class="comment">// 再改旧</span></span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    linklist_header-&gt;num++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>找前置节点的核心逻辑</strong>：单链表没有”回头路”，要插入到 pos 位置，必须先走到 <strong>pos-1 位置（前置节点）</strong>，再改它的 next。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">哨兵(-1) → 节点0 → 节点1 → 节点2 → 节点3 → NULL</span><br><span class="line">           ↑</span><br><span class="line">           p 走到这里 (index = pos-1) 停下</span><br><span class="line"></span><br><span class="line">pos=2 时：p 停在节点1（index=1），把新节点插到它后面 = 插到位置2 ✅</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>哨兵下标约定为 <code>-1</code>，第一个真实节点下标为 <code>0</code>，所以前置节点的 index 是 <code>pos-1</code></li>
+<li>**<code>pos</code> 可以等于 <code>num</code>**：此时 p 会走到最后一个节点后面（next 为 NULL），插入后即为尾插——这就是 <code>pos</code> 范围写成 <code>0~num</code> 的原因</li>
+</ul>
+<hr>
+<h2 id="四、删除操作"><a href="#四、删除操作" class="headerlink" title="四、删除操作"></a>四、删除操作</h2><figure class="highlight c"><figcaption><span>linkList.c - deleteLinkListVal</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">deleteLinkListVal</span><span class="params">(LinkListHeader* linklist_header, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 创建辅助指针，指向前置节点</span></span><br><span class="line">    <span class="comment">// 单链表只能单向走，删除节点也必须站在"前置节点"的位置上</span></span><br><span class="line">    LinkListNode* p = &amp;linklist_header-&gt;header;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 写法一：先找再断，直白</span></span><br><span class="line">    <span class="comment">// while (p-&gt;next) {</span></span><br><span class="line">    <span class="comment">//     if (p-&gt;next-&gt;val == val) break;</span></span><br><span class="line">    <span class="comment">//     p = p-&gt;next;</span></span><br><span class="line">    <span class="comment">// }</span></span><br><span class="line">    <span class="comment">// 写法二：用 &amp;&amp; 短路技巧，更简洁</span></span><br><span class="line">    <span class="keyword">while</span> ((p-&gt;next) &amp;&amp; (p-&gt;next-&gt;val != val)) {</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">    }</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 删除——核心思想就是备份</span></span><br><span class="line">    <span class="comment">// while 有两个出口：找到（p-&gt;next 非空）或 走到底（p-&gt;next 为空），结果不同，需要判断</span></span><br><span class="line">    <span class="keyword">if</span> (p-&gt;next) {</span><br><span class="line">        LinkListNode* temp = p-&gt;next;  <span class="comment">// 备份要删的节点</span></span><br><span class="line">        p-&gt;next = temp-&gt;next;          <span class="comment">// 让前置节点跳过它</span></span><br><span class="line">        <span class="built_in">free</span>(temp);                    <span class="comment">// 释放</span></span><br><span class="line">        linklist_header-&gt;num--;</span><br><span class="line">    } <span class="keyword">else</span> {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"Delete failed! No %d element\n"</span>, val);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>三个关键点</strong>：</p>
+<ol>
+<li><strong>单链表删除为什么必须找”前置节点”？</strong> 因为删除 = 让前一个节点的 next 跳过自己。而单链表只能顺着 next 往后走，无法回头，所以必须停在被删节点的前一个位置。代码里判断的是 <code>p-&gt;next-&gt;val == val</code>，p 始终站在前置位。</li>
+<li><strong>短路写法</strong>：<code>while (p-&gt;next &amp;&amp; p-&gt;next-&gt;val != val)</code>——<code>p-&gt;next</code> 为 NULL（走到尾）时直接短路退出，不会去解引用 NULL。**”先判空、再取值”是遍历链表的铁律**。</li>
+<li><strong>备份思想</strong>：<code>temp = p-&gt;next</code> 把要删的节点备份下来，改链之后再 <code>free(temp)</code>。<strong>释放前必须先摘链</strong>，防止悬空。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">删除前：  header → 节点A → 节点B → 节点C → NULL</span><br><span class="line">                              ↑</span><br><span class="line">                     p 停在这里（p-&gt;next 是 B）</span><br><span class="line"></span><br><span class="line">删除后：  header → 节点A ──────→ 节点C → NULL</span><br><span class="line">                              (B 被跳过、释放)</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、没有头节点怎么办：dummy-虚拟头节点"><a href="#五、没有头节点怎么办：dummy-虚拟头节点" class="headerlink" title="五、没有头节点怎么办：dummy 虚拟头节点"></a>五、没有头节点怎么办：dummy 虚拟头节点</h2><p>上面所有操作之所以统一，全靠哨兵头节点。但<strong>如果链表只有头指针、没有哨兵</strong>呢？</p>
+<figure class="highlight c"><figcaption><span>chainlist.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    ChainNode* next;   <span class="comment">// 头指针：指向第一个真实节点</span></span><br><span class="line">    ElemType val;      <span class="comment">// 这里被"借用"来当节点计数用</span></span><br><span class="line">} ChainHeader;</span><br></pre></td></tr></table></figure>
+
+<p>没有哨兵时，头插的代码会很别扭——插入位置的前置节点不存在，必须特判”是不是插入到头部”。<strong>解决办法：在函数内部创建一个栈上的 dummy 虚拟头节点</strong>：</p>
+<figure class="highlight c"><figcaption><span>chainlist.c - insertChainList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertChainList</span><span class="params">(ChainHeader* header, <span class="type">int</span> pos, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 没有头节点，就自己创建一个 dummy 虚拟头节点</span></span><br><span class="line">    ChainNode dummy;</span><br><span class="line">    dummy.next = header-&gt;next;      <span class="comment">// 让 dummy 指向真实的第一个节点</span></span><br><span class="line">    <span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; header-&gt;val) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"位置不合法\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    ChainNode* p = &amp;dummy;          <span class="comment">// 辅助指针从 dummy 出发，逻辑就和带头节点版一样了</span></span><br><span class="line">    <span class="type">int</span> index = <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">while</span> (p &amp;&amp; index &lt; pos - <span class="number">1</span>) {</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        index++;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">if</span> (p == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line"></span><br><span class="line">    ChainNode* new_node = (ChainNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ChainNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    new_node-&gt;next = p-&gt;next;       <span class="comment">// 先接新</span></span><br><span class="line">    p-&gt;next = new_node;             <span class="comment">// 再改旧</span></span><br><span class="line">    ++header-&gt;val;</span><br><span class="line">    header-&gt;next = dummy.next;      <span class="comment">// 头插可能改了第一个节点，同步回真实的头指针</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>dummy 技巧的本质</strong>：在一个局部栈变量上”伪造”一个临时头节点，让<strong>头插、中间插、尾插共用同一套前置节点逻辑</strong>。函数结束后 dummy 自动销毁，但插入已经完成，<code>header-&gt;next</code> 同步为 dummy 的下一个——即最新的链头。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">头插 5 到空链表：</span><br><span class="line">dummy ──→ NULL        →  新节点5 插入后：</span><br><span class="line">dummy ──→ [5|NULL]  ，header-&gt;next = dummy.next = 节点5 ✅</span><br><span class="line"></span><br><span class="line">再头插 4：</span><br><span class="line">dummy ──→ [4|●] ──→ [5|NULL] ，header-&gt;next = 节点4 ✅</span><br></pre></td></tr></table></figure>
+
+<p><strong>两种方案的取舍</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>哨兵头节点（常驻）</td>
+<td>逻辑统一、结构清晰</td>
+<td>多一个节点开销</td>
+</tr>
+<tr>
+<td>dummy 虚拟头节点（临时）</td>
+<td>不占常驻内存</td>
+<td>每次插入都要同步头指针</td>
+</tr>
+</tbody></table>
+<p>刷题时（LeetCode 等）没有哨兵头节点，<strong>dummy 技巧是最常用的解题手段</strong>，务必掌握。</p>
+<hr>
+<h2 id="六、单向循环链表：尾指针的妙用"><a href="#六、单向循环链表：尾指针的妙用" class="headerlink" title="六、单向循环链表：尾指针的妙用"></a>六、单向循环链表：尾指针的妙用</h2><p>循环链表 = 把最后一个节点的 next 指回开头，形成闭环。**配合尾指针 <code>rear</code>，尾插可以做到 O(1)**——这是它比普通链表强的地方。（对应代码：<code>03_LinkLoop</code>）</p>
+<figure class="highlight c"><figcaption><span>linkLoop.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">linkloopNode</span> {</span>  <span class="comment">// 节点结构</span></span><br><span class="line">    ElemType val;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">linkloopNode</span>* <span class="title">next</span>;</span></span><br><span class="line">} LinkLoopNode;</span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span>               <span class="comment">// 表头结构</span></span><br><span class="line">    LinkLoopNode header;       <span class="comment">// 头节点（哨兵）</span></span><br><span class="line">    LinkLoopNode* rear;        <span class="comment">// 尾指针：指向最后一个节点</span></span><br><span class="line">    <span class="type">int</span> num;</span><br><span class="line">} LinkLoopHeader;</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-1-初始化"><a href="#6-1-初始化" class="headerlink" title="6.1 初始化"></a>6.1 初始化</h3><figure class="highlight c"><figcaption><span>linkLoop.c - initLinkLoopList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 初始化已经存在的空间（栈上的表头，用 init 而非 create）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">initLinkLoopList</span><span class="params">(LinkLoopHeader* linkloop_header)</span> {</span><br><span class="line">    linkloop_header-&gt;num = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 尾指针和头节点的 next 都指向头节点自身</span></span><br><span class="line">    linkloop_header-&gt;rear = linkloop_header-&gt;header.next = &amp;linkloop_header-&gt;header;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>空循环链表的标志：<code>header.next == &amp;header</code>（自己指向自己）</strong>，这是循环链表”空表”和”遍历结束”的统一判断条件。初始化时 <code>rear</code> 也指向自身——因为空表只有一个节点（哨兵），它既是头又是尾。</p>
+<h3 id="6-2-尾插法（O-1-的关键）"><a href="#6-2-尾插法（O-1-的关键）" class="headerlink" title="6.2 尾插法（O(1) 的关键）"></a>6.2 尾插法（O(1) 的关键）</h3><figure class="highlight c"><figcaption><span>linkLoop.c - insertLinkLoopRear</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertLinkLoopRear</span><span class="params">(LinkLoopHeader* linkloop_header, ElemType val)</span> {</span><br><span class="line">    LinkLoopNode* new_node = (LinkLoopNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkLoopNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    new_node-&gt;next = linkloop_header-&gt;rear-&gt;next;   <span class="comment">// ① 新节点接在"尾的后面"（即头节点）</span></span><br><span class="line">    linkloop_header-&gt;rear-&gt;next = new_node;         <span class="comment">// ② 尾节点的 next 指向新节点</span></span><br><span class="line">    <span class="comment">// 无论是否存在节点，尾插法尾指针都要更新</span></span><br><span class="line">    linkloop_header-&gt;rear = new_node;               <span class="comment">// ③ 新节点成为新尾</span></span><br><span class="line">    ++linkloop_header-&gt;num;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>普通链表尾插要遍历到尾部（O(n)）；循环链表<strong>有 <code>rear</code> 直接知道尾在哪</strong>，三步完成：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">① 新节点 next 指向"尾的 next"（哨兵头）→ 形成闭环</span><br><span class="line">② 尾的 next 指向新节点 → 接上</span><br><span class="line">③ rear 移到新节点 → 新尾就位</span><br><span class="line"></span><br><span class="line">header(哨兵) → 节点1 → 节点2 → 节点3(rear) ──┐</span><br><span class="line">     ↑                                        │</span><br><span class="line">     └────────────── 新节点(新rear) ←──────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>记住：循环链表尾插永远三步——接环、接入、更新 rear</strong>，和元素个数无关。</p>
+<h3 id="6-3-头插法的特殊处理"><a href="#6-3-头插法的特殊处理" class="headerlink" title="6.3 头插法的特殊处理"></a>6.3 头插法的特殊处理</h3><figure class="highlight c"><figcaption><span>linkLoop.c - insertLinkLoopHeader</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertLinkLoopHeader</span><span class="params">(LinkLoopHeader* linkloop_header, ElemType val)</span> {</span><br><span class="line">    LinkLoopNode* new_node = (LinkLoopNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkLoopNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    new_node-&gt;next = linkloop_header-&gt;header.next;   <span class="comment">// 插到哨兵后面</span></span><br><span class="line">    linkloop_header-&gt;header.next = new_node;</span><br><span class="line">    linkloop_header-&gt;num++;</span><br><span class="line">    <span class="comment">// 头插法一般不会改变尾节点，除非是创建第一个节点的时候</span></span><br><span class="line">    <span class="keyword">if</span> (linkloop_header-&gt;rear == &amp;linkloop_header-&gt;header) {</span><br><span class="line">        linkloop_header-&gt;rear = new_node;   <span class="comment">// 空表插入第一个节点，尾也要更新</span></span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>头插通常只动哨兵后面，rear 不变。<strong>唯一例外：空链表头插第一个节点</strong>——此时这个节点既是头也是尾，必须顺手更新 <code>rear</code>。这就是”<strong>创建第一个节点时，头尾指针一起指它</strong>“的经典处理。</p>
+<h3 id="6-4-遍历与释放"><a href="#6-4-遍历与释放" class="headerlink" title="6.4 遍历与释放"></a>6.4 遍历与释放</h3><figure class="highlight c"><figcaption><span>linkLoop.c - showLinkLoop / releaseLinkLoop</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">showLinkLoop</span><span class="params">(LinkLoopHeader* linkloop_header)</span> {</span><br><span class="line">    LinkLoopNode* p = linkloop_header-&gt;header.next;</span><br><span class="line">    <span class="keyword">while</span> (p != &amp;linkloop_header-&gt;header) {   <span class="comment">// 回到哨兵 = 遍历完一圈</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d\t"</span>, p-&gt;val);</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">    }</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"\n"</span>);</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">releaseLinkLoop</span><span class="params">(LinkLoopHeader* linkloop_header)</span> {</span><br><span class="line">    LinkLoopNode* p = linkloop_header-&gt;header.next;</span><br><span class="line">    <span class="keyword">while</span> (p != &amp;linkloop_header-&gt;header) {</span><br><span class="line">        LinkLoopNode* temp = p;</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        <span class="built_in">free</span>(temp);</span><br><span class="line">        --linkloop_header-&gt;num;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 释放完后恢复初始状态</span></span><br><span class="line">    linkloop_header-&gt;rear = linkloop_header-&gt;header.next = &amp;linkloop_header-&gt;header;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>循环链表的遍历/释放终止条件从”<code>p != NULL</code>“变成了”<strong><code>p != &amp;header</code></strong>“——因为最后一个节点的 next 指向的是哨兵头而不是 NULL。<strong>不能再用 NULL 判断，否则死循环。</strong></p>
+<hr>
+<h2 id="七、双向循环链表：addNode-delNode-四指针"><a href="#七、双向循环链表：addNode-delNode-四指针" class="headerlink" title="七、双向循环链表：addNode / delNode 四指针"></a>七、双向循环链表：addNode / delNode 四指针</h2><p>双向 = 每个节点多一个 <code>prev</code> 指针，可以往前走了。代码上最大的进步是：<strong>把”接缝”和”拆缝”封装成两个通用函数，头插尾插删除全部复用</strong>。（对应代码：<code>04_DoubleLinkLoop</code>）</p>
+<figure class="highlight c"><figcaption><span>doublelinkloop.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">doublenode</span> {</span></span><br><span class="line">    ElemType val;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">doublenode</span>* <span class="title">next</span>;</span>   <span class="comment">// 后继</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">doublenode</span>* <span class="title">prev</span>;</span>   <span class="comment">// 前驱</span></span><br><span class="line">} DoubleNode, DoubleHeader;    <span class="comment">// 同一个结构体既是节点也是表头（哨兵模式）</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>注意这里的精巧设计</strong>：<code>DoubleHeader</code> 和 <code>DoubleNode</code> 是<strong>同一个结构体</strong>——表头本身就是一个哨兵节点实体。这是双向循环链表最常见的实现（STL 的 list 就是这个结构）。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌───────────────────────── 环 ─────────────────────────┐</span><br><span class="line">│                                                        │</span><br><span class="line">▼                                                        │</span><br><span class="line">header(哨兵) ↔ 节点1 ↔ 节点2 ↔ 节点3 ↔ ... ↔ 节点n ──────┘</span><br><span class="line">  next=节点1    prev=header</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-1-初始化"><a href="#7-1-初始化" class="headerlink" title="7.1 初始化"></a>7.1 初始化</h3><figure class="highlight c"><figcaption><span>doublelinkloop.c - initDLink</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">initDLink</span><span class="params">(DoubleHeader* double_header)</span> {</span><br><span class="line">    double_header-&gt;next = double_header-&gt;prev = double_header;  <span class="comment">// 自己指自己</span></span><br><span class="line">    double_header-&gt;val = <span class="number">0</span>;   <span class="comment">// 顺手当计数用</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>空双向循环表：<code>next == prev == 自身</code>——整个表就一个哨兵节点。</p>
+<h3 id="7-2-核心：addNode（把新节点插到-prev-next-之间）"><a href="#7-2-核心：addNode（把新节点插到-prev-next-之间）" class="headerlink" title="7.2 核心：addNode（把新节点插到 [prev, next] 之间）"></a>7.2 核心：addNode（把新节点插到 [prev, next] 之间）</h3><figure class="highlight c"><figcaption><span>doublelinkloop.c - addNode</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">addNode</span><span class="params">(DoubleNode* new_node, DoubleNode* next, DoubleNode* prev)</span> {</span><br><span class="line">    new_node-&gt;next = next;   <span class="comment">// ① 新节点后继</span></span><br><span class="line">    next-&gt;prev = new_node;   <span class="comment">// ② 后继的前驱 = 新节点</span></span><br><span class="line">    new_node-&gt;prev = prev;   <span class="comment">// ③ 新节点前驱</span></span><br><span class="line">    prev-&gt;next = new_node;   <span class="comment">// ④ 前驱的后继 = 新节点</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>四根指针，两根线</strong>。画图理解：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">插入前：  prev ↔ next</span><br><span class="line">插入后：  prev ↔ new_node ↔ next</span><br><span class="line"></span><br><span class="line">new_node-&gt;next = next;   → 新节点连后继   ┐</span><br><span class="line">next-&gt;prev = new_node;   → 后继连新节点   ┤  左边这条线（new ↔ next）接通</span><br><span class="line">new_node-&gt;prev = prev;   → 新节点连前驱   ┤</span><br><span class="line">prev-&gt;next = new_node;   → 前驱连新节点   ┘  右边这条线（prev ↔ new）接通</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>四步的顺序其实没有严格要求（互不覆盖），但<strong>保持”先接新节点，再改老节点”的习惯</strong>最不容易出错。<code>static</code> 修饰表示它是文件内部工具函数，不对外暴露。</p>
+</blockquote>
+<h3 id="7-3-头插-尾插-删除，全是-addNode-delNode-的调用"><a href="#7-3-头插-尾插-删除，全是-addNode-delNode-的调用" class="headerlink" title="7.3 头插 / 尾插 / 删除，全是 addNode / delNode 的调用"></a>7.3 头插 / 尾插 / 删除，全是 addNode / delNode 的调用</h3><figure class="highlight c"><figcaption><span>doublelinkloop.c - insertDHeader / insertDRear / delDLink</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 头插：插到哨兵和原第一个节点之间</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">insertDHeader</span><span class="params">(DoubleHeader* double_header, ElemType val)</span> {</span><br><span class="line">    DoubleNode* new_node = (DoubleNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(DoubleNode));</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    addNode(new_node, double_header-&gt;next, double_header);  <span class="comment">// 前驱=header，后继=原第一个</span></span><br><span class="line">    ++double_header-&gt;val;</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// 尾插：插到原尾节点和哨兵之间</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">insertDRear</span><span class="params">(DoubleHeader* double_header, ElemType val)</span> {</span><br><span class="line">    DoubleNode* new_node = (DoubleNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(DoubleNode));</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    addNode(new_node, double_header, double_header-&gt;prev);  <span class="comment">// 前驱=原尾，后继=header</span></span><br><span class="line">    ++double_header-&gt;val;</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// 删除：找到节点后，把它前后两个节点直接"焊"起来</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">delDLink</span><span class="params">(DoubleHeader* double_header, ElemType val)</span> {</span><br><span class="line">    DoubleNode* p = double_header-&gt;next;</span><br><span class="line">    <span class="keyword">for</span> (; p != double_header; p = p-&gt;next) {   <span class="comment">// 遍历找值</span></span><br><span class="line">        <span class="keyword">if</span> (p-&gt;val == val) <span class="keyword">break</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">if</span> (p == double_header) {   <span class="comment">// 走到哨兵 = 没找到</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"no %d element\n"</span>, val);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    }</span><br><span class="line">    delNode(p-&gt;prev, p-&gt;next);  <span class="comment">// 摘链：前驱的 next 跨过 p 直连后继</span></span><br><span class="line">    <span class="built_in">free</span>(p);</span><br><span class="line">    --double_header-&gt;val;</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// delNode：拆缝只做一件事——前驱的 next 指向后继，后继的 prev 指回前驱</span></span><br><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">delNode</span><span class="params">(DoubleNode* prev, DoubleNode* next)</span> {</span><br><span class="line">    prev-&gt;next = next;</span><br><span class="line">    next-&gt;prev = prev;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>双向链表的三大优势</strong>：</p>
+<ol>
+<li><strong>删除 O(1)<strong>：单链表删除必须找前置节点，双向链表 <code>p-&gt;prev</code> 直接就是前置，</strong>摘链只要两行</strong>（<code>prev-&gt;next = next; next-&gt;prev = prev</code>）</li>
+<li><strong>头插尾插完全对称</strong>：头插是 <code>(header, header-&gt;next)</code>，尾插是 <code>(header-&gt;prev, header)</code>，一套 addNode 通吃，<strong>没有任何特判</strong></li>
+<li><strong>哨兵模式天然闭环</strong>：不需要维护 head/tail 两个指针，头尾操作都退化成”在哨兵身边插/删”</li>
+</ol>
+<hr>
+<h2 id="八、实战应用：约瑟夫环问题"><a href="#八、实战应用：约瑟夫环问题" class="headerlink" title="八、实战应用：约瑟夫环问题"></a>八、实战应用：约瑟夫环问题</h2><p>约瑟夫问题（约瑟夫环）：n 个人围成一圈，从第 1 个人开始报数，报到 m 的人出列，下一个人重新从 1 报数，直到剩最后一个人。经典应用，<strong>天然适合用循环链表模拟</strong>。（对应代码：<code>03_LinkLoop/Joseph.c</code>）</p>
+<h3 id="8-1-问题建模"><a href="#8-1-问题建模" class="headerlink" title="8.1 问题建模"></a>8.1 问题建模</h3><figure class="highlight c"><figcaption><span>Joseph.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">josephnode</span> {</span></span><br><span class="line">    <span class="type">int</span> val;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">josephnode</span>* <span class="title">next</span>;</span></span><br><span class="line">} JosephNode;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 约瑟夫环的表头，只保留头尾指针</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    JosephNode* head;   <span class="comment">// 头指针</span></span><br><span class="line">    JosephNode* tail;   <span class="comment">// 尾指针</span></span><br><span class="line">} JosephHeader;</span><br></pre></td></tr></table></figure>
+
+<p>注意这里<strong>没有哨兵节点</strong>，只有头尾两个指针——因为约瑟夫环要频繁”转圈报数”，头尾指针直接定位最方便。它依然是循环链表（<code>tail-&gt;next == head</code>）。</p>
+<h3 id="8-2-初始化：尾插建环-首尾相接"><a href="#8-2-初始化：尾插建环-首尾相接" class="headerlink" title="8.2 初始化：尾插建环 + 首尾相接"></a>8.2 初始化：尾插建环 + 首尾相接</h3><figure class="highlight c"><figcaption><span>Joseph.c - initJosephGame</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">initJosephGame</span><span class="params">(JosephHeader* joseph_header, <span class="type">int</span> n)</span> {</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">1</span>; i &lt;= n; i++) {</span><br><span class="line">        JosephNode* new_node = (JosephNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(JosephNode));</span><br><span class="line">        <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        }</span><br><span class="line">        new_node-&gt;val = i;</span><br><span class="line">        new_node-&gt;next = <span class="literal">NULL</span>;</span><br><span class="line">        <span class="comment">// 判断是否是空链表</span></span><br><span class="line">        <span class="keyword">if</span> (joseph_header-&gt;head == <span class="literal">NULL</span>) {</span><br><span class="line">            <span class="comment">// 第一个节点：头尾指针同时指向它</span></span><br><span class="line">            joseph_header-&gt;head = joseph_header-&gt;tail = new_node;</span><br><span class="line">        } <span class="keyword">else</span> {</span><br><span class="line">            <span class="comment">// 后续节点：只需更新尾指针</span></span><br><span class="line">            joseph_header-&gt;tail-&gt;next = new_node;</span><br><span class="line">            joseph_header-&gt;tail = new_node;</span><br><span class="line">        }</span><br><span class="line">        joseph_header-&gt;tail-&gt;next = joseph_header-&gt;head;   <span class="comment">// 每次插入后都重新闭环</span></span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>**”空表首节点头尾同指，后续节点只动尾指针，最后一句闭环”**——没有哨兵时建循环链表的固定套路。每次插入末尾都执行 <code>tail-&gt;next = head</code>，保证环永远闭合。</p>
+<h3 id="8-3-遍历：do-while-的用武之地"><a href="#8-3-遍历：do-while-的用武之地" class="headerlink" title="8.3 遍历：do-while 的用武之地"></a>8.3 遍历：do-while 的用武之地</h3><figure class="highlight c"><figcaption><span>Joseph.c - showData</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">showData</span><span class="params">(JosephHeader* joseph_header)</span> {</span><br><span class="line">    JosephNode* p = joseph_header-&gt;head;</span><br><span class="line">    <span class="comment">// 没有头节点，只有头指针的循环链表的遍历方式——do while 循环</span></span><br><span class="line">    <span class="keyword">do</span> {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d\t"</span>, p-&gt;val);</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        <span class="comment">// 先执行一次，然后再判断是否回到起点</span></span><br><span class="line">    } <span class="keyword">while</span> (p != joseph_header-&gt;head);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"\n"</span>);</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>普通循环链表有哨兵，用 <code>while (p != &amp;header)</code>；**无哨兵的循环链表必须用 <code>do-while</code>**——因为第一次进来 p 就是合法节点，判断放在后面才能完整走完一圈再停。</p>
+<h3 id="8-4-核心：淘汰逻辑（pre-cur-双指针）"><a href="#8-4-核心：淘汰逻辑（pre-cur-双指针）" class="headerlink" title="8.4 核心：淘汰逻辑（pre / cur 双指针）"></a>8.4 核心：淘汰逻辑（pre / cur 双指针）</h3><figure class="highlight c"><figcaption><span>Joseph.c - startJosephGame</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">startJosephGame</span><span class="params">(JosephHeader* joseph_header, <span class="type">int</span> m)</span> {</span><br><span class="line">    JosephNode* pre = <span class="literal">NULL</span>;                    <span class="comment">// 前驱：淘汰时用它摘链</span></span><br><span class="line">    JosephNode* cur = joseph_header-&gt;head;     <span class="comment">// 当前指针：从第一个人开始报数</span></span><br><span class="line">    <span class="keyword">while</span> (cur-&gt;next != cur) {                 <span class="comment">// 环上只剩一个节点时结束</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">1</span>; i &lt; m; i++) {          <span class="comment">// 报数 m-1 次，cur 停在"报到 m"的人上</span></span><br><span class="line">            pre = cur;</span><br><span class="line">            cur = cur-&gt;next;</span><br><span class="line">        }</span><br><span class="line">        pre-&gt;next = cur-&gt;next;                 <span class="comment">// 摘链：前驱跳过 cur</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d号淘汰\t"</span>, cur-&gt;val);</span><br><span class="line">        <span class="built_in">free</span>(cur);                             <span class="comment">// 释放</span></span><br><span class="line">        cur = pre-&gt;next;                       <span class="comment">// 下一个人从 1 重新报数</span></span><br><span class="line">    }</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"最后剩下的是%d号\n"</span>, cur-&gt;val);</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>逐行拆解</strong>：</p>
+<ol>
+<li><strong>为什么报 m 次只走 m-1 步？</strong> 因为 <code>cur</code> 初始已经站在第 1 个人上，<code>for (i=1; i&lt;m; i++)</code> 再走 m-1 步正好停在报到 m 的人身上</li>
+<li><strong>为什么需要 <code>pre</code>？</strong> 这是无哨兵的单向链表，删除仍然要找前置节点——<code>pre</code> 就是干这个的</li>
+<li><strong>淘汰三步</strong>：<code>pre-&gt;next = cur-&gt;next</code>（摘链）→ <code>free(cur)</code>（释放）→ <code>cur = pre-&gt;next</code>（从下一个人重新开始报数）</li>
+<li>**终止条件 <code>cur-&gt;next != cur</code>**：环上只剩一个节点时，它自己指向自己——这是”单节点环”的标志，跳出后它即幸存者</li>
+</ol>
+<h3 id="8-5-运行模拟（n-10，m-3）"><a href="#8-5-运行模拟（n-10，m-3）" class="headerlink" title="8.5 运行模拟（n=10，m=3）"></a>8.5 运行模拟（n=10，m=3）</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">初始：1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → (回1)</span><br><span class="line"></span><br><span class="line">第1轮：从1报数，3号淘汰 → 剩余 1 2 4 5 6 7 8 9 10</span><br><span class="line">第2轮：从4报数，6号淘汰 → 剩余 1 2 4 5 7 8 9 10</span><br><span class="line">第3轮：从7报数，9号淘汰 → 剩余 1 2 4 5 7 8 10</span><br><span class="line">第4轮：从10报数，2号淘汰 → 剩余 1 4 5 7 8 10</span><br><span class="line">第5轮：从4报数，7号淘汰 → 剩余 1 4 5 8 10</span><br><span class="line">第6轮：从8报数，1号淘汰 → 剩余 4 5 8 10</span><br><span class="line">第7轮：从4报数，8号淘汰 → 剩余 4 5 10</span><br><span class="line">第8轮：从10报数，5号淘汰 → 剩余 4 10</span><br><span class="line">第9轮：从10报数，10号淘汰 → 剩余 4</span><br><span class="line"></span><br><span class="line">输出：3号淘汰 6号淘汰 9号淘汰 2号淘汰 7号淘汰 1号淘汰 8号淘汰 5号淘汰 10号淘汰</span><br><span class="line">最后剩下的是4号 ✅</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="九、复习要点总结"><a href="#九、复习要点总结" class="headerlink" title="九、复习要点总结"></a>九、复习要点总结</h2><h3 id="9-1-四版链表代码对照"><a href="#9-1-四版链表代码对照" class="headerlink" title="9.1 四版链表代码对照"></a>9.1 四版链表代码对照</h3><table>
+<thead>
+<tr>
+<th>版本</th>
+<th>表头结构</th>
+<th>空表标志</th>
+<th>遍历终止</th>
+<th>亮点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单向链表（带头节点）</td>
+<td>哨兵 header + num</td>
+<td><code>header.next == NULL</code></td>
+<td><code>p != NULL</code></td>
+<td>插入删除逻辑统一</td>
+</tr>
+<tr>
+<td>单向链表（无头节点）</td>
+<td>头指针 next</td>
+<td><code>next == NULL</code></td>
+<td><code>p != NULL</code></td>
+<td><strong>dummy 虚拟头节点</strong>技巧</td>
+</tr>
+<tr>
+<td>单向循环链表</td>
+<td>哨兵 + 尾指针 rear</td>
+<td><code>next == &amp;header</code></td>
+<td><code>p != &amp;header</code></td>
+<td><strong>尾插 O(1)</strong></td>
+</tr>
+<tr>
+<td>双向循环链表</td>
+<td>哨兵即表头</td>
+<td><code>next == prev == &amp;header</code></td>
+<td><code>p != &amp;header</code></td>
+<td><strong>addNode/delNode 通用</strong></td>
+</tr>
+</tbody></table>
+<h3 id="9-2-操作复杂度"><a href="#9-2-操作复杂度" class="headerlink" title="9.2 操作复杂度"></a>9.2 操作复杂度</h3><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>单链表（带头）</th>
+<th>循环链表（带 rear）</th>
+<th>双向循环链表</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>头插</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td>尾插</td>
+<td>O(n)（要遍历）</td>
+<td><strong>O(1)</strong></td>
+<td><strong>O(1)</strong></td>
+</tr>
+<tr>
+<td>任意位置插入</td>
+<td>O(n)</td>
+<td>O(n)</td>
+<td>O(n)</td>
+</tr>
+<tr>
+<td>按值删除</td>
+<td>O(n)（找前置）</td>
+<td>O(n)</td>
+<td>O(n)，但找到后摘链 O(1)</td>
+</tr>
+<tr>
+<td>查找</td>
+<td>O(n)</td>
+<td>O(n)</td>
+<td>O(n)</td>
+</tr>
+</tbody></table>
+<h3 id="9-3-面试常问细节"><a href="#9-3-面试常问细节" class="headerlink" title="9.3 面试常问细节"></a>9.3 面试常问细节</h3><ol>
+<li><strong>为什么要哨兵头节点？</strong> — 让头插和中间插共用”前置节点”逻辑，删除也无需特判”删的是不是第一个”，代码统一、不易出错</li>
+<li><strong>单链表删除为什么必须找前置节点？</strong> — 单向链表只能顺着 next 走，删除的本质是”前一个节点跳过自己”，而前一个节点无法回头访问，只能先走到它</li>
+<li><strong>插入时”先接新、再改旧”为什么不能反？</strong> — 先改旧会让原链断开，新节点无法挂接，后续节点全部丢失</li>
+<li><strong>循环链表如何判断空表和遍历结束？</strong> — 统一用 <code>p == &amp;header</code>（有哨兵）或 <code>p == head</code>（无哨兵），<strong>永远不能用 NULL</strong></li>
+<li><strong>为什么循环链表尾插能 O(1)？</strong> — 尾指针 rear 直接定位尾节点，免去 O(n) 的找尾遍历</li>
+<li><strong>双向循环链表删除为什么更优？</strong> — 节点自带 prev，前置节点 O(1) 可得，摘链只需 <code>delNode(p-&gt;prev, p-&gt;next)</code> 两行</li>
+<li><strong>dummy 虚拟头节点什么时候用？</strong> — 刷题时链表常常只有头指针，局部创建 dummy 即可复用统一的插入逻辑，无需修改调用方的头指针（注意同步 <code>header-&gt;next = dummy.next</code>）</li>
+<li><strong>为什么要有 ElemType？</strong> — 数据结构只关心”组织方式”不关心”元素类型”，typedef 一次，换类型只改一行</li>
+</ol>
+<hr>
+]]></content>
+      <categories>
+        <category>数据结构</category>
+      </categories>
+      <tags>
+        <tag>C/C++</tag>
+        <tag>链表</tag>
+        <tag>数据结构</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——蓝牙BLE通信，用蓝牙无线控制小灯</title>
     <url>/2026/07/30/STM32_BLE_Bluetooth/</url>
     <content><![CDATA[<h2 id="从有线到无线——蓝牙来了"><a href="#从有线到无线——蓝牙来了" class="headerlink" title="从有线到无线——蓝牙来了"></a>从有线到无线——蓝牙来了</h2><p>上篇博客我们学完了 DMA + 空闲中断，串口收发效率达到了极致。但一直是有线连接</p>
@@ -1308,8 +1874,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>USART</tag>
         <tag>蓝牙</tag>
@@ -1620,8 +2186,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>RCC</tag>
         <tag>时钟树</tag>
@@ -1629,271 +2195,327 @@
       </tags>
   </entry>
   <entry>
-    <title>Keil 工程迁移到 VS Code + EIDE——智能小车项目前置准备</title>
-    <url>/2026/08/10/Keil_to_VSCode_EIDE_Migration/</url>
-    <content><![CDATA[<h2 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h2><p>我在b站获取了up主“陈加油嗯”的 STM32F103C8T6 智能小车项目（蓝牙遥控 + 循迹 + 避障三合一），他是用 <strong>Keil5 + 标准外设库</strong>写的。但我平时的主力编辑器是 VS Code，所以目标很明确：</p>
-<p><strong>在 VS Code 里把这个 Keil 工程编译、烧录、跑起来，源代码一行不改。</strong></p>
-<p>折腾了半天，搜索了一些教程，最终用 <strong>EIDE 插件</strong>顺利跑通：导入工程 → GCC 编译 → ST-Link 烧录，全程图形化点击。这篇文章把完整流程和 4 个遇到的坑记录下来，以后任何 Keil 工程想迁移都能照搬。</p>
-<h2 id="一、为什么要从-Keil-搬到-VS-Code"><a href="#一、为什么要从-Keil-搬到-VS-Code" class="headerlink" title="一、为什么要从 Keil 搬到 VS Code"></a>一、为什么要从 Keil 搬到 VS Code</h2><table>
-<thead>
-<tr>
-<th align="left">对比项</th>
-<th align="left">Keil5</th>
-<th align="left">VS Code + EIDE</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">编辑器体验</td>
-<td align="left">编辑器老、代码补全弱</td>
-<td align="left">现代编辑器，补全&#x2F;跳转&#x2F;主题好</td>
-</tr>
-<tr>
-<td align="left">编译器</td>
-<td align="left">ARMCC（Keil 专用）</td>
-<td align="left">ARM GCC（开源，通用）</td>
-</tr>
-<tr>
-<td align="left">烧录</td>
-<td align="left">内置</td>
-<td align="left">支持 ST-Link&#x2F;J-Link&#x2F;OpenOCD</td>
-</tr>
-<tr>
-<td align="left">跨平台</td>
-<td align="left">仅 Windows</td>
-<td align="left">Windows&#x2F;Linux&#x2F;Mac</td>
-</tr>
-<tr>
-<td align="left">版本管理</td>
-<td align="left">弱</td>
-<td align="left">原生 Git 集成</td>
-</tr>
-<tr>
-<td align="left">学习成本</td>
-<td align="left">工程文件是黑盒</td>
-<td align="left">构建过程透明可见</td>
-</tr>
-</tbody></table>
-<p>标准外设库（SPL）工程的结构非常规整，天然适合迁移：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">工程目录/</span><br><span class="line">├── User/          # main.c、中断处理</span><br><span class="line">├── System/        # 延时、sys</span><br><span class="line">├── HARDWARE/      # 各外设驱动（LED/电机/OLED/串口…）</span><br><span class="line">├── Library/       # 标准外设库（SPL）</span><br><span class="line">├── Start/         # 启动文件 + CMSIS 核心</span><br><span class="line">└── Project.uvprojx  # Keil 工程文件（配置的源头）</span><br></pre></td></tr></table></figure>
-
-<h2 id="二、三条路线怎么选"><a href="#二、三条路线怎么选" class="headerlink" title="二、三条路线怎么选"></a>二、三条路线怎么选</h2><p>把 Keil 工程搬到 VS Code，我研究后有<strong>三条</strong>路线：EIDE 插件、手写 CMake、ST 官方扩展。</p>
-<h3 id="1-主路线：EIDE-插件（我选的）"><a href="#1-主路线：EIDE-插件（我选的）" class="headerlink" title="1. 主路线：EIDE 插件（我选的）"></a>1. 主路线：EIDE 插件（我选的）</h3><table>
-<thead>
-<tr>
-<th align="left"></th>
-<th align="left">EIDE 插件</th>
-<th align="left">手写 CMake</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">移植工作量</td>
-<td align="left"><strong>零</strong>（直接导入 .uvprojx）</td>
-<td align="left">写 CMakeLists + 链接脚本 + 换启动文件</td>
-</tr>
-<tr>
-<td align="left">操作方式</td>
-<td align="left">图形化按钮</td>
-<td align="left">命令行</td>
-</tr>
-<tr>
-<td align="left">宏&#x2F;头文件路径</td>
-<td align="left">自动从 Keil 工程解析</td>
-<td align="left">手动照抄</td>
-</tr>
-<tr>
-<td align="left">适合人群</td>
-<td align="left">想快速跑通</td>
-<td align="left">想深入理解构建流程 &#x2F; 做 CI</td>
-</tr>
-</tbody></table>
-<p><strong>学习阶段选 EIDE 最快</strong>——它只是编译工具，不影响你读代码理解代码。CMake 方案留作进阶（做 CI、复杂工程时再用）。</p>
-<h3 id="2-为什么不选-ST-官方扩展？"><a href="#2-为什么不选-ST-官方扩展？" class="headerlink" title="2. 为什么不选 ST 官方扩展？"></a>2. 为什么不选 ST 官方扩展？</h3><p>keysking的stm32教程中安装的是stm32Cube插件，<strong>为什么不用它，用第三方 EIDE？</strong> 关键区别在这里：</p>
+    <title>深入stm32的底层通信模型--数据的存储与传输</title>
+    <url>/2026/08/02/STM32_Data_Buffer_Mechanism/</url>
+    <content><![CDATA[<h2 id="从串口到-I2C：一个反复出现的问题"><a href="#从串口到-I2C：一个反复出现的问题" class="headerlink" title="从串口到 I2C：一个反复出现的问题"></a>从串口到 I2C：一个反复出现的问题</h2><p>回顾一下我们这一路学过的通信博客：</p>
 <table>
 <thead>
 <tr>
-<th align="left"></th>
-<th align="left">STM32 官方扩展</th>
-<th align="left">EIDE</th>
+<th align="left">博客</th>
+<th align="left">外设</th>
+<th align="left">模式</th>
+<th align="left">收发用的数组</th>
 </tr>
 </thead>
 <tbody><tr>
-<td align="left">出身</td>
-<td align="left">ST 官方</td>
-<td align="left">第三方</td>
+<td align="left"><a href="/2026/07/29/STM32_USART_Serial_Communication/">串口轮询</a></td>
+<td align="left">USART2</td>
+<td align="left">轮询</td>
+<td align="left"><code>receiveData[2]</code></td>
 </tr>
 <tr>
-<td align="left">支持的芯片</td>
-<td align="left">仅 STM32</td>
-<td align="left">几乎所有单片机</td>
+<td align="left"><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断</a></td>
+<td align="left">USART2</td>
+<td align="left">中断</td>
+<td align="left"><code>receiveData[2]</code>（全局变量）</td>
 </tr>
 <tr>
-<td align="left">支持的工程格式</td>
-<td align="left">仅 CubeMX 生成（.cproject）</td>
-<td align="left"><strong>Keil(.uvprojx)、CubeMX、ESP-IDF…</strong></td>
+<td align="left"><a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/">串口 DMA 不定长</a></td>
+<td align="left">USART2 + DMA</td>
+<td align="left">DMA + 空闲中断</td>
+<td align="left"><code>receiveData[50]</code></td>
 </tr>
 <tr>
-<td align="left">支持的库</td>
-<td align="left">仅 HAL 库</td>
-<td align="left"><strong>标准库(SPL) + HAL 库都行</strong></td>
+<td align="left"><a href="/2026/07/30/STM32_BLE_Bluetooth/">蓝牙 BLE</a></td>
+<td align="left">USART3 + DMA</td>
+<td align="left">DMA + 空闲中断</td>
+<td align="left"><code>receiveData[50]</code></td>
 </tr>
 <tr>
-<td align="left">编译器</td>
-<td align="left">armclang &#x2F; GCC</td>
-<td align="left">GCC &#x2F; ARMCC &#x2F; IAR</td>
-</tr>
-<tr>
-<td align="left">导入别人现成的 Keil 工程</td>
-<td align="left">❌ 不认</td>
-<td align="left">✅ 一键导入</td>
+<td align="left"><a href="/2026/08/01/STM32_I2C_AHT20/">I2C 读 AHT20</a></td>
+<td align="left">I2C1 + USART2</td>
+<td align="left">I2C 轮询</td>
+<td align="left"><code>sendBuffer[3]</code> &#x2F; <code>readBuffer[6]</code></td>
 </tr>
 </tbody></table>
-<p>ST 官方扩展是<strong>ST 生态的延伸</strong>：它的世界只有”CubeMX 生成的 HAL 工程”这一种工作流。而我们的目标是导入<strong>别人用 Keil + 标准外设库写的现成工程</strong>，官方扩展根本不认这种格式——EIDE 是通用工程管理器，芯片、工程格式、编译器都”来者不拒”。</p>
-<p>所以不是官方扩展不好，是它只管自己生态，管不了别人的 Keil 工程。而EIDE 是超集。</p>
-<h2 id="三、环境搭建"><a href="#三、环境搭建" class="headerlink" title="三、环境搭建"></a>三、环境搭建</h2><h3 id="1-安装-ARM-GCC-编译器"><a href="#1-安装-ARM-GCC-编译器" class="headerlink" title="1. 安装 ARM GCC 编译器"></a>1. 安装 ARM GCC 编译器</h3><p>EIDE 编译需要 ARM 交叉编译器（GCC 的 ARM 版本，替代 Keil 的 ARMCC）。</p>
-<ul>
-<li>下载：ARM 官方 GNU 工具链（搜索 “Arm GNU Toolchain Downloads”），Windows 版选 <code>arm-none-eabi</code> 目标</li>
-<li>安装：一路 Next，安装时勾选 “Add path to environment variable”（以后终端直接敲 <code>arm-none-eabi-gcc</code>）</li>
-<li>安装路径默认在：<code>C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\&lt;版本&gt;</code><ul>
-<li>⚠️ 注意版本目录名是 <code>14.2 rel1</code>（<strong>空格</strong>），不是 <code>14.2.rel1</code>（点）</li>
-</ul>
-</li>
-</ul>
-<p>验证安装（新开终端）：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">arm-none-eabi-gcc --version</span><br><span class="line"><span class="comment"># arm-none-eabi-gcc.exe (Arm GNU Toolchain 14.2.Rel1 (Build arm-14.52)) 14.2.1</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="2-安装-EIDE-插件"><a href="#2-安装-EIDE-插件" class="headerlink" title="2. 安装 EIDE 插件"></a>2. 安装 EIDE 插件</h3><p>VS Code 扩展市场搜 <strong>Embedded IDE</strong>（<code>cl.eide</code>），或命令行安装：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">code --install-extension cl.eide</span><br></pre></td></tr></table></figure>
-
-<p>EIDE 需要 .NET 运行时（首次启动会自动检测，缺了会提示安装）。</p>
-<h3 id="3-指定编译器路径（关键）"><a href="#3-指定编译器路径（关键）" class="headerlink" title="3. 指定编译器路径（关键）"></a>3. 指定编译器路径（关键）</h3><p>EIDE 默认不知道 GCC 装在哪，在 VS Code 用户设置（settings.json）里配置：</p>
-<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="attr">&quot;EIDE.ARM.GCC.InstallDirectory&quot;</span><span class="punctuation">:</span> <span class="string">&quot;C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\14.2 rel1&quot;</span><span class="punctuation">,</span></span><br><span class="line"><span class="attr">&quot;EIDE.ARM.Option.AxfToElf&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span></span><br></pre></td></tr></table></figure>
-
-<h2 id="四、导入-Keil-工程"><a href="#四、导入-Keil-工程" class="headerlink" title="四、导入 Keil 工程"></a>四、导入 Keil 工程</h2><h3 id="第-1-步：VS-Code-打开工程目录"><a href="#第-1-步：VS-Code-打开工程目录" class="headerlink" title="第 1 步：VS Code 打开工程目录"></a>第 1 步：VS Code 打开工程目录</h3><p>VS Code → 文件 → 打开文件夹，选中<strong>包含 <code>Project.uvprojx</code> 的那个目录</strong>（不是打开 .uvprojx 文件本身，是打开它所在的文件夹）。</p>
-<blockquote>
-<p>💡 <strong>先给工程目录起个纯英文名</strong>：比如 <code>D:\projects\car\</code>。这一步很重要，坑④会解释为什么——中文路径会导致链接失败，现在养成习惯最省事。</p>
-</blockquote>
-<h3 id="第-2-步：找到-EIDE-面板"><a href="#第-2-步：找到-EIDE-面板" class="headerlink" title="第 2 步：找到 EIDE 面板"></a>第 2 步：找到 EIDE 面板</h3><p>安装 EIDE 插件后，<strong>左侧活动栏</strong>会出现一个新的图标（嵌入式芯片图案，⚠️ 不是资源管理器那个文件图标）。点击它，EIDE 面板就展开了。</p>
-<h3 id="第-3-步：导入-Keil-工程"><a href="#第-3-步：导入-Keil-工程" class="headerlink" title="第 3 步：导入 Keil 工程"></a>第 3 步：导入 Keil 工程</h3><ol>
-<li>在 EIDE 面板顶部找到 <strong>“导入工程”</strong> 按钮（Import），点击</li>
-<li>弹出菜单选择 **”Keil”**，再选择 <strong>“Keil ARM project (.uvprojx)”</strong><ul>
-<li>这里有两个选项：**”ARM 还是 C51？”**——答案是 <strong>ARM</strong>。Keil MDK 就是 ARM 版本（Microcontroller Development Kit），我们的 STM32F103 是 Cortex-M3 内核，属于 ARM；C51 是给 8051 单片机用的，选错后面全乱</li>
-</ul>
-</li>
-<li>在弹出的文件选择框中，选中工程目录下的 <code>Project.uvprojx</code>，确认</li>
-</ol>
-<h3 id="第-4-步：等待自动解析，EIDE-在做”配置搬运”"><a href="#第-4-步：等待自动解析，EIDE-在做”配置搬运”" class="headerlink" title="第 4 步：等待自动解析，EIDE 在做”配置搬运”"></a>第 4 步：等待自动解析，EIDE 在做”配置搬运”</h3><p>导入瞬间 EIDE 会<strong>只读解析</strong> <code>Project.uvprojx</code>（Keil 工程文件本质是 XML，记录了全部配置），自动生成：</p>
-<table>
-<thead>
-<tr>
-<th align="left">从 uvprojx 读出的内容</th>
-<th align="left">EIDE 的处理</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">源文件清单（40 个 .c&#x2F;.s）</td>
-<td align="left">构建列表</td>
-</tr>
-<tr>
-<td align="left">头文件路径（IncludePath）</td>
-<td align="left">编译选项</td>
-</tr>
-<tr>
-<td align="left">宏定义（Defines）</td>
-<td align="left">预处理器定义</td>
-</tr>
-<tr>
-<td align="left">芯片型号（STM32F103C8）</td>
-<td align="left">芯片支持包</td>
-</tr>
-</tbody></table>
-<p><strong>这个过程只读，不会破坏原 Keil 工程</strong>——uvprojx 原封不动，原工程随时还能用 Keil 打开。EIDE 只是生成自己的一套工程配置（<code>.eide/</code> 目录），两边共存互不干扰。</p>
-<h3 id="第-5-步：安装推荐扩展（可选）"><a href="#第-5-步：安装推荐扩展（可选）" class="headerlink" title="第 5 步：安装推荐扩展（可选）"></a>第 5 步：安装推荐扩展（可选）</h3><p>导入完成后 VS Code 右下角可能弹窗推荐扩展（来自 dan-c-underwood 等的），直接点<strong>安装</strong>——ARM 汇编语法高亮、C&#x2F;C++ 等。</p>
-<h3 id="第-6-步：切换编译器为-GCC"><a href="#第-6-步：切换编译器为-GCC" class="headerlink" title="第 6 步：切换编译器为 GCC"></a>第 6 步：切换编译器为 GCC</h3><p>导入后 EIDE 默认沿用 Keil 工程的编译器设置 <strong>AC5</strong>（ARMCC）。注意：<strong>即使电脑上装了 Keil5</strong>，EIDE 也不知道 ARMCC 装在哪——它需要额外的路径配置（<code>EIDE.ARM.ARMCC5.InstallDirectory</code> 指向 Keil 的 ARM\ARMCC 目录），没配置的话此时点编译会报：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">无法找到编译器 &#x27;AC5&#x27; 的位置！[path]: &#x27;null\bin&#x27;</span><br></pre></td></tr></table></figure>
-
-<p>（<code>null\bin</code> 就是”路径没配置”的痕迹）</p>
-<p><strong>我的操作</strong>：在 EIDE 面板<strong>顶部工具栏</strong>找到编译器选择框（此时显示 “AC5”），点击弹出下拉，选择 **”GCC”**（GNU Arm Embedded Toolchain）。切换后 EIDE 会读取我们在第三章配置的 <code>EIDE.ARM.GCC.InstallDirectory</code> 路径，弹出确认框时点确定即可。<img src="/./../images/Keil_to_VSCode_EIDE_Migration/image-20260810193532935.png" alt="image-20260810193532935"></p>
-<p><strong>另一个选择</strong>：如果你想让 EIDE 直接用 Keil 的 ARMCC 编译，也可以在 VS Code 设置里配置 <code>EIDE.ARM.ARMCC5.InstallDirectory</code> 指向 Keil 安装目录。但推荐用 <strong>GCC</strong>——开源免费不依赖 Keil 安装、命令行通用、构建过程透明，本文后面的坑也都是按 GCC 写的。</p>
-<blockquote>
-<p>判断标准：<strong>AC5&#x2F;AC6 是 Keil 的编译器（ARMCC），GCC 是 ARM 官方工具链</strong>。EIDE 下拉框里显示哪个就点哪个，关键是让 EIDE 能找到对应编译器的真实路径。</p>
-</blockquote>
-<h3 id="第-7-步：认识-EIDE-面板"><a href="#第-7-步：认识-EIDE-面板" class="headerlink" title="第 7 步：认识 EIDE 面板"></a>第 7 步：认识 EIDE 面板</h3><p>切换完成后，EIDE 面板展开成这样的结构：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">📁 stdperiph (Target 1)</span><br><span class="line">├── 项目资源           # 源文件树（点击可查看/添加/删除文件）</span><br><span class="line">├── 芯片支持包         # 芯片型号、CPU 类型、链接脚本</span><br><span class="line">├── 构建配置           # 链接脚本路径、烧录配置 ← 坑④和烧录都在这</span><br><span class="line">└── C/C++ 属性         # 预处理器定义、编译选项 ← 坑①在这</span><br></pre></td></tr></table></figure>
-
-<p>到这里导入就完成了。接下来点编译按钮（锤子图标），会依次踩到坑①~④——别慌，都是工具链差异的小修补，下面逐个解决。</p>
-<h2 id="五、坑-①：编译报错-“Please-select-first-the-target-STM32F10x-device”"><a href="#五、坑-①：编译报错-“Please-select-first-the-target-STM32F10x-device”" class="headerlink" title="五、坑 ①：编译报错 “Please select first the target STM32F10x device”"></a>五、坑 ①：编译报错 “Please select first the target STM32F10x device”</h2><p>标准外设库的 <code>stm32f10x.h</code> 第 96 行有个设备检查：<strong>必须定义芯片型号宏</strong>，否则 <code>#error</code> 直接拒绝编译：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">if</span> !defined(STM32F10X_LD) &amp;&amp; !defined(STM32F10X_MD) &amp;&amp; ...</span></span><br><span class="line"> <span class="meta">#<span class="keyword">error</span> <span class="string">&quot;Please select first the target STM32F10x device used in your application&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
-
-<p>Keil 工程里只有 <code>USE_STDPERIPH_DRIVER</code> 一个宏（uvprojx 里没写型号宏），EIDE 原样搬过来了 → 编译全报错。</p>
-<p><strong>解法</strong>：EIDE → C&#x2F;C++ 属性 → <strong>预处理器定义</strong>，改为：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">USE_STDPERIPH_DRIVER;STM32F10X_MD</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><code>STM32F10X_MD</code> &#x3D; Medium Density 中容量 &#x3D; F103C8&#x2F;CB 系列（HD 是高容量 F103ZE，LD 是低容量 F103C6）</li>
-<li>⚠️ 分号分隔，不能有任何空格，否则报 <code>cannot have whitespace on either side of &#39;=&#39;</code>，这里我直接点修改，老是报这个错误，然后我删掉原本的定义，重新添加，就不报错了，很神奇的bug。</li>
-</ul>
-<p>这一个宏修好后，后面连带的 <code>TIM4_IRQn</code>、<code>USART1_IRQn</code> 未定义错误也全消失了——它们都是没定义型号宏导致的连锁反应。</p>
-<h2 id="六、坑-②：启动文件汇编语法不兼容"><a href="#六、坑-②：启动文件汇编语法不兼容" class="headerlink" title="六、坑 ②：启动文件汇编语法不兼容"></a>六、坑 ②：启动文件汇编语法不兼容</h2><p>39 个 C 文件全过了，栽在启动文件上：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Error: bad instruction `stack_size EQU 0x00000400&#x27;</span><br><span class="line">Error: bad instruction `__vectors DCD __initial_sp&#x27;</span><br></pre></td></tr></table></figure>
-
-<p><strong>原因</strong>：Keil 工程里的 <code>startup_stm32f10x_md.s</code> 是 <strong>ARMCC 汇编语法</strong>（<code>EQU</code>&#x2F;<code>AREA</code>&#x2F;<code>DCD</code>&#x2F;<code>PROC</code> 是 Keil 汇编器的指令），而 EIDE 用的是 <strong>GNU 汇编器</strong>（arm-none-eabi-as），两者语法不通用。</p>
-<p><strong>解法</strong>：换成 GNU 语法的启动文件。ST 官方标准外设库里其实自带 GNU 版（RIDE7 工具链版），长这样：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">.syntax unified</span><br><span class="line">.thumb</span><br><span class="line">.word   _sidata          @ 数据段起始</span><br><span class="line">.word   _sdata</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
-
-<p>从 GitHub 的 STM32F103 GCC 模板仓库（如 <code>0x0E86/STM32F103C8T6</code>）拉一份即可，文件名不变，直接覆盖 <code>Start/startup_stm32f10x_md.s</code>。<strong>原文件先备份</strong>（改名 <code>.bak</code>），哪天回 Keil 还能还原。</p>
-<blockquote>
-<p>判断启动文件是什么语法：看到 <code>.syntax</code>&#x2F;<code>.word</code>&#x2F;<code>.section</code> 是 GNU 版；看到 <code>EQU</code>&#x2F;<code>AREA</code>&#x2F;<code>DCD</code> 是 ARMCC 版。</p>
-</blockquote>
-<h2 id="七、坑-③：老-CMSIS-与-GCC-14-的兼容问题"><a href="#七、坑-③：老-CMSIS-与-GCC-14-的兼容问题" class="headerlink" title="七、坑 ③：老 CMSIS 与 GCC 14 的兼容问题"></a>七、坑 ③：老 CMSIS 与 GCC 14 的兼容问题</h2><p>编译 <code>core_cm3.c</code> 时报汇编错误：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Error: registers may not be the same -- `strexb r0,r0,[r1]&#x27;</span><br></pre></td></tr></table></figure>
-
-<p><strong>原因</strong>：2011 年的老版 CMSIS 内联汇编写死了寄存器（ARMCC 的写法），GCC 14 的寄存器分配检查更严格，目标寄存器与源寄存器相同直接报错。</p>
-<p><strong>解法</strong>：替换为 GCC 兼容版 <code>core_cm3.c</code>&#x2F;<code>core_cm3.h</code>（同上，模板仓库里有现成的）。新版里 GCC 分支用标准约束模板写法：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">__ASM <span class="title function_">volatile</span> <span class="params">(<span class="string">&quot;strexb %0, %2, [%1]&quot;</span> : <span class="string">&quot;=&amp;r&quot;</span> (result) : <span class="string">&quot;r&quot;</span> (addr), <span class="string">&quot;r&quot;</span> (value))</span>;</span><br></pre></td></tr></table></figure>
-
-<p>这种编译器差异的问题，<code>stm32f10x.h</code> 等库文件本身一般兼容（内部有 <code>#if defined(__GNUC__)</code> 分支），<strong>只有老汇编和 CMSIS 内核文件需要换</strong>。</p>
-<h2 id="八、坑-④：中文路径导致链接失败"><a href="#八、坑-④：中文路径导致链接失败" class="headerlink" title="八、坑 ④：中文路径导致链接失败"></a>八、坑 ④：中文路径导致链接失败</h2><p>编译全过，链接报：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">ld.exe: cannot open linker script file ...1.STM32F1????...v1.1/...stm32f103c8.lds: Invalid argument</span><br></pre></td></tr></table></figure>
-
-<p>注意是 <code>Invalid argument</code>（不是 No such file）—— <strong>Windows + GCC 的经典编码问题</strong>：链接器收到中文路径时编码损坏（<code>????</code>），文件明明存在却打不开。编译能过是因为 EIDE 编译用相对路径，而链接脚本存的是<strong>绝对路径</strong>，就踩雷了。</p>
-<p><strong>解法</strong>：<strong>工程目录必须全英文</strong>。把工程复制一份到纯英文路径（如 <code>D:\stm32project\smartcar\stdperiph\</code>），重新导入即可。</p>
-<blockquote>
-<p>这条经验很重要：<strong>嵌入式工程路径永远用纯英文</strong>，中文路径在 OpenOCD 烧录、调试器、脚本里还会继续捣乱，趁早搬走。</p>
-</blockquote>
-<h2 id="九、编译-烧录"><a href="#九、编译-烧录" class="headerlink" title="九、编译 &amp; 烧录"></a>九、编译 &amp; 烧录</h2><p>配置完以上四点，点编译，输出：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[ INFO ] start compiling (jobs: 16) ...</span><br><span class="line">[ INFO ] start linking ...</span><br><span class="line">Memory region         Used Size  Region Size  %age Used</span><br><span class="line">           FLASH:       13792 B        64 KB     21.04%</span><br><span class="line">             RAM:        1452 B        20 KB      7.09%</span><br><span class="line">[ DONE ] build successfully !</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>链接时出现的 <code>_close is not implemented and will always fail</code> 等 warning 是裸机环境的正常提示（没有文件系统），无视即可。</p>
-</blockquote>
-<p>烧录前把<strong>烧录配置从默认的 JLink 改为 ST-Link</strong>（构建配置里），第一次用会提示自动下载 STM32CubeProgrammer 烧录工具。接好 ST-Link（SWD 四线：3.3V&#x2F;SWDIO&#x2F;SWCLK&#x2F;GND），点烧录按钮：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">STM32CubeProgrammer v2.8.0</span><br><span class="line">Device: STM32F103C8T6  Flash: 64 KB</span><br><span class="line">Download verified successfully ✅</span><br><span class="line">RUNNING Program... Start operation achieved successfully</span><br></pre></td></tr></table></figure>
-
-<p><strong>烧录验证通过，程序跑起来了。</strong></p>
-<h2 id="十、总结：迁移-Checklist，可直接照搬"><a href="#十、总结：迁移-Checklist，可直接照搬" class="headerlink" title="十、总结：迁移 Checklist，可直接照搬"></a>十、总结：迁移 Checklist，可直接照搬</h2><p>以后任何 Keil 标准库工程迁移，按这个清单走：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">□ 1. 装 ARM GCC（勾选加 PATH），settings.json 配 EIDE.ARM.GCC.InstallDirectory</span><br><span class="line">□ 2. 装 EIDE 插件，导入 .uvprojx（选 ARM 不是 C51）</span><br><span class="line">□ 3. 编译器切换为 GCC</span><br><span class="line">□ 4. 预处理器定义补芯片型号宏：USE_STDPERIPH_DRIVER;STM32F10X_MD</span><br><span class="line">□ 5. 启动文件换 GNU 语法版（备份原文件）</span><br><span class="line">□ 6. core_cm3.c/h 换 GCC 兼容版（老 CMSIS + GCC14 才需要）</span><br><span class="line">□ 7. 工程放纯英文路径（中文路径链接必挂）</span><br><span class="line">□ 8. 构建配置指定链接脚本（.lds，64K Flash/20K RAM 等按芯片规格）</span><br><span class="line">□ 9. 烧录配置选 ST-Link/J-Link，接线烧录</span><br></pre></td></tr></table></figure>
-
-<p><strong>核心思路</strong>：EIDE 帮你自动完成 90% 的配置搬运（源文件、宏、路径都从 uvprojx 解析），剩下 10% 是<strong>工具链差异</strong>的修补——启动文件语法、CMSIS 版本、编码问题，都是换文件&#x2F;换路径的事，<strong>你的业务代码一行都不用动</strong>。</p>
+<p>写代码时我脑子里一直有个疑惑：每次调用 HAL 收发函数，参数表格里都有一行”<strong>数据缓冲区指针</strong>“——我照着填 <code>receiveData</code>、<code>sendBuffer</code>，程序跑得挺好，但<strong>这些数据到底存在哪里？</strong> 是存在这个数组里，还是存在外设里？为什么每次都要传指针？为什么换个外设（从 UART 到 I2C），这个套路还是一模一样？</p>
+<p>这篇博客就来解决这个疑惑。答案是：<strong>数组在 STM32 的内存（RAM）里，外设内部还有一个”一次只能装 1 字节”的数据寄存器（DR），数据从数组到外设、从外设到数组，都是 1 字节 1 字节地过手的。</strong></p>
 <hr>
-<p><strong>参考资料</strong>：</p>
+<h2 id="两个存储地点：数组（RAM）和数据寄存器（DR）"><a href="#两个存储地点：数组（RAM）和数据寄存器（DR）" class="headerlink" title="两个存储地点：数组（RAM）和数据寄存器（DR）"></a>两个存储地点：数组（RAM）和数据寄存器（DR）</h2><p>要搞清楚数据存在哪，先分清两个完全不同的存储位置：</p>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">我的数组（RAM）</th>
+<th align="left">外设数据寄存器 DR</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">位置</td>
+<td align="left">STM32 内存，我代码里定义的变量</td>
+<td align="left">外设模块内部（如 USART2、I2C1 外设里）</td>
+</tr>
+<tr>
+<td align="left">容量</td>
+<td align="left">想多大就多大（2、6、50 字节……）</td>
+<td align="left"><strong>只有 1 字节</strong></td>
+</tr>
+<tr>
+<td align="left">谁来读写</td>
+<td align="left">CPU 通过代码读写</td>
+<td align="left">硬件自动操作</td>
+</tr>
+<tr>
+<td align="left">类比</td>
+<td align="left">候车大厅里的<strong>候车人群</strong></td>
+<td align="left"><strong>检票口</strong>（一次只能过一个人）</td>
+</tr>
+</tbody></table>
+<p>关键点：<strong>数据寄存器 DR 一次只能装 1 字节</strong>。这是硬件设计决定的——USART 外设有 <code>USART_DR</code>，I2C 外设有 <code>I2C_DR</code>，都是一字节宽的小寄存器。</p>
+<p>打个比方：我的数组是候车大厅，DR 是检票口。一次通信要传 6 字节数据，就像 6 个人要出站——他们<strong>只能一个一个过检票口</strong>，不可能 6 个人同时挤过去。</p>
+<hr>
+<h2 id="发送：数据从哪来，到哪去"><a href="#发送：数据从哪来，到哪去" class="headerlink" title="发送：数据从哪来，到哪去"></a>发送：数据从哪来，到哪去</h2><p>以 I2C 发送 3 字节测量命令为例（<code>HAL_I2C_Master_Transmit(&amp;hi2c1, addr, sendBuffer, 3, ...)</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">          RAM（我的代码）                 I2C1 外设                   总线</span><br><span class="line">┌──────────────────────┐      ┌─────────────────────────┐</span><br><span class="line">│  sendBuffer[0] = 0xAC │──①──→│          DR            │──②──→  SDA 引脚</span><br><span class="line">│  sendBuffer[1] = 0x33 │──①──→│   （1字节小信箱）        │──②──→  （逐位移位发出）</span><br><span class="line">│  sendBuffer[2] = 0x00 │──①──→│            ↑           │</span><br><span class="line">└──────────────────────┘      └───────────┼─────────────┘</span><br><span class="line">            ① CPU 把 sendBuffer[i] 写入 DR（HAL 库内部循环）</span><br><span class="line">            ② 硬件把 DR 里的字节移出到总线上</span><br></pre></td></tr></table></figure>
+
+<p><code>HAL_I2C_Master_Transmit</code> 内部干的事，简化后就是：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// HAL_I2C_Master_Transmit 内部（简化版）</span></span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_TXE) == RESET);   <span class="comment">// 等 DR 空了</span></span><br><span class="line">    hi2c-&gt;Instance-&gt;DR = pData[i];                             <span class="comment">// 把数组第 i 个字节塞进 DR</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意</strong>：<code>0xAC</code>、<code>0x33</code>、<code>0x00</code> 这三个字节全程待在 <code>sendBuffer</code> 数组里。CPU 只是”读”数组、”写”寄存器，数组里的值并不会消失。发完之后数组还在，下次发新命令直接覆盖。</p>
+<p>串口发送（<code>HAL_UART_Transmit</code>）一模一样，只是把 <code>I2C_FLAG_TXE</code> 换成 <code>UART_FLAG_TXE</code>、把 <code>I2C_DR</code> 换成 <code>USART_DR</code>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_UART_GET_FLAG(huart, UART_FLAG_TXE) == RESET);  <span class="comment">// 等 DR 空了</span></span><br><span class="line">    huart-&gt;Instance-&gt;DR = pData[i];                              <span class="comment">// 塞一个字节</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="接收：数据从哪来，到哪去"><a href="#接收：数据从哪来，到哪去" class="headerlink" title="接收：数据从哪来，到哪去"></a>接收：数据从哪来，到哪去</h2><p>以 I2C 接收 6 字节温湿度为例（<code>HAL_I2C_Master_Receive(&amp;hi2c1, addr, readBuffer, 6, ...)</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">总线               I2C1 外设                    RAM</span><br><span class="line">SDA 引脚 ──→ 移位寄存器 ──→  DR ──②──→  readBuffer[0]</span><br><span class="line">                     （硬件逐位移入）              readBuffer[1]</span><br><span class="line">                                                readBuffer[2]</span><br><span class="line">                                                readBuffer[3]</span><br><span class="line">                                                readBuffer[4]</span><br><span class="line">                                                readBuffer[5]</span><br></pre></td></tr></table></figure>
+
+<p>HAL 内部循环：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_RXNE) == RESET);   <span class="comment">// 等 DR 里有数据</span></span><br><span class="line">    pData[i] = hi2c-&gt;Instance-&gt;DR;                              <span class="comment">// 把 DR 里的字节存进数组</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>6 字节被 CPU <strong>一个一个</strong>塞进 <code>readBuffer</code> 数组——CPU 每读一次 DR，硬件就会自动把下一个字节移进 DR。</p>
+<p>串口中断模式下，这个搬运甚至就写在 HAL 源码里，我们之前还解析过这行代码（<a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断博客</a>）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">*huart-&gt;pRxBuffPtr = (<span class="type">uint8_t</span>)(huart-&gt;Instance-&gt;DR &amp; <span class="number">0x00FF</span>);  <span class="comment">// DR → 数组，搬一个字节</span></span><br></pre></td></tr></table></figure>
+
+<p><code>pRxBuffPtr</code> 就是 HAL 库内部的”数组指针”，每搬一个字节它自己 +1，指向数组下一个位置。</p>
+<hr>
+<h2 id="AHT20-在链路中的哪个位置？"><a href="#AHT20-在链路中的哪个位置？" class="headerlink" title="AHT20 在链路中的哪个位置？"></a>AHT20 在链路中的哪个位置？</h2><p>前面的图都只画了 STM32 到总线的这一段，AHT20 一直没露面——它挂在<strong>总线的另一端</strong>。补上它，整条链路才完整：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                    发送 3 字节测量命令 0xAC 0x33 0x00 时：</span><br><span class="line">                    ┌────────────────────────────────────────────┐</span><br><span class="line">                    │                                            │</span><br><span class="line">   STM32 (主机)     │                 SDA 总线                    │      AHT20 (从机)</span><br><span class="line">┌──────────────┐    │    ┌──────────────┐    ┌──────────────┐     │    ┌──────────────┐</span><br><span class="line">│ sendBuffer   │    │    │  I2C1 外设    │    │              │     │    │  芯片内部      │</span><br><span class="line">│ [0]=0xAC ────┼─①─┼───→│  DR（1字节）  │─②─┼─→  SDA 引脚 ──┼─────┼─→│ 引脚 → 移位    │</span><br><span class="line">│ [1]=0x33     │    │    │              │    │              │     │    │ 寄存器 → 内部   │</span><br><span class="line">│ [2]=0x00     │    │    └──────────────┘    └──────────────┘     │    │ 命令/配置寄存器 │</span><br><span class="line">└──────────────┘    │                                            │    └──────────────┘</span><br><span class="line">                    └────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
 <ul>
-<li><p>B站视频：再见了，Keil君！我已经爱上了EIDE插件（vscode+嵌入式开发）<a href="https://www.bilibili.com/video/BV1XGLozvEJf/?spm_id_from=333.337.search-card.all.click&vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1XGLozvEJf/?spm_id_from=333.337.search-card.all.click&amp;vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
-</li>
-<li><p>模板仓库：<code>github.com/0x0E86/STM32F103C8T6</code>（GNU startup + 兼容 CMSIS）</p>
-</li>
+<li><strong>①</strong> <code>sendBuffer</code> 数组（STM32 的 RAM）→ CPU 逐字节塞进 I2C1 的 DR</li>
+<li><strong>②</strong> 硬件把 DR 里的字节移位到 SDA 引脚，电平信号在总线上传播</li>
+<li><strong>③</strong> 电平到达 AHT20 的 SDA 引脚 → 芯片内部按 SCL 时钟逐位接收 → 拼成一字节 → <strong>存进 AHT20 芯片内部的寄存器</strong></li>
+</ul>
+<p>所以命令字节的最终”目的地”是 <strong>AHT20 芯片内部的寄存器</strong>——传感器芯片自己也有存储，数据不在 STM32 里，也不在总线上（总线只是”路”）。</p>
+<p>接收时方向反过来：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                    读取 6 字节测量结果时：</span><br><span class="line">                    ┌────────────────────────────────────────────┐</span><br><span class="line">                    │                                            │</span><br><span class="line">   STM32 (主机)     │                 SDA 总线                    │      AHT20 (从机)</span><br><span class="line">┌──────────────┐    │    ┌──────────────┐    ┌──────────────┐     │    ┌──────────────┐</span><br><span class="line">│ readBuffer   │    │    │  I2C1 外设    │    │              │     │    │ 芯片内部       │</span><br><span class="line">│ [0]←───④────┼───┼───←│  DR（1字节）  │←③─┼── SDA 引脚 ←──┼─────┼──←│ 测量结果寄存器  │</span><br><span class="line">│ [1]          │    │    │              │    │              │     │    │ （温湿度原始值） │</span><br><span class="line">│ ...          │    │    └──────────────┘    └──────────────┘     │    └──────────────┘</span><br><span class="line">└──────────────┘    │                                            │</span><br><span class="line">                    └────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>③</strong> AHT20 把内部寄存器里的测量结果逐字节放上 SDA 线</li>
+<li><strong>④</strong> STM32 的 I2C1 硬件逐位收下 → 装进 DR → CPU 把 DR 读走放进 <code>readBuffer</code></li>
+</ul>
+<h3 id="AHT20-对-STM32-来说是个”黑盒”"><a href="#AHT20-对-STM32-来说是个”黑盒”" class="headerlink" title="AHT20 对 STM32 来说是个”黑盒”"></a>AHT20 对 STM32 来说是个”黑盒”</h3><p>我写的代码里从头到尾没有”直接操作 AHT20 内部寄存器”的写法——STM32 只做两件事：<strong>把命令字节发到总线上、从总线上收字节</strong>。AHT20 收到 0xAC 之后自己知道”该开始测量了”，测量完自己把结果放好等着被读。芯片内部怎么处理，STM32 完全不关心。</p>
+<h3 id="地址参数就是”点名”"><a href="#地址参数就是”点名”" class="headerlink" title="地址参数就是”点名”"></a>地址参数就是”点名”</h3><p><code>HAL_I2C_Master_Transmit(&amp;hi2c1, AHT20_ADDRESS, ...)</code> 里的地址（0x70）就是主机在总线上<strong>喊话点名</strong>：一条总线上可能挂着多个从机（OLED、传感器……），地址告诉它们”这 3 个字节是发给 0x70 的，其他的别收”。数据到了总线上，<strong>只有 AHT20 认领</strong>，别的设备”选择性失聪”。</p>
+<p>这也顺带解释了串口和 I2C 的一个根本区别：<strong>串口是点对点</strong>（线那端就一个设备），不需要地址参数；<strong>I2C 是总线</strong>（线那端可能挂好几个从机），必须带地址点名，数据才能被正确的从机收下。</p>
+<h3 id="完整存储位置列表"><a href="#完整存储位置列表" class="headerlink" title="完整存储位置列表"></a>完整存储位置列表</h3><table>
+<thead>
+<tr>
+<th align="left">环节</th>
+<th align="left">数据存在哪</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">发送起点</td>
+<td align="left">STM32 RAM（<code>sendBuffer</code> 数组）</td>
+</tr>
+<tr>
+<td align="left">过手</td>
+<td align="left">STM32 的 I2C1 DR（1 字节）</td>
+</tr>
+<tr>
+<td align="left">运输</td>
+<td align="left">SDA 总线（电平信号，不存储）</td>
+</tr>
+<tr>
+<td align="left"><strong>发送终点</strong></td>
+<td align="left"><strong>AHT20 芯片内部的寄存器</strong>（命令&#x2F;配置）</td>
+</tr>
+<tr>
+<td align="left">接收起点</td>
+<td align="left">AHT20 芯片内部的寄存器（测量结果）</td>
+</tr>
+<tr>
+<td align="left">过手</td>
+<td align="left">STM32 的 I2C1 DR（1 字节）</td>
+</tr>
+<tr>
+<td align="left"><strong>接收终点</strong></td>
+<td align="left">STM32 RAM（<code>readBuffer</code> 数组）</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="为什么必须是数组？"><a href="#为什么必须是数组？" class="headerlink" title="为什么必须是数组？"></a>为什么必须是数组？</h2><p>因为 DR 一次只能装 1 字节，而通信往往是多字节的。假如不用数组、只用一个变量：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">uint8_t</span> data;   <span class="comment">// 只有 1 字节</span></span><br><span class="line">HAL_UART_Receive(&amp;huart2, &amp;data, <span class="number">2</span>, HAL_MAX_DELAY);  <span class="comment">// 想收 2 字节？没地方放！</span></span><br></pre></td></tr></table></figure>
+
+<p>第二个字节一来就把第一个字节覆盖了。所以必须有”一块连续的内存”把多字节数据都装下——这就是数组。</p>
+<p>数组大小怎么定？看我的通信协议：</p>
+<ul>
+<li>串口轮询：指令固定 2 字节 → <code>receiveData[2]</code></li>
+<li>串口 DMA：数据不定长 → <code>receiveData[50]</code>（50 是安全上限）</li>
+<li>I2C 读 AHT20：每次读 6 字节 → <code>readBuffer[6]</code></li>
+</ul>
+<p>这也解释了之前博客里的一个细节：DMA 接收不定长数据那篇的数组为什么从 <code>[2]</code> 变成 <code>[50]</code>——<strong>不是语法变了，是数据量上限变了</strong>。</p>
+<hr>
+<h2 id="为什么-HAL-函数要传指针？"><a href="#为什么-HAL-函数要传指针？" class="headerlink" title="为什么 HAL 函数要传指针？"></a>为什么 HAL 函数要传指针？</h2><p>看函数签名：<code>HAL_I2C_Master_Receive(..., uint8_t *pData, ...)</code>——传的是<strong>数组首地址</strong>（数组名本身就是首地址，前面加 <code>&amp;</code> 或者直接用数组名都行）。</p>
+<p>因为 HAL 库函数要<strong>往stm32的内存里写数据</strong>（接收）或者<strong>从内存里读数据</strong>（发送）。传指针 &#x3D; 把仓库地址告诉 HAL，它直接操作我的仓库，<strong>不需要把数据复制一份</strong>。这也意味着缓冲区大小、数据格式全由stm32自己掌控——HAL 只负责”从数组第 0 个位置搬到第 Size 个位置”。</p>
+<blockquote>
+<p>想想看：如果不传指针而是传数组本身，C 语言会复制一份整个数组——又慢又浪费内存，而且接收时复制过去的副本根本收不到数据（数据要写回原数组才有用）。所以通信 API 一律传指针。</p>
+</blockquote>
+<hr>
+<h2 id="三种”搬运工”：轮询、中断、DMA"><a href="#三种”搬运工”：轮询、中断、DMA" class="headerlink" title="三种”搬运工”：轮询、中断、DMA"></a>三种”搬运工”：轮询、中断、DMA</h2><p>前面 5 篇博客学过的所有模式，<strong>数据存放的位置完全没变</strong>——数组还是那个数组（RAM），DR 还是那个 DR（外设里）。变的只有一件事：<strong>谁来搬</strong>。</p>
+<table>
+<thead>
+<tr>
+<th align="left">模式</th>
+<th align="left">搬运工</th>
+<th align="left">CPU 在干嘛</th>
+<th align="left">对应博客</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>轮询</strong></td>
+<td align="left">CPU 亲自搬，等一个搬一个</td>
+<td align="left">全程占着，啥也干不了</td>
+<td align="left">串口轮询、I2C 读 AHT20</td>
+</tr>
+<tr>
+<td align="left"><strong>中断</strong></td>
+<td align="left">硬件标志位置位 → 中断服务函数来搬</td>
+<td align="left">平时干别的，被叫去才搬一下</td>
+<td align="left">串口中断</td>
+</tr>
+<tr>
+<td align="left"><strong>DMA</strong></td>
+<td align="left">专门的 DMA 硬件搬，一次搬一批</td>
+<td align="left">彻底解放，搬完了才收到通知（回调）</td>
+<td align="left">串口 DMA、蓝牙</td>
+</tr>
+</tbody></table>
+<p>轮询和中断的搬运其实”长得一模一样”——都是 CPU 执行”等标志位 → 搬一字节”的循环，区别只在<strong>等待方式</strong>：</p>
+<ul>
+<li>轮询：CPU 站在 DR 门口<strong>死等</strong>标志位（<code>while (标志位 == 0);</code>），期间什么事都干不了</li>
+<li>中断：CPU 去干别的，<strong>标志位置位时硬件把 CPU 叫回来</strong>（触发中断），在中断服务函数里搬一字节，搬完继续干别的</li>
+</ul>
+<p>DMA 则是完全不同的搬运工：它是个硬件模块，自己知道”源地址（DR）、目标地址（数组）、搬多少”，一条命令就能把整批数据搬完，连 CPU 都不需要。</p>
+<p>关键：<strong>不管是哪种搬运工，数据最终都落在同一个数组里</strong>。所以不管是我在回调函数里用 <code>receiveData</code>，还是在 <code>while(1)</code> 里用 <code>readBuffer</code>，操作的都是同一块内存——程序逻辑完全不用区分数据是怎么进来的。</p>
+<hr>
+<h2 id="统一模型：所有通信外设一个套路"><a href="#统一模型：所有通信外设一个套路" class="headerlink" title="统一模型：所有通信外设一个套路"></a>统一模型：所有通信外设一个套路</h2><p>把 5 篇博客串起来，得到一个贯穿所有通信编程的模型：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌───────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    【通信统一模型】                              │</span><br><span class="line">│                                                               │</span><br><span class="line">│    ┌──────────────┐     搬运机制       ┌───────────────────┐   │</span><br><span class="line">│    │  数组 / 变量   │  ◄──────────────► │ 外设数据寄存器 DR   │   │</span><br><span class="line">│    │  (RAM 内存)   │                   │  (外设硬件内部)     │   │</span><br><span class="line">│    │              │  轮询: CPU 手动    │  USART_DR          │   │</span><br><span class="line">│    │ receiveData  │  中断: 硬件通知    │  I2C_DR            │   │</span><br><span class="line">│    │ sendBuffer   │  DMA: 硬件自动     │                    │   │</span><br><span class="line">│    │ readBuffer   │                   │                    │   │</span><br><span class="line">│    └──────────────┘                   └─────────┬─────────┘   │</span><br><span class="line">│              ▲                                 │              │</span><br><span class="line">│              │        TXE / RXNE 标志驱动       │              │</span><br><span class="line">│              └─────────────────────────────────┘              │</span><br><span class="line">│                                                               │</span><br><span class="line">└───────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>把 5 篇博客放进这个模型里看：</p>
+<table>
+<thead>
+<tr>
+<th align="left">博客</th>
+<th align="left">搬运工</th>
+<th align="left">数组在哪</th>
+<th align="left">DR → 数组由谁完成</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">串口轮询</td>
+<td align="left">CPU 查询 RXNE</td>
+<td align="left"><code>receiveData[2]</code> 局部变量</td>
+<td align="left">CPU 在 <code>HAL_UART_Receive</code> 里逐字节读 DR</td>
+</tr>
+<tr>
+<td align="left">串口中断</td>
+<td align="left">中断服务函数</td>
+<td align="left"><code>receiveData[2]</code> 全局变量</td>
+<td align="left">CPU 在 <code>UART_Receive_IT</code> 里读 DR</td>
+</tr>
+<tr>
+<td align="left">串口 DMA</td>
+<td align="left">DMA 硬件</td>
+<td align="left"><code>receiveData[50]</code> 全局变量</td>
+<td align="left">DMA 控制器直接从 DR 搬到数组</td>
+</tr>
+<tr>
+<td align="left">蓝牙（USART3+DMA）</td>
+<td align="left">DMA 硬件</td>
+<td align="left"><code>receiveData[50]</code> 全局变量</td>
+<td align="left">DMA 控制器直接从 DR 搬到数组</td>
+</tr>
+<tr>
+<td align="left">I2C 读 AHT20</td>
+<td align="left">CPU 查询 I2C 标志</td>
+<td align="left"><code>sendBuffer[3]</code> &#x2F; <code>readBuffer[6]</code> 局部变量</td>
+<td align="left">CPU 在 HAL_I2C 函数里搬运</td>
+</tr>
+</tbody></table>
+<p>所以可以看到，<strong>从 USART 到 I2C，从轮询到 DMA，底层永远是这个模型</strong>：</p>
+<blockquote>
+<p><strong>数组（RAM） ↔ 数据寄存器 DR（外设） ↔ 移位寄存器 ↔ 物理引脚</strong></p>
+</blockquote>
+<p>编程层面我只需要做两件事：</p>
+<ol>
+<li><strong>准备数组</strong>：发送前往数组里放数据；接收前准备一个空数组</li>
+<li><strong>调 HAL 函数</strong>：把数组首地址（指针）和长度告诉 HAL</li>
+</ol>
+<p>剩下的”数组↔DR 一来一回”的搬运，交给 HAL 库（轮询&#x2F;中断）或 DMA（硬件）。这也是为什么换一个通信外设（UART → I2C → 以后的 SPI&#x2F;CAN）学习成本很低——<strong>学会一个通信外设，就学会了一半</strong>。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">问题</th>
+<th align="left">答案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">数据到底存在哪？</td>
+<td align="left">存在<strong>我代码定义的数组里</strong>（RAM 内存），发送和接收都是</td>
+</tr>
+<tr>
+<td align="left">外设里存数据吗？</td>
+<td align="left">外设只有一个<strong>1 字节的数据寄存器 DR</strong>，只作”过手”用，不存数据</td>
+</tr>
+<tr>
+<td align="left">为什么用数组？</td>
+<td align="left">DR 一次只能装 1 字节，多字节数据必须有连续内存暂存</td>
+</tr>
+<tr>
+<td align="left">为什么传指针？</td>
+<td align="left">HAL 函数要直接读写我的内存，传首地址即可，避免复制</td>
+</tr>
+<tr>
+<td align="left">数据怎么进的数组？</td>
+<td align="left">轮询&#x2F;中断：CPU 逐字节搬；DMA：硬件整批搬——数组位置不变</td>
+</tr>
+<tr>
+<td align="left">换外设为什么套路一样？</td>
+<td align="left">USART、I2C（以及以后的 SPI&#x2F;CAN）都是”数组 ↔ DR ↔ 引脚”模型</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li><a href="/2026/08/01/STM32_I2C_AHT20/">上一篇：STM32——IIC通信，轮询模式读取温湿度传感器AHT20</a></li>
+<li><a href="/2026/07/29/STM32_USART_Serial_Communication/">串口轮询：STM32——串口通信，用电脑控制三色LED</a></li>
+<li><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断：STM32——串口中断模式通信，让CPU不再”傻等”</a></li>
+<li><a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/">DMA 不定长：STM32——串口DMA模式收发，与不定长数据接收</a></li>
+<li><a href="/2026/07/30/STM32_BLE_Bluetooth/">蓝牙：STM32——蓝牙BLE通信，用蓝牙无线控制小灯</a></li>
+<li>参考资料：STM32F103xx 参考手册（USART 数据寄存器 DR、I2C 数据寄存器 DR 章节）、AHT20 数据手册</li>
 </ul>
 ]]></content>
       <categories>
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>VS Code</tag>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
-        <tag>EIDE</tag>
-        <tag>Keil</tag>
-        <tag>工具链</tag>
-        <tag>GCC</tag>
+        <tag>STM32</tag>
+        <tag>USART</tag>
+        <tag>DMA</tag>
+        <tag>I2C</tag>
+        <tag>中断</tag>
+        <tag>内存</tag>
       </tags>
   </entry>
   <entry>
@@ -2319,335 +2941,11 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
+        <tag>中断</tag>
         <tag>EXTI</tag>
-        <tag>中断</tag>
         <tag>NVIC</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>深入stm32的底层通信模型--数据的存储与传输</title>
-    <url>/2026/08/02/STM32_Data_Buffer_Mechanism/</url>
-    <content><![CDATA[<h2 id="从串口到-I2C：一个反复出现的问题"><a href="#从串口到-I2C：一个反复出现的问题" class="headerlink" title="从串口到 I2C：一个反复出现的问题"></a>从串口到 I2C：一个反复出现的问题</h2><p>回顾一下我们这一路学过的通信博客：</p>
-<table>
-<thead>
-<tr>
-<th align="left">博客</th>
-<th align="left">外设</th>
-<th align="left">模式</th>
-<th align="left">收发用的数组</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><a href="/2026/07/29/STM32_USART_Serial_Communication/">串口轮询</a></td>
-<td align="left">USART2</td>
-<td align="left">轮询</td>
-<td align="left"><code>receiveData[2]</code></td>
-</tr>
-<tr>
-<td align="left"><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断</a></td>
-<td align="left">USART2</td>
-<td align="left">中断</td>
-<td align="left"><code>receiveData[2]</code>（全局变量）</td>
-</tr>
-<tr>
-<td align="left"><a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/">串口 DMA 不定长</a></td>
-<td align="left">USART2 + DMA</td>
-<td align="left">DMA + 空闲中断</td>
-<td align="left"><code>receiveData[50]</code></td>
-</tr>
-<tr>
-<td align="left"><a href="/2026/07/30/STM32_BLE_Bluetooth/">蓝牙 BLE</a></td>
-<td align="left">USART3 + DMA</td>
-<td align="left">DMA + 空闲中断</td>
-<td align="left"><code>receiveData[50]</code></td>
-</tr>
-<tr>
-<td align="left"><a href="/2026/08/01/STM32_I2C_AHT20/">I2C 读 AHT20</a></td>
-<td align="left">I2C1 + USART2</td>
-<td align="left">I2C 轮询</td>
-<td align="left"><code>sendBuffer[3]</code> &#x2F; <code>readBuffer[6]</code></td>
-</tr>
-</tbody></table>
-<p>写代码时我脑子里一直有个疑惑：每次调用 HAL 收发函数，参数表格里都有一行”<strong>数据缓冲区指针</strong>“——我照着填 <code>receiveData</code>、<code>sendBuffer</code>，程序跑得挺好，但<strong>这些数据到底存在哪里？</strong> 是存在这个数组里，还是存在外设里？为什么每次都要传指针？为什么换个外设（从 UART 到 I2C），这个套路还是一模一样？</p>
-<p>这篇博客就来解决这个疑惑。答案是：<strong>数组在 STM32 的内存（RAM）里，外设内部还有一个”一次只能装 1 字节”的数据寄存器（DR），数据从数组到外设、从外设到数组，都是 1 字节 1 字节地过手的。</strong></p>
-<hr>
-<h2 id="两个存储地点：数组（RAM）和数据寄存器（DR）"><a href="#两个存储地点：数组（RAM）和数据寄存器（DR）" class="headerlink" title="两个存储地点：数组（RAM）和数据寄存器（DR）"></a>两个存储地点：数组（RAM）和数据寄存器（DR）</h2><p>要搞清楚数据存在哪，先分清两个完全不同的存储位置：</p>
-<table>
-<thead>
-<tr>
-<th align="left"></th>
-<th align="left">我的数组（RAM）</th>
-<th align="left">外设数据寄存器 DR</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">位置</td>
-<td align="left">STM32 内存，我代码里定义的变量</td>
-<td align="left">外设模块内部（如 USART2、I2C1 外设里）</td>
-</tr>
-<tr>
-<td align="left">容量</td>
-<td align="left">想多大就多大（2、6、50 字节……）</td>
-<td align="left"><strong>只有 1 字节</strong></td>
-</tr>
-<tr>
-<td align="left">谁来读写</td>
-<td align="left">CPU 通过代码读写</td>
-<td align="left">硬件自动操作</td>
-</tr>
-<tr>
-<td align="left">类比</td>
-<td align="left">候车大厅里的<strong>候车人群</strong></td>
-<td align="left"><strong>检票口</strong>（一次只能过一个人）</td>
-</tr>
-</tbody></table>
-<p>关键点：<strong>数据寄存器 DR 一次只能装 1 字节</strong>。这是硬件设计决定的——USART 外设有 <code>USART_DR</code>，I2C 外设有 <code>I2C_DR</code>，都是一字节宽的小寄存器。</p>
-<p>打个比方：我的数组是候车大厅，DR 是检票口。一次通信要传 6 字节数据，就像 6 个人要出站——他们<strong>只能一个一个过检票口</strong>，不可能 6 个人同时挤过去。</p>
-<hr>
-<h2 id="发送：数据从哪来，到哪去"><a href="#发送：数据从哪来，到哪去" class="headerlink" title="发送：数据从哪来，到哪去"></a>发送：数据从哪来，到哪去</h2><p>以 I2C 发送 3 字节测量命令为例（<code>HAL_I2C_Master_Transmit(&amp;hi2c1, addr, sendBuffer, 3, ...)</code>）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">          RAM（我的代码）                 I2C1 外设                   总线</span><br><span class="line">┌──────────────────────┐      ┌─────────────────────────┐</span><br><span class="line">│  sendBuffer[0] = 0xAC │──①──→│          DR            │──②──→  SDA 引脚</span><br><span class="line">│  sendBuffer[1] = 0x33 │──①──→│   （1字节小信箱）        │──②──→  （逐位移位发出）</span><br><span class="line">│  sendBuffer[2] = 0x00 │──①──→│            ↑           │</span><br><span class="line">└──────────────────────┘      └───────────┼─────────────┘</span><br><span class="line">            ① CPU 把 sendBuffer[i] 写入 DR（HAL 库内部循环）</span><br><span class="line">            ② 硬件把 DR 里的字节移出到总线上</span><br></pre></td></tr></table></figure>
-
-<p><code>HAL_I2C_Master_Transmit</code> 内部干的事，简化后就是：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// HAL_I2C_Master_Transmit 内部（简化版）</span></span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_TXE) == RESET);   <span class="comment">// 等 DR 空了</span></span><br><span class="line">    hi2c-&gt;Instance-&gt;DR = pData[i];                             <span class="comment">// 把数组第 i 个字节塞进 DR</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>注意</strong>：<code>0xAC</code>、<code>0x33</code>、<code>0x00</code> 这三个字节全程待在 <code>sendBuffer</code> 数组里。CPU 只是”读”数组、”写”寄存器，数组里的值并不会消失。发完之后数组还在，下次发新命令直接覆盖。</p>
-<p>串口发送（<code>HAL_UART_Transmit</code>）一模一样，只是把 <code>I2C_FLAG_TXE</code> 换成 <code>UART_FLAG_TXE</code>、把 <code>I2C_DR</code> 换成 <code>USART_DR</code>：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_UART_GET_FLAG(huart, UART_FLAG_TXE) == RESET);  <span class="comment">// 等 DR 空了</span></span><br><span class="line">    huart-&gt;Instance-&gt;DR = pData[i];                              <span class="comment">// 塞一个字节</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="接收：数据从哪来，到哪去"><a href="#接收：数据从哪来，到哪去" class="headerlink" title="接收：数据从哪来，到哪去"></a>接收：数据从哪来，到哪去</h2><p>以 I2C 接收 6 字节温湿度为例（<code>HAL_I2C_Master_Receive(&amp;hi2c1, addr, readBuffer, 6, ...)</code>）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">总线               I2C1 外设                    RAM</span><br><span class="line">SDA 引脚 ──→ 移位寄存器 ──→  DR ──②──→  readBuffer[0]</span><br><span class="line">                     （硬件逐位移入）              readBuffer[1]</span><br><span class="line">                                                readBuffer[2]</span><br><span class="line">                                                readBuffer[3]</span><br><span class="line">                                                readBuffer[4]</span><br><span class="line">                                                readBuffer[5]</span><br></pre></td></tr></table></figure>
-
-<p>HAL 内部循环：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; Size; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">while</span> (__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_RXNE) == RESET);   <span class="comment">// 等 DR 里有数据</span></span><br><span class="line">    pData[i] = hi2c-&gt;Instance-&gt;DR;                              <span class="comment">// 把 DR 里的字节存进数组</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>6 字节被 CPU <strong>一个一个</strong>塞进 <code>readBuffer</code> 数组——CPU 每读一次 DR，硬件就会自动把下一个字节移进 DR。</p>
-<p>串口中断模式下，这个搬运甚至就写在 HAL 源码里，我们之前还解析过这行代码（<a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断博客</a>）：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">*huart-&gt;pRxBuffPtr = (<span class="type">uint8_t</span>)(huart-&gt;Instance-&gt;DR &amp; <span class="number">0x00FF</span>);  <span class="comment">// DR → 数组，搬一个字节</span></span><br></pre></td></tr></table></figure>
-
-<p><code>pRxBuffPtr</code> 就是 HAL 库内部的”数组指针”，每搬一个字节它自己 +1，指向数组下一个位置。</p>
-<hr>
-<h2 id="AHT20-在链路中的哪个位置？"><a href="#AHT20-在链路中的哪个位置？" class="headerlink" title="AHT20 在链路中的哪个位置？"></a>AHT20 在链路中的哪个位置？</h2><p>前面的图都只画了 STM32 到总线的这一段，AHT20 一直没露面——它挂在<strong>总线的另一端</strong>。补上它，整条链路才完整：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                    发送 3 字节测量命令 0xAC 0x33 0x00 时：</span><br><span class="line">                    ┌────────────────────────────────────────────┐</span><br><span class="line">                    │                                            │</span><br><span class="line">   STM32 (主机)     │                 SDA 总线                    │      AHT20 (从机)</span><br><span class="line">┌──────────────┐    │    ┌──────────────┐    ┌──────────────┐     │    ┌──────────────┐</span><br><span class="line">│ sendBuffer   │    │    │  I2C1 外设    │    │              │     │    │  芯片内部      │</span><br><span class="line">│ [0]=0xAC ────┼─①─┼───→│  DR（1字节）  │─②─┼─→  SDA 引脚 ──┼─────┼─→│ 引脚 → 移位    │</span><br><span class="line">│ [1]=0x33     │    │    │              │    │              │     │    │ 寄存器 → 内部   │</span><br><span class="line">│ [2]=0x00     │    │    └──────────────┘    └──────────────┘     │    │ 命令/配置寄存器 │</span><br><span class="line">└──────────────┘    │                                            │    └──────────────┘</span><br><span class="line">                    └────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><strong>①</strong> <code>sendBuffer</code> 数组（STM32 的 RAM）→ CPU 逐字节塞进 I2C1 的 DR</li>
-<li><strong>②</strong> 硬件把 DR 里的字节移位到 SDA 引脚，电平信号在总线上传播</li>
-<li><strong>③</strong> 电平到达 AHT20 的 SDA 引脚 → 芯片内部按 SCL 时钟逐位接收 → 拼成一字节 → <strong>存进 AHT20 芯片内部的寄存器</strong></li>
-</ul>
-<p>所以命令字节的最终”目的地”是 <strong>AHT20 芯片内部的寄存器</strong>——传感器芯片自己也有存储，数据不在 STM32 里，也不在总线上（总线只是”路”）。</p>
-<p>接收时方向反过来：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                    读取 6 字节测量结果时：</span><br><span class="line">                    ┌────────────────────────────────────────────┐</span><br><span class="line">                    │                                            │</span><br><span class="line">   STM32 (主机)     │                 SDA 总线                    │      AHT20 (从机)</span><br><span class="line">┌──────────────┐    │    ┌──────────────┐    ┌──────────────┐     │    ┌──────────────┐</span><br><span class="line">│ readBuffer   │    │    │  I2C1 外设    │    │              │     │    │ 芯片内部       │</span><br><span class="line">│ [0]←───④────┼───┼───←│  DR（1字节）  │←③─┼── SDA 引脚 ←──┼─────┼──←│ 测量结果寄存器  │</span><br><span class="line">│ [1]          │    │    │              │    │              │     │    │ （温湿度原始值） │</span><br><span class="line">│ ...          │    │    └──────────────┘    └──────────────┘     │    └──────────────┘</span><br><span class="line">└──────────────┘    │                                            │</span><br><span class="line">                    └────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><strong>③</strong> AHT20 把内部寄存器里的测量结果逐字节放上 SDA 线</li>
-<li><strong>④</strong> STM32 的 I2C1 硬件逐位收下 → 装进 DR → CPU 把 DR 读走放进 <code>readBuffer</code></li>
-</ul>
-<h3 id="AHT20-对-STM32-来说是个”黑盒”"><a href="#AHT20-对-STM32-来说是个”黑盒”" class="headerlink" title="AHT20 对 STM32 来说是个”黑盒”"></a>AHT20 对 STM32 来说是个”黑盒”</h3><p>我写的代码里从头到尾没有”直接操作 AHT20 内部寄存器”的写法——STM32 只做两件事：<strong>把命令字节发到总线上、从总线上收字节</strong>。AHT20 收到 0xAC 之后自己知道”该开始测量了”，测量完自己把结果放好等着被读。芯片内部怎么处理，STM32 完全不关心。</p>
-<h3 id="地址参数就是”点名”"><a href="#地址参数就是”点名”" class="headerlink" title="地址参数就是”点名”"></a>地址参数就是”点名”</h3><p><code>HAL_I2C_Master_Transmit(&amp;hi2c1, AHT20_ADDRESS, ...)</code> 里的地址（0x70）就是主机在总线上<strong>喊话点名</strong>：一条总线上可能挂着多个从机（OLED、传感器……），地址告诉它们”这 3 个字节是发给 0x70 的，其他的别收”。数据到了总线上，<strong>只有 AHT20 认领</strong>，别的设备”选择性失聪”。</p>
-<p>这也顺带解释了串口和 I2C 的一个根本区别：<strong>串口是点对点</strong>（线那端就一个设备），不需要地址参数；<strong>I2C 是总线</strong>（线那端可能挂好几个从机），必须带地址点名，数据才能被正确的从机收下。</p>
-<h3 id="完整存储位置列表"><a href="#完整存储位置列表" class="headerlink" title="完整存储位置列表"></a>完整存储位置列表</h3><table>
-<thead>
-<tr>
-<th align="left">环节</th>
-<th align="left">数据存在哪</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">发送起点</td>
-<td align="left">STM32 RAM（<code>sendBuffer</code> 数组）</td>
-</tr>
-<tr>
-<td align="left">过手</td>
-<td align="left">STM32 的 I2C1 DR（1 字节）</td>
-</tr>
-<tr>
-<td align="left">运输</td>
-<td align="left">SDA 总线（电平信号，不存储）</td>
-</tr>
-<tr>
-<td align="left"><strong>发送终点</strong></td>
-<td align="left"><strong>AHT20 芯片内部的寄存器</strong>（命令&#x2F;配置）</td>
-</tr>
-<tr>
-<td align="left">接收起点</td>
-<td align="left">AHT20 芯片内部的寄存器（测量结果）</td>
-</tr>
-<tr>
-<td align="left">过手</td>
-<td align="left">STM32 的 I2C1 DR（1 字节）</td>
-</tr>
-<tr>
-<td align="left"><strong>接收终点</strong></td>
-<td align="left">STM32 RAM（<code>readBuffer</code> 数组）</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="为什么必须是数组？"><a href="#为什么必须是数组？" class="headerlink" title="为什么必须是数组？"></a>为什么必须是数组？</h2><p>因为 DR 一次只能装 1 字节，而通信往往是多字节的。假如不用数组、只用一个变量：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">uint8_t</span> data;   <span class="comment">// 只有 1 字节</span></span><br><span class="line">HAL_UART_Receive(&amp;huart2, &amp;data, <span class="number">2</span>, HAL_MAX_DELAY);  <span class="comment">// 想收 2 字节？没地方放！</span></span><br></pre></td></tr></table></figure>
-
-<p>第二个字节一来就把第一个字节覆盖了。所以必须有”一块连续的内存”把多字节数据都装下——这就是数组。</p>
-<p>数组大小怎么定？看我的通信协议：</p>
-<ul>
-<li>串口轮询：指令固定 2 字节 → <code>receiveData[2]</code></li>
-<li>串口 DMA：数据不定长 → <code>receiveData[50]</code>（50 是安全上限）</li>
-<li>I2C 读 AHT20：每次读 6 字节 → <code>readBuffer[6]</code></li>
-</ul>
-<p>这也解释了之前博客里的一个细节：DMA 接收不定长数据那篇的数组为什么从 <code>[2]</code> 变成 <code>[50]</code>——<strong>不是语法变了，是数据量上限变了</strong>。</p>
-<hr>
-<h2 id="为什么-HAL-函数要传指针？"><a href="#为什么-HAL-函数要传指针？" class="headerlink" title="为什么 HAL 函数要传指针？"></a>为什么 HAL 函数要传指针？</h2><p>看函数签名：<code>HAL_I2C_Master_Receive(..., uint8_t *pData, ...)</code>——传的是<strong>数组首地址</strong>（数组名本身就是首地址，前面加 <code>&amp;</code> 或者直接用数组名都行）。</p>
-<p>因为 HAL 库函数要<strong>往stm32的内存里写数据</strong>（接收）或者<strong>从内存里读数据</strong>（发送）。传指针 &#x3D; 把仓库地址告诉 HAL，它直接操作我的仓库，<strong>不需要把数据复制一份</strong>。这也意味着缓冲区大小、数据格式全由stm32自己掌控——HAL 只负责”从数组第 0 个位置搬到第 Size 个位置”。</p>
-<blockquote>
-<p>想想看：如果不传指针而是传数组本身，C 语言会复制一份整个数组——又慢又浪费内存，而且接收时复制过去的副本根本收不到数据（数据要写回原数组才有用）。所以通信 API 一律传指针。</p>
-</blockquote>
-<hr>
-<h2 id="三种”搬运工”：轮询、中断、DMA"><a href="#三种”搬运工”：轮询、中断、DMA" class="headerlink" title="三种”搬运工”：轮询、中断、DMA"></a>三种”搬运工”：轮询、中断、DMA</h2><p>前面 5 篇博客学过的所有模式，<strong>数据存放的位置完全没变</strong>——数组还是那个数组（RAM），DR 还是那个 DR（外设里）。变的只有一件事：<strong>谁来搬</strong>。</p>
-<table>
-<thead>
-<tr>
-<th align="left">模式</th>
-<th align="left">搬运工</th>
-<th align="left">CPU 在干嘛</th>
-<th align="left">对应博客</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>轮询</strong></td>
-<td align="left">CPU 亲自搬，等一个搬一个</td>
-<td align="left">全程占着，啥也干不了</td>
-<td align="left">串口轮询、I2C 读 AHT20</td>
-</tr>
-<tr>
-<td align="left"><strong>中断</strong></td>
-<td align="left">硬件标志位置位 → 中断服务函数来搬</td>
-<td align="left">平时干别的，被叫去才搬一下</td>
-<td align="left">串口中断</td>
-</tr>
-<tr>
-<td align="left"><strong>DMA</strong></td>
-<td align="left">专门的 DMA 硬件搬，一次搬一批</td>
-<td align="left">彻底解放，搬完了才收到通知（回调）</td>
-<td align="left">串口 DMA、蓝牙</td>
-</tr>
-</tbody></table>
-<p>轮询和中断的搬运其实”长得一模一样”——都是 CPU 执行”等标志位 → 搬一字节”的循环，区别只在<strong>等待方式</strong>：</p>
-<ul>
-<li>轮询：CPU 站在 DR 门口<strong>死等</strong>标志位（<code>while (标志位 == 0);</code>），期间什么事都干不了</li>
-<li>中断：CPU 去干别的，<strong>标志位置位时硬件把 CPU 叫回来</strong>（触发中断），在中断服务函数里搬一字节，搬完继续干别的</li>
-</ul>
-<p>DMA 则是完全不同的搬运工：它是个硬件模块，自己知道”源地址（DR）、目标地址（数组）、搬多少”，一条命令就能把整批数据搬完，连 CPU 都不需要。</p>
-<p>关键：<strong>不管是哪种搬运工，数据最终都落在同一个数组里</strong>。所以不管是我在回调函数里用 <code>receiveData</code>，还是在 <code>while(1)</code> 里用 <code>readBuffer</code>，操作的都是同一块内存——程序逻辑完全不用区分数据是怎么进来的。</p>
-<hr>
-<h2 id="统一模型：所有通信外设一个套路"><a href="#统一模型：所有通信外设一个套路" class="headerlink" title="统一模型：所有通信外设一个套路"></a>统一模型：所有通信外设一个套路</h2><p>把 5 篇博客串起来，得到一个贯穿所有通信编程的模型：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌───────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    【通信统一模型】                              │</span><br><span class="line">│                                                               │</span><br><span class="line">│    ┌──────────────┐     搬运机制       ┌───────────────────┐   │</span><br><span class="line">│    │  数组 / 变量   │  ◄──────────────► │ 外设数据寄存器 DR   │   │</span><br><span class="line">│    │  (RAM 内存)   │                   │  (外设硬件内部)     │   │</span><br><span class="line">│    │              │  轮询: CPU 手动    │  USART_DR          │   │</span><br><span class="line">│    │ receiveData  │  中断: 硬件通知    │  I2C_DR            │   │</span><br><span class="line">│    │ sendBuffer   │  DMA: 硬件自动     │                    │   │</span><br><span class="line">│    │ readBuffer   │                   │                    │   │</span><br><span class="line">│    └──────────────┘                   └─────────┬─────────┘   │</span><br><span class="line">│              ▲                                 │              │</span><br><span class="line">│              │        TXE / RXNE 标志驱动       │              │</span><br><span class="line">│              └─────────────────────────────────┘              │</span><br><span class="line">│                                                               │</span><br><span class="line">└───────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<p>把 5 篇博客放进这个模型里看：</p>
-<table>
-<thead>
-<tr>
-<th align="left">博客</th>
-<th align="left">搬运工</th>
-<th align="left">数组在哪</th>
-<th align="left">DR → 数组由谁完成</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">串口轮询</td>
-<td align="left">CPU 查询 RXNE</td>
-<td align="left"><code>receiveData[2]</code> 局部变量</td>
-<td align="left">CPU 在 <code>HAL_UART_Receive</code> 里逐字节读 DR</td>
-</tr>
-<tr>
-<td align="left">串口中断</td>
-<td align="left">中断服务函数</td>
-<td align="left"><code>receiveData[2]</code> 全局变量</td>
-<td align="left">CPU 在 <code>UART_Receive_IT</code> 里读 DR</td>
-</tr>
-<tr>
-<td align="left">串口 DMA</td>
-<td align="left">DMA 硬件</td>
-<td align="left"><code>receiveData[50]</code> 全局变量</td>
-<td align="left">DMA 控制器直接从 DR 搬到数组</td>
-</tr>
-<tr>
-<td align="left">蓝牙（USART3+DMA）</td>
-<td align="left">DMA 硬件</td>
-<td align="left"><code>receiveData[50]</code> 全局变量</td>
-<td align="left">DMA 控制器直接从 DR 搬到数组</td>
-</tr>
-<tr>
-<td align="left">I2C 读 AHT20</td>
-<td align="left">CPU 查询 I2C 标志</td>
-<td align="left"><code>sendBuffer[3]</code> &#x2F; <code>readBuffer[6]</code> 局部变量</td>
-<td align="left">CPU 在 HAL_I2C 函数里搬运</td>
-</tr>
-</tbody></table>
-<p>所以可以看到，<strong>从 USART 到 I2C，从轮询到 DMA，底层永远是这个模型</strong>：</p>
-<blockquote>
-<p><strong>数组（RAM） ↔ 数据寄存器 DR（外设） ↔ 移位寄存器 ↔ 物理引脚</strong></p>
-</blockquote>
-<p>编程层面我只需要做两件事：</p>
-<ol>
-<li><strong>准备数组</strong>：发送前往数组里放数据；接收前准备一个空数组</li>
-<li><strong>调 HAL 函数</strong>：把数组首地址（指针）和长度告诉 HAL</li>
-</ol>
-<p>剩下的”数组↔DR 一来一回”的搬运，交给 HAL 库（轮询&#x2F;中断）或 DMA（硬件）。这也是为什么换一个通信外设（UART → I2C → 以后的 SPI&#x2F;CAN）学习成本很低——<strong>学会一个通信外设，就学会了一半</strong>。</p>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
-<thead>
-<tr>
-<th align="left">问题</th>
-<th align="left">答案</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">数据到底存在哪？</td>
-<td align="left">存在<strong>我代码定义的数组里</strong>（RAM 内存），发送和接收都是</td>
-</tr>
-<tr>
-<td align="left">外设里存数据吗？</td>
-<td align="left">外设只有一个<strong>1 字节的数据寄存器 DR</strong>，只作”过手”用，不存数据</td>
-</tr>
-<tr>
-<td align="left">为什么用数组？</td>
-<td align="left">DR 一次只能装 1 字节，多字节数据必须有连续内存暂存</td>
-</tr>
-<tr>
-<td align="left">为什么传指针？</td>
-<td align="left">HAL 函数要直接读写我的内存，传首地址即可，避免复制</td>
-</tr>
-<tr>
-<td align="left">数据怎么进的数组？</td>
-<td align="left">轮询&#x2F;中断：CPU 逐字节搬；DMA：硬件整批搬——数组位置不变</td>
-</tr>
-<tr>
-<td align="left">换外设为什么套路一样？</td>
-<td align="left">USART、I2C（以及以后的 SPI&#x2F;CAN）都是”数组 ↔ DR ↔ 引脚”模型</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li><a href="/2026/08/01/STM32_I2C_AHT20/">上一篇：STM32——IIC通信，轮询模式读取温湿度传感器AHT20</a></li>
-<li><a href="/2026/07/29/STM32_USART_Serial_Communication/">串口轮询：STM32——串口通信，用电脑控制三色LED</a></li>
-<li><a href="/2026/07/29/STM32_USART_Interrupt_Mode/">串口中断：STM32——串口中断模式通信，让CPU不再”傻等”</a></li>
-<li><a href="/2026/07/30/STM32_USART_DMA_Idle_Receive/">DMA 不定长：STM32——串口DMA模式收发，与不定长数据接收</a></li>
-<li><a href="/2026/07/30/STM32_BLE_Bluetooth/">蓝牙：STM32——蓝牙BLE通信，用蓝牙无线控制小灯</a></li>
-<li>参考资料：STM32F103xx 参考手册（USART 数据寄存器 DR、I2C 数据寄存器 DR 章节）、AHT20 数据手册</li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>STM32</tag>
-        <tag>嵌入式</tag>
-        <tag>USART</tag>
-        <tag>DMA</tag>
-        <tag>中断</tag>
-        <tag>I2C</tag>
-        <tag>内存</tag>
       </tags>
   </entry>
   <entry>
@@ -2967,11 +3265,11 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
-        <tag>EXTI</tag>
         <tag>中断</tag>
+        <tag>EXTI</tag>
       </tags>
   </entry>
   <entry>
@@ -3539,8 +3837,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>I2C</tag>
         <tag>AHT20</tag>
@@ -4099,12 +4397,12 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>DMA</tag>
-        <tag>中断</tag>
         <tag>I2C</tag>
+        <tag>中断</tag>
         <tag>AHT20</tag>
         <tag>状态机</tag>
       </tags>
@@ -4445,8 +4743,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>GPIO</tag>
       </tags>
@@ -4758,8 +5056,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>I2C</tag>
         <tag>OLED</tag>
@@ -4909,8 +5207,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>I2C</tag>
         <tag>AHT20</tag>
@@ -5252,8 +5550,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>GPIO</tag>
       </tags>
@@ -5825,8 +6123,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>TIM</tag>
         <tag>定时器</tag>
@@ -6308,8 +6606,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>TIM</tag>
         <tag>定时器</tag>
@@ -6606,8 +6904,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>中断</tag>
         <tag>TIM</tag>
@@ -7246,8 +7544,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>USART</tag>
         <tag>DMA</tag>
@@ -7606,8 +7904,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>USART</tag>
         <tag>中断</tag>
@@ -8252,8 +8550,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>USART</tag>
         <tag>串口</tag>
@@ -8584,8 +8882,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>智能小车</tag>
         <tag>标准库</tag>
         <tag>架构</tag>
@@ -12555,8 +12853,8 @@
         <category>嵌入式</category>
       </categories>
       <tags>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>GPIO</tag>
       </tags>
@@ -13013,8 +13311,8 @@
       </categories>
       <tags>
         <tag>VS Code</tag>
-        <tag>STM32</tag>
         <tag>嵌入式</tag>
+        <tag>STM32</tag>
         <tag>CubeMX</tag>
         <tag>GPIO</tag>
       </tags>
@@ -17010,8 +17308,8 @@
       </categories>
       <tags>
         <tag>C/C++</tag>
-        <tag>顺序表</tag>
         <tag>数据结构</tag>
+        <tag>顺序表</tag>
       </tags>
   </entry>
   <entry>

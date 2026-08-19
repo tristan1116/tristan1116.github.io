@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="从代码出发，整理链表的完整知识体系：节点与表头结构、头插尾插任意插、删除、无头节点的 dummy 技巧、单向循环链表、双向循环链表、约瑟夫环实战。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="数据结构 —— 链表">
+<meta property="og:url" content="http://tristan1116.github.io/2026/08/19/LinkList_DataStructure/index.html">
+<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:description" content="从代码出发，整理链表的完整知识体系：节点与表头结构、头插尾插任意插、删除、无头节点的 dummy 技巧、单向循环链表、双向循环链表、约瑟夫环实战。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-19T21:30:00.000Z">
+<meta property="article:modified_time" content="2026-08-19T21:30:00.000Z">
+<meta property="article:author" content="点灯大王">
+<meta property="article:tag" content="C&#x2F;C++">
+<meta property="article:tag" content="链表">
+<meta property="article:tag" content="数据结构">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/08/19/LinkList_DataStructure/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>数据结构 —— 链表 | 点灯大王的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<style>mjx-container[jax="SVG"] {
+  direction: ltr;
+}
+
+mjx-container[jax="SVG"] > svg {
+  overflow: visible;
+}
+
+mjx-container[jax="SVG"][display="true"] {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+}
+
+mjx-container[jax="SVG"][justify="left"] {
+  text-align: left;
+}
+
+mjx-container[jax="SVG"][justify="right"] {
+  text-align: right;
+}
+
+g[data-mml-node="merror"] > g {
+  fill: red;
+  stroke: red;
+}
+
+g[data-mml-node="merror"] > rect[data-background] {
+  fill: yellow;
+  stroke: none;
+}
+
+g[data-mml-node="mtable"] > line[data-line] {
+  stroke-width: 70px;
+  fill: none;
+}
+
+g[data-mml-node="mtable"] > rect[data-frame] {
+  stroke-width: 70px;
+  fill: none;
+}
+
+g[data-mml-node="mtable"] > .mjx-dashed {
+  stroke-dasharray: 140;
+}
+
+g[data-mml-node="mtable"] > .mjx-dotted {
+  stroke-linecap: round;
+  stroke-dasharray: 0,140;
+}
+
+g[data-mml-node="mtable"] > svg {
+  overflow: visible;
+}
+
+[jax="SVG"] mjx-tool {
+  display: inline-block;
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+[jax="SVG"] mjx-tool > mjx-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+mjx-tool > mjx-tip {
+  display: inline-block;
+  padding: .2em;
+  border: 1px solid #888;
+  font-size: 70%;
+  background-color: #F8F8F8;
+  color: black;
+  box-shadow: 2px 2px 5px #AAAAAA;
+}
+
+g[data-mml-node="maction"][data-toggle] {
+  cursor: pointer;
+}
+
+mjx-status {
+  display: block;
+  position: fixed;
+  left: 1em;
+  bottom: 1em;
+  min-width: 25%;
+  padding: .2em .4em;
+  border: 1px solid #888;
+  font-size: 90%;
+  background-color: #F8F8F8;
+  color: black;
+}
+
+foreignObject[data-mjx-xml] {
+  font-family: initial;
+  line-height: normal;
+  overflow: visible;
+}
+
+.MathJax path {
+  stroke-width: 3;
+}
+
+mjx-container[display="true"] {
+  overflow: auto hidden;
+}
+
+mjx-container[display="true"] + br {
+  display: none;
+}
+</style></head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">点灯大王的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/08/19/LinkList_DataStructure/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="点灯大王的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          数据结构 —— 链表
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-19 21:30:00" itemprop="dateCreated datePublished" datetime="2026-08-19T21:30:00+00:00">2026-08-19</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">数据结构</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>16k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>14 分钟</span>
+            </span>
+            <div class="post-description">从代码出发，整理链表的完整知识体系：节点与表头结构、头插尾插任意插、删除、无头节点的 dummy 技巧、单向循环链表、双向循环链表、约瑟夫环实战。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="什么是链表"><a href="#什么是链表" class="headerlink" title="什么是链表"></a>什么是链表</h2><p><strong>链表</strong>是线性表的另一种存储方式。与顺序表（数组）不同，链表的每个元素都是<strong>独立申请的一块内存</strong>（称为<strong>节点</strong>），通过指针把它们”串”起来。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">顺序表：data → [ 1 | 2 | 3 | 4 | 5 ]    内存连续，一格挨着一格</span><br><span class="line"></span><br><span class="line">链表：  节点1 → 节点2 → 节点3 → 节点4 → 节点5 → NULL</span><br><span class="line">        [1|●]   [2|●]   [3|●]   [4|●]   [5|●]</span><br><span class="line">        内存是零散的，靠指针(next)把它们连成一条链</span><br></pre></td></tr></table></figure>
+
+<p>两者核心区别：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>顺序表</th>
+<th>链表</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内存</td>
+<td>连续</td>
+<td>离散（靠指针相连）</td>
+</tr>
+<tr>
+<td>访问</td>
+<td>随机访问 O(1)，按下标直接取</td>
+<td>只能从头<strong>顺序访问</strong> O(n)</td>
+</tr>
+<tr>
+<td>插入/删除</td>
+<td>O(n)，要移动大量元素</td>
+<td>**O(1)**（改指针即可，前提是已找到位置）</td>
+</tr>
+<tr>
+<td>扩容</td>
+<td>需要拷贝整个数据区</td>
+<td>天然”扩容”，随时 new 一个节点</td>
+</tr>
+</tbody></table>
+<p>一句话总结：**顺序表适合”查多改少”，链表适合”改多查少”**。</p>
+<hr>
+<h2 id="一、单向链表的结构定义"><a href="#一、单向链表的结构定义" class="headerlink" title="一、单向链表的结构定义"></a>一、单向链表的结构定义</h2><p>链式结构的代码套路是固定的：<strong>先定义节点结构，再定义表头结构，最后定义操作接口</strong>。</p>
+<h3 id="1-1-节点结构"><a href="#1-1-节点结构" class="headerlink" title="1.1 节点结构"></a>1.1 节点结构</h3><figure class="highlight c"><figcaption><span>linkList.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="type">int</span> ElemType;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 定义单链表节点的结构</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">LinkListNode</span> {</span></span><br><span class="line">    ElemType val;                 <span class="comment">// 数据域：存元素</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">LinkListNode</span>* <span class="title">next</span>;</span>    <span class="comment">// 指针域：指向下一个节点</span></span><br><span class="line">} LinkListNode;</span><br></pre></td></tr></table></figure>
+
+<p>节点 = <strong>数据域 + 指针域</strong>。指针域存的是下一个节点的地址，这就是”链”的由来。</p>
+<blockquote>
+<p>注意结构体里的写法是 <code>struct LinkListNode* next</code> 而不是 <code>LinkListNode* next</code>——因为此时 typedef 的名字 <code>LinkListNode</code> 还没有生效，必须用完整的 <code>struct LinkListNode</code>。</p>
+</blockquote>
+<h3 id="1-2-表头结构（含哨兵头节点）"><a href="#1-2-表头结构（含哨兵头节点）" class="headerlink" title="1.2 表头结构（含哨兵头节点）"></a>1.2 表头结构（含哨兵头节点）</h3><figure class="highlight c"><figcaption><span>linkList.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    LinkListNode header;  <span class="comment">// 头节点（哨兵），不存数据，保证操作统一</span></span><br><span class="line">    <span class="type">int</span> num;              <span class="comment">// 存储链表节点的个数</span></span><br><span class="line">} LinkListHeader;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意：这里的 <code>header</code> 是一个节点结构体的”实体”（不是指针）</strong>，它作为<strong>哨兵头节点</strong>存在。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">LinkListHeader (表头)</span><br><span class="line">┌──────────────┐</span><br><span class="line">│ header节点    │     节点1      节点2      节点3</span><br><span class="line">│ val=0,next───┼──→ [1|●] ──→ [2|●] ──→ [3|●] ──→ NULL</span><br><span class="line">│ num=3        │</span><br><span class="line">└──────────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么需要这个哨兵头节点？</strong></p>
+<p>因为有了它，<strong>所有插入删除的代码逻辑完全统一</strong>：</p>
+<ul>
+<li>没有哨兵时：插入到头部要改”头指针本身”，插入到中间要改”某个节点的 next”，<strong>两种情况的代码不一样</strong>，需要特判</li>
+<li>有哨兵时：插入位置的前置节点<strong>永远是某个节点的 next 字段</strong>（头插时前置节点就是哨兵 header），一套代码通吃</li>
+</ul>
+<p>这就是”<strong>用空间换逻辑统一</strong>“的思想，也是 STL 里 list 等容器的常见做法。</p>
+<hr>
+<h2 id="二、创建与释放"><a href="#二、创建与释放" class="headerlink" title="二、创建与释放"></a>二、创建与释放</h2><h3 id="2-1-创建表头"><a href="#2-1-创建表头" class="headerlink" title="2.1 创建表头"></a>2.1 创建表头</h3><figure class="highlight c"><figcaption><span>linkList.c - createLinkListHeader</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">LinkListHeader* <span class="title function_">createLinkListHeader</span><span class="params">()</span> {</span><br><span class="line">    <span class="comment">// 1. 在堆区申请表头结构体空间</span></span><br><span class="line">    LinkListHeader* res = (LinkListHeader*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkListHeader));</span><br><span class="line">    <span class="keyword">if</span> (res == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"申请表头失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 初始化：哨兵节点的 next 指向 NULL（空链表），计数为 0</span></span><br><span class="line">    res-&gt;header.next = <span class="literal">NULL</span>;</span><br><span class="line">    res-&gt;header.val = <span class="number">0</span>;</span><br><span class="line">    res-&gt;num = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> res;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>和顺序表一样，<strong>表头在堆区申请，返回指针</strong>。空链表的状态就是 <code>header.next = NULL</code>。</p>
+<h3 id="2-2-释放链表"><a href="#2-2-释放链表" class="headerlink" title="2.2 释放链表"></a>2.2 释放链表</h3><figure class="highlight c"><figcaption><span>linkList.c - releaseLinkList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">releaseLinkList</span><span class="params">(LinkListHeader* linklist_header)</span> {</span><br><span class="line">    <span class="keyword">if</span> (linklist_header) {</span><br><span class="line">        LinkListNode* p = linklist_header-&gt;header.next;  <span class="comment">// 从第一个真实节点开始</span></span><br><span class="line">        LinkListNode* temp;</span><br><span class="line">        <span class="comment">// 一路向前：先备份，再前移，最后释放</span></span><br><span class="line">        <span class="keyword">while</span> (p) {</span><br><span class="line">            temp = p;</span><br><span class="line">            p = p-&gt;next;</span><br><span class="line">            <span class="built_in">free</span>(temp);</span><br><span class="line">            linklist_header-&gt;num--;   <span class="comment">// 每释放一个，计数减一</span></span><br><span class="line">        }</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"Release success ! LinkList has %d values\n"</span>, linklist_header-&gt;num);</span><br><span class="line">        <span class="built_in">free</span>(linklist_header);        <span class="comment">// 最后释放表头</span></span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>释放的三大要点</strong>：</p>
+<ol>
+<li><strong>先备份再释放</strong>：<code>temp = p; p = p-&gt;next; free(temp);</code>——释放 p 之前必须先拿到下一个节点的地址，否则就”断链找不到了”</li>
+<li><strong>哨兵节点先不释放</strong>：遍历从 <code>header.next</code> 开始，哨兵 header 本身随表头一起释放</li>
+<li><strong>释放顺序与创建相反</strong>：先释放所有节点，再释放表头</li>
+</ol>
+<hr>
+<h2 id="三、插入操作"><a href="#三、插入操作" class="headerlink" title="三、插入操作"></a>三、插入操作</h2><h3 id="3-1-头插法（insertLinkListHeader）"><a href="#3-1-头插法（insertLinkListHeader）" class="headerlink" title="3.1 头插法（insertLinkListHeader）"></a>3.1 头插法（insertLinkListHeader）</h3><figure class="highlight c"><figcaption><span>linkList.c - insertLinkListHeader</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertLinkListHeader</span><span class="params">(LinkListHeader* linklist_header, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 创建辅助指针，指向前置节点</span></span><br><span class="line">    <span class="comment">// 头插法的前置节点就是哨兵头节点，天然自带</span></span><br><span class="line">    LinkListNode* p = &amp;linklist_header-&gt;header;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 创建新节点，创建之后第一步先初始化</span></span><br><span class="line">    LinkListNode* new_node = (LinkListNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkListNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 核心操作：先把新节点接上，再让前置节点跟上</span></span><br><span class="line">    new_node-&gt;next = p-&gt;next;   <span class="comment">// ① 新节点的 next 指向原来第一个节点</span></span><br><span class="line">    p-&gt;next = new_node;         <span class="comment">// ② 前置节点的 next 指向新节点</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 4. 更新表头计数</span></span><br><span class="line">    ++linklist_header-&gt;num;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心两行，顺序不能反</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">① new_node-&gt;next = p-&gt;next;</span><br><span class="line">             ┌─────────┐</span><br><span class="line">   header ──→│ 新节点   │──→ 原第一个节点 ──→ ...</span><br><span class="line">             └─────────┘</span><br><span class="line">   ①先把新节点"挂在"原链上（此时原第一个节点还被 header 指着，没丢）</span><br><span class="line"></span><br><span class="line">② p-&gt;next = new_node;</span><br><span class="line">             ┌─────────┐</span><br><span class="line">   header ──→│ 新节点   │──→ 原第一个节点 ──→ ...</span><br><span class="line">             └─────────┘</span><br><span class="line">   ②再让 header 指向新节点，新节点正式"上位"</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么先①后②？</strong> 如果先写 <code>p-&gt;next = new_node</code>，原链就断了——<code>new_node-&gt;next = p-&gt;next</code> 拿到的将是新节点自己（自环），原节点全部丢失。**”先接新，再改旧”是链表插入的铁律。**</p>
+<blockquote>
+<p>头插法的特点：插入顺序和最终顺序<strong>相反</strong>。循环头插 1~10，链里是 10 9 8 … 1。</p>
+</blockquote>
+<h3 id="3-2-任意位置插入（insertLinkListPos）"><a href="#3-2-任意位置插入（insertLinkListPos）" class="headerlink" title="3.2 任意位置插入（insertLinkListPos）"></a>3.2 任意位置插入（insertLinkListPos）</h3><figure class="highlight c"><figcaption><span>linkList.c - insertLinkListPos</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// pos 的取值范围：0 ~ num（pos=num 等价于尾插）</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">insertLinkListPos</span><span class="params">(LinkListHeader* linklist_header, <span class="type">int</span> pos, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 判断位置是否合法</span></span><br><span class="line">    <span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; linklist_header-&gt;num) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"insert pos invalid\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 创建辅助指针，指向前置节点</span></span><br><span class="line">    <span class="comment">// 头节点位置约定为 -1（哨兵下标）</span></span><br><span class="line">    LinkListNode* p = &amp;linklist_header-&gt;header;</span><br><span class="line">    <span class="type">int</span> index = <span class="number">-1</span>;</span><br><span class="line">    <span class="comment">// 当 index 为 pos-1 时，就找到了前置节点</span></span><br><span class="line">    <span class="keyword">while</span> (p &amp;&amp; (index &lt; pos - <span class="number">1</span>)) {</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        index++;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">if</span> (p == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 创建插入的节点空间，先操作新节点，再操作老节点</span></span><br><span class="line">    LinkListNode* new_node = (LinkListNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkListNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;next = p-&gt;next;   <span class="comment">// 同头插法，先接新</span></span><br><span class="line">    p-&gt;next = new_node;         <span class="comment">// 再改旧</span></span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    linklist_header-&gt;num++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>找前置节点的核心逻辑</strong>：单链表没有”回头路”，要插入到 pos 位置，必须先走到 <strong>pos-1 位置（前置节点）</strong>，再改它的 next。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">哨兵(-1) → 节点0 → 节点1 → 节点2 → 节点3 → NULL</span><br><span class="line">           ↑</span><br><span class="line">           p 走到这里 (index = pos-1) 停下</span><br><span class="line"></span><br><span class="line">pos=2 时：p 停在节点1（index=1），把新节点插到它后面 = 插到位置2 ✅</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>哨兵下标约定为 <code>-1</code>，第一个真实节点下标为 <code>0</code>，所以前置节点的 index 是 <code>pos-1</code></li>
+<li>**<code>pos</code> 可以等于 <code>num</code>**：此时 p 会走到最后一个节点后面（next 为 NULL），插入后即为尾插——这就是 <code>pos</code> 范围写成 <code>0~num</code> 的原因</li>
+</ul>
+<hr>
+<h2 id="四、删除操作"><a href="#四、删除操作" class="headerlink" title="四、删除操作"></a>四、删除操作</h2><figure class="highlight c"><figcaption><span>linkList.c - deleteLinkListVal</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">deleteLinkListVal</span><span class="params">(LinkListHeader* linklist_header, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 创建辅助指针，指向前置节点</span></span><br><span class="line">    <span class="comment">// 单链表只能单向走，删除节点也必须站在"前置节点"的位置上</span></span><br><span class="line">    LinkListNode* p = &amp;linklist_header-&gt;header;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 写法一：先找再断，直白</span></span><br><span class="line">    <span class="comment">// while (p-&gt;next) {</span></span><br><span class="line">    <span class="comment">//     if (p-&gt;next-&gt;val == val) break;</span></span><br><span class="line">    <span class="comment">//     p = p-&gt;next;</span></span><br><span class="line">    <span class="comment">// }</span></span><br><span class="line">    <span class="comment">// 写法二：用 &amp;&amp; 短路技巧，更简洁</span></span><br><span class="line">    <span class="keyword">while</span> ((p-&gt;next) &amp;&amp; (p-&gt;next-&gt;val != val)) {</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">    }</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 删除——核心思想就是备份</span></span><br><span class="line">    <span class="comment">// while 有两个出口：找到（p-&gt;next 非空）或 走到底（p-&gt;next 为空），结果不同，需要判断</span></span><br><span class="line">    <span class="keyword">if</span> (p-&gt;next) {</span><br><span class="line">        LinkListNode* temp = p-&gt;next;  <span class="comment">// 备份要删的节点</span></span><br><span class="line">        p-&gt;next = temp-&gt;next;          <span class="comment">// 让前置节点跳过它</span></span><br><span class="line">        <span class="built_in">free</span>(temp);                    <span class="comment">// 释放</span></span><br><span class="line">        linklist_header-&gt;num--;</span><br><span class="line">    } <span class="keyword">else</span> {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"Delete failed! No %d element\n"</span>, val);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>三个关键点</strong>：</p>
+<ol>
+<li><strong>单链表删除为什么必须找”前置节点”？</strong> 因为删除 = 让前一个节点的 next 跳过自己。而单链表只能顺着 next 往后走，无法回头，所以必须停在被删节点的前一个位置。代码里判断的是 <code>p-&gt;next-&gt;val == val</code>，p 始终站在前置位。</li>
+<li><strong>短路写法</strong>：<code>while (p-&gt;next &amp;&amp; p-&gt;next-&gt;val != val)</code>——<code>p-&gt;next</code> 为 NULL（走到尾）时直接短路退出，不会去解引用 NULL。**”先判空、再取值”是遍历链表的铁律**。</li>
+<li><strong>备份思想</strong>：<code>temp = p-&gt;next</code> 把要删的节点备份下来，改链之后再 <code>free(temp)</code>。<strong>释放前必须先摘链</strong>，防止悬空。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">删除前：  header → 节点A → 节点B → 节点C → NULL</span><br><span class="line">                              ↑</span><br><span class="line">                     p 停在这里（p-&gt;next 是 B）</span><br><span class="line"></span><br><span class="line">删除后：  header → 节点A ──────→ 节点C → NULL</span><br><span class="line">                              (B 被跳过、释放)</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、没有头节点怎么办：dummy-虚拟头节点"><a href="#五、没有头节点怎么办：dummy-虚拟头节点" class="headerlink" title="五、没有头节点怎么办：dummy 虚拟头节点"></a>五、没有头节点怎么办：dummy 虚拟头节点</h2><p>上面所有操作之所以统一，全靠哨兵头节点。但<strong>如果链表只有头指针、没有哨兵</strong>呢？</p>
+<figure class="highlight c"><figcaption><span>chainlist.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    ChainNode* next;   <span class="comment">// 头指针：指向第一个真实节点</span></span><br><span class="line">    ElemType val;      <span class="comment">// 这里被"借用"来当节点计数用</span></span><br><span class="line">} ChainHeader;</span><br></pre></td></tr></table></figure>
+
+<p>没有哨兵时，头插的代码会很别扭——插入位置的前置节点不存在，必须特判”是不是插入到头部”。<strong>解决办法：在函数内部创建一个栈上的 dummy 虚拟头节点</strong>：</p>
+<figure class="highlight c"><figcaption><span>chainlist.c - insertChainList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertChainList</span><span class="params">(ChainHeader* header, <span class="type">int</span> pos, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 没有头节点，就自己创建一个 dummy 虚拟头节点</span></span><br><span class="line">    ChainNode dummy;</span><br><span class="line">    dummy.next = header-&gt;next;      <span class="comment">// 让 dummy 指向真实的第一个节点</span></span><br><span class="line">    <span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; header-&gt;val) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"位置不合法\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    ChainNode* p = &amp;dummy;          <span class="comment">// 辅助指针从 dummy 出发，逻辑就和带头节点版一样了</span></span><br><span class="line">    <span class="type">int</span> index = <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">while</span> (p &amp;&amp; index &lt; pos - <span class="number">1</span>) {</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        index++;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">if</span> (p == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line"></span><br><span class="line">    ChainNode* new_node = (ChainNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ChainNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    new_node-&gt;next = p-&gt;next;       <span class="comment">// 先接新</span></span><br><span class="line">    p-&gt;next = new_node;             <span class="comment">// 再改旧</span></span><br><span class="line">    ++header-&gt;val;</span><br><span class="line">    header-&gt;next = dummy.next;      <span class="comment">// 头插可能改了第一个节点，同步回真实的头指针</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>dummy 技巧的本质</strong>：在一个局部栈变量上”伪造”一个临时头节点，让<strong>头插、中间插、尾插共用同一套前置节点逻辑</strong>。函数结束后 dummy 自动销毁，但插入已经完成，<code>header-&gt;next</code> 同步为 dummy 的下一个——即最新的链头。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">头插 5 到空链表：</span><br><span class="line">dummy ──→ NULL        →  新节点5 插入后：</span><br><span class="line">dummy ──→ [5|NULL]  ，header-&gt;next = dummy.next = 节点5 ✅</span><br><span class="line"></span><br><span class="line">再头插 4：</span><br><span class="line">dummy ──→ [4|●] ──→ [5|NULL] ，header-&gt;next = 节点4 ✅</span><br></pre></td></tr></table></figure>
+
+<p><strong>两种方案的取舍</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>哨兵头节点（常驻）</td>
+<td>逻辑统一、结构清晰</td>
+<td>多一个节点开销</td>
+</tr>
+<tr>
+<td>dummy 虚拟头节点（临时）</td>
+<td>不占常驻内存</td>
+<td>每次插入都要同步头指针</td>
+</tr>
+</tbody></table>
+<p>刷题时（LeetCode 等）没有哨兵头节点，<strong>dummy 技巧是最常用的解题手段</strong>，务必掌握。</p>
+<hr>
+<h2 id="六、单向循环链表：尾指针的妙用"><a href="#六、单向循环链表：尾指针的妙用" class="headerlink" title="六、单向循环链表：尾指针的妙用"></a>六、单向循环链表：尾指针的妙用</h2><p>循环链表 = 把最后一个节点的 next 指回开头，形成闭环。**配合尾指针 <code>rear</code>，尾插可以做到 O(1)**——这是它比普通链表强的地方。（对应代码：<code>03_LinkLoop</code>）</p>
+<figure class="highlight c"><figcaption><span>linkLoop.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">linkloopNode</span> {</span>  <span class="comment">// 节点结构</span></span><br><span class="line">    ElemType val;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">linkloopNode</span>* <span class="title">next</span>;</span></span><br><span class="line">} LinkLoopNode;</span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span>               <span class="comment">// 表头结构</span></span><br><span class="line">    LinkLoopNode header;       <span class="comment">// 头节点（哨兵）</span></span><br><span class="line">    LinkLoopNode* rear;        <span class="comment">// 尾指针：指向最后一个节点</span></span><br><span class="line">    <span class="type">int</span> num;</span><br><span class="line">} LinkLoopHeader;</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-1-初始化"><a href="#6-1-初始化" class="headerlink" title="6.1 初始化"></a>6.1 初始化</h3><figure class="highlight c"><figcaption><span>linkLoop.c - initLinkLoopList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 初始化已经存在的空间（栈上的表头，用 init 而非 create）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">initLinkLoopList</span><span class="params">(LinkLoopHeader* linkloop_header)</span> {</span><br><span class="line">    linkloop_header-&gt;num = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 尾指针和头节点的 next 都指向头节点自身</span></span><br><span class="line">    linkloop_header-&gt;rear = linkloop_header-&gt;header.next = &amp;linkloop_header-&gt;header;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>空循环链表的标志：<code>header.next == &amp;header</code>（自己指向自己）</strong>，这是循环链表”空表”和”遍历结束”的统一判断条件。初始化时 <code>rear</code> 也指向自身——因为空表只有一个节点（哨兵），它既是头又是尾。</p>
+<h3 id="6-2-尾插法（O-1-的关键）"><a href="#6-2-尾插法（O-1-的关键）" class="headerlink" title="6.2 尾插法（O(1) 的关键）"></a>6.2 尾插法（O(1) 的关键）</h3><figure class="highlight c"><figcaption><span>linkLoop.c - insertLinkLoopRear</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertLinkLoopRear</span><span class="params">(LinkLoopHeader* linkloop_header, ElemType val)</span> {</span><br><span class="line">    LinkLoopNode* new_node = (LinkLoopNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkLoopNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    new_node-&gt;next = linkloop_header-&gt;rear-&gt;next;   <span class="comment">// ① 新节点接在"尾的后面"（即头节点）</span></span><br><span class="line">    linkloop_header-&gt;rear-&gt;next = new_node;         <span class="comment">// ② 尾节点的 next 指向新节点</span></span><br><span class="line">    <span class="comment">// 无论是否存在节点，尾插法尾指针都要更新</span></span><br><span class="line">    linkloop_header-&gt;rear = new_node;               <span class="comment">// ③ 新节点成为新尾</span></span><br><span class="line">    ++linkloop_header-&gt;num;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>普通链表尾插要遍历到尾部（O(n)）；循环链表<strong>有 <code>rear</code> 直接知道尾在哪</strong>，三步完成：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">① 新节点 next 指向"尾的 next"（哨兵头）→ 形成闭环</span><br><span class="line">② 尾的 next 指向新节点 → 接上</span><br><span class="line">③ rear 移到新节点 → 新尾就位</span><br><span class="line"></span><br><span class="line">header(哨兵) → 节点1 → 节点2 → 节点3(rear) ──┐</span><br><span class="line">     ↑                                        │</span><br><span class="line">     └────────────── 新节点(新rear) ←──────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>记住：循环链表尾插永远三步——接环、接入、更新 rear</strong>，和元素个数无关。</p>
+<h3 id="6-3-头插法的特殊处理"><a href="#6-3-头插法的特殊处理" class="headerlink" title="6.3 头插法的特殊处理"></a>6.3 头插法的特殊处理</h3><figure class="highlight c"><figcaption><span>linkLoop.c - insertLinkLoopHeader</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertLinkLoopHeader</span><span class="params">(LinkLoopHeader* linkloop_header, ElemType val)</span> {</span><br><span class="line">    LinkLoopNode* new_node = (LinkLoopNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(LinkLoopNode));</span><br><span class="line">    <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    new_node-&gt;next = linkloop_header-&gt;header.next;   <span class="comment">// 插到哨兵后面</span></span><br><span class="line">    linkloop_header-&gt;header.next = new_node;</span><br><span class="line">    linkloop_header-&gt;num++;</span><br><span class="line">    <span class="comment">// 头插法一般不会改变尾节点，除非是创建第一个节点的时候</span></span><br><span class="line">    <span class="keyword">if</span> (linkloop_header-&gt;rear == &amp;linkloop_header-&gt;header) {</span><br><span class="line">        linkloop_header-&gt;rear = new_node;   <span class="comment">// 空表插入第一个节点，尾也要更新</span></span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>头插通常只动哨兵后面，rear 不变。<strong>唯一例外：空链表头插第一个节点</strong>——此时这个节点既是头也是尾，必须顺手更新 <code>rear</code>。这就是”<strong>创建第一个节点时，头尾指针一起指它</strong>“的经典处理。</p>
+<h3 id="6-4-遍历与释放"><a href="#6-4-遍历与释放" class="headerlink" title="6.4 遍历与释放"></a>6.4 遍历与释放</h3><figure class="highlight c"><figcaption><span>linkLoop.c - showLinkLoop / releaseLinkLoop</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">showLinkLoop</span><span class="params">(LinkLoopHeader* linkloop_header)</span> {</span><br><span class="line">    LinkLoopNode* p = linkloop_header-&gt;header.next;</span><br><span class="line">    <span class="keyword">while</span> (p != &amp;linkloop_header-&gt;header) {   <span class="comment">// 回到哨兵 = 遍历完一圈</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d\t"</span>, p-&gt;val);</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">    }</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"\n"</span>);</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">releaseLinkLoop</span><span class="params">(LinkLoopHeader* linkloop_header)</span> {</span><br><span class="line">    LinkLoopNode* p = linkloop_header-&gt;header.next;</span><br><span class="line">    <span class="keyword">while</span> (p != &amp;linkloop_header-&gt;header) {</span><br><span class="line">        LinkLoopNode* temp = p;</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        <span class="built_in">free</span>(temp);</span><br><span class="line">        --linkloop_header-&gt;num;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 释放完后恢复初始状态</span></span><br><span class="line">    linkloop_header-&gt;rear = linkloop_header-&gt;header.next = &amp;linkloop_header-&gt;header;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>循环链表的遍历/释放终止条件从”<code>p != NULL</code>“变成了”<strong><code>p != &amp;header</code></strong>“——因为最后一个节点的 next 指向的是哨兵头而不是 NULL。<strong>不能再用 NULL 判断，否则死循环。</strong></p>
+<hr>
+<h2 id="七、双向循环链表：addNode-delNode-四指针"><a href="#七、双向循环链表：addNode-delNode-四指针" class="headerlink" title="七、双向循环链表：addNode / delNode 四指针"></a>七、双向循环链表：addNode / delNode 四指针</h2><p>双向 = 每个节点多一个 <code>prev</code> 指针，可以往前走了。代码上最大的进步是：<strong>把”接缝”和”拆缝”封装成两个通用函数，头插尾插删除全部复用</strong>。（对应代码：<code>04_DoubleLinkLoop</code>）</p>
+<figure class="highlight c"><figcaption><span>doublelinkloop.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">doublenode</span> {</span></span><br><span class="line">    ElemType val;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">doublenode</span>* <span class="title">next</span>;</span>   <span class="comment">// 后继</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">doublenode</span>* <span class="title">prev</span>;</span>   <span class="comment">// 前驱</span></span><br><span class="line">} DoubleNode, DoubleHeader;    <span class="comment">// 同一个结构体既是节点也是表头（哨兵模式）</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>注意这里的精巧设计</strong>：<code>DoubleHeader</code> 和 <code>DoubleNode</code> 是<strong>同一个结构体</strong>——表头本身就是一个哨兵节点实体。这是双向循环链表最常见的实现（STL 的 list 就是这个结构）。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">┌───────────────────────── 环 ─────────────────────────┐</span><br><span class="line">│                                                        │</span><br><span class="line">▼                                                        │</span><br><span class="line">header(哨兵) ↔ 节点1 ↔ 节点2 ↔ 节点3 ↔ ... ↔ 节点n ──────┘</span><br><span class="line">  next=节点1    prev=header</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-1-初始化"><a href="#7-1-初始化" class="headerlink" title="7.1 初始化"></a>7.1 初始化</h3><figure class="highlight c"><figcaption><span>doublelinkloop.c - initDLink</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">initDLink</span><span class="params">(DoubleHeader* double_header)</span> {</span><br><span class="line">    double_header-&gt;next = double_header-&gt;prev = double_header;  <span class="comment">// 自己指自己</span></span><br><span class="line">    double_header-&gt;val = <span class="number">0</span>;   <span class="comment">// 顺手当计数用</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>空双向循环表：<code>next == prev == 自身</code>——整个表就一个哨兵节点。</p>
+<h3 id="7-2-核心：addNode（把新节点插到-prev-next-之间）"><a href="#7-2-核心：addNode（把新节点插到-prev-next-之间）" class="headerlink" title="7.2 核心：addNode（把新节点插到 [prev, next] 之间）"></a>7.2 核心：addNode（把新节点插到 [prev, next] 之间）</h3><figure class="highlight c"><figcaption><span>doublelinkloop.c - addNode</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">addNode</span><span class="params">(DoubleNode* new_node, DoubleNode* next, DoubleNode* prev)</span> {</span><br><span class="line">    new_node-&gt;next = next;   <span class="comment">// ① 新节点后继</span></span><br><span class="line">    next-&gt;prev = new_node;   <span class="comment">// ② 后继的前驱 = 新节点</span></span><br><span class="line">    new_node-&gt;prev = prev;   <span class="comment">// ③ 新节点前驱</span></span><br><span class="line">    prev-&gt;next = new_node;   <span class="comment">// ④ 前驱的后继 = 新节点</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>四根指针，两根线</strong>。画图理解：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">插入前：  prev ↔ next</span><br><span class="line">插入后：  prev ↔ new_node ↔ next</span><br><span class="line"></span><br><span class="line">new_node-&gt;next = next;   → 新节点连后继   ┐</span><br><span class="line">next-&gt;prev = new_node;   → 后继连新节点   ┤  左边这条线（new ↔ next）接通</span><br><span class="line">new_node-&gt;prev = prev;   → 新节点连前驱   ┤</span><br><span class="line">prev-&gt;next = new_node;   → 前驱连新节点   ┘  右边这条线（prev ↔ new）接通</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>四步的顺序其实没有严格要求（互不覆盖），但<strong>保持”先接新节点，再改老节点”的习惯</strong>最不容易出错。<code>static</code> 修饰表示它是文件内部工具函数，不对外暴露。</p>
+</blockquote>
+<h3 id="7-3-头插-尾插-删除，全是-addNode-delNode-的调用"><a href="#7-3-头插-尾插-删除，全是-addNode-delNode-的调用" class="headerlink" title="7.3 头插 / 尾插 / 删除，全是 addNode / delNode 的调用"></a>7.3 头插 / 尾插 / 删除，全是 addNode / delNode 的调用</h3><figure class="highlight c"><figcaption><span>doublelinkloop.c - insertDHeader / insertDRear / delDLink</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 头插：插到哨兵和原第一个节点之间</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">insertDHeader</span><span class="params">(DoubleHeader* double_header, ElemType val)</span> {</span><br><span class="line">    DoubleNode* new_node = (DoubleNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(DoubleNode));</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    addNode(new_node, double_header-&gt;next, double_header);  <span class="comment">// 前驱=header，后继=原第一个</span></span><br><span class="line">    ++double_header-&gt;val;</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// 尾插：插到原尾节点和哨兵之间</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">insertDRear</span><span class="params">(DoubleHeader* double_header, ElemType val)</span> {</span><br><span class="line">    DoubleNode* new_node = (DoubleNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(DoubleNode));</span><br><span class="line">    new_node-&gt;val = val;</span><br><span class="line">    addNode(new_node, double_header, double_header-&gt;prev);  <span class="comment">// 前驱=原尾，后继=header</span></span><br><span class="line">    ++double_header-&gt;val;</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// 删除：找到节点后，把它前后两个节点直接"焊"起来</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">delDLink</span><span class="params">(DoubleHeader* double_header, ElemType val)</span> {</span><br><span class="line">    DoubleNode* p = double_header-&gt;next;</span><br><span class="line">    <span class="keyword">for</span> (; p != double_header; p = p-&gt;next) {   <span class="comment">// 遍历找值</span></span><br><span class="line">        <span class="keyword">if</span> (p-&gt;val == val) <span class="keyword">break</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">if</span> (p == double_header) {   <span class="comment">// 走到哨兵 = 没找到</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"no %d element\n"</span>, val);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    }</span><br><span class="line">    delNode(p-&gt;prev, p-&gt;next);  <span class="comment">// 摘链：前驱的 next 跨过 p 直连后继</span></span><br><span class="line">    <span class="built_in">free</span>(p);</span><br><span class="line">    --double_header-&gt;val;</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// delNode：拆缝只做一件事——前驱的 next 指向后继，后继的 prev 指回前驱</span></span><br><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">delNode</span><span class="params">(DoubleNode* prev, DoubleNode* next)</span> {</span><br><span class="line">    prev-&gt;next = next;</span><br><span class="line">    next-&gt;prev = prev;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>双向链表的三大优势</strong>：</p>
+<ol>
+<li><strong>删除 O(1)<strong>：单链表删除必须找前置节点，双向链表 <code>p-&gt;prev</code> 直接就是前置，</strong>摘链只要两行</strong>（<code>prev-&gt;next = next; next-&gt;prev = prev</code>）</li>
+<li><strong>头插尾插完全对称</strong>：头插是 <code>(header, header-&gt;next)</code>，尾插是 <code>(header-&gt;prev, header)</code>，一套 addNode 通吃，<strong>没有任何特判</strong></li>
+<li><strong>哨兵模式天然闭环</strong>：不需要维护 head/tail 两个指针，头尾操作都退化成”在哨兵身边插/删”</li>
+</ol>
+<hr>
+<h2 id="八、实战应用：约瑟夫环问题"><a href="#八、实战应用：约瑟夫环问题" class="headerlink" title="八、实战应用：约瑟夫环问题"></a>八、实战应用：约瑟夫环问题</h2><p>约瑟夫问题（约瑟夫环）：n 个人围成一圈，从第 1 个人开始报数，报到 m 的人出列，下一个人重新从 1 报数，直到剩最后一个人。经典应用，<strong>天然适合用循环链表模拟</strong>。（对应代码：<code>03_LinkLoop/Joseph.c</code>）</p>
+<h3 id="8-1-问题建模"><a href="#8-1-问题建模" class="headerlink" title="8.1 问题建模"></a>8.1 问题建模</h3><figure class="highlight c"><figcaption><span>Joseph.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">josephnode</span> {</span></span><br><span class="line">    <span class="type">int</span> val;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">josephnode</span>* <span class="title">next</span>;</span></span><br><span class="line">} JosephNode;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 约瑟夫环的表头，只保留头尾指针</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    JosephNode* head;   <span class="comment">// 头指针</span></span><br><span class="line">    JosephNode* tail;   <span class="comment">// 尾指针</span></span><br><span class="line">} JosephHeader;</span><br></pre></td></tr></table></figure>
+
+<p>注意这里<strong>没有哨兵节点</strong>，只有头尾两个指针——因为约瑟夫环要频繁”转圈报数”，头尾指针直接定位最方便。它依然是循环链表（<code>tail-&gt;next == head</code>）。</p>
+<h3 id="8-2-初始化：尾插建环-首尾相接"><a href="#8-2-初始化：尾插建环-首尾相接" class="headerlink" title="8.2 初始化：尾插建环 + 首尾相接"></a>8.2 初始化：尾插建环 + 首尾相接</h3><figure class="highlight c"><figcaption><span>Joseph.c - initJosephGame</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">initJosephGame</span><span class="params">(JosephHeader* joseph_header, <span class="type">int</span> n)</span> {</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">1</span>; i &lt;= n; i++) {</span><br><span class="line">        JosephNode* new_node = (JosephNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(JosephNode));</span><br><span class="line">        <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        }</span><br><span class="line">        new_node-&gt;val = i;</span><br><span class="line">        new_node-&gt;next = <span class="literal">NULL</span>;</span><br><span class="line">        <span class="comment">// 判断是否是空链表</span></span><br><span class="line">        <span class="keyword">if</span> (joseph_header-&gt;head == <span class="literal">NULL</span>) {</span><br><span class="line">            <span class="comment">// 第一个节点：头尾指针同时指向它</span></span><br><span class="line">            joseph_header-&gt;head = joseph_header-&gt;tail = new_node;</span><br><span class="line">        } <span class="keyword">else</span> {</span><br><span class="line">            <span class="comment">// 后续节点：只需更新尾指针</span></span><br><span class="line">            joseph_header-&gt;tail-&gt;next = new_node;</span><br><span class="line">            joseph_header-&gt;tail = new_node;</span><br><span class="line">        }</span><br><span class="line">        joseph_header-&gt;tail-&gt;next = joseph_header-&gt;head;   <span class="comment">// 每次插入后都重新闭环</span></span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>**”空表首节点头尾同指，后续节点只动尾指针，最后一句闭环”**——没有哨兵时建循环链表的固定套路。每次插入末尾都执行 <code>tail-&gt;next = head</code>，保证环永远闭合。</p>
+<h3 id="8-3-遍历：do-while-的用武之地"><a href="#8-3-遍历：do-while-的用武之地" class="headerlink" title="8.3 遍历：do-while 的用武之地"></a>8.3 遍历：do-while 的用武之地</h3><figure class="highlight c"><figcaption><span>Joseph.c - showData</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">showData</span><span class="params">(JosephHeader* joseph_header)</span> {</span><br><span class="line">    JosephNode* p = joseph_header-&gt;head;</span><br><span class="line">    <span class="comment">// 没有头节点，只有头指针的循环链表的遍历方式——do while 循环</span></span><br><span class="line">    <span class="keyword">do</span> {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d\t"</span>, p-&gt;val);</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        <span class="comment">// 先执行一次，然后再判断是否回到起点</span></span><br><span class="line">    } <span class="keyword">while</span> (p != joseph_header-&gt;head);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"\n"</span>);</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>普通循环链表有哨兵，用 <code>while (p != &amp;header)</code>；**无哨兵的循环链表必须用 <code>do-while</code>**——因为第一次进来 p 就是合法节点，判断放在后面才能完整走完一圈再停。</p>
+<h3 id="8-4-核心：淘汰逻辑（pre-cur-双指针）"><a href="#8-4-核心：淘汰逻辑（pre-cur-双指针）" class="headerlink" title="8.4 核心：淘汰逻辑（pre / cur 双指针）"></a>8.4 核心：淘汰逻辑（pre / cur 双指针）</h3><figure class="highlight c"><figcaption><span>Joseph.c - startJosephGame</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">startJosephGame</span><span class="params">(JosephHeader* joseph_header, <span class="type">int</span> m)</span> {</span><br><span class="line">    JosephNode* pre = <span class="literal">NULL</span>;                    <span class="comment">// 前驱：淘汰时用它摘链</span></span><br><span class="line">    JosephNode* cur = joseph_header-&gt;head;     <span class="comment">// 当前指针：从第一个人开始报数</span></span><br><span class="line">    <span class="keyword">while</span> (cur-&gt;next != cur) {                 <span class="comment">// 环上只剩一个节点时结束</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">1</span>; i &lt; m; i++) {          <span class="comment">// 报数 m-1 次，cur 停在"报到 m"的人上</span></span><br><span class="line">            pre = cur;</span><br><span class="line">            cur = cur-&gt;next;</span><br><span class="line">        }</span><br><span class="line">        pre-&gt;next = cur-&gt;next;                 <span class="comment">// 摘链：前驱跳过 cur</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d号淘汰\t"</span>, cur-&gt;val);</span><br><span class="line">        <span class="built_in">free</span>(cur);                             <span class="comment">// 释放</span></span><br><span class="line">        cur = pre-&gt;next;                       <span class="comment">// 下一个人从 1 重新报数</span></span><br><span class="line">    }</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"最后剩下的是%d号\n"</span>, cur-&gt;val);</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>逐行拆解</strong>：</p>
+<ol>
+<li><strong>为什么报 m 次只走 m-1 步？</strong> 因为 <code>cur</code> 初始已经站在第 1 个人上，<code>for (i=1; i&lt;m; i++)</code> 再走 m-1 步正好停在报到 m 的人身上</li>
+<li><strong>为什么需要 <code>pre</code>？</strong> 这是无哨兵的单向链表，删除仍然要找前置节点——<code>pre</code> 就是干这个的</li>
+<li><strong>淘汰三步</strong>：<code>pre-&gt;next = cur-&gt;next</code>（摘链）→ <code>free(cur)</code>（释放）→ <code>cur = pre-&gt;next</code>（从下一个人重新开始报数）</li>
+<li>**终止条件 <code>cur-&gt;next != cur</code>**：环上只剩一个节点时，它自己指向自己——这是”单节点环”的标志，跳出后它即幸存者</li>
+</ol>
+<h3 id="8-5-运行模拟（n-10，m-3）"><a href="#8-5-运行模拟（n-10，m-3）" class="headerlink" title="8.5 运行模拟（n=10，m=3）"></a>8.5 运行模拟（n=10，m=3）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">初始：1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → (回1)</span><br><span class="line"></span><br><span class="line">第1轮：从1报数，3号淘汰 → 剩余 1 2 4 5 6 7 8 9 10</span><br><span class="line">第2轮：从4报数，6号淘汰 → 剩余 1 2 4 5 7 8 9 10</span><br><span class="line">第3轮：从7报数，9号淘汰 → 剩余 1 2 4 5 7 8 10</span><br><span class="line">第4轮：从10报数，2号淘汰 → 剩余 1 4 5 7 8 10</span><br><span class="line">第5轮：从4报数，7号淘汰 → 剩余 1 4 5 8 10</span><br><span class="line">第6轮：从8报数，1号淘汰 → 剩余 4 5 8 10</span><br><span class="line">第7轮：从4报数，8号淘汰 → 剩余 4 5 10</span><br><span class="line">第8轮：从10报数，5号淘汰 → 剩余 4 10</span><br><span class="line">第9轮：从10报数，10号淘汰 → 剩余 4</span><br><span class="line"></span><br><span class="line">输出：3号淘汰 6号淘汰 9号淘汰 2号淘汰 7号淘汰 1号淘汰 8号淘汰 5号淘汰 10号淘汰</span><br><span class="line">最后剩下的是4号 ✅</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="九、复习要点总结"><a href="#九、复习要点总结" class="headerlink" title="九、复习要点总结"></a>九、复习要点总结</h2><h3 id="9-1-四版链表代码对照"><a href="#9-1-四版链表代码对照" class="headerlink" title="9.1 四版链表代码对照"></a>9.1 四版链表代码对照</h3><table>
+<thead>
+<tr>
+<th>版本</th>
+<th>表头结构</th>
+<th>空表标志</th>
+<th>遍历终止</th>
+<th>亮点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单向链表（带头节点）</td>
+<td>哨兵 header + num</td>
+<td><code>header.next == NULL</code></td>
+<td><code>p != NULL</code></td>
+<td>插入删除逻辑统一</td>
+</tr>
+<tr>
+<td>单向链表（无头节点）</td>
+<td>头指针 next</td>
+<td><code>next == NULL</code></td>
+<td><code>p != NULL</code></td>
+<td><strong>dummy 虚拟头节点</strong>技巧</td>
+</tr>
+<tr>
+<td>单向循环链表</td>
+<td>哨兵 + 尾指针 rear</td>
+<td><code>next == &amp;header</code></td>
+<td><code>p != &amp;header</code></td>
+<td><strong>尾插 O(1)</strong></td>
+</tr>
+<tr>
+<td>双向循环链表</td>
+<td>哨兵即表头</td>
+<td><code>next == prev == &amp;header</code></td>
+<td><code>p != &amp;header</code></td>
+<td><strong>addNode/delNode 通用</strong></td>
+</tr>
+</tbody></table>
+<h3 id="9-2-操作复杂度"><a href="#9-2-操作复杂度" class="headerlink" title="9.2 操作复杂度"></a>9.2 操作复杂度</h3><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>单链表（带头）</th>
+<th>循环链表（带 rear）</th>
+<th>双向循环链表</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>头插</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td>尾插</td>
+<td>O(n)（要遍历）</td>
+<td><strong>O(1)</strong></td>
+<td><strong>O(1)</strong></td>
+</tr>
+<tr>
+<td>任意位置插入</td>
+<td>O(n)</td>
+<td>O(n)</td>
+<td>O(n)</td>
+</tr>
+<tr>
+<td>按值删除</td>
+<td>O(n)（找前置）</td>
+<td>O(n)</td>
+<td>O(n)，但找到后摘链 O(1)</td>
+</tr>
+<tr>
+<td>查找</td>
+<td>O(n)</td>
+<td>O(n)</td>
+<td>O(n)</td>
+</tr>
+</tbody></table>
+<h3 id="9-3-面试常问细节"><a href="#9-3-面试常问细节" class="headerlink" title="9.3 面试常问细节"></a>9.3 面试常问细节</h3><ol>
+<li><strong>为什么要哨兵头节点？</strong> — 让头插和中间插共用”前置节点”逻辑，删除也无需特判”删的是不是第一个”，代码统一、不易出错</li>
+<li><strong>单链表删除为什么必须找前置节点？</strong> — 单向链表只能顺着 next 走，删除的本质是”前一个节点跳过自己”，而前一个节点无法回头访问，只能先走到它</li>
+<li><strong>插入时”先接新、再改旧”为什么不能反？</strong> — 先改旧会让原链断开，新节点无法挂接，后续节点全部丢失</li>
+<li><strong>循环链表如何判断空表和遍历结束？</strong> — 统一用 <code>p == &amp;header</code>（有哨兵）或 <code>p == head</code>（无哨兵），<strong>永远不能用 NULL</strong></li>
+<li><strong>为什么循环链表尾插能 O(1)？</strong> — 尾指针 rear 直接定位尾节点，免去 O(n) 的找尾遍历</li>
+<li><strong>双向循环链表删除为什么更优？</strong> — 节点自带 prev，前置节点 O(1) 可得，摘链只需 <code>delNode(p-&gt;prev, p-&gt;next)</code> 两行</li>
+<li><strong>dummy 虚拟头节点什么时候用？</strong> — 刷题时链表常常只有头指针，局部创建 dummy 即可复用统一的插入逻辑，无需修改调用方的头指针（注意同步 <code>header-&gt;next = dummy.next</code>）</li>
+<li><strong>为什么要有 ElemType？</strong> — 数据结构只关心”组织方式”不关心”元素类型”，typedef 一次，换类型只改一行</li>
+</ol>
+<hr>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C-C/" rel="tag"># C/C++</a>
+              <a href="/tags/%E9%93%BE%E8%A1%A8/" rel="tag"># 链表</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" rel="tag"># 数据结构</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/08/17/STM32_TIM_SlaveMode/" rel="prev" title="STM32——定时器从模式：复位、门控、触发，三种方式控制定时器">
+      <i class="fa fa-chevron-left"></i> STM32——定时器从模式：复位、门控、触发，三种方式控制定时器
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E9%93%BE%E8%A1%A8"><span class="nav-number">1.</span> <span class="nav-text">什么是链表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%8D%95%E5%90%91%E9%93%BE%E8%A1%A8%E7%9A%84%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89"><span class="nav-number">2.</span> <span class="nav-text">一、单向链表的结构定义</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-%E8%8A%82%E7%82%B9%E7%BB%93%E6%9E%84"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 节点结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-%E8%A1%A8%E5%A4%B4%E7%BB%93%E6%9E%84%EF%BC%88%E5%90%AB%E5%93%A8%E5%85%B5%E5%A4%B4%E8%8A%82%E7%82%B9%EF%BC%89"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 表头结构（含哨兵头节点）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E5%88%9B%E5%BB%BA%E4%B8%8E%E9%87%8A%E6%94%BE"><span class="nav-number">3.</span> <span class="nav-text">二、创建与释放</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E5%88%9B%E5%BB%BA%E8%A1%A8%E5%A4%B4"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 创建表头</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E9%87%8A%E6%94%BE%E9%93%BE%E8%A1%A8"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 释放链表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%8F%92%E5%85%A5%E6%93%8D%E4%BD%9C"><span class="nav-number">4.</span> <span class="nav-text">三、插入操作</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E5%A4%B4%E6%8F%92%E6%B3%95%EF%BC%88insertLinkListHeader%EF%BC%89"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 头插法（insertLinkListHeader）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E4%BB%BB%E6%84%8F%E4%BD%8D%E7%BD%AE%E6%8F%92%E5%85%A5%EF%BC%88insertLinkListPos%EF%BC%89"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 任意位置插入（insertLinkListPos）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C"><span class="nav-number">5.</span> <span class="nav-text">四、删除操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E6%B2%A1%E6%9C%89%E5%A4%B4%E8%8A%82%E7%82%B9%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9Adummy-%E8%99%9A%E6%8B%9F%E5%A4%B4%E8%8A%82%E7%82%B9"><span class="nav-number">6.</span> <span class="nav-text">五、没有头节点怎么办：dummy 虚拟头节点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%8D%95%E5%90%91%E5%BE%AA%E7%8E%AF%E9%93%BE%E8%A1%A8%EF%BC%9A%E5%B0%BE%E6%8C%87%E9%92%88%E7%9A%84%E5%A6%99%E7%94%A8"><span class="nav-number">7.</span> <span class="nav-text">六、单向循环链表：尾指针的妙用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 初始化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-%E5%B0%BE%E6%8F%92%E6%B3%95%EF%BC%88O-1-%E7%9A%84%E5%85%B3%E9%94%AE%EF%BC%89"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 尾插法（O(1) 的关键）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-%E5%A4%B4%E6%8F%92%E6%B3%95%E7%9A%84%E7%89%B9%E6%AE%8A%E5%A4%84%E7%90%86"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 头插法的特殊处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-%E9%81%8D%E5%8E%86%E4%B8%8E%E9%87%8A%E6%94%BE"><span class="nav-number">7.4.</span> <span class="nav-text">6.4 遍历与释放</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E5%8F%8C%E5%90%91%E5%BE%AA%E7%8E%AF%E9%93%BE%E8%A1%A8%EF%BC%9AaddNode-delNode-%E5%9B%9B%E6%8C%87%E9%92%88"><span class="nav-number">8.</span> <span class="nav-text">七、双向循环链表：addNode &#x2F; delNode 四指针</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 初始化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-%E6%A0%B8%E5%BF%83%EF%BC%9AaddNode%EF%BC%88%E6%8A%8A%E6%96%B0%E8%8A%82%E7%82%B9%E6%8F%92%E5%88%B0-prev-next-%E4%B9%8B%E9%97%B4%EF%BC%89"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 核心：addNode（把新节点插到 [prev, next] 之间）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-%E5%A4%B4%E6%8F%92-%E5%B0%BE%E6%8F%92-%E5%88%A0%E9%99%A4%EF%BC%8C%E5%85%A8%E6%98%AF-addNode-delNode-%E7%9A%84%E8%B0%83%E7%94%A8"><span class="nav-number">8.3.</span> <span class="nav-text">7.3 头插 &#x2F; 尾插 &#x2F; 删除，全是 addNode &#x2F; delNode 的调用</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E5%AE%9E%E6%88%98%E5%BA%94%E7%94%A8%EF%BC%9A%E7%BA%A6%E7%91%9F%E5%A4%AB%E7%8E%AF%E9%97%AE%E9%A2%98"><span class="nav-number">9.</span> <span class="nav-text">八、实战应用：约瑟夫环问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-%E9%97%AE%E9%A2%98%E5%BB%BA%E6%A8%A1"><span class="nav-number">9.1.</span> <span class="nav-text">8.1 问题建模</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-%E5%88%9D%E5%A7%8B%E5%8C%96%EF%BC%9A%E5%B0%BE%E6%8F%92%E5%BB%BA%E7%8E%AF-%E9%A6%96%E5%B0%BE%E7%9B%B8%E6%8E%A5"><span class="nav-number">9.2.</span> <span class="nav-text">8.2 初始化：尾插建环 + 首尾相接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-3-%E9%81%8D%E5%8E%86%EF%BC%9Ado-while-%E7%9A%84%E7%94%A8%E6%AD%A6%E4%B9%8B%E5%9C%B0"><span class="nav-number">9.3.</span> <span class="nav-text">8.3 遍历：do-while 的用武之地</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-4-%E6%A0%B8%E5%BF%83%EF%BC%9A%E6%B7%98%E6%B1%B0%E9%80%BB%E8%BE%91%EF%BC%88pre-cur-%E5%8F%8C%E6%8C%87%E9%92%88%EF%BC%89"><span class="nav-number">9.4.</span> <span class="nav-text">8.4 核心：淘汰逻辑（pre &#x2F; cur 双指针）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-5-%E8%BF%90%E8%A1%8C%E6%A8%A1%E6%8B%9F%EF%BC%88n-10%EF%BC%8Cm-3%EF%BC%89"><span class="nav-number">9.5.</span> <span class="nav-text">8.5 运行模拟（n&#x3D;10，m&#x3D;3）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E5%A4%8D%E4%B9%A0%E8%A6%81%E7%82%B9%E6%80%BB%E7%BB%93"><span class="nav-number">10.</span> <span class="nav-text">九、复习要点总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#9-1-%E5%9B%9B%E7%89%88%E9%93%BE%E8%A1%A8%E4%BB%A3%E7%A0%81%E5%AF%B9%E7%85%A7"><span class="nav-number">10.1.</span> <span class="nav-text">9.1 四版链表代码对照</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-2-%E6%93%8D%E4%BD%9C%E5%A4%8D%E6%9D%82%E5%BA%A6"><span class="nav-number">10.2.</span> <span class="nav-text">9.2 操作复杂度</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-3-%E9%9D%A2%E8%AF%95%E5%B8%B8%E9%97%AE%E7%BB%86%E8%8A%82"><span class="nav-number">10.3.</span> <span class="nav-text">9.3 面试常问细节</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="点灯大王"
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">43</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">63</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">356k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">5:24</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
