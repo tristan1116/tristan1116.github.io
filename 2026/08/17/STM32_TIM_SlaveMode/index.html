@@ -26,7 +26,7 @@
 <meta property="og:type" content="article">
 <meta property="og:title" content="STM32——定时器从模式：复位、门控、触发，三种方式控制定时器">
 <meta property="og:url" content="http://tristan1116.github.io/2026/08/17/STM32_TIM_SlaveMode/index.html">
-<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:site_name" content="开发者LT的博客">
 <meta property="og:description" content="上篇用 ETR 直连的外部时钟模式二让定时器数外部脉冲；这篇把从模式剩下的三个选项走一遍：复位模式、门控模式、触发模式。配合之前的循迹开关实战，用串口观察三种模式各自怎么控制定时器，并讲解&quot;复位触发&quot;和&quot;自动重载&quot;的区分方法、单脉冲模式的作用。">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://tristan1116.github.io/images/STM32_TIM_SlaveMode/image-20260817135100512.png">
@@ -35,7 +35,6 @@
 <meta property="og:image" content="http://tristan1116.github.io/images/STM32_TIM_SlaveMode/image-20260817153200760.png">
 <meta property="article:published_time" content="2026-08-17T15:40:00.000Z">
 <meta property="article:modified_time" content="2026-08-17T15:40:00.000Z">
-<meta property="article:author" content="点灯大王">
 <meta property="article:tag" content="嵌入式">
 <meta property="article:tag" content="STM32">
 <meta property="article:tag" content="CubeMX">
@@ -58,7 +57,7 @@
   };
 </script>
 
-  <title>STM32——定时器从模式：复位、门控、触发，三种方式控制定时器 | 点灯大王的博客</title>
+  <title>STM32——定时器从模式：复位、门控、触发，三种方式控制定时器 | 开发者LT的博客</title>
   
 
 
@@ -109,7 +108,7 @@
 
     <a href="/" class="brand" rel="start">
       <span class="logo-line-before"><i></i></span>
-      <h1 class="site-title">点灯大王的博客</h1>
+      <h1 class="site-title">开发者LT的博客</h1>
       <span class="logo-line-after"><i></i></span>
     </a>
   </div>
@@ -205,12 +204,12 @@
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
-      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="name" content="">
       <meta itemprop="description" content="博客、记录">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="点灯大王的博客">
+      <meta itemprop="name" content="开发者LT的博客">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
@@ -829,9 +828,9 @@
 
       <div class="site-overview-wrap sidebar-panel">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-    <img class="site-author-image" itemprop="image" alt="点灯大王"
+    <img class="site-author-image" itemprop="image" alt=""
       src="/images/avatar/potatolearning.jpg">
-  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <p class="site-author-name" itemprop="name"></p>
   <div class="site-description" itemprop="description">博客、记录</div>
 </div>
 <div class="site-state-wrap motion-element">
@@ -852,7 +851,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">63</span>
+        <span class="site-state-item-count">64</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -883,17 +882,17 @@
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
-  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+  <span class="author" itemprop="copyrightHolder"></span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">358k</span>
+    <span title="站点总字数">347k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">5:25</span>
+    <span title="站点阅读时长">5:15</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>

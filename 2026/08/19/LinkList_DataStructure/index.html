@@ -26,12 +26,11 @@
 <meta property="og:type" content="article">
 <meta property="og:title" content="数据结构 —— 链表">
 <meta property="og:url" content="http://tristan1116.github.io/2026/08/19/LinkList_DataStructure/index.html">
-<meta property="og:site_name" content="点灯大王的博客">
+<meta property="og:site_name" content="开发者LT的博客">
 <meta property="og:description" content="从代码出发，整理链表的完整知识体系：节点与表头结构、头插尾插任意插、删除、无头节点的 dummy 技巧、单向循环链表、双向循环链表、约瑟夫环实战。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-08-19T21:30:00.000Z">
 <meta property="article:modified_time" content="2026-08-20T10:37:11.000Z">
-<meta property="article:author" content="点灯大王">
 <meta property="article:tag" content="C&#x2F;C++">
 <meta property="article:tag" content="链表">
 <meta property="article:tag" content="数据结构">
@@ -50,7 +49,7 @@
   };
 </script>
 
-  <title>数据结构 —— 链表 | 点灯大王的博客</title>
+  <title>数据结构 —— 链表 | 开发者LT的博客</title>
   
 
 
@@ -213,7 +212,7 @@ mjx-container[display="true"] + br {
 
     <a href="/" class="brand" rel="start">
       <span class="logo-line-before"><i></i></span>
-      <h1 class="site-title">点灯大王的博客</h1>
+      <h1 class="site-title">开发者LT的博客</h1>
       <span class="logo-line-after"><i></i></span>
     </a>
   </div>
@@ -309,12 +308,12 @@ mjx-container[display="true"] + br {
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
-      <meta itemprop="name" content="点灯大王">
+      <meta itemprop="name" content="">
       <meta itemprop="description" content="博客、记录">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="点灯大王的博客">
+      <meta itemprop="name" content="开发者LT的博客">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
@@ -582,7 +581,7 @@ mjx-container[display="true"] + br {
 
 <h3 id="8-2-初始化：尾插建环-首尾相接"><a href="#8-2-初始化：尾插建环-首尾相接" class="headerlink" title="8.2 初始化：尾插建环 + 首尾相接"></a>8.2 初始化：尾插建环 + 首尾相接</h3><figure class="highlight c"><figcaption><span>Joseph.c - initJosephGame</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">initJosephGame</span><span class="params">(JosephHeader* joseph_header, <span class="type">int</span> n)</span> {</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">1</span>; i &lt;= n; i++) {</span><br><span class="line">        JosephNode* new_node = (JosephNode*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(JosephNode));</span><br><span class="line">        <span class="keyword">if</span> (new_node == <span class="literal">NULL</span>) {</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">"创建新节点失败\n"</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        }</span><br><span class="line">        new_node-&gt;val = i;</span><br><span class="line">        new_node-&gt;next = <span class="literal">NULL</span>;</span><br><span class="line">        <span class="comment">// 判断是否是空链表</span></span><br><span class="line">        <span class="keyword">if</span> (joseph_header-&gt;head == <span class="literal">NULL</span>) {</span><br><span class="line">            <span class="comment">// 第一个节点：头尾指针同时指向它</span></span><br><span class="line">            joseph_header-&gt;head = joseph_header-&gt;tail = new_node;</span><br><span class="line">        } <span class="keyword">else</span> {</span><br><span class="line">            <span class="comment">// 后续节点：只需更新尾指针</span></span><br><span class="line">            joseph_header-&gt;tail-&gt;next = new_node;</span><br><span class="line">            joseph_header-&gt;tail = new_node;</span><br><span class="line">        }</span><br><span class="line">        joseph_header-&gt;tail-&gt;next = joseph_header-&gt;head;   <span class="comment">// 每次插入后都重新闭环</span></span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
 
-<p><strong>空表首节点头尾同指，后续节点只动尾指针，最后一句闭环</strong>——没有哨兵时建循环链表的固定套路。每次插入末尾都执行 <code>tail-&gt;next = head</code>，保证环永远闭合。</p>
+<p><strong>空表的首节点头尾指针相同，后续节点只动尾指针，最后闭环</strong>——没有哨兵时建循环链表的固定套路。每次插入末尾都执行 <code>tail-&gt;next = head</code>，保证环永远闭合。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">建环三步(以 1、2 两个节点为例):</span><br><span class="line"></span><br><span class="line">① 空表:               head = tail = NULL</span><br><span class="line"></span><br><span class="line">② 插入节点1:          head = tail = 节点1,首尾同指</span><br><span class="line">                      ┌───────┐</span><br><span class="line">                      │       ▼</span><br><span class="line">                      1 ──────┘</span><br><span class="line"></span><br><span class="line">③ 插入节点2:          tail-&gt;next = 节点2;tail = 节点2;闭环</span><br><span class="line">                      ┌─────────┐</span><br><span class="line">                      │         ▼</span><br><span class="line">                      1 → 2 ────┘</span><br></pre></td></tr></table></figure>
 
 <h3 id="8-3-遍历：do-while-的用武之地"><a href="#8-3-遍历：do-while-的用武之地" class="headerlink" title="8.3 遍历：do-while 的用武之地"></a>8.3 遍历：do-while 的用武之地</h3><figure class="highlight c"><figcaption><span>Joseph.c - showData</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">showData</span><span class="params">(JosephHeader* joseph_header)</span> {</span><br><span class="line">    JosephNode* p = joseph_header-&gt;head;</span><br><span class="line">    <span class="comment">// 没有头节点，只有头指针的循环链表的遍历方式——do while 循环</span></span><br><span class="line">    <span class="keyword">do</span> {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d\t"</span>, p-&gt;val);</span><br><span class="line">        p = p-&gt;next;</span><br><span class="line">        <span class="comment">// 先执行一次，然后再判断是否回到起点</span></span><br><span class="line">    } <span class="keyword">while</span> (p != joseph_header-&gt;head);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"\n"</span>);</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
@@ -715,7 +714,10 @@ mjx-container[display="true"] + br {
     <a href="/2026/08/17/STM32_TIM_SlaveMode/" rel="prev" title="STM32——定时器从模式：复位、门控、触发，三种方式控制定时器">
       <i class="fa fa-chevron-left"></i> STM32——定时器从模式：复位、门控、触发，三种方式控制定时器
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2026/08/27/Python_Basic_Syntax/" rel="next" title="Python 入门">
+      Python 入门 <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -780,9 +782,9 @@ mjx-container[display="true"] + br {
 
       <div class="site-overview-wrap sidebar-panel">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-    <img class="site-author-image" itemprop="image" alt="点灯大王"
+    <img class="site-author-image" itemprop="image" alt=""
       src="/images/avatar/potatolearning.jpg">
-  <p class="site-author-name" itemprop="name">点灯大王</p>
+  <p class="site-author-name" itemprop="name"></p>
   <div class="site-description" itemprop="description">博客、记录</div>
 </div>
 <div class="site-state-wrap motion-element">
@@ -803,7 +805,7 @@ mjx-container[display="true"] + br {
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">63</span>
+        <span class="site-state-item-count">64</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -834,17 +836,17 @@ mjx-container[display="true"] + br {
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
-  <span class="author" itemprop="copyrightHolder">点灯大王</span>
+  <span class="author" itemprop="copyrightHolder"></span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">358k</span>
+    <span title="站点总字数">347k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">5:25</span>
+    <span title="站点阅读时长">5:15</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>
