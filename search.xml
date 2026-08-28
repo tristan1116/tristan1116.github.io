@@ -2576,6 +2576,827 @@
 <td>嵌套列表</td>
 </tr>
 </tbody></table>
+<hr>
+<h1 id="元组"><a href="#元组" class="headerlink" title="元组"></a>元组</h1><p>元组（tuple）和列表几乎一样：有序、按下标访问、可切片、可遍历。唯一区别：<strong>创建后元素不能修改</strong>。可以理解为”只读的列表”，相当于 C 里加 <code>const</code> 的数组。</p>
+<h2 id="一、创建元组"><a href="#一、创建元组" class="headerlink" title="一、创建元组"></a>一、创建元组</h2><p>用<strong>小括号 <code>()</code></strong> 包起来，元素用逗号隔开：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup1 = (<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="number">1997</span>, <span class="number">2000</span>)</span><br><span class="line">tup2 = (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>)</span><br></pre></td></tr></table></figure>
+
+<p><strong>括号不是必须的</strong>——元组的本质是逗号：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup3 = <span class="string">&quot;a&quot;</span>, <span class="string">&quot;b&quot;</span>, <span class="string">&quot;c&quot;</span>, <span class="string">&quot;d&quot;</span>    <span class="comment"># 不写括号也是元组</span></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">type</span>(tup3))            <span class="comment"># &lt;class &#x27;tuple&#x27;&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>空元组</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup1 = ()</span><br></pre></td></tr></table></figure>
+
+<p><strong>单元素元组的坑</strong>：只有一个元素时，必须加逗号，否则括号被当成运算符，<code>(50)</code> 只是整数 50：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup1 = (<span class="number">50</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">type</span>(tup1))    <span class="comment"># &lt;class &#x27;int&#x27;&gt;      ← 这是整数！</span></span><br><span class="line"></span><br><span class="line">tup2 = (<span class="number">50</span>,)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">type</span>(tup2))    <span class="comment"># &lt;class &#x27;tuple&#x27;&gt;    ← 加逗号才是元组</span></span><br></pre></td></tr></table></figure>
+
+<p>这和 C 的道理一样：<code>(a + b) * c</code> 里括号就是运算符，Python 的括号默认也是运算符，想表示元组必须用逗号表态。</p>
+<h2 id="二、访问元组"><a href="#二、访问元组" class="headerlink" title="二、访问元组"></a>二、访问元组</h2><p>下标从 0 开始，支持索引和切片，和字符串、列表完全一样：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup1 = (<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="number">1997</span>, <span class="number">2000</span>)</span><br><span class="line">tup2 = (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(tup1[<span class="number">0</span>])       <span class="comment"># Google</span></span><br><span class="line"><span class="built_in">print</span>(tup2[<span class="number">1</span>:<span class="number">5</span>])     <span class="comment"># (2, 3, 4, 5)   切片结果还是元组</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="三、元组不能修改（和列表最本质的区别）"><a href="#三、元组不能修改（和列表最本质的区别）" class="headerlink" title="三、元组不能修改（和列表最本质的区别）"></a>三、元组不能修改（和列表最本质的区别）</h2><p>给元素赋值直接报错：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup = (<span class="string">&#x27;r&#x27;</span>, <span class="string">&#x27;u&#x27;</span>, <span class="string">&#x27;n&#x27;</span>, <span class="string">&#x27;o&#x27;</span>, <span class="string">&#x27;o&#x27;</span>, <span class="string">&#x27;b&#x27;</span>)</span><br><span class="line">tup[<span class="number">0</span>] = <span class="string">&#x27;g&#x27;</span></span><br><span class="line"><span class="comment"># TypeError: &#x27;tuple&#x27; object does not support item assignment</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>不能改，但可以连接</strong>：用 <code>+</code> 把两个元组合成一个<strong>新元组</strong>，原元组不变：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup1 = (<span class="number">12</span>, <span class="number">34.56</span>)</span><br><span class="line">tup2 = (<span class="string">&#x27;abc&#x27;</span>, <span class="string">&#x27;xyz&#x27;</span>)</span><br><span class="line"></span><br><span class="line">tup3 = tup1 + tup2</span><br><span class="line"><span class="built_in">print</span>(tup3)    <span class="comment"># (12, 34.56, &#x27;abc&#x27;, &#x27;xyz&#x27;)</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>不能删单个元素，但能删整个元组</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup = (<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="number">1997</span>, <span class="number">2000</span>)</span><br><span class="line"><span class="keyword">del</span> tup              <span class="comment"># 整个元组被删除</span></span><br><span class="line"><span class="built_in">print</span>(tup)</span><br><span class="line"><span class="comment"># NameError: name &#x27;tup&#x27; is not defined    ← 元组已不存在，访问报错</span></span><br></pre></td></tr></table></figure>
+
+<p>C 里释放变量靠 <code>free()</code> 或等作用域结束，Python 用 <code>del</code> 直接删除变量，但平时很少主动用。</p>
+<h2 id="四、元组运算符"><a href="#四、元组运算符" class="headerlink" title="四、元组运算符"></a>四、元组运算符</h2><p>和字符串一样，<code>+</code>、<code>+=</code>、<code>*</code> 都能用于元组，运算后生成新元组：</p>
+<table>
+<thead>
+<tr>
+<th>表达式</th>
+<th>结果</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>len((1, 2, 3))</code></td>
+<td><code>3</code></td>
+<td>元素个数</td>
+</tr>
+<tr>
+<td><code>(1, 2, 3) + (4, 5, 6)</code></td>
+<td><code>(1, 2, 3, 4, 5, 6)</code></td>
+<td>连接</td>
+</tr>
+<tr>
+<td><code>a += b</code></td>
+<td><code>a</code> 变成 <code>(1, 2, 3, 4, 5, 6)</code></td>
+<td>连接后赋回 a</td>
+</tr>
+<tr>
+<td><code>(&#39;Hi!&#39;,) * 4</code></td>
+<td><code>(&#39;Hi!&#39;, &#39;Hi!&#39;, &#39;Hi!&#39;, &#39;Hi!&#39;)</code></td>
+<td>复制</td>
+</tr>
+<tr>
+<td><code>3 in (1, 2, 3)</code></td>
+<td><code>True</code></td>
+<td>元素是否存在</td>
+</tr>
+<tr>
+<td><code>for x in (1, 2, 3)</code></td>
+<td>依次输出 <code>1 2 3</code></td>
+<td>迭代</td>
+</tr>
+</tbody></table>
+<p>运行示例：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>)</span><br><span class="line">b = (<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>)</span><br><span class="line">c = a + b</span><br><span class="line"><span class="built_in">print</span>(c)             <span class="comment"># (1, 2, 3, 4, 5, 6)</span></span><br><span class="line"></span><br><span class="line">a += b               <span class="comment"># 相当于 a = a + b，a 指向新元组</span></span><br><span class="line"><span class="built_in">print</span>(a)             <span class="comment"># (1, 2, 3, 4, 5, 6)</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>((<span class="string">&#x27;Hi!&#x27;</span>,) * <span class="number">4</span>)  <span class="comment"># (&#x27;Hi!&#x27;, &#x27;Hi!&#x27;, &#x27;Hi!&#x27;, &#x27;Hi!&#x27;)</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="number">3</span> <span class="keyword">in</span> (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>))  <span class="comment"># True</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> x <span class="keyword">in</span> (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>):</span><br><span class="line">    <span class="built_in">print</span>(x, end=<span class="string">&quot; &quot;</span>)  <span class="comment"># 1 2 3</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="五、元组索引与截取"><a href="#五、元组索引与截取" class="headerlink" title="五、元组索引与截取"></a>五、元组索引与截取</h2><p>反向索引和切片与字符串、列表规则完全相同：</p>
+<table>
+<thead>
+<tr>
+<th>表达式</th>
+<th>结果</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tup[1]</code></td>
+<td><code>&#39;Runoob&#39;</code></td>
+<td>第二个元素</td>
+</tr>
+<tr>
+<td><code>tup[-2]</code></td>
+<td><code>&#39;Weibo&#39;</code></td>
+<td>倒数第二个元素</td>
+</tr>
+<tr>
+<td><code>tup[1:]</code></td>
+<td><code>(&#39;Runoob&#39;, &#39;Taobao&#39;, &#39;Wiki&#39;, &#39;Weibo&#39;, &#39;Weixin&#39;)</code></td>
+<td>从第二个到最后</td>
+</tr>
+<tr>
+<td><code>tup[1:4]</code></td>
+<td><code>(&#39;Runoob&#39;, &#39;Taobao&#39;, &#39;Wiki&#39;)</code></td>
+<td>下标 1 到 3（不含 4）</td>
+</tr>
+</tbody></table>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup = (<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Taobao&#x27;</span>, <span class="string">&#x27;Wiki&#x27;</span>, <span class="string">&#x27;Weibo&#x27;</span>, <span class="string">&#x27;Weixin&#x27;</span>)</span><br><span class="line"><span class="built_in">print</span>(tup[<span class="number">1</span>])     <span class="comment"># Runoob</span></span><br><span class="line"><span class="built_in">print</span>(tup[-<span class="number">2</span>])    <span class="comment"># Weibo</span></span><br><span class="line"><span class="built_in">print</span>(tup[<span class="number">1</span>:])    <span class="comment"># (&#x27;Runoob&#x27;, &#x27;Taobao&#x27;, &#x27;Wiki&#x27;, &#x27;Weibo&#x27;, &#x27;Weixin&#x27;)</span></span><br><span class="line"><span class="built_in">print</span>(tup[<span class="number">1</span>:<span class="number">4</span>])   <span class="comment"># (&#x27;Runoob&#x27;, &#x27;Taobao&#x27;, &#x27;Wiki&#x27;)</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="六、元组内置函数"><a href="#六、元组内置函数" class="headerlink" title="六、元组内置函数"></a>六、元组内置函数</h2><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tuple1 = (<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Taobao&#x27;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">len</span>(tuple1))      <span class="comment"># 3    元素个数</span></span><br><span class="line"></span><br><span class="line">tuple2 = (<span class="string">&#x27;5&#x27;</span>, <span class="string">&#x27;4&#x27;</span>, <span class="string">&#x27;8&#x27;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">max</span>(tuple2))      <span class="comment"># 8    最大值（字符串按字典序比较）</span></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">min</span>(tuple2))      <span class="comment"># 4    最小值</span></span><br></pre></td></tr></table></figure>
+
+<p><code>tuple(iterable)</code>：把列表、字符串等可迭代对象转成元组：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">list1 = [<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Taobao&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Baidu&#x27;</span>]</span><br><span class="line">tuple1 = <span class="built_in">tuple</span>(list1)</span><br><span class="line"><span class="built_in">print</span>(tuple1)    <span class="comment"># (&#x27;Google&#x27;, &#x27;Taobao&#x27;, &#x27;Runoob&#x27;, &#x27;Baidu&#x27;)</span></span><br></pre></td></tr></table></figure>
+
+<p>列表部分讲过 <code>list((1, 2))</code> 把元组转成列表，这里正好相反：<code>tuple()</code> 把列表转成元组。</p>
+<h2 id="七、不可变性的真相"><a href="#七、不可变性的真相" class="headerlink" title="七、不可变性的真相"></a>七、不可变性的真相</h2><p>“不可变”指的是：<strong>元组指向的那块内存内容不能变</strong>。重新赋值不是修改，而是让变量<strong>绑定一个新对象</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup = (<span class="string">&#x27;r&#x27;</span>, <span class="string">&#x27;u&#x27;</span>, <span class="string">&#x27;n&#x27;</span>, <span class="string">&#x27;o&#x27;</span>, <span class="string">&#x27;o&#x27;</span>, <span class="string">&#x27;b&#x27;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">id</span>(tup))      <span class="comment"># 4440687904    原对象的地址</span></span><br><span class="line"></span><br><span class="line">tup = (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>)     <span class="comment"># 重新赋值：绑定到新元组</span></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">id</span>(tup))      <span class="comment"># 4441088800    地址变了，是另一个对象</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">第一次赋值：</span><br><span class="line">tup ──────► 元组A (&#x27;r&#x27;,&#x27;u&#x27;,&#x27;n&#x27;,&#x27;o&#x27;,&#x27;o&#x27;,&#x27;b&#x27;)</span><br><span class="line">            地址 4440687904</span><br><span class="line"></span><br><span class="line">重新赋值：</span><br><span class="line">tup ──────► 元组B (1,2,3)          ← 全新对象</span><br><span class="line">            地址 4441088800</span><br><span class="line">元组A 还在内存里，只是没人引用它了</span><br></pre></td></tr></table></figure>
+
+<p>对比列表：<code>list[0] = &#39;g&#39;</code> 是原地改内容，<strong>地址不变</strong>；元组做不到原地改，只能整个换对象。</p>
+<h2 id="八、元组解包（实用技巧）"><a href="#八、元组解包（实用技巧）" class="headerlink" title="八、元组解包（实用技巧）"></a>八、元组解包（实用技巧）</h2><p>元组可以直接拆开赋给多个变量：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tup = (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>)</span><br><span class="line">a, b, c = tup       <span class="comment"># a=1, b=2, c=3</span></span><br></pre></td></tr></table></figure>
+
+<p>最经典的用途：<strong>交换两个变量</strong>。C 里需要临时变量：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// C 写法</span></span><br><span class="line"><span class="type">int</span> temp = a;</span><br><span class="line">a = b;</span><br><span class="line">b = temp;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># Python 写法</span></span><br><span class="line">a, b = b, a         <span class="comment"># 一行搞定，没有临时变量</span></span><br></pre></td></tr></table></figure>
+
+<p>原理：右边先组合成一个临时元组 <code>(b, a)</code>，再解包赋给 <code>a, b</code>。</p>
+<p>函数返回多个值也靠元组：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">get_point</span>():</span><br><span class="line">    <span class="keyword">return</span> <span class="number">3</span>, <span class="number">4</span>      <span class="comment"># 返回元组 (3, 4)</span></span><br><span class="line"></span><br><span class="line">x, y = get_point()   <span class="comment"># x=3, y=4</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="九、元组-vs-列表：怎么选"><a href="#九、元组-vs-列表：怎么选" class="headerlink" title="九、元组 vs 列表：怎么选"></a>九、元组 vs 列表：怎么选</h2><table>
+<thead>
+<tr>
+<th></th>
+<th>元组 tuple</th>
+<th>列表 list</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>符号</td>
+<td><code>()</code></td>
+<td><code>[]</code></td>
+</tr>
+<tr>
+<td>内容</td>
+<td>创建后不能修改</td>
+<td>可以增删改</td>
+</tr>
+<tr>
+<td>内存</td>
+<td>更小</td>
+<td>更大</td>
+</tr>
+<tr>
+<td>速度</td>
+<td>更快</td>
+<td>稍慢</td>
+</tr>
+<tr>
+<td>典型用途</td>
+<td>坐标、常量、多返回值</td>
+<td>动态数据集合</td>
+</tr>
+</tbody></table>
+<p>选择原则：</p>
+<ul>
+<li>数据<strong>不允许被改</strong>（坐标、颜色、固定配置）→ 用元组</li>
+<li>数据<strong>需要增删改</strong>（收集动态内容）→ 用列表</li>
+</ul>
+<hr>
+<h1 id="字典"><a href="#字典" class="headerlink" title="字典"></a>字典</h1><p>字典（dict）是<strong>键值对（key-value）</strong>的集合：每个元素由”键”和”值”组成，通过<strong>键</strong>直接找到对应的<strong>值</strong>，不用像列表那样按下标挨个数。C 里没有直接对应的类型，可以理解成”<strong>用任意不可变值当下标的数组</strong>“；Python 字典底层是<strong>哈希表</strong>实现的，查找一步到位。</p>
+<h2 id="一、创建字典"><a href="#一、创建字典" class="headerlink" title="一、创建字典"></a>一、创建字典</h2><p>格式：花括号 <code>&#123;&#125;</code> 包起来，键和值用冒号 <code>:</code> 分割，键值对之间用逗号 <code>,</code> 分割：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">d = &#123;key1: value1, key2: value2, key3: value3&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;name&#x27;</span>: <span class="string">&#x27;runoob&#x27;</span>, <span class="string">&#x27;likes&#x27;</span>: <span class="number">123</span>, <span class="string">&#x27;url&#x27;</span>: <span class="string">&#x27;www.runoob.com&#x27;</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>键和值的类型很自由：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict1 = &#123; <span class="string">&#x27;abc&#x27;</span>: <span class="number">456</span> &#125;</span><br><span class="line">tinydict2 = &#123; <span class="string">&#x27;abc&#x27;</span>: <span class="number">123</span>, <span class="number">98.6</span>: <span class="number">37</span> &#125;    <span class="comment"># 键还可以是数字</span></span><br></pre></td></tr></table></figure>
+
+<p>注意：<code>dict</code> 是 Python 的关键字和内置函数名，<strong>变量名不要命名为 dict</strong>——和列表章节说过的”不要用 <code>list</code>、<code>str</code> 当变量名”是同一个道理，会覆盖掉内置功能。</p>
+<h2 id="二、创建空字典"><a href="#二、创建空字典" class="headerlink" title="二、创建空字典"></a>二、创建空字典</h2><p>两种方式，效果一样：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">emptyDict = &#123;&#125;         <span class="comment"># 方式一：大括号</span></span><br><span class="line"><span class="built_in">print</span>(emptyDict)       <span class="comment"># &#123;&#125;</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Length:&quot;</span>, <span class="built_in">len</span>(emptyDict))    <span class="comment"># Length: 0</span></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">type</span>(emptyDict)) <span class="comment"># &lt;class &#x27;dict&#x27;&gt;</span></span><br><span class="line"></span><br><span class="line">emptyDict2 = <span class="built_in">dict</span>()    <span class="comment"># 方式二：内置函数 dict()</span></span><br><span class="line"><span class="built_in">print</span>(emptyDict2)      <span class="comment"># &#123;&#125;</span></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">type</span>(emptyDict2))  <span class="comment"># &lt;class &#x27;dict&#x27;&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>注意：<code>&#123;&#125;</code> 创建的是<strong>空字典</strong>，不是空集合——集合章节讲过，空集合必须用 <code>set()</code>，因为 <code>&#123;&#125;</code> 被字典占用了。</p>
+<h2 id="三、访问字典里的值"><a href="#三、访问字典里的值" class="headerlink" title="三、访问字典里的值"></a>三、访问字典里的值</h2><p>把<strong>键</strong>放进方括号 <code>[]</code>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>, <span class="string">&#x27;Class&#x27;</span>: <span class="string">&#x27;First&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(tinydict[<span class="string">&#x27;Name&#x27;</span>])    <span class="comment"># Runoob</span></span><br><span class="line"><span class="built_in">print</span>(tinydict[<span class="string">&#x27;Age&#x27;</span>])     <span class="comment"># 7</span></span><br></pre></td></tr></table></figure>
+
+<p>和列表的区别：列表按下标（0、1、2…）访问，字典按<strong>键</strong>访问，键可以是字符串、数字、元组。</p>
+<p><strong>访问不存在的键会直接报错</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>, <span class="string">&#x27;Class&#x27;</span>: <span class="string">&#x27;First&#x27;</span>&#125;</span><br><span class="line"><span class="built_in">print</span>(tinydict[<span class="string">&#x27;Alice&#x27;</span>])</span><br><span class="line"><span class="comment"># KeyError: &#x27;Alice&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>C 里数组越界不提示（未定义行为），Python 直接抛 KeyError，反而更好排查。不想报错就用 <code>get()</code>（见第八节）。</p>
+<h2 id="四、修改字典"><a href="#四、修改字典" class="headerlink" title="四、修改字典"></a>四、修改字典</h2><p>向字典添加新内容 &#x3D; 给新键赋值；修改已有内容 &#x3D; 给已有键赋新值。写法完全相同，Python 自己判断：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>, <span class="string">&#x27;Class&#x27;</span>: <span class="string">&#x27;First&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line">tinydict[<span class="string">&#x27;Age&#x27;</span>] = <span class="number">8</span>              <span class="comment"># 键 Age 已存在 → 修改值</span></span><br><span class="line">tinydict[<span class="string">&#x27;School&#x27;</span>] = <span class="string">&quot;菜鸟教程&quot;</span>   <span class="comment"># 键 School 不存在 → 添加新键值对</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(tinydict[<span class="string">&#x27;Age&#x27;</span>])     <span class="comment"># 8</span></span><br><span class="line"><span class="built_in">print</span>(tinydict[<span class="string">&#x27;School&#x27;</span>])  <span class="comment"># 菜鸟教程</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="五、删除字典元素"><a href="#五、删除字典元素" class="headerlink" title="五、删除字典元素"></a>五、删除字典元素</h2><p>三种删除，范围从小到大：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>, <span class="string">&#x27;Class&#x27;</span>: <span class="string">&#x27;First&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">del</span> tinydict[<span class="string">&#x27;Name&#x27;</span>]     <span class="comment"># 1. 删除单个键值对</span></span><br><span class="line">tinydict.clear()         <span class="comment"># 2. 清空字典（变成空字典 &#123;&#125;）</span></span><br><span class="line"><span class="keyword">del</span> tinydict             <span class="comment"># 3. 删除整个字典</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(tinydict[<span class="string">&#x27;Age&#x27;</span>])</span><br><span class="line"><span class="comment"># NameError: name &#x27;tinydict&#x27; is not defined    ← 字典已不存在，访问报错</span></span><br></pre></td></tr></table></figure>
+
+<p><code>clear()</code> 和 <code>del</code> 的区别：清空后字典还在（空的），<code>del</code> 之后字典整个没了。</p>
+<h2 id="六、字典键的特性（重点）"><a href="#六、字典键的特性（重点）" class="headerlink" title="六、字典键的特性（重点）"></a>六、字典键的特性（重点）</h2><h3 id="1-键不允许重复"><a href="#1-键不允许重复" class="headerlink" title="1. 键不允许重复"></a>1. 键不允许重复</h3><p>同一个键出现两次，<strong>后写的值覆盖先写的</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>, <span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;小菜鸟&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(tinydict[<span class="string">&#x27;Name&#x27;</span>])    <span class="comment"># 小菜鸟   后写的覆盖了先写的</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-键必须不可变"><a href="#2-键必须不可变" class="headerlink" title="2. 键必须不可变"></a>2. 键必须不可变</h3><p>值可以是任意类型，<strong>键必须是不可变的</strong>——数字、字符串、元组都可以，<strong>列表不行</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;[<span class="string">&#x27;Name&#x27;</span>]: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>&#125;</span><br><span class="line"><span class="comment"># TypeError: unhashable type: &#x27;list&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>原因：字典靠<strong>哈希</strong>（把键算成一个数字）实现快速查找，可变对象内容一变哈希就乱了，所以不能用。这正是元组章节讲的”不可变”的用武之地——<strong>需要多个字段当键时用元组</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">d = &#123;(<span class="string">&#x27;张三&#x27;</span>, <span class="string">&#x27;2024级&#x27;</span>): <span class="number">95</span>&#125;    <span class="comment"># 键是元组，合法</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="七、字典内置函数"><a href="#七、字典内置函数" class="headerlink" title="七、字典内置函数"></a>七、字典内置函数</h2><table>
+<thead>
+<tr>
+<th>函数</th>
+<th>作用</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>len(dict)</code></td>
+<td>键值对个数</td>
+<td><code>len(&#123;&#39;Name&#39;: &#39;Runoob&#39;, &#39;Age&#39;: 7&#125;)</code> → <code>2</code></td>
+</tr>
+<tr>
+<td><code>str(dict)</code></td>
+<td>转成字符串</td>
+<td><code>str(&#123;&#39;a&#39;: 1&#125;)</code> → <code>&quot;&#123;&#39;a&#39;: 1&#125;&quot;</code></td>
+</tr>
+<tr>
+<td><code>type(variable)</code></td>
+<td>变量类型</td>
+<td><code>type(&#123;&#125;)</code> → <code>&lt;class &#39;dict&#39;&gt;</code></td>
+</tr>
+</tbody></table>
+<h2 id="八、字典内置方法"><a href="#八、字典内置方法" class="headerlink" title="八、字典内置方法"></a>八、字典内置方法</h2><p>12 个方法全表：</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>clear()</code></td>
+<td>清空所有键值对</td>
+</tr>
+<tr>
+<td><code>copy()</code></td>
+<td>复制一份字典（浅复制）</td>
+</tr>
+<tr>
+<td><code>fromkeys(seq, val)</code></td>
+<td>用序列的元素作键创建新字典，值统一为 val</td>
+</tr>
+<tr>
+<td><code>get(key, default)</code></td>
+<td>取键的值，键不存在返回 default（不报错）</td>
+</tr>
+<tr>
+<td><code>key in dict</code></td>
+<td>判断键是否存在</td>
+</tr>
+<tr>
+<td><code>items()</code></td>
+<td>返回所有 (键, 值) 对的视图</td>
+</tr>
+<tr>
+<td><code>keys()</code></td>
+<td>返回所有键的视图</td>
+</tr>
+<tr>
+<td><code>setdefault(key, default)</code></td>
+<td>类似 get，但键不存在时会把键添加进去</td>
+</tr>
+<tr>
+<td><code>update(dict2)</code></td>
+<td>把另一个字典的键值对合并进来</td>
+</tr>
+<tr>
+<td><code>values()</code></td>
+<td>返回所有值的视图</td>
+</tr>
+<tr>
+<td><code>pop(key, default)</code></td>
+<td>删除指定键，返回被删的值</td>
+</tr>
+<tr>
+<td><code>popitem()</code></td>
+<td>删除并返回最后一对 (键, 值)</td>
+</tr>
+</tbody></table>
+<p>分四组讲：</p>
+<h3 id="查：get-in-keys-values-items"><a href="#查：get-in-keys-values-items" class="headerlink" title="查：get &#x2F; in &#x2F; keys &#x2F; values &#x2F; items"></a>查：get &#x2F; in &#x2F; keys &#x2F; values &#x2F; items</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># get：键不存在不报错，返回默认值</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.get(<span class="string">&#x27;Name&#x27;</span>))                  <span class="comment"># Runoob</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.get(<span class="string">&#x27;Alice&#x27;</span>))                 <span class="comment"># None    键不存在，默认返回 None</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.get(<span class="string">&#x27;Alice&#x27;</span>, <span class="string">&#x27;查无此人&#x27;</span>))      <span class="comment"># 查无此人   自己指定默认值</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># in：判断键是否存在</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&#x27;Name&#x27;</span> <span class="keyword">in</span> tinydict)      <span class="comment"># True</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&#x27;Alice&#x27;</span> <span class="keyword">in</span> tinydict)     <span class="comment"># False</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># keys / values / items：三个&quot;视图&quot;</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.keys())     <span class="comment"># dict_keys([&#x27;Name&#x27;, &#x27;Age&#x27;])</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.values())   <span class="comment"># dict_values([&#x27;Runoob&#x27;, 7])</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.items())    <span class="comment"># dict_items([(&#x27;Name&#x27;, &#x27;Runoob&#x27;), (&#x27;Age&#x27;, 7)])</span></span><br></pre></td></tr></table></figure>
+
+<p><code>get()</code> 和 <code>tinydict[&#39;key&#39;]</code> 的区别：直接访问不存在的键抛 KeyError 中断程序，<code>get()</code> 返回默认值让程序继续。**不确定键是否存在时用 get()**。</p>
+<p>keys &#x2F; values &#x2F; items 返回的是<strong>视图对象</strong>，不是列表。它跟着字典实时变化，能用 <code>for</code> 遍历，想转成列表用 <code>list()</code> 包一下。</p>
+<h3 id="改：update-setdefault"><a href="#改：update-setdefault" class="headerlink" title="改：update &#x2F; setdefault"></a>改：update &#x2F; setdefault</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>&#125;</span><br><span class="line">extra = &#123;<span class="string">&#x27;Age&#x27;</span>: <span class="number">8</span>, <span class="string">&#x27;School&#x27;</span>: <span class="string">&#x27;菜鸟教程&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line">tinydict.update(extra)   <span class="comment"># 合并：Age 已存在被改成 8，School 不存在被添加</span></span><br><span class="line"><span class="built_in">print</span>(tinydict)          <span class="comment"># &#123;&#x27;Name&#x27;: &#x27;Runoob&#x27;, &#x27;Age&#x27;: 8, &#x27;School&#x27;: &#x27;菜鸟教程&#x27;&#125;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># setdefault：键存在返回原值；键不存在则添加</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.setdefault(<span class="string">&#x27;Age&#x27;</span>, <span class="number">0</span>))       <span class="comment"># 8    键存在，不动</span></span><br><span class="line"><span class="built_in">print</span>(tinydict.setdefault(<span class="string">&#x27;City&#x27;</span>, <span class="string">&#x27;杭州&#x27;</span>))  <span class="comment"># 杭州  键不存在，添加进去</span></span><br><span class="line"><span class="built_in">print</span>(tinydict)   <span class="comment"># 现在多了 &#x27;City&#x27;: &#x27;杭州&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="删：pop-popitem-clear"><a href="#删：pop-popitem-clear" class="headerlink" title="删：pop &#x2F; popitem &#x2F; clear"></a>删：pop &#x2F; popitem &#x2F; clear</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">tinydict = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>: <span class="number">7</span>, <span class="string">&#x27;Class&#x27;</span>: <span class="string">&#x27;First&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line">x = tinydict.pop(<span class="string">&#x27;Age&#x27;</span>)     <span class="comment"># 删除键 Age，返回它的值</span></span><br><span class="line"><span class="built_in">print</span>(x)                    <span class="comment"># 7</span></span><br><span class="line"><span class="built_in">print</span>(tinydict)             <span class="comment"># &#123;&#x27;Name&#x27;: &#x27;Runoob&#x27;, &#x27;Class&#x27;: &#x27;First&#x27;&#125;</span></span><br><span class="line"></span><br><span class="line">pair = tinydict.popitem()   <span class="comment"># 删除并返回最后一对（Python 3.7 起按插入顺序）</span></span><br><span class="line"><span class="built_in">print</span>(pair)                 <span class="comment"># (&#x27;Class&#x27;, &#x27;First&#x27;)</span></span><br><span class="line"><span class="built_in">print</span>(tinydict)             <span class="comment"># &#123;&#x27;Name&#x27;: &#x27;Runoob&#x27;&#125;</span></span><br><span class="line"></span><br><span class="line">tinydict.clear()            <span class="comment"># 清空</span></span><br><span class="line"><span class="built_in">print</span>(tinydict)             <span class="comment"># &#123;&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>pop</code> 和 <code>del</code> 的区别：<code>pop</code> 返回被删的值，<code>del</code> 不返回。<code>pop(&#39;Age&#39;)</code> 删一个并拿到值；<code>del d[&#39;Age&#39;]</code> 删一个、拿不到值。</p>
+<h3 id="其他：copy-fromkeys"><a href="#其他：copy-fromkeys" class="headerlink" title="其他：copy &#x2F; fromkeys"></a>其他：copy &#x2F; fromkeys</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># copy：复制一份（和列表章节的 copy() 同一个道理：b = a 只是共享，copy 才是真复制）</span></span><br><span class="line">a = &#123;<span class="string">&#x27;Name&#x27;</span>: <span class="string">&#x27;Runoob&#x27;</span>&#125;</span><br><span class="line">b = a.copy()</span><br><span class="line">b[<span class="string">&#x27;Name&#x27;</span>] = <span class="string">&#x27;小菜鸟&#x27;</span></span><br><span class="line"><span class="built_in">print</span>(a)    <span class="comment"># &#123;&#x27;Name&#x27;: &#x27;Runoob&#x27;&#125;    a 不受影响</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># fromkeys：批量创建——序列的元素当键，值统一</span></span><br><span class="line">keys = (<span class="string">&#x27;Name&#x27;</span>, <span class="string">&#x27;Age&#x27;</span>)</span><br><span class="line">d = <span class="built_in">dict</span>.fromkeys(keys, <span class="number">0</span>)</span><br><span class="line"><span class="built_in">print</span>(d)    <span class="comment"># &#123;&#x27;Name&#x27;: 0, &#x27;Age&#x27;: 0&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="九、和-C-的对照"><a href="#九、和-C-的对照" class="headerlink" title="九、和 C 的对照"></a>九、和 C 的对照</h2><p>C 语言没有字典。要”按键查值”，笨办法是<strong>结构体数组 + 循环比对</strong>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">student</span> &#123;</span> <span class="type">char</span> name[<span class="number">20</span>]; <span class="type">int</span> age; &#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">student</span> <span class="title">list</span>[] =</span> &#123;&#123;<span class="string">&quot;张三&quot;</span>, <span class="number">19</span>&#125;, &#123;<span class="string">&quot;李四&quot;</span>, <span class="number">20</span>&#125;&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">find_age</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *name)</span> &#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">2</span>; i++)</span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">strcmp</span>(<span class="built_in">list</span>[i].name, name) == <span class="number">0</span>)</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">list</span>[i].age;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;    <span class="comment">// 找不到返回 -1</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>数据少还行，数据一多每次都要从头遍历。Python 字典底层是<strong>哈希表</strong>，<code>dict[key]</code> 一步定位：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">C 结构体数组：  按键查找 = 遍历比对，O(n)，n 大就慢</span><br><span class="line">Python 字典：  哈希表定位，O(1)，数据多少无所谓</span><br></pre></td></tr></table></figure>
+
+<h2 id="十、实际应用场景"><a href="#十、实际应用场景" class="headerlink" title="十、实际应用场景"></a>十、实际应用场景</h2><ul>
+<li><strong>查表</strong>：学号 → 姓名、星期几 → 中文名、状态码 → 描述</li>
+<li><strong>配置项</strong>：<code>config = &#123;&#39;baud&#39;: 115200, &#39;parity&#39;: &#39;N&#39;&#125;</code>，按键取参数</li>
+<li><strong>统计词频</strong>：遍历一段文字，统计每个字符出现次数</li>
+<li><strong>JSON</strong>：前后端传数据的 JSON 对象，解析成 Python 就是字典</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 统计每个字符出现次数（用上了 get 的默认值技巧）</span></span><br><span class="line">text = <span class="string">&quot;hello world&quot;</span></span><br><span class="line">count = &#123;&#125;</span><br><span class="line"><span class="keyword">for</span> ch <span class="keyword">in</span> text:</span><br><span class="line">    count[ch] = count.get(ch, <span class="number">0</span>) + <span class="number">1</span></span><br><span class="line"><span class="built_in">print</span>(count)</span><br><span class="line"><span class="comment"># &#123;&#x27;h&#x27;: 1, &#x27;e&#x27;: 1, &#x27;l&#x27;: 3, &#x27;o&#x27;: 2, &#x27; &#x27;: 1, &#x27;w&#x27;: 1, &#x27;r&#x27;: 1, &#x27;d&#x27;: 1&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>核心套路：<code>count.get(ch, 0)</code> 取当前次数，第一次遇到返回 0，加 1 存回去；后面再遇到就加 1。</p>
+<hr>
+<h1 id="集合"><a href="#集合" class="headerlink" title="集合"></a>集合</h1><p>集合（set）是<strong>无序、不重复</strong>的元素序列。两个招牌能力：<strong>去重</strong>+ <strong>快速判断在不在</strong>（<code>in</code>）。还能做交集、并集、差集等集合运算。C 里没有对应物，去重要自己写循环。</p>
+<h2 id="一、创建集合"><a href="#一、创建集合" class="headerlink" title="一、创建集合"></a>一、创建集合</h2><p>大括号 <code>&#123;&#125;</code> 或 <code>set()</code> 函数：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">set1 = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>&#125;            <span class="comment"># 直接使用大括号创建集合</span></span><br><span class="line">set2 = <span class="built_in">set</span>([<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>])       <span class="comment"># 使用 set() 函数从列表创建集合</span></span><br><span class="line"><span class="built_in">print</span>(set1)    <span class="comment"># &#123;1, 2, 3, 4&#125;</span></span><br><span class="line"><span class="built_in">print</span>(set2)    <span class="comment"># &#123;4, 5, 6, 7&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>**空集合必须用 <code>set()</code>**，<code>&#123;&#125;</code> 创建的是空字典（字典章节讲过）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">s = <span class="built_in">set</span>()      <span class="comment"># ✅ 空集合</span></span><br><span class="line">d = &#123;&#125;         <span class="comment"># ❌ 这是空字典，不是空集合</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="去重演示"><a href="#去重演示" class="headerlink" title="去重演示"></a>去重演示</h3><p>创建时重复元素自动只留一个：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">basket = &#123;<span class="string">&#x27;apple&#x27;</span>, <span class="string">&#x27;orange&#x27;</span>, <span class="string">&#x27;apple&#x27;</span>, <span class="string">&#x27;pear&#x27;</span>, <span class="string">&#x27;orange&#x27;</span>, <span class="string">&#x27;banana&#x27;</span>&#125;</span><br><span class="line"><span class="built_in">print</span>(basket)    <span class="comment"># 重复的 apple、orange 只留一个</span></span><br></pre></td></tr></table></figure>
+
+<p>注意：集合<strong>无序</strong>，输出顺序不固定，不要指望它按插入顺序输出（Python 3.7 起字典保持插入顺序，集合不保证）。</p>
+<h2 id="二、判断元素在不在"><a href="#二、判断元素在不在" class="headerlink" title="二、判断元素在不在"></a>二、判断元素在不在</h2><p><code>x in s</code> 快速判断成员：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">basket = &#123;<span class="string">&#x27;apple&#x27;</span>, <span class="string">&#x27;orange&#x27;</span>, <span class="string">&#x27;apple&#x27;</span>, <span class="string">&#x27;pear&#x27;</span>, <span class="string">&#x27;orange&#x27;</span>, <span class="string">&#x27;banana&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&#x27;orange&#x27;</span> <span class="keyword">in</span> basket)      <span class="comment"># True</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&#x27;crabgrass&#x27;</span> <span class="keyword">in</span> basket)   <span class="comment"># False</span></span><br></pre></td></tr></table></figure>
+
+<p>C 对照：C 里判断数组有没有某元素，要写 for 循环挨个比；集合直接 <code>in</code> 一步，底层也是哈希表。</p>
+<h2 id="三、集合运算"><a href="#三、集合运算" class="headerlink" title="三、集合运算"></a>三、集合运算</h2><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = <span class="built_in">set</span>(<span class="string">&#x27;abracadabra&#x27;</span>)    <span class="comment"># 从字符串创建：拆成单个字符并去重</span></span><br><span class="line">b = <span class="built_in">set</span>(<span class="string">&#x27;alacazam&#x27;</span>)</span><br><span class="line"><span class="built_in">print</span>(a)    <span class="comment"># 五个字符（&#x27;abracadabra&#x27; 里的不同字符）</span></span><br><span class="line"><span class="built_in">print</span>(b)    <span class="comment"># 五个字符（&#x27;alacazam&#x27; 里的不同字符）</span></span><br></pre></td></tr></table></figure>
+
+<p>四种运算：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="built_in">print</span>(a - b)    <span class="comment"># 差集：a 里有、b 里没有</span></span><br><span class="line"><span class="built_in">print</span>(a | b)    <span class="comment"># 并集：a 或 b 的全部元素</span></span><br><span class="line"><span class="built_in">print</span>(a &amp; b)    <span class="comment"># 交集：a 和 b 都有的元素</span></span><br><span class="line"><span class="built_in">print</span>(a ^ b)    <span class="comment"># 对称差：不同时属于 a 和 b 的元素</span></span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>运算</th>
+<th>符号</th>
+<th>含义</th>
+<th>示例（a&#x3D;{a,r,b,c,d}，b&#x3D;{a,l,c,z,m}）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>差集</td>
+<td><code>a - b</code></td>
+<td>a 里有、b 里没有</td>
+<td><code>&#123;r, d, b&#125;</code></td>
+</tr>
+<tr>
+<td>并集</td>
+<td><code>a | b</code></td>
+<td>两个集合合并去重</td>
+<td><code>&#123;a, c, r, d, b, m, z, l&#125;</code></td>
+</tr>
+<tr>
+<td>交集</td>
+<td><code>a &amp; b</code></td>
+<td>两个集合都有</td>
+<td><code>&#123;a, c&#125;</code></td>
+</tr>
+<tr>
+<td>对称差</td>
+<td><code>a ^ b</code></td>
+<td>两边不同时有的</td>
+<td><code>&#123;r, d, b, m, z, l&#125;</code></td>
+</tr>
+</tbody></table>
+<p>每个运算都有对应的<strong>方法版</strong>（union &#x2F; intersection &#x2F; difference &#x2F; symmetric_difference），效果一样，第八节展开。</p>
+<h2 id="四、集合推导式"><a href="#四、集合推导式" class="headerlink" title="四、集合推导式"></a>四、集合推导式</h2><p>类似列表推导式的写法，一行生成集合：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = &#123;x <span class="keyword">for</span> x <span class="keyword">in</span> <span class="string">&#x27;abracadabra&#x27;</span> <span class="keyword">if</span> x <span class="keyword">not</span> <span class="keyword">in</span> <span class="string">&#x27;abc&#x27;</span>&#125;</span><br><span class="line"><span class="built_in">print</span>(a)    <span class="comment"># &#123;&#x27;r&#x27;, &#x27;d&#x27;&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>解读：遍历字符串 <code>&#39;abracadabra&#39;</code> 的每个字符 x，筛掉在 <code>&#39;abc&#39;</code> 里的，剩下的放进集合（自动去重）。</p>
+<h2 id="五、添加元素"><a href="#五、添加元素" class="headerlink" title="五、添加元素"></a>五、添加元素</h2><h3 id="add：加单个"><a href="#add：加单个" class="headerlink" title="add：加单个"></a>add：加单个</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">thisset = <span class="built_in">set</span>((<span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>))</span><br><span class="line">thisset.add(<span class="string">&quot;Facebook&quot;</span>)</span><br><span class="line"><span class="built_in">print</span>(thisset)    <span class="comment"># &#123;&#x27;Taobao&#x27;, &#x27;Facebook&#x27;, &#x27;Google&#x27;, &#x27;Runoob&#x27;&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>元素已存在时 add 不进行任何操作（去重特性）。</p>
+<h3 id="update：批量加"><a href="#update：批量加" class="headerlink" title="update：批量加"></a>update：批量加</h3><p>参数可以是列表、元组、字典、集合，还可以传多个：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">thisset = <span class="built_in">set</span>((<span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>))</span><br><span class="line">thisset.update(&#123;<span class="number">1</span>, <span class="number">3</span>&#125;)</span><br><span class="line"><span class="built_in">print</span>(thisset)    <span class="comment"># &#123;1, 3, &#x27;Google&#x27;, &#x27;Taobao&#x27;, &#x27;Runoob&#x27;&#125;</span></span><br><span class="line"></span><br><span class="line">thisset.update([<span class="number">1</span>, <span class="number">4</span>], [<span class="number">5</span>, <span class="number">6</span>])    <span class="comment"># 传多个参数</span></span><br><span class="line"><span class="built_in">print</span>(thisset)    <span class="comment"># &#123;1, 3, 4, 5, 6, &#x27;Google&#x27;, &#x27;Taobao&#x27;, &#x27;Runoob&#x27;&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>add 和 update 的区别：add 加<strong>一个</strong>元素，update 把参数<strong>展开</strong>逐个加（和列表的 append &#x2F; extend 关系类似）。</p>
+<h2 id="六、移除元素"><a href="#六、移除元素" class="headerlink" title="六、移除元素"></a>六、移除元素</h2><h3 id="remove：不存在会报错"><a href="#remove：不存在会报错" class="headerlink" title="remove：不存在会报错"></a>remove：不存在会报错</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">thisset = <span class="built_in">set</span>((<span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>))</span><br><span class="line">thisset.remove(<span class="string">&quot;Taobao&quot;</span>)</span><br><span class="line"><span class="built_in">print</span>(thisset)    <span class="comment"># &#123;&#x27;Google&#x27;, &#x27;Runoob&#x27;&#125;</span></span><br><span class="line"></span><br><span class="line">thisset.remove(<span class="string">&quot;Facebook&quot;</span>)    <span class="comment"># 不存在 → 报错</span></span><br><span class="line"><span class="comment"># KeyError: &#x27;Facebook&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="discard：不存在也不报错"><a href="#discard：不存在也不报错" class="headerlink" title="discard：不存在也不报错"></a>discard：不存在也不报错</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">thisset = <span class="built_in">set</span>((<span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>))</span><br><span class="line">thisset.discard(<span class="string">&quot;Facebook&quot;</span>)    <span class="comment"># 不存在，忽略</span></span><br><span class="line"><span class="built_in">print</span>(thisset)    <span class="comment"># &#123;&#x27;Taobao&#x27;, &#x27;Google&#x27;, &#x27;Runoob&#x27;&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="pop：随机删一个"><a href="#pop：随机删一个" class="headerlink" title="pop：随机删一个"></a>pop：随机删一个</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">thisset = <span class="built_in">set</span>((<span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>, <span class="string">&quot;Facebook&quot;</span>))</span><br><span class="line">x = thisset.pop()    <span class="comment"># 删哪个不确定</span></span><br><span class="line"><span class="built_in">print</span>(x)             <span class="comment"># 每次运行结果可能不同</span></span><br></pre></td></tr></table></figure>
+
+<p>集合无序，pop 删的是”第一个”，但哪个是第一个不确定。要删指定元素用 remove &#x2F; discard。</p>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>不存在时</th>
+<th>返回</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>remove(x)</code></td>
+<td>报错 KeyError</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>discard(x)</code></td>
+<td>忽略，不报错</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>pop()</code></td>
+<td>集合为空报错</td>
+<td>返回被删的元素（随机）</td>
+</tr>
+</tbody></table>
+<h2 id="七、其他基本操作"><a href="#七、其他基本操作" class="headerlink" title="七、其他基本操作"></a>七、其他基本操作</h2><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">thisset = <span class="built_in">set</span>((<span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>))</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">len</span>(thisset))            <span class="comment"># 3    元素个数</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Runoob&quot;</span> <span class="keyword">in</span> thisset)     <span class="comment"># True    判断存在</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Facebook&quot;</span> <span class="keyword">in</span> thisset)   <span class="comment"># False</span></span><br><span class="line"></span><br><span class="line">thisset.clear()     <span class="comment"># 清空</span></span><br><span class="line"><span class="built_in">print</span>(thisset)      <span class="comment"># set()</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="八、内置方法完整列表"><a href="#八、内置方法完整列表" class="headerlink" title="八、内置方法完整列表"></a>八、内置方法完整列表</h2><p>方法名和运算符一一对应：<code>|</code> → union、<code>&amp;</code> → intersection、<code>-</code> → difference、<code>^</code> → symmetric_difference。</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>add()</code></td>
+<td>添加元素</td>
+</tr>
+<tr>
+<td><code>clear()</code></td>
+<td>移除所有元素</td>
+</tr>
+<tr>
+<td><code>copy()</code></td>
+<td>拷贝集合</td>
+</tr>
+<tr>
+<td><code>difference()</code></td>
+<td>返回差集（<code>-</code>）</td>
+</tr>
+<tr>
+<td><code>difference_update()</code></td>
+<td>把”在另一个集合里也存在”的元素删掉（直接改原集合）</td>
+</tr>
+<tr>
+<td><code>discard()</code></td>
+<td>删除指定元素（不存在不报错）</td>
+</tr>
+<tr>
+<td><code>intersection()</code></td>
+<td>返回交集（<code>&amp;</code>）</td>
+</tr>
+<tr>
+<td><code>intersection_update()</code></td>
+<td>只留下交集部分（直接改原集合）</td>
+</tr>
+<tr>
+<td><code>isdisjoint()</code></td>
+<td>两个集合有没有共同元素，没有返回 True</td>
+</tr>
+<tr>
+<td><code>issubset()</code></td>
+<td>是否为另一个集合的子集</td>
+</tr>
+<tr>
+<td><code>issuperset()</code></td>
+<td>是否包含另一个集合</td>
+</tr>
+<tr>
+<td><code>pop()</code></td>
+<td>随机移除元素</td>
+</tr>
+<tr>
+<td><code>remove()</code></td>
+<td>移除指定元素（不存在报错）</td>
+</tr>
+<tr>
+<td><code>symmetric_difference()</code></td>
+<td>返回对称差（<code>^</code>）</td>
+</tr>
+<tr>
+<td><code>symmetric_difference_update()</code></td>
+<td>只留下对称差部分（直接改原集合）</td>
+</tr>
+<tr>
+<td><code>union()</code></td>
+<td>返回并集（<code>|</code>）</td>
+</tr>
+<tr>
+<td><code>update()</code></td>
+<td>添加元素（可多个参数）</td>
+</tr>
+<tr>
+<td><code>len()</code></td>
+<td>元素个数</td>
+</tr>
+</tbody></table>
+<h3 id="运算的方法版（有返回值，原集合不变）"><a href="#运算的方法版（有返回值，原集合不变）" class="headerlink" title="运算的方法版（有返回值，原集合不变）"></a>运算的方法版（有返回值，原集合不变）</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line">b = &#123;<span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(a.union(b))                  <span class="comment"># &#123;1, 2, 3, 4&#125;    并集</span></span><br><span class="line"><span class="built_in">print</span>(a.intersection(b))           <span class="comment"># &#123;2, 3&#125;          交集</span></span><br><span class="line"><span class="built_in">print</span>(a.difference(b))             <span class="comment"># &#123;1&#125;             差集</span></span><br><span class="line"><span class="built_in">print</span>(a.symmetric_difference(b))   <span class="comment"># &#123;1, 4&#125;          对称差</span></span><br><span class="line"><span class="built_in">print</span>(a)                           <span class="comment"># &#123;1, 2, 3&#125;       原集合没变</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="带-update-的方法：直接改原集合，不返回新集合"><a href="#带-update-的方法：直接改原集合，不返回新集合" class="headerlink" title="带 _update 的方法：直接改原集合，不返回新集合"></a>带 _update 的方法：直接改原集合，不返回新集合</h3><p>不带 <code>_update</code> 的方法（union 等）算出结果后<strong>返回一个新集合</strong>，原集合不动；带 <code>_update</code> 的方法<strong>把原集合直接改掉</strong>，不返回任何东西：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line">b = &#123;<span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>&#125;</span><br><span class="line"></span><br><span class="line">a.intersection_update(b)    <span class="comment"># a 被直接改成交集，没生成新集合</span></span><br><span class="line"><span class="built_in">print</span>(a)                    <span class="comment"># &#123;2, 3&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="关系判断：子集-超集-不相交"><a href="#关系判断：子集-超集-不相交" class="headerlink" title="关系判断：子集 &#x2F; 超集 &#x2F; 不相交"></a>关系判断：子集 &#x2F; 超集 &#x2F; 不相交</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = &#123;<span class="number">1</span>, <span class="number">2</span>&#125;</span><br><span class="line">b = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(a.issubset(b))        <span class="comment"># True    a 是 b 的子集</span></span><br><span class="line"><span class="built_in">print</span>(b.issuperset(a))      <span class="comment"># True    b 是 a 的超集</span></span><br><span class="line"><span class="built_in">print</span>(a.isdisjoint(&#123;<span class="number">9</span>&#125;))    <span class="comment"># True    a 和 &#123;9&#125; 没有共同元素</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="九、和-C-的对照-1"><a href="#九、和-C-的对照-1" class="headerlink" title="九、和 C 的对照"></a>九、和 C 的对照</h2><p>C 没有集合类型。最常用的”去重”功能，C 要两层循环：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// C：数组去重，O(n²)</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">uniq</span><span class="params">(<span class="type">int</span> *src, <span class="type">int</span> n, <span class="type">int</span> *dst)</span> &#123;</span><br><span class="line">    <span class="type">int</span> m = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">        <span class="type">int</span> dup = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; m; j++)</span><br><span class="line">            <span class="keyword">if</span> (dst[j] == src[i]) &#123; dup = <span class="number">1</span>; <span class="keyword">break</span>; &#125;</span><br><span class="line">        <span class="keyword">if</span> (!dup) dst[m++] = src[i];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> m;    <span class="comment">// 返回去重后长度</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># Python：一行</span></span><br><span class="line">dst = <span class="built_in">list</span>(<span class="built_in">set</span>(src))</span><br></pre></td></tr></table></figure>
+
+<h2 id="十、实际应用场景-1"><a href="#十、实际应用场景-1" class="headerlink" title="十、实际应用场景"></a>十、实际应用场景</h2><ul>
+<li><strong>去重</strong>：统计文章里有哪些不同的词、列表去重</li>
+<li><strong>快速判断在不在</strong>：黑名单、已访问记录（配合 <code>in</code>，一步到位）</li>
+<li><strong>集合运算</strong>：求共同好友（交集）、推荐用户（差集：A 关注了但 B 没关注）</li>
+<li><strong>配合字典</strong>：字典的 <code>keys()</code> 可以直接和集合做运算</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 共同好友：两个好友列表的交集</span></span><br><span class="line">my_friends = &#123;<span class="string">&#x27;张三&#x27;</span>, <span class="string">&#x27;李四&#x27;</span>, <span class="string">&#x27;王五&#x27;</span>&#125;</span><br><span class="line">her_friends = &#123;<span class="string">&#x27;李四&#x27;</span>, <span class="string">&#x27;赵六&#x27;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(my_friends &amp; her_friends)    <span class="comment"># &#123;&#x27;李四&#x27;&#125;   共同好友</span></span><br><span class="line"><span class="built_in">print</span>(my_friends - her_friends)    <span class="comment"># &#123;&#x27;张三&#x27;, &#x27;王五&#x27;&#125;   我独有</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h1 id="条件控制"><a href="#条件控制" class="headerlink" title="条件控制"></a>条件控制</h1><p>条件控制就是<strong>根据条件（True &#x2F; False）决定执行哪段代码</strong>，和 C 的 if &#x2F; switch 是一回事，只是写法不同。</p>
+<h2 id="一、if-语句的基本形式"><a href="#一、if-语句的基本形式" class="headerlink" title="一、if 语句的基本形式"></a>一、if 语句的基本形式</h2><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> condition_1:</span><br><span class="line">    语句块<span class="number">1</span></span><br><span class="line"><span class="keyword">elif</span> condition_2:</span><br><span class="line">    语句块<span class="number">2</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    语句块<span class="number">3</span></span><br></pre></td></tr></table></figure>
+
+<p>执行逻辑：</p>
+<ol>
+<li><code>condition_1</code> 为 True → 执行语句块 1</li>
+<li>否则判断 <code>condition_2</code>，为 True → 执行语句块 2</li>
+<li>都不满足 → 执行 else 的语句块 3</li>
+</ol>
+<p>和 C 的对照：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// C 语言</span></span><br><span class="line"><span class="keyword">if</span> (a &gt; <span class="number">0</span>) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (a == <span class="number">0</span>) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># Python</span></span><br><span class="line"><span class="keyword">if</span> a &gt; <span class="number">0</span>:</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">elif</span> a == <span class="number">0</span>:      <span class="comment"># 注意：是 elif，不是 else if</span></span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    ...</span><br></pre></td></tr></table></figure>
+
+<p>三个必须记住的点：</p>
+<ol>
+<li><strong>每个条件后面要写冒号 <code>:</code></strong></li>
+<li><strong>用缩进划分语句块</strong>（相同缩进 &#x3D; 同一代码块），没有大括号</li>
+<li><strong>没有 <code>else if</code>，用 <code>elif</code></strong></li>
+</ol>
+<p>看一个实际例子——<code>if</code> 后面直接放变量当条件：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">var1 = <span class="number">100</span></span><br><span class="line"><span class="keyword">if</span> var1:                    <span class="comment"># var1 非零，为真</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;1 - if 表达式条件为 true&quot;</span>)</span><br><span class="line">    <span class="built_in">print</span>(var1)             <span class="comment"># 100</span></span><br><span class="line"></span><br><span class="line">var2 = <span class="number">0</span></span><br><span class="line"><span class="keyword">if</span> var2:                    <span class="comment"># 0 是假值，不执行</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;2 - if 表达式条件为 true&quot;</span>)    <span class="comment"># 不会打印</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Good bye!&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1 - if 表达式条件为 true</span><br><span class="line">100</span><br><span class="line">Good bye!</span><br></pre></td></tr></table></figure>
+
+<p><code>if var1:</code> 这种”直接拿变量当条件”的写法，判断依据是<strong>假值清单</strong>（前面 bool 部分讲过）：<code>0</code>、<code>&#39;&#39;</code>、<code>[]</code>、<code>None</code> 等为假，其余为真——和 C 里 <code>if (a)</code> 的规则一样。</p>
+<h2 id="二、条件里常用的比较运算符"><a href="#二、条件里常用的比较运算符" class="headerlink" title="二、条件里常用的比较运算符"></a>二、条件里常用的比较运算符</h2><table>
+<thead>
+<tr>
+<th>运算符</th>
+<th>说明</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;</code> <code>&lt;=</code></td>
+<td>小于 &#x2F; 小于等于</td>
+<td><code>5 &lt; 6</code> → True</td>
+</tr>
+<tr>
+<td><code>&gt;</code> <code>&gt;=</code></td>
+<td>大于 &#x2F; 大于等于</td>
+<td><code>5 &gt; 6</code> → False</td>
+</tr>
+<tr>
+<td><code>==</code></td>
+<td>等于（注意是两个等号）</td>
+<td><code>5 == 6</code> → False</td>
+</tr>
+<tr>
+<td><code>!=</code></td>
+<td>不等于</td>
+<td><code>5 != 6</code> → True</td>
+</tr>
+<tr>
+<td><code>in</code></td>
+<td>在序列里</td>
+<td><code>3 in [1, 2, 3]</code> → True</td>
+</tr>
+<tr>
+<td><code>and</code> &#x2F; <code>or</code> &#x2F; <code>not</code></td>
+<td>逻辑与 &#x2F; 或 &#x2F; 非</td>
+<td><code>x &gt; 0 and x &lt; 10</code></td>
+</tr>
+</tbody></table>
+<p>组合条件示例：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">age = <span class="number">25</span></span><br><span class="line"><span class="keyword">if</span> age &gt;= <span class="number">18</span> <span class="keyword">and</span> age &lt; <span class="number">60</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;成年&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<h2 id="三、if-嵌套"><a href="#三、if-嵌套" class="headerlink" title="三、if 嵌套"></a>三、if 嵌套</h2><p>if 里面可以再套 if（和 C 一样），注意<strong>缩进层级</strong>表示嵌套深度：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">num = <span class="built_in">int</span>(<span class="built_in">input</span>(<span class="string">&quot;输入一个数字：&quot;</span>))</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> num % <span class="number">2</span> == <span class="number">0</span>:</span><br><span class="line">    <span class="keyword">if</span> num % <span class="number">3</span> == <span class="number">0</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;你输入的数字可以整除 2 和 3&quot;</span>)</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;你输入的数字可以整除 2，但不能整除 3&quot;</span>)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="keyword">if</span> num % <span class="number">3</span> == <span class="number">0</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;你输入的数字可以整除 3，但不能整除 2&quot;</span>)</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;你输入的数字不能整除 2 和 3&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、综合实例：数字猜谜游戏"><a href="#四、综合实例：数字猜谜游戏" class="headerlink" title="四、综合实例：数字猜谜游戏"></a>四、综合实例：数字猜谜游戏</h2><p>用 <code>while</code> + <code>if-elif-else</code> 写一个小游戏（while 循环下一部分详讲）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">number = <span class="number">7</span></span><br><span class="line">guess = -<span class="number">1</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;数字猜谜游戏!&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> guess != number:</span><br><span class="line">    guess = <span class="built_in">int</span>(<span class="built_in">input</span>(<span class="string">&quot;请输入你猜的数字：&quot;</span>))</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> guess == number:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;恭喜，你猜对了！&quot;</span>)</span><br><span class="line">    <span class="keyword">elif</span> guess &lt; number:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;猜的数字小了...&quot;</span>)</span><br><span class="line">    <span class="keyword">elif</span> guess &gt; number:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;猜的数字大了...&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>运行示例：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">数字猜谜游戏!</span><br><span class="line">请输入你猜的数字：1</span><br><span class="line">猜的数字小了...</span><br><span class="line">请输入你猜的数字：9</span><br><span class="line">猜的数字大了...</span><br><span class="line">请输入你猜的数字：7</span><br><span class="line">恭喜，你猜对了！</span><br></pre></td></tr></table></figure>
+
+<h2 id="五、match…case"><a href="#五、match…case" class="headerlink" title="五、match…case"></a>五、match…case</h2><p><code>match...case</code> 是 Python 3.10 新增的结构化模式匹配，类似 C 的 <code>switch</code>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">http_error</span>(<span class="params">status</span>):</span><br><span class="line">    <span class="keyword">match</span> status:</span><br><span class="line">        <span class="keyword">case</span> <span class="number">400</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="string">&quot;Bad request&quot;</span></span><br><span class="line">        <span class="keyword">case</span> <span class="number">404</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="string">&quot;Not found&quot;</span></span><br><span class="line">        <span class="keyword">case</span> <span class="number">418</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="string">&quot;I&#x27;m a teapot&quot;</span></span><br><span class="line">        <span class="keyword">case</span> _:</span><br><span class="line">            <span class="keyword">return</span> <span class="string">&quot;Something&#x27;s wrong with the internet&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>（上面用到了函数 <code>def</code> 和 <code>return</code>，还没学到也没关系，函数部分会详讲，先看 match 的语法。）</p>
+<p>规则：</p>
+<ul>
+<li><code>match</code> 后面的值<strong>从上到下依次和每个 <code>case</code> 匹配</strong>，匹配成功就执行对应的语句</li>
+<li><code>case _:</code> 匹配一切（通配符），相当于 C 的 <code>default:</code>，放在最后兜底</li>
+<li>一个 case 可以用 <code>|</code> 匹配多个值：</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">match</span> status:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">200</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;OK&quot;</span></span><br><span class="line">    <span class="keyword">case</span> <span class="number">301</span> | <span class="number">302</span>:          <span class="comment"># 301 或 302 都走这里</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;Redirect&quot;</span></span><br><span class="line">    <span class="keyword">case</span> <span class="number">401</span> | <span class="number">403</span> | <span class="number">404</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;Not allowed&quot;</span></span><br><span class="line">    <span class="keyword">case</span> _:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;Unknown&quot;</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><code>match...case</code> 适合”一个值对应多种结果”的场景，比一串 <code>if-elif-else</code> 清晰。注意要 Python 3.10+ 才能用。</p>
+</blockquote>
+<hr>
+<h1 id="循环语句"><a href="#循环语句" class="headerlink" title="循环语句"></a>循环语句</h1><p>Python 只有两种循环：<strong>while</strong>（条件循环，条件为 True 就一直执行）和 <strong>for</strong>（遍历循环，把可迭代对象里的元素挨个取一遍）。没有 C 的 do…while。break &#x2F; continue 和 C 语义一样，但 Python 多了一个 C 没有的<strong>循环 else 子句</strong>。</p>
+<h2 id="一、循环控制关键字总览"><a href="#一、循环控制关键字总览" class="headerlink" title="一、循环控制关键字总览"></a>一、循环控制关键字总览</h2><table>
+<thead>
+<tr>
+<th>关键字&#x2F;函数</th>
+<th>说明</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>for</code></td>
+<td>遍历循环</td>
+<td><code>for i in list:</code></td>
+</tr>
+<tr>
+<td><code>while</code></td>
+<td>条件循环</td>
+<td><code>while x &gt; 0:</code></td>
+</tr>
+<tr>
+<td><code>break</code></td>
+<td>立即终止当前循环</td>
+<td><code>break</code></td>
+</tr>
+<tr>
+<td><code>continue</code></td>
+<td>跳过本次循环剩余代码，进入下一次</td>
+<td><code>continue</code></td>
+</tr>
+<tr>
+<td><code>else</code>（循环）</td>
+<td>循环正常结束（未被 break）时执行</td>
+<td><code>for i in range(3): ... else: ...</code></td>
+</tr>
+<tr>
+<td><code>pass</code></td>
+<td>占位语句（空操作）</td>
+<td><code>for i in range(5): pass</code></td>
+</tr>
+<tr>
+<td><code>range()</code></td>
+<td>生成整数序列，常配合 for</td>
+<td><code>range(0, 5)</code></td>
+</tr>
+<tr>
+<td><code>enumerate()</code></td>
+<td>遍历时同时拿索引和值</td>
+<td><code>for i, v in enumerate(list):</code></td>
+</tr>
+</tbody></table>
+<h2 id="二、while-循环"><a href="#二、while-循环" class="headerlink" title="二、while 循环"></a>二、while 循环</h2><p>一般形式，注意冒号和缩进：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> 判断条件:</span><br><span class="line">    执行语句……</span><br></pre></td></tr></table></figure>
+
+<p>计算 1 到 100 的总和：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">n = <span class="number">100</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">sum</span> = <span class="number">0</span></span><br><span class="line">counter = <span class="number">1</span></span><br><span class="line"><span class="keyword">while</span> counter &lt;= n:</span><br><span class="line">    <span class="built_in">sum</span> = <span class="built_in">sum</span> + counter</span><br><span class="line">    counter += <span class="number">1</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;1 到 100 之和为: &quot;</span>, <span class="built_in">sum</span>)    <span class="comment"># 1 到 100 之和为:  5050</span></span><br></pre></td></tr></table></figure>
+
+<p>这段和 C 的写法几乎一模一样，只有格式区别（冒号 + 缩进代替大括号）。</p>
+<p>C 对照：Python 没有 <strong>do…while</strong>。C 的 <code>do &#123; &#125; while(条件);</code>（先执行一次再判断）在 Python 里要改写：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    do_something()</span><br><span class="line">    <span class="keyword">if</span> 条件:</span><br><span class="line">        <span class="keyword">break</span>    <span class="comment"># 手动判断退出</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="无限循环"><a href="#无限循环" class="headerlink" title="无限循环"></a>无限循环</h3><p>条件永远为 True 就无限循环：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">var = <span class="number">1</span></span><br><span class="line"><span class="keyword">while</span> var == <span class="number">1</span>:    <span class="comment"># 表达式永远为 true</span></span><br><span class="line">    num = <span class="built_in">int</span>(<span class="built_in">input</span>(<span class="string">&quot;输入一个数字: &quot;</span>))</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;你输入的数字是: &quot;</span>, num)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Good bye!&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>按 <code>CTRL+C</code> 退出。无限循环在服务器上处理客户端实时请求很有用（一直监听）。</p>
+<h3 id="简单语句组"><a href="#简单语句组" class="headerlink" title="简单语句组"></a>简单语句组</h3><p>循环体只有一条语句时，可以和 while 写在同一行：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">flag = <span class="number">1</span></span><br><span class="line"><span class="keyword">while</span> (flag): <span class="built_in">print</span>(<span class="string">&#x27;欢迎访问菜鸟教程!&#x27;</span>)    <span class="comment"># 无限循环，CTRL+C 中断</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="三、while…else"><a href="#三、while…else" class="headerlink" title="三、while…else"></a>三、while…else</h2><p>while 条件变为 False（正常退出）时，执行 else 的语句块：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">count = <span class="number">0</span></span><br><span class="line"><span class="keyword">while</span> count &lt; <span class="number">5</span>:</span><br><span class="line">    <span class="built_in">print</span>(count, <span class="string">&quot; 小于 5&quot;</span>)</span><br><span class="line">    count = count + <span class="number">1</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="built_in">print</span>(count, <span class="string">&quot; 大于或等于 5&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">0  小于 5</span><br><span class="line">1  小于 5</span><br><span class="line">2  小于 5</span><br><span class="line">3  小于 5</span><br><span class="line">4  小于 5</span><br><span class="line">5  大于或等于 5</span><br></pre></td></tr></table></figure>
+
+<p>注意：被 break 中断退出时不执行 else（见第七节）。</p>
+<h2 id="四、for-循环"><a href="#四、for-循环" class="headerlink" title="四、for 循环"></a>四、for 循环</h2><p>Python 的 for 是<strong>遍历循环</strong>：把可迭代对象（列表、字符串、range 等）里的元素<strong>挨个取出来</strong>处理，不需要下标。</p>
+<p>一般格式：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> &lt;variable&gt; <span class="keyword">in</span> &lt;sequence&gt;:</span><br><span class="line">    &lt;statements&gt;</span><br></pre></td></tr></table></figure>
+
+<p>遍历列表：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">sites = [<span class="string">&quot;Baidu&quot;</span>, <span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>]</span><br><span class="line"><span class="keyword">for</span> site <span class="keyword">in</span> sites:</span><br><span class="line">    <span class="built_in">print</span>(site)</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">Baidu</span><br><span class="line">Google</span><br><span class="line">Runoob</span><br><span class="line">Taobao</span><br></pre></td></tr></table></figure>
+
+<p>遍历字符串（每个字符）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">word = <span class="string">&#x27;runoob&#x27;</span></span><br><span class="line"><span class="keyword">for</span> letter <span class="keyword">in</span> word:</span><br><span class="line">    <span class="built_in">print</span>(letter)</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">r</span><br><span class="line">u</span><br><span class="line">n</span><br><span class="line">o</span><br><span class="line">o</span><br><span class="line">b</span><br></pre></td></tr></table></figure>
+
+<p><strong>和 C 最大的不同</strong>：C 的 for 是计数循环（<code>for (i = 0; i &lt; n; i++)</code>），要自己管下标；Python 的 for 是遍历循环，直接拿元素本身，不用下标（类似 C++ 的范围 for）。</p>
+<h2 id="五、range-函数（重点）"><a href="#五、range-函数（重点）" class="headerlink" title="五、range() 函数（重点）"></a>五、range() 函数（重点）</h2><p><code>range()</code> 生成整数序列，常和 for 配合：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">5</span>):</span><br><span class="line">    <span class="built_in">print</span>(i)</span><br></pre></td></tr></table></figure>
+
+<p>输出 <code>0 1 2 3 4</code>——<strong>从 0 开始，到 5 结束，不含 5</strong>（含头不含尾，和切片规则一样）。</p>
+<p>指定区间：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">5</span>, <span class="number">9</span>):</span><br><span class="line">    <span class="built_in">print</span>(i)    <span class="comment"># 5 6 7 8</span></span><br></pre></td></tr></table></figure>
+
+<p>指定步长（第三个参数）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">0</span>, <span class="number">10</span>, <span class="number">3</span>):</span><br><span class="line">    <span class="built_in">print</span>(i)    <span class="comment"># 0 3 6 9</span></span><br></pre></td></tr></table></figure>
+
+<p>步长可以是负数（倒着数）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(-<span class="number">10</span>, -<span class="number">100</span>, -<span class="number">30</span>):</span><br><span class="line">    <span class="built_in">print</span>(i)    <span class="comment"># -10 -40 -70</span></span><br></pre></td></tr></table></figure>
+
+<p>和 C 对照：<code>range(起始, 结束, 步长)</code> 等价于：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (i = 起始; i &lt; 结束; i += 步长)</span><br></pre></td></tr></table></figure>
+
+<p>注意含头不含尾（结束值不包含）。</p>
+<p><code>range(len(列表))</code> 配合下标遍历：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = [<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Baidu&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Taobao&#x27;</span>, <span class="string">&#x27;QQ&#x27;</span>]</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(a)):</span><br><span class="line">    <span class="built_in">print</span>(i, a[i])</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">0 Google</span><br><span class="line">1 Baidu</span><br><span class="line">2 Runoob</span><br><span class="line">3 Taobao</span><br><span class="line">4 QQ</span><br></pre></td></tr></table></figure>
+
+<p><code>range()</code> 也可以直接转成列表：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="built_in">print</span>(<span class="built_in">list</span>(<span class="built_in">range</span>(<span class="number">5</span>)))    <span class="comment"># [0, 1, 2, 3, 4]</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="六、for…else"><a href="#六、for…else" class="headerlink" title="六、for…else"></a>六、for…else</h2><p>循环<strong>正常遍历完</strong>后执行 else 子句；<strong>被 break 中断</strong>则不执行：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> x <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">6</span>):</span><br><span class="line">    <span class="built_in">print</span>(x)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;Finally finished!&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">0</span><br><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">Finally finished!</span><br></pre></td></tr></table></figure>
+
+<p>被 break 中断时 else 不执行：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">sites = [<span class="string">&quot;Baidu&quot;</span>, <span class="string">&quot;Google&quot;</span>, <span class="string">&quot;Runoob&quot;</span>, <span class="string">&quot;Taobao&quot;</span>]</span><br><span class="line"><span class="keyword">for</span> site <span class="keyword">in</span> sites:</span><br><span class="line">    <span class="keyword">if</span> site == <span class="string">&quot;Runoob&quot;</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;菜鸟教程!&quot;</span>)</span><br><span class="line">        <span class="keyword">break</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;循环数据 &quot;</span> + site)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;没有循环数据!&quot;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;完成循环!&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">循环数据 Baidu</span><br><span class="line">循环数据 Google</span><br><span class="line">菜鸟教程!</span><br><span class="line">完成循环!</span><br></pre></td></tr></table></figure>
+
+<h2 id="七、break-和-continue"><a href="#七、break-和-continue" class="headerlink" title="七、break 和 continue"></a>七、break 和 continue</h2><p>和 C 的语义一样：<strong>break 终止整个循环</strong>，<strong>continue 跳过本次循环剩余代码、进入下一轮</strong>。</p>
+<p>while 中使用 break：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">n = <span class="number">5</span></span><br><span class="line"><span class="keyword">while</span> n &gt; <span class="number">0</span>:</span><br><span class="line">    n -= <span class="number">1</span></span><br><span class="line">    <span class="keyword">if</span> n == <span class="number">2</span>:</span><br><span class="line">        <span class="keyword">break</span>        <span class="comment"># n 变到 2 时直接跳出循环</span></span><br><span class="line">    <span class="built_in">print</span>(n)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&#x27;循环结束。&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">4</span><br><span class="line">3</span><br><span class="line">循环结束。</span><br></pre></td></tr></table></figure>
+
+<p>while 中使用 continue：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">n = <span class="number">5</span></span><br><span class="line"><span class="keyword">while</span> n &gt; <span class="number">0</span>:</span><br><span class="line">    n -= <span class="number">1</span></span><br><span class="line">    <span class="keyword">if</span> n == <span class="number">2</span>:</span><br><span class="line">        <span class="keyword">continue</span>     <span class="comment"># n == 2 时跳过 print，进入下一轮</span></span><br><span class="line">    <span class="built_in">print</span>(n)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&#x27;循环结束。&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">4</span><br><span class="line">3</span><br><span class="line">1</span><br><span class="line">0</span><br><span class="line">循环结束。</span><br></pre></td></tr></table></figure>
+
+<p>对比两个输出：break 版循环直接结束了（没有 1、0）；continue 版只是少了 2 那一次，其余照常。</p>
+<p>for 中使用 break：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> letter <span class="keyword">in</span> <span class="string">&#x27;Runoob&#x27;</span>:</span><br><span class="line">    <span class="keyword">if</span> letter == <span class="string">&#x27;b&#x27;</span>:</span><br><span class="line">        <span class="keyword">break</span>        <span class="comment"># 碰到 b 终止循环</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;当前字母 :&#x27;</span>, letter)</span><br></pre></td></tr></table></figure>
+
+<p>for 中使用 continue：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> letter <span class="keyword">in</span> <span class="string">&#x27;Runoob&#x27;</span>:</span><br><span class="line">    <span class="keyword">if</span> letter == <span class="string">&#x27;o&#x27;</span>:</span><br><span class="line">        <span class="keyword">continue</span>     <span class="comment"># 字母为 o 时跳过输出</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;当前字母 :&#x27;</span>, letter)</span><br></pre></td></tr></table></figure>
+
+<h2 id="八、循环-else-综合实例：判断质数"><a href="#八、循环-else-综合实例：判断质数" class="headerlink" title="八、循环 else 综合实例：判断质数"></a>八、循环 else 综合实例：判断质数</h2><p>循环 else 的实际用途：<strong>循环里没找到（没 break）时执行 else</strong>。经典例子——判断 2~9 哪些是质数：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> n <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">2</span>, <span class="number">10</span>):</span><br><span class="line">    <span class="keyword">for</span> x <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">2</span>, n):</span><br><span class="line">        <span class="keyword">if</span> n % x == <span class="number">0</span>:</span><br><span class="line">            <span class="built_in">print</span>(n, <span class="string">&#x27;等于&#x27;</span>, x, <span class="string">&#x27;*&#x27;</span>, n // x)</span><br><span class="line">            <span class="keyword">break</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="comment"># 内层循环一个因子都没找到 → n 是质数</span></span><br><span class="line">        <span class="built_in">print</span>(n, <span class="string">&#x27; 是质数&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">2  是质数</span><br><span class="line">3  是质数</span><br><span class="line">4 等于 2 * 2</span><br><span class="line">5  是质数</span><br><span class="line">6 等于 2 * 3</span><br><span class="line">7  是质数</span><br><span class="line">8 等于 2 * 4</span><br><span class="line">9 等于 3 * 3</span><br></pre></td></tr></table></figure>
+
+<p>注意 else 挂在<strong>内层 for</strong> 上：内层循环找因子，找到了就 break（不是质数），一个因子都没找到就正常遍历完 → 执行 else 打印质数。C 里这个逻辑要用标志变量，Python 的 else 更直接。</p>
+<h2 id="九、pass-语句"><a href="#九、pass-语句" class="headerlink" title="九、pass 语句"></a>九、pass 语句</h2><p>pass 是空语句，什么都不做，用来<strong>占位</strong>，保持程序结构完整：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    <span class="keyword">pass</span>    <span class="comment"># 等待键盘中断 (Ctrl+C)</span></span><br></pre></td></tr></table></figure>
+
+<p>写代码时类先空着，用 pass 占位（面向对象章节会看到）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">MyEmptyClass</span>:</span><br><span class="line">    <span class="keyword">pass</span>    <span class="comment"># 暂时什么都不做</span></span><br></pre></td></tr></table></figure>
+
+<p>for 循环里演示 pass 的执行时机：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> letter <span class="keyword">in</span> <span class="string">&#x27;Runoob&#x27;</span>:</span><br><span class="line">    <span class="keyword">if</span> letter == <span class="string">&#x27;o&#x27;</span>:</span><br><span class="line">        <span class="keyword">pass</span>    <span class="comment"># pass 什么都不做，继续往下执行</span></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&#x27;执行 pass 块&#x27;</span>)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;当前字母 :&#x27;</span>, letter)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Good bye!&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">当前字母 : R</span><br><span class="line">当前字母 : u</span><br><span class="line">当前字母 : n</span><br><span class="line">执行 pass 块</span><br><span class="line">当前字母 : o</span><br><span class="line">执行 pass 块</span><br><span class="line">当前字母 : o</span><br><span class="line">当前字母 : b</span><br><span class="line">Good bye!</span><br></pre></td></tr></table></figure>
+
+<p>pass 和 continue 的区别：pass 什么都不做，<strong>继续往下执行本行后面的代码</strong>；continue 是<strong>跳过本次循环剩余代码</strong>、直接进下一轮。</p>
+<h2 id="十、和-C-的对照总结"><a href="#十、和-C-的对照总结" class="headerlink" title="十、和 C 的对照总结"></a>十、和 C 的对照总结</h2><table>
+<thead>
+<tr>
+<th></th>
+<th>C</th>
+<th>Python</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>for</td>
+<td>计数循环，自己管下标</td>
+<td>遍历循环，直接拿元素</td>
+</tr>
+<tr>
+<td>while</td>
+<td>有</td>
+<td>有，写法几乎一样</td>
+</tr>
+<tr>
+<td>do…while</td>
+<td>有</td>
+<td>没有</td>
+</tr>
+<tr>
+<td>break &#x2F; continue</td>
+<td>有</td>
+<td>有，语义一样</td>
+</tr>
+<tr>
+<td>循环 else</td>
+<td>没有</td>
+<td>for &#x2F; while 都能挂 else</td>
+</tr>
+<tr>
+<td>数字循环</td>
+<td><code>for (i = 0; i &lt; n; i++)</code></td>
+<td><code>for i in range(n):</code></td>
+</tr>
+<tr>
+<td>同时拿下标</td>
+<td>下标就是循环变量</td>
+<td><code>enumerate()</code></td>
+</tr>
+</tbody></table>
+<p><code>enumerate()</code> 补一个示例（总览表提过，这里跑通）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">sites = [<span class="string">&#x27;Google&#x27;</span>, <span class="string">&#x27;Runoob&#x27;</span>, <span class="string">&#x27;Taobao&#x27;</span>]</span><br><span class="line"><span class="keyword">for</span> i, site <span class="keyword">in</span> <span class="built_in">enumerate</span>(sites):</span><br><span class="line">    <span class="built_in">print</span>(i, site)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">0 Google</span><br><span class="line">1 Runoob</span><br><span class="line">2 Taobao</span><br></pre></td></tr></table></figure>
+
+<p><code>enumerate</code> 同时返回下标和元素，等价于 C 里”用下标访问数组元素”，但更省事。</p>
 <p>​                                                                                                              </p>
 ]]></content>
       <categories>
@@ -9814,340 +10635,6 @@
       </tags>
   </entry>
   <entry>
-    <title>STM32智能小车——标准库工程整体架构解析</title>
-    <url>/2026/08/12/SmartCar_StdPeriph_Architecture/</url>
-    <content><![CDATA[<h2 id="一、从上一篇到这篇"><a href="#一、从上一篇到这篇" class="headerlink" title="一、从上一篇到这篇"></a>一、从上一篇到这篇</h2><p>上一篇《<a href="https://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">Keil 工程迁移到 VS Code + EIDE</a>》完成了把 Keil 标准库工程迁移到 VS Code 里编译烧录。接下来我一步步组装部件，把程序烧录到小车上，让小车成功跑了起来。<img src="/./../images/SmartCar_StdPeriph_Architecture/50b02f84e45a5d75b09044f0c7f524eb.jpg" alt="50b02f84e45a5d75b09044f0c7f524eb"></p>
-<p>但”能跑”和”看懂”是两回事。标准库工程虽然只有十几二十个文件，但对外设的调用像一张网——这篇博客就把这张网完整地拆开：</p>
-<ul>
-<li>工程怎么分层？每个文件夹是干什么的？</li>
-<li>蓝牙 APP 发一个指令，到电机转动，中间走了哪几步？</li>
-<li>避障、循迹这两个”自动驾驶”功能是怎么实现的？</li>
-<li>这个架构好在哪、坑在哪？为什么我计划用 HAL 重写？</li>
-</ul>
-<h2 id="二、工程目录全景：一个清晰的三层结构"><a href="#二、工程目录全景：一个清晰的三层结构" class="headerlink" title="二、工程目录全景：一个清晰的三层结构"></a>二、工程目录全景：一个清晰的三层结构</h2><p>先看整体。忽略 <code>.cmsis</code>（EIDE 插件自带的设备描述，不用管）和 <code>Library</code> 里的杂项，工程其实只有三层：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">stdperiph/                         # 我命名的 EIDE工程根目录</span><br><span class="line">│</span><br><span class="line">├── User/                          # 🟢 应用层：业务逻辑，唯一&quot;动脑子&quot;的地方</span><br><span class="line">│   ├── main.c                     #    主流程：初始化 + 蓝牙指令分发（switch）</span><br><span class="line">│   ├── mycontrol.c / .h           #    避障、循迹算法</span><br><span class="line">│   └── stm32f10x_it.c             #    中断服务框架（本工程中断写在各模块里）</span><br><span class="line">│</span><br><span class="line">├── HARDWARE/                      # 🟡 驱动层：一外设一目录，封装寄存器操作</span><br><span class="line">│   ├── LED/                       #    板载 LED（PC13）</span><br><span class="line">│   ├── MOTOR/                     #    TB6612 电机驱动：Set_Car_Speed()</span><br><span class="line">│   ├── TIME/                      #    TIM3 输出两路 PWM（5kHz），给电机调速</span><br><span class="line">│   ├── Servo/                     #    TIM2 输出 PWM（50Hz），控制 SG90 舵机</span><br><span class="line">│   ├── HCSR04/                    #    超声波测距（TIM4 中断计时法）</span><br><span class="line">│   ├── TRACE/                     #    四路红外循迹：X1~X4 宏</span><br><span class="line">│   ├── OLED/                      #    OLED 显示（软件 IIC + 字库）</span><br><span class="line">│   └── USART/                     #    USART1：接 JDY-31 蓝牙，中断收指令</span><br><span class="line">│</span><br><span class="line">├── System/                        # 🔵 基础层</span><br><span class="line">│   ├── Delay.c                    #    SysTick 延时：Delay_us / ms / s</span><br><span class="line">│   └── sys/                       #    位带操作宏（PAout 等）+ NVIC 配置</span><br><span class="line">│</span><br><span class="line">├── Library/                       # ⚪ 标准外设库（官方 SPL 3.5.0，不修改）</span><br><span class="line">├── Start/                         # ⚪ CMSIS 启动：startup + core_cm3 + system_stm32f10x</span><br><span class="line">└── .eide/                         # EIDE 插件工程配置（eide.yml 等）</span><br></pre></td></tr></table></figure>
-
-<p><strong>这个分层是教科书级的</strong>：<code>Library</code> 和 <code>Start</code> 是官方库、永远不改；<code>HARDWARE</code> 只关心”某个外设怎么驱动”，不管业务；<code>User</code> 只关心”车要干什么”，不碰寄存器。</p>
-<blockquote>
-<p><img src="/./../images/SmartCar_StdPeriph_Architecture/image-20260812214352244.png" alt="image-20260812214352244"></p>
-</blockquote>
-<h2 id="三、硬件资源分配总表"><a href="#三、硬件资源分配总表" class="headerlink" title="三、硬件资源分配总表"></a>三、硬件资源分配总表</h2><p>整个小车的外设全部集中在 <strong>PA、PB、PC 三个端口</strong>上。这张表是”地图”，后面讲每个模块都要回头看它：</p>
-<table>
-<thead>
-<tr>
-<th align="left">外设</th>
-<th align="left">引脚</th>
-<th align="left">用途</th>
-<th align="left">说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">TIM3_CH2</td>
-<td align="left">PA7</td>
-<td align="left">左电机调速</td>
-<td align="left">PWM 5kHz</td>
-</tr>
-<tr>
-<td align="left">TIM3_CH1</td>
-<td align="left">PA6</td>
-<td align="left">右电机调速</td>
-<td align="left">PWM 5kHz</td>
-</tr>
-<tr>
-<td align="left">TB6612</td>
-<td align="left">PB5&#x2F;PB6</td>
-<td align="left">AIN1&#x2F;AIN2：左电机方向</td>
-<td align="left"></td>
-</tr>
-<tr>
-<td align="left">TB6612</td>
-<td align="left">PB7&#x2F;PB8</td>
-<td align="left">BIN1&#x2F;BIN2：右电机方向</td>
-<td align="left"></td>
-</tr>
-<tr>
-<td align="left">TIM2_CH1</td>
-<td align="left">PA0</td>
-<td align="left">SG90 舵机</td>
-<td align="left">PWM 50Hz，周期 20ms</td>
-</tr>
-<tr>
-<td align="left">HC-SR04</td>
-<td align="left">PA4</td>
-<td align="left">Trig：触发脉冲输出</td>
-<td align="left"></td>
-</tr>
-<tr>
-<td align="left">HC-SR04</td>
-<td align="left">PA5</td>
-<td align="left">Echo：回波电平输入</td>
-<td align="left">下拉输入</td>
-</tr>
-<tr>
-<td align="left">USART1</td>
-<td align="left">PA9&#x2F;PA10</td>
-<td align="left">JDY-31 蓝牙 TX&#x2F;RX</td>
-<td align="left">波特率 9600</td>
-</tr>
-<tr>
-<td align="left">OLED</td>
-<td align="left">PA11&#x2F;PA12</td>
-<td align="left">SCL&#x2F;SDA（软件 IIC）</td>
-<td align="left">⚠️ 见文末踩坑</td>
-</tr>
-<tr>
-<td align="left">循迹</td>
-<td align="left">PB0&#x2F;PB1&#x2F;PB10&#x2F;PB11</td>
-<td align="left">X1~X4 四路红外输入</td>
-<td align="left">下拉输入</td>
-</tr>
-<tr>
-<td align="left">板载 LED</td>
-<td align="left">PC13</td>
-<td align="left">指示灯</td>
-<td align="left">低电平点亮</td>
-</tr>
-</tbody></table>
-<p>注意一个细节：<strong>电机调速用了 TIM3 的两个通道，舵机单独用了 TIM2，超声波计时用了 TIM4</strong>——三个定时器各司其职，谁都不打架。这是选定时器时的基本思路：看通道够不够、时钟域冲突不冲突。</p>
-<h2 id="四、模块职责速览"><a href="#四、模块职责速览" class="headerlink" title="四、模块职责速览"></a>四、模块职责速览</h2><table>
-<thead>
-<tr>
-<th align="left">模块</th>
-<th align="left">对外接口</th>
-<th align="left">一句话职责</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">MOTOR</td>
-<td align="left"><code>Set_Car_Speed(left, right)</code></td>
-<td align="left">唯一的电机入口：正负号定方向，数值定速度</td>
-</tr>
-<tr>
-<td align="left">TIM3_PWM</td>
-<td align="left"><code>TIM3_PWM_Init(arr, psc)</code></td>
-<td align="left">出两路 5kHz PWM，喂给 TB6612 调速</td>
-</tr>
-<tr>
-<td align="left">Servo</td>
-<td align="left"><code>myServo_Init()</code> &#x2F; <code>Servo_SetAngle(angle)</code></td>
-<td align="left">把超声波转到 30°&#x2F;90°&#x2F;150° 三方向</td>
-</tr>
-<tr>
-<td align="left">HCSR04</td>
-<td align="left"><code>HCSR04_Init()</code> &#x2F; <code>HCSR04_GetValue()</code></td>
-<td align="left">返回前方距离（cm）</td>
-</tr>
-<tr>
-<td align="left">TRACE</td>
-<td align="left"><code>Trace_Init()</code> + 宏 <code>X1~X4</code></td>
-<td align="left">直接读四个红外传感器电平</td>
-</tr>
-<tr>
-<td align="left">USART1</td>
-<td align="left"><code>USART1_Init(9600)</code></td>
-<td align="left">中断接收蓝牙指令，写全局 <code>RxData</code></td>
-</tr>
-<tr>
-<td align="left">OLED</td>
-<td align="left"><code>OLED_ShowString/Num(...)</code></td>
-<td align="left">显示指令、距离、循迹状态</td>
-</tr>
-<tr>
-<td align="left">LED</td>
-<td align="left"><code>LED_Init()</code> &#x2F; <code>LED_Flash()</code></td>
-<td align="left">板载灯</td>
-</tr>
-</tbody></table>
-<p>应用层只有两个函数：<code>Avoidance()</code>（避障）和 <code>Trace_task()</code>（循迹），都放在 <code>mycontrol.c</code> 里——<strong>业务与驱动分离</strong>，这是这个工程值得学习的地方。</p>
-<h2 id="五、主流程：蓝牙指令协议与命令分发"><a href="#五、主流程：蓝牙指令协议与命令分发" class="headerlink" title="五、主流程：蓝牙指令协议与命令分发"></a>五、主流程：蓝牙指令协议与命令分发</h2><h3 id="5-1-指令协议"><a href="#5-1-指令协议" class="headerlink" title="5.1 指令协议"></a>5.1 指令协议</h3><p>main 的主循环非常简单，本质是一个”命令分发器”：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">switch</span>(RxData)                 <span class="comment">// RxData：蓝牙中断收进来的指令字节</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x00</span>: Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停车</span></span><br><span class="line">                   HCSR04_Distance = HCSR04_GetValue();  <span class="comment">// 顺带测距</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x01</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">6500</span>);    <span class="comment">// 直行</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x02</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">-6500</span>);  <span class="comment">// 后退</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x03</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">6500</span>);   <span class="comment">// 左转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x04</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">-6500</span>);   <span class="comment">// 右转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x05</span>: Avoidance();                 <span class="comment">// 自动避障</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x06</span>: Trace_task();                <span class="comment">// 自动循迹</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// OLED 刷新：指令号、距离、循迹状态</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>手机蓝牙 APP 发一个字节，就能切换小车的 7 种行为。这个协议表（0x00~0x06）就是手机 APP 和单片机之间唯一的”接口文档”——<strong>协议越简单，联调越不容易出幺蛾子</strong>。</p>
-<h3 id="5-2-一条指令的完整链路（数据流全链路）"><a href="#5-2-一条指令的完整链路（数据流全链路）" class="headerlink" title="5.2 一条指令的完整链路（数据流全链路）"></a>5.2 一条指令的完整链路（数据流全链路）</h3><p>以”手机上按直行键”为例，数据从手机到车轮，一共经过 7 站：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">手机蓝牙APP                单片机内部</span><br><span class="line">      │                        │</span><br><span class="line">  ① 发送 0x01                  │</span><br><span class="line">      ▼                        │</span><br><span class="line"> JDY-31 蓝牙模块 ──TX──►  USART1 RX (PA10)      ← 9600 波特率</span><br><span class="line">                               │</span><br><span class="line">                          ② USART1_IRQHandler 中断</span><br><span class="line">                             RxData = USART_ReceiveData(USART1);</span><br><span class="line">                               │            （中断写，main 读）</span><br><span class="line">                               ▼</span><br><span class="line">                        ③ while(1) 主循环</span><br><span class="line">                           switch(RxData) 命中 case 0x01</span><br><span class="line">                               │</span><br><span class="line">                               ▼</span><br><span class="line">                        ④ Set_Car_Speed(6500, 6500)</span><br><span class="line">                               │</span><br><span class="line">                 ┌─────────────┴─────────────┐</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑤ 左电机：TIM3_CH2 占空比   右电机：TIM3_CH1 占空比</span><br><span class="line">            6500/7200 ≈ 90%        6500/7200 ≈ 90%</span><br><span class="line">            AIN1=0, AIN2=1         BIN1=0, BIN2=1   ← 方向位</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑥ TB6612 双路电机驱动芯片   ← 同时输出 5kHz PWM 到两电机</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑦ 左电机正转 90% 力        右电机正转 90% 力  → 小车直行</span><br></pre></td></tr></table></figure>
-
-<p><strong>关键点：整条链路上，唯一的”人机接口”是中断里的 <code>RxData</code>，唯一的”执行接口”是 <code>Set_Car_Speed()</code>。</strong> 中间每一个环节都是独立模块，任何一个坏了都能单独排查。</p>
-<h2 id="六、核心算法详解"><a href="#六、核心算法详解" class="headerlink" title="六、核心算法详解"></a>六、核心算法详解</h2><h3 id="6-1-电机控制：为什么一个函数能表达所有运动"><a href="#6-1-电机控制：为什么一个函数能表达所有运动" class="headerlink" title="6.1 电机控制：为什么一个函数能表达所有运动"></a>6.1 电机控制：为什么一个函数能表达所有运动</h3><p><code>Set_Car_Speed(Left_speed, Right_speed)</code> 的参数范围是 -7200~7200，正负号表达方向。看看它怎么把”正负号”翻译成硬件动作（以左电机为例）：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(Left_speed &gt; <span class="number">0</span>)                    <span class="comment">// 正转：方向位 AIN1=0/AIN2=1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, Left_speed);          <span class="comment">// 占空比 = 速度值</span></span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);            <span class="comment">// AIN2 = 1</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_5);          <span class="comment">// AIN1 = 0</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(Left_speed &lt; <span class="number">0</span>)               <span class="comment">// 反转：方向位反过来</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, -Left_speed);         <span class="comment">// 取绝对值给 PWM</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span>                                  <span class="comment">// 0：刹停，方向位全置 1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, <span class="number">0</span>);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>设计很巧妙：</p>
-<ul>
-<li><strong>速度 &#x3D; 数值的绝对值</strong>，直接写进 TIM3 的比较寄存器 <code>CCR</code>，变成 PWM 占空比（5kHz 方波，占空比越大电机越有力）；</li>
-<li><strong>方向 &#x3D; 数值的正负号</strong>，翻译成 TB6612 的方向引脚 AIN1&#x2F;AIN2 的高低电平；</li>
-<li><strong>差速 &#x3D; 左右两个数不同</strong>。左转 &#x3D; 左轮反转右轮正转（原地转），拐弯 &#x3D; 一快一慢。</li>
-</ul>
-<p>所以”直行、后退、左转、右转”四个动作在代码里只是<strong>四个不同的二元组</strong>，一条指令一个 case，简单粗暴但极其直观。</p>
-<h3 id="6-2-超声波测距：TIM4-中断”掐表”法"><a href="#6-2-超声波测距：TIM4-中断”掐表”法" class="headerlink" title="6.2 超声波测距：TIM4 中断”掐表”法"></a>6.2 超声波测距：TIM4 中断”掐表”法</h3><p>HC-SR04 的原理是声波往返计时：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">MCU ──Trig 高电平 45μs──►  模块发射超声波</span><br><span class="line">模块 ──Echo 高电平──►  MCU     （回波期间 Echo 保持高电平）</span><br><span class="line">距离 = Echo高电平时间 × 声速(34000cm/s) ÷ 2   ← 往返除 2</span><br></pre></td></tr></table></figure>
-
-<p>代码的实现方式值得细看——<strong>用 TIM4 的更新中断来掐表</strong>：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">TIM4_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>          <span class="comment">// 每 0.1ms 进一次</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (TIM_GetITStatus(TIM4, TIM_IT_Update) == SET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// Echo 是高电平 → 计数器 +1（每格 = 0.1ms）</span></span><br><span class="line">        <span class="keyword">if</span> (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_5) == <span class="number">1</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            Time++;</span><br><span class="line">        &#125;</span><br><span class="line">        TIM_ClearITPendingBit(TIM4, TIM_IT_Update);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>测量时：Trig 拉高 45μs 触发超声波 → <code>Time=0</code> 启动 TIM4 → 中断里盯着 Echo，高电平就 <code>Time++</code> → 等 100ms 后关定时器：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">uint16_t</span> <span class="title function_">HCSR04_GetValue</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_Start();               <span class="comment">// 发 Trig 脉冲 + 启动 TIM4</span></span><br><span class="line">    Delay_ms(<span class="number">100</span>);                <span class="comment">// 等一个完整测距周期（官方建议 ≥60ms）</span></span><br><span class="line">    TIM_Cmd(TIM4, DISABLE);       <span class="comment">// 关定时器</span></span><br><span class="line">    <span class="keyword">if</span>(Time &gt; <span class="number">235</span>) Time = <span class="number">0</span>;      <span class="comment">// 超 4 米算无效（23.5ms ≈ 4m）</span></span><br><span class="line">    <span class="keyword">return</span> ((Time * <span class="number">0.0001f</span>) * <span class="number">34000</span>) / <span class="number">2</span>;   <span class="comment">// 时间×声速÷2</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>时间 → 距离的换算很直白：一格 0.1ms &#x3D; <code>0.0001s × 34000cm/s ÷ 2 = 1.7cm</code>，所以 <code>Time</code> 的值 ×1.7 就是厘米数。大概 20cm 左右会误差 ±1cm。</p>
-<h3 id="6-3-避障：舵机带超声波”左中右”三向扫描"><a href="#6-3-避障：舵机带超声波”左中右”三向扫描" class="headerlink" title="6.3 避障：舵机带超声波”左中右”三向扫描"></a>6.3 避障：舵机带超声波”左中右”三向扫描</h3><p>这个工程的功能逻辑在 <code>Avoidance()</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">     前方距离</span><br><span class="line">        │</span><br><span class="line"> ┌──────▼──────┐</span><br><span class="line"> │ 前方 ≤ 20cm ? │</span><br><span class="line"> └───┬──────┬───┘</span><br><span class="line">   是│      │否</span><br><span class="line">停车，舵机扫描  │ 直行</span><br><span class="line">左150° 测 L     │</span><br><span class="line">右30°  测 R     │</span><br><span class="line">    │           │</span><br><span class="line">L ≥ R ? → 向左转（倒车→原地左转 600ms）</span><br><span class="line">否则    → 向右转（倒车→原地右转 600ms）</span><br></pre></td></tr></table></figure>
-
-<p>代码骨架：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">Avoidance</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_M = HCSR04_GetValue();        <span class="comment">// 先测正前方</span></span><br><span class="line">    <span class="keyword">if</span>(HCSR04_M &gt; <span class="number">0</span> &amp;&amp; HCSR04_M &lt;= <span class="number">20</span>)   <span class="comment">// 前方 ≤ 20cm 才避障</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停车</span></span><br><span class="line">        HCSR04_getData();                <span class="comment">// 舵机转到左右测距</span></span><br><span class="line">        <span class="keyword">if</span>(HCSR04_L &gt;= HCSR04_R)         <span class="comment">// 左边空间大 → 左转</span></span><br><span class="line">        &#123;</span><br><span class="line">            Set_Car_Speed(<span class="number">-2600</span>,<span class="number">-2600</span>);  <span class="comment">// 倒车</span></span><br><span class="line">            Delay_ms(<span class="number">500</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停一下再转</span></span><br><span class="line">            Delay_ms(<span class="number">200</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">-2500</span>,<span class="number">2500</span>);   <span class="comment">// 原地左转</span></span><br><span class="line">            Delay_ms(<span class="number">600</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123; <span class="comment">/* 对称的右转分支 */</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);        <span class="comment">// 没障碍 → 直行</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>三向扫描靠的是舵机：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HCSR04_getData</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 转中间</span></span><br><span class="line">    HCSR04_M = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">150</span>);   <span class="comment">// 转左边</span></span><br><span class="line">    HCSR04_L = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">30</span>);    <span class="comment">// 转右边</span></span><br><span class="line">    HCSR04_R = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 归位</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这套”先看前方，近了再扫左右，往开阔一侧走”的逻辑，就是<strong>最简单的壁障式避障</strong>——不建图、不规划路径，只做局部决策。够用，但谈不上聪明，后文会分析它的代价。</p>
-<h3 id="6-4-循迹：四路红外组合判断"><a href="#6-4-循迹：四路红外组合判断" class="headerlink" title="6.4 循迹：四路红外组合判断"></a>6.4 循迹：四路红外组合判断</h3><p>四个红外传感器横向排开（X1~X4），每个返回 0&#x2F;1。代码用一组 <code>if</code> 判断”线在车底下哪个位置”，然后差速修正：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 白地 = 1，压到黑线 = 0（极性以你的模块实测为准）</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);  <span class="comment">// 中间两路压线 → 直行</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2500</span>,<span class="number">0</span>);     <span class="comment">// 线偏右 → 右转</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">1</span>)            Set_Car_Speed(<span class="number">0</span>,<span class="number">2500</span>);     <span class="comment">// 线偏左 → 左转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">1</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">0</span>)  Set_Car_Speed(<span class="number">3000</span>,<span class="number">0</span>);  <span class="comment">// 最右压线 → 大右转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">0</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">1</span>)  Set_Car_Speed(<span class="number">0</span>,<span class="number">3000</span>);  <span class="comment">// 最左压线 → 大左转</span></span><br></pre></td></tr></table></figure>
-
-<p>直角弯是循迹的难点，教程用”原地转圈直到出线”来处理：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 右直角弯：右侧两个传感器都出线</span></span><br><span class="line"><span class="keyword">if</span>(X3==<span class="number">0</span> &amp;&amp; X4==<span class="number">0</span>)</span><br><span class="line">&#123;</span><br><span class="line">    Delay_ms(<span class="number">200</span>);</span><br><span class="line">    Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停一下</span></span><br><span class="line">    Delay_ms(<span class="number">500</span>);</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">3000</span>,<span class="number">-3000</span>);   <span class="comment">// 原地右转</span></span><br><span class="line">    &#125; <span class="keyword">while</span>(X1==<span class="number">0</span>);                  <span class="comment">// 转到左传感器从线上出来为止</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h2 id="七、架构分析：优点与不足"><a href="#七、架构分析：优点与不足" class="headerlink" title="七、架构分析：优点与不足"></a>七、架构分析：优点与不足</h2><h3 id="优点（值得保留的）"><a href="#优点（值得保留的）" class="headerlink" title="优点（值得保留的）"></a>优点（值得保留的）</h3><table>
-<thead>
-<tr>
-<th align="left">#</th>
-<th align="left">优点</th>
-<th align="left">说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">1</td>
-<td align="left"><strong>驱动与业务分离</strong></td>
-<td align="left">电机、超声波、循迹的”怎么用”在 HARDWARE，业务逻辑全在 mycontrol.c</td>
-</tr>
-<tr>
-<td align="left">2</td>
-<td align="left"><strong>唯一入口</strong></td>
-<td align="left">所有运动都走 <code>Set_Car_Speed()</code>，上层不需要知道 PWM 和 TB6612 的细节</td>
-</tr>
-<tr>
-<td align="left">3</td>
-<td align="left"><strong>指令协议极简</strong></td>
-<td align="left">一个字节 7 种命令，蓝牙联调零负担</td>
-</tr>
-<tr>
-<td align="left">4</td>
-<td align="left"><strong>模块独立性好</strong></td>
-<td align="left">每模块自包含 init + 操作函数，单测&#x2F;复用都方便</td>
-</tr>
-</tbody></table>
-<h3 id="不足（HAL-重写要消灭的）"><a href="#不足（HAL-重写要消灭的）" class="headerlink" title="不足（HAL 重写要消灭的）"></a>不足（HAL 重写要消灭的）</h3><table>
-<thead>
-<tr>
-<th align="left">#</th>
-<th align="left">不足</th>
-<th align="left">后果</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">1</td>
-<td align="left"><strong>main 大杂烩 switch</strong></td>
-<td align="left">新功能只能不断加 case，没有”状态”概念，加行为容易，加”流程”很难</td>
-</tr>
-<tr>
-<td align="left">2</td>
-<td align="left"><strong>全程阻塞式</strong></td>
-<td align="left"><code>Delay_ms(500)</code>、超声波等 100ms、舵机内部还带 500ms 延时——<strong>任意时刻只有一个任务在跑</strong>，避障时蓝牙指令完全不理</td>
-</tr>
-<tr>
-<td align="left">3</td>
-<td align="left"><strong>中断写、主循环读的裸全局变量</strong></td>
-<td align="left"><code>RxData</code> 没有 <code>volatile</code> 修饰，属于”理论上未定义、实际上能跑”的边缘行为</td>
-</tr>
-<tr>
-<td align="left">4</td>
-<td align="left"><strong>延时与运动耦合</strong></td>
-<td align="left">“倒车 500ms → 停 200ms → 转 600ms”是死时间，速度变化&#x2F;障碍变化都不会打断它</td>
-</tr>
-<tr>
-<td align="left">5</td>
-<td align="left"><strong>注释与代码不一致</strong></td>
-<td align="left">USART1.c 头注释写”波特率 115200”，实际 main 传的是 9600；<code>Set_Car_Speed</code> 注释范围 -7200~7200，实际 ARR&#x3D;7199 时最大 7199</td>
-</tr>
-</tbody></table>
-<h2 id="八、发现的坑：TIME-h-无效引用，编译却通过了"><a href="#八、发现的坑：TIME-h-无效引用，编译却通过了" class="headerlink" title="八、发现的坑：TIME.h 无效引用，编译却通过了"></a>八、发现的坑：TIME.h 无效引用，编译却通过了</h2><p>读 HCSR04.c 时发现开头有一行：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;TIME.h&quot;</span>         <span class="comment">// 时间管理头文件（延时等）</span></span></span><br></pre></td></tr></table></figure>
-
-<p>但整个工程里<strong>根本没有 TIME.h</strong> 这个文件（TIME 文件夹里只有 TIM3_PWM.h）。按理说 GCC 找不到头文件应该报 <code>fatal error</code>，工程却编译烧录成功了。我用 ARM GCC 单独编译 HCSR04.c 验证，确实零报错。</p>
-<p>原因：<strong>Windows 文件系统不区分大小写</strong>。<code>#include &quot;TIME.h&quot;</code> 在项目里找不到后，GCC 继续往系统 include 目录找，大小写不敏感地匹配到了 ARM 工具链自带的 C 标准库 <code>time.h</code>——一个只声明了 <code>time()</code> 等函数的无害头文件，于是静默编译通过。但是如果交叉编译到 Linux，对大小写有区别的话，会当场报错；如果匹配到有副作用的头文件，会引入查不出来的 bug。</p>
-<p><strong>应该怎么做：</strong></p>
-<ol>
-<li><strong>立即修复</strong>：删掉 HCSR04.c 里这行 <code>#include &quot;TIME.h&quot;</code>——第 4 行的 <code>delay.h</code> 已经提供了它用到的 <code>Delay_ms</code>&#x2F;<code>Delay_us</code>，这行本来就是多余的，删完重新编译烧录验证</li>
-<li><strong>以后写 include 精确拼写</strong>：文件名、大小写必须和实际文件完全一致，写错就要当场报错，而不是被编译器”好心”兜住</li>
-<li><strong>排查工具</strong>：<code>gcc -H xxx.c</code> 会把实际包含的头文件树全部打印出来，怀疑多包含&#x2F;少包含时用它核对</li>
-</ol>
-<h2 id="九、下一步：HAL-重写架构预告"><a href="#九、下一步：HAL-重写架构预告" class="headerlink" title="九、下一步：HAL 重写架构预告"></a>九、下一步：HAL 重写架构预告</h2><p>标准库版已完整跑通，接下来按计划用 CubeMX + HAL 重写。重写不是翻译代码，而是<strong>按上面的不足逐条解决</strong>，目标架构：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">app/                  # 应用层：状态机（遥控/避障/循迹 三个状态）</span><br><span class="line">  ├── main.c          #   主循环只做状态调度，绝不写 Delay</span><br><span class="line">  ├── car_remote.c    #   遥控状态</span><br><span class="line">  ├── car_avoid.c     #   避障状态</span><br><span class="line">  └── car_trace.c     #   循迹状态</span><br><span class="line">speed_ctrl/           # 中间层：速度控制</span><br><span class="line">  └── Speed_Ctrl_SetTarget(left_cm, right_cm)   # 开环 PWM 直给，</span><br><span class="line">                                                 # 将来换 PID 闭环只改内部</span><br><span class="line">bsp/                  # 驱动层：硬件抽象</span><br><span class="line">  ├── bsp_motor.c     #   TB6612 + TIM PWM</span><br><span class="line">  ├── bsp_oled.c      #   硬件 IIC</span><br><span class="line">  ├── bsp_usart.c     #   串口（DMA 接收）</span><br><span class="line">  ├── bsp_servo.c     #   舵机</span><br><span class="line">  ├── bsp_sr04.c      #   超声波（定时器输入捕获）</span><br><span class="line">  └── bsp_trace.c     #   循迹</span><br></pre></td></tr></table></figure>
-
-<p>三样规范：</p>
-<ul>
-<li>**业务不直接调 <code>HAL_Delay()</code>**，统一走 <code>Delay_Ms()</code>——将来上 FreeRTOS 只改这一处；</li>
-<li><strong>中断只置标志位</strong>，业务全部放主循环状态机里——将来每个状态就是一个小 task；</li>
-<li><strong>速度接口预留 PID</strong>：<code>Speed_Ctrl_SetTarget()</code> 内部现在是”占空比直给”，换成 PID 闭环后上层一行不用改。</li>
-</ul>
-<h2 id="十、总结"><a href="#十、总结" class="headerlink" title="十、总结"></a>十、总结</h2><table>
-<thead>
-<tr>
-<th align="left">知识点</th>
-<th align="left">要点</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">工程分层</td>
-<td align="left">User（应用）&#x2F; HARDWARE（驱动）&#x2F; System（基础）&#x2F; Library+Start（官方库）</td>
-</tr>
-<tr>
-<td align="left">蓝牙指令协议</td>
-<td align="left">一字节 7 命令，中断收 → 主循环 switch 分发</td>
-</tr>
-<tr>
-<td align="left">电机控制</td>
-<td align="left">数值绝对值 &#x3D; PWM 占空比，正负号 &#x3D; 方向位，差速 &#x3D; 左右不同</td>
-</tr>
-<tr>
-<td align="left">超声波</td>
-<td align="left">TIM4 更新中断掐表 Echo 高电平时间 ×1.7cm&#x2F;格</td>
-</tr>
-<tr>
-<td align="left">避障</td>
-<td align="left">前向 ≤20cm → 舵机三向扫描 → 往开阔侧转</td>
-</tr>
-<tr>
-<td align="left">循迹</td>
-<td align="left">X1~X4 组合判断 + 直角弯原地转</td>
-</tr>
-<tr>
-<td align="left">最大短板</td>
-<td align="left">阻塞式 + 无状态机，任何延时期间所有任务冻结</td>
-</tr>
-<tr>
-<td align="left">隐藏坑</td>
-<td align="left"><code>#include &quot;TIME.h&quot;</code> 大小写不敏感匹配到标准库 time.h，静默通过</td>
-</tr>
-</tbody></table>
-<p>标准库版的价值在于<strong>让人完整理解一辆车所有外设的原始协作方式</strong>——它不够优雅，但足够透明。</p>
-<p>参考资源</p>
-<ul>
-<li>B站up陈加油嗯STM32智能小车入门教程：<a href="https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&amp;vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></li>
-<li>上篇：Keil 工程迁移到 VS Code + EIDE（Keil_to_VSCode_EIDE_Migration）</li>
-<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>嵌入式</tag>
-        <tag>STM32</tag>
-        <tag>智能小车</tag>
-        <tag>标准库</tag>
-        <tag>架构</tag>
-        <tag>TB6612</tag>
-        <tag>PWM</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>Hello World</title>
     <url>/2026/07/06/hello-world/</url>
     <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
@@ -16888,6 +17375,340 @@
       </categories>
       <tags>
         <tag>暴力&amp;枚举</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>STM32智能小车——标准库工程整体架构解析</title>
+    <url>/2026/08/12/SmartCar_StdPeriph_Architecture/</url>
+    <content><![CDATA[<h2 id="一、从上一篇到这篇"><a href="#一、从上一篇到这篇" class="headerlink" title="一、从上一篇到这篇"></a>一、从上一篇到这篇</h2><p>上一篇《<a href="https://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">Keil 工程迁移到 VS Code + EIDE</a>》完成了把 Keil 标准库工程迁移到 VS Code 里编译烧录。接下来我一步步组装部件，把程序烧录到小车上，让小车成功跑了起来。<img src="/./../images/SmartCar_StdPeriph_Architecture/50b02f84e45a5d75b09044f0c7f524eb.jpg" alt="50b02f84e45a5d75b09044f0c7f524eb"></p>
+<p>但”能跑”和”看懂”是两回事。标准库工程虽然只有十几二十个文件，但对外设的调用像一张网——这篇博客就把这张网完整地拆开：</p>
+<ul>
+<li>工程怎么分层？每个文件夹是干什么的？</li>
+<li>蓝牙 APP 发一个指令，到电机转动，中间走了哪几步？</li>
+<li>避障、循迹这两个”自动驾驶”功能是怎么实现的？</li>
+<li>这个架构好在哪、坑在哪？为什么我计划用 HAL 重写？</li>
+</ul>
+<h2 id="二、工程目录全景：一个清晰的三层结构"><a href="#二、工程目录全景：一个清晰的三层结构" class="headerlink" title="二、工程目录全景：一个清晰的三层结构"></a>二、工程目录全景：一个清晰的三层结构</h2><p>先看整体。忽略 <code>.cmsis</code>（EIDE 插件自带的设备描述，不用管）和 <code>Library</code> 里的杂项，工程其实只有三层：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">stdperiph/                         # 我命名的 EIDE工程根目录</span><br><span class="line">│</span><br><span class="line">├── User/                          # 🟢 应用层：业务逻辑，唯一&quot;动脑子&quot;的地方</span><br><span class="line">│   ├── main.c                     #    主流程：初始化 + 蓝牙指令分发（switch）</span><br><span class="line">│   ├── mycontrol.c / .h           #    避障、循迹算法</span><br><span class="line">│   └── stm32f10x_it.c             #    中断服务框架（本工程中断写在各模块里）</span><br><span class="line">│</span><br><span class="line">├── HARDWARE/                      # 🟡 驱动层：一外设一目录，封装寄存器操作</span><br><span class="line">│   ├── LED/                       #    板载 LED（PC13）</span><br><span class="line">│   ├── MOTOR/                     #    TB6612 电机驱动：Set_Car_Speed()</span><br><span class="line">│   ├── TIME/                      #    TIM3 输出两路 PWM（5kHz），给电机调速</span><br><span class="line">│   ├── Servo/                     #    TIM2 输出 PWM（50Hz），控制 SG90 舵机</span><br><span class="line">│   ├── HCSR04/                    #    超声波测距（TIM4 中断计时法）</span><br><span class="line">│   ├── TRACE/                     #    四路红外循迹：X1~X4 宏</span><br><span class="line">│   ├── OLED/                      #    OLED 显示（软件 IIC + 字库）</span><br><span class="line">│   └── USART/                     #    USART1：接 JDY-31 蓝牙，中断收指令</span><br><span class="line">│</span><br><span class="line">├── System/                        # 🔵 基础层</span><br><span class="line">│   ├── Delay.c                    #    SysTick 延时：Delay_us / ms / s</span><br><span class="line">│   └── sys/                       #    位带操作宏（PAout 等）+ NVIC 配置</span><br><span class="line">│</span><br><span class="line">├── Library/                       # ⚪ 标准外设库（官方 SPL 3.5.0，不修改）</span><br><span class="line">├── Start/                         # ⚪ CMSIS 启动：startup + core_cm3 + system_stm32f10x</span><br><span class="line">└── .eide/                         # EIDE 插件工程配置（eide.yml 等）</span><br></pre></td></tr></table></figure>
+
+<p><strong>这个分层是教科书级的</strong>：<code>Library</code> 和 <code>Start</code> 是官方库、永远不改；<code>HARDWARE</code> 只关心”某个外设怎么驱动”，不管业务；<code>User</code> 只关心”车要干什么”，不碰寄存器。</p>
+<blockquote>
+<p><img src="/./../images/SmartCar_StdPeriph_Architecture/image-20260812214352244.png" alt="image-20260812214352244"></p>
+</blockquote>
+<h2 id="三、硬件资源分配总表"><a href="#三、硬件资源分配总表" class="headerlink" title="三、硬件资源分配总表"></a>三、硬件资源分配总表</h2><p>整个小车的外设全部集中在 <strong>PA、PB、PC 三个端口</strong>上。这张表是”地图”，后面讲每个模块都要回头看它：</p>
+<table>
+<thead>
+<tr>
+<th align="left">外设</th>
+<th align="left">引脚</th>
+<th align="left">用途</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">TIM3_CH2</td>
+<td align="left">PA7</td>
+<td align="left">左电机调速</td>
+<td align="left">PWM 5kHz</td>
+</tr>
+<tr>
+<td align="left">TIM3_CH1</td>
+<td align="left">PA6</td>
+<td align="left">右电机调速</td>
+<td align="left">PWM 5kHz</td>
+</tr>
+<tr>
+<td align="left">TB6612</td>
+<td align="left">PB5&#x2F;PB6</td>
+<td align="left">AIN1&#x2F;AIN2：左电机方向</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">TB6612</td>
+<td align="left">PB7&#x2F;PB8</td>
+<td align="left">BIN1&#x2F;BIN2：右电机方向</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">TIM2_CH1</td>
+<td align="left">PA0</td>
+<td align="left">SG90 舵机</td>
+<td align="left">PWM 50Hz，周期 20ms</td>
+</tr>
+<tr>
+<td align="left">HC-SR04</td>
+<td align="left">PA4</td>
+<td align="left">Trig：触发脉冲输出</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">HC-SR04</td>
+<td align="left">PA5</td>
+<td align="left">Echo：回波电平输入</td>
+<td align="left">下拉输入</td>
+</tr>
+<tr>
+<td align="left">USART1</td>
+<td align="left">PA9&#x2F;PA10</td>
+<td align="left">JDY-31 蓝牙 TX&#x2F;RX</td>
+<td align="left">波特率 9600</td>
+</tr>
+<tr>
+<td align="left">OLED</td>
+<td align="left">PA11&#x2F;PA12</td>
+<td align="left">SCL&#x2F;SDA（软件 IIC）</td>
+<td align="left">⚠️ 见文末踩坑</td>
+</tr>
+<tr>
+<td align="left">循迹</td>
+<td align="left">PB0&#x2F;PB1&#x2F;PB10&#x2F;PB11</td>
+<td align="left">X1~X4 四路红外输入</td>
+<td align="left">下拉输入</td>
+</tr>
+<tr>
+<td align="left">板载 LED</td>
+<td align="left">PC13</td>
+<td align="left">指示灯</td>
+<td align="left">低电平点亮</td>
+</tr>
+</tbody></table>
+<p>注意一个细节：<strong>电机调速用了 TIM3 的两个通道，舵机单独用了 TIM2，超声波计时用了 TIM4</strong>——三个定时器各司其职，谁都不打架。这是选定时器时的基本思路：看通道够不够、时钟域冲突不冲突。</p>
+<h2 id="四、模块职责速览"><a href="#四、模块职责速览" class="headerlink" title="四、模块职责速览"></a>四、模块职责速览</h2><table>
+<thead>
+<tr>
+<th align="left">模块</th>
+<th align="left">对外接口</th>
+<th align="left">一句话职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">MOTOR</td>
+<td align="left"><code>Set_Car_Speed(left, right)</code></td>
+<td align="left">唯一的电机入口：正负号定方向，数值定速度</td>
+</tr>
+<tr>
+<td align="left">TIM3_PWM</td>
+<td align="left"><code>TIM3_PWM_Init(arr, psc)</code></td>
+<td align="left">出两路 5kHz PWM，喂给 TB6612 调速</td>
+</tr>
+<tr>
+<td align="left">Servo</td>
+<td align="left"><code>myServo_Init()</code> &#x2F; <code>Servo_SetAngle(angle)</code></td>
+<td align="left">把超声波转到 30°&#x2F;90°&#x2F;150° 三方向</td>
+</tr>
+<tr>
+<td align="left">HCSR04</td>
+<td align="left"><code>HCSR04_Init()</code> &#x2F; <code>HCSR04_GetValue()</code></td>
+<td align="left">返回前方距离（cm）</td>
+</tr>
+<tr>
+<td align="left">TRACE</td>
+<td align="left"><code>Trace_Init()</code> + 宏 <code>X1~X4</code></td>
+<td align="left">直接读四个红外传感器电平</td>
+</tr>
+<tr>
+<td align="left">USART1</td>
+<td align="left"><code>USART1_Init(9600)</code></td>
+<td align="left">中断接收蓝牙指令，写全局 <code>RxData</code></td>
+</tr>
+<tr>
+<td align="left">OLED</td>
+<td align="left"><code>OLED_ShowString/Num(...)</code></td>
+<td align="left">显示指令、距离、循迹状态</td>
+</tr>
+<tr>
+<td align="left">LED</td>
+<td align="left"><code>LED_Init()</code> &#x2F; <code>LED_Flash()</code></td>
+<td align="left">板载灯</td>
+</tr>
+</tbody></table>
+<p>应用层只有两个函数：<code>Avoidance()</code>（避障）和 <code>Trace_task()</code>（循迹），都放在 <code>mycontrol.c</code> 里——<strong>业务与驱动分离</strong>，这是这个工程值得学习的地方。</p>
+<h2 id="五、主流程：蓝牙指令协议与命令分发"><a href="#五、主流程：蓝牙指令协议与命令分发" class="headerlink" title="五、主流程：蓝牙指令协议与命令分发"></a>五、主流程：蓝牙指令协议与命令分发</h2><h3 id="5-1-指令协议"><a href="#5-1-指令协议" class="headerlink" title="5.1 指令协议"></a>5.1 指令协议</h3><p>main 的主循环非常简单，本质是一个”命令分发器”：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">switch</span>(RxData)                 <span class="comment">// RxData：蓝牙中断收进来的指令字节</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x00</span>: Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停车</span></span><br><span class="line">                   HCSR04_Distance = HCSR04_GetValue();  <span class="comment">// 顺带测距</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x01</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">6500</span>);    <span class="comment">// 直行</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x02</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">-6500</span>);  <span class="comment">// 后退</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x03</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">6500</span>);   <span class="comment">// 左转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x04</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">-6500</span>);   <span class="comment">// 右转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x05</span>: Avoidance();                 <span class="comment">// 自动避障</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x06</span>: Trace_task();                <span class="comment">// 自动循迹</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// OLED 刷新：指令号、距离、循迹状态</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>手机蓝牙 APP 发一个字节，就能切换小车的 7 种行为。这个协议表（0x00~0x06）就是手机 APP 和单片机之间唯一的”接口文档”——<strong>协议越简单，联调越不容易出幺蛾子</strong>。</p>
+<h3 id="5-2-一条指令的完整链路（数据流全链路）"><a href="#5-2-一条指令的完整链路（数据流全链路）" class="headerlink" title="5.2 一条指令的完整链路（数据流全链路）"></a>5.2 一条指令的完整链路（数据流全链路）</h3><p>以”手机上按直行键”为例，数据从手机到车轮，一共经过 7 站：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">手机蓝牙APP                单片机内部</span><br><span class="line">      │                        │</span><br><span class="line">  ① 发送 0x01                  │</span><br><span class="line">      ▼                        │</span><br><span class="line"> JDY-31 蓝牙模块 ──TX──►  USART1 RX (PA10)      ← 9600 波特率</span><br><span class="line">                               │</span><br><span class="line">                          ② USART1_IRQHandler 中断</span><br><span class="line">                             RxData = USART_ReceiveData(USART1);</span><br><span class="line">                               │            （中断写，main 读）</span><br><span class="line">                               ▼</span><br><span class="line">                        ③ while(1) 主循环</span><br><span class="line">                           switch(RxData) 命中 case 0x01</span><br><span class="line">                               │</span><br><span class="line">                               ▼</span><br><span class="line">                        ④ Set_Car_Speed(6500, 6500)</span><br><span class="line">                               │</span><br><span class="line">                 ┌─────────────┴─────────────┐</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑤ 左电机：TIM3_CH2 占空比   右电机：TIM3_CH1 占空比</span><br><span class="line">            6500/7200 ≈ 90%        6500/7200 ≈ 90%</span><br><span class="line">            AIN1=0, AIN2=1         BIN1=0, BIN2=1   ← 方向位</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑥ TB6612 双路电机驱动芯片   ← 同时输出 5kHz PWM 到两电机</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑦ 左电机正转 90% 力        右电机正转 90% 力  → 小车直行</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键点：整条链路上，唯一的”人机接口”是中断里的 <code>RxData</code>，唯一的”执行接口”是 <code>Set_Car_Speed()</code>。</strong> 中间每一个环节都是独立模块，任何一个坏了都能单独排查。</p>
+<h2 id="六、核心算法详解"><a href="#六、核心算法详解" class="headerlink" title="六、核心算法详解"></a>六、核心算法详解</h2><h3 id="6-1-电机控制：为什么一个函数能表达所有运动"><a href="#6-1-电机控制：为什么一个函数能表达所有运动" class="headerlink" title="6.1 电机控制：为什么一个函数能表达所有运动"></a>6.1 电机控制：为什么一个函数能表达所有运动</h3><p><code>Set_Car_Speed(Left_speed, Right_speed)</code> 的参数范围是 -7200~7200，正负号表达方向。看看它怎么把”正负号”翻译成硬件动作（以左电机为例）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(Left_speed &gt; <span class="number">0</span>)                    <span class="comment">// 正转：方向位 AIN1=0/AIN2=1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, Left_speed);          <span class="comment">// 占空比 = 速度值</span></span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);            <span class="comment">// AIN2 = 1</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_5);          <span class="comment">// AIN1 = 0</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(Left_speed &lt; <span class="number">0</span>)               <span class="comment">// 反转：方向位反过来</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, -Left_speed);         <span class="comment">// 取绝对值给 PWM</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span>                                  <span class="comment">// 0：刹停，方向位全置 1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, <span class="number">0</span>);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>设计很巧妙：</p>
+<ul>
+<li><strong>速度 &#x3D; 数值的绝对值</strong>，直接写进 TIM3 的比较寄存器 <code>CCR</code>，变成 PWM 占空比（5kHz 方波，占空比越大电机越有力）；</li>
+<li><strong>方向 &#x3D; 数值的正负号</strong>，翻译成 TB6612 的方向引脚 AIN1&#x2F;AIN2 的高低电平；</li>
+<li><strong>差速 &#x3D; 左右两个数不同</strong>。左转 &#x3D; 左轮反转右轮正转（原地转），拐弯 &#x3D; 一快一慢。</li>
+</ul>
+<p>所以”直行、后退、左转、右转”四个动作在代码里只是<strong>四个不同的二元组</strong>，一条指令一个 case，简单粗暴但极其直观。</p>
+<h3 id="6-2-超声波测距：TIM4-中断”掐表”法"><a href="#6-2-超声波测距：TIM4-中断”掐表”法" class="headerlink" title="6.2 超声波测距：TIM4 中断”掐表”法"></a>6.2 超声波测距：TIM4 中断”掐表”法</h3><p>HC-SR04 的原理是声波往返计时：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">MCU ──Trig 高电平 45μs──►  模块发射超声波</span><br><span class="line">模块 ──Echo 高电平──►  MCU     （回波期间 Echo 保持高电平）</span><br><span class="line">距离 = Echo高电平时间 × 声速(34000cm/s) ÷ 2   ← 往返除 2</span><br></pre></td></tr></table></figure>
+
+<p>代码的实现方式值得细看——<strong>用 TIM4 的更新中断来掐表</strong>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">TIM4_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>          <span class="comment">// 每 0.1ms 进一次</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (TIM_GetITStatus(TIM4, TIM_IT_Update) == SET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// Echo 是高电平 → 计数器 +1（每格 = 0.1ms）</span></span><br><span class="line">        <span class="keyword">if</span> (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_5) == <span class="number">1</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            Time++;</span><br><span class="line">        &#125;</span><br><span class="line">        TIM_ClearITPendingBit(TIM4, TIM_IT_Update);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>测量时：Trig 拉高 45μs 触发超声波 → <code>Time=0</code> 启动 TIM4 → 中断里盯着 Echo，高电平就 <code>Time++</code> → 等 100ms 后关定时器：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">uint16_t</span> <span class="title function_">HCSR04_GetValue</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_Start();               <span class="comment">// 发 Trig 脉冲 + 启动 TIM4</span></span><br><span class="line">    Delay_ms(<span class="number">100</span>);                <span class="comment">// 等一个完整测距周期（官方建议 ≥60ms）</span></span><br><span class="line">    TIM_Cmd(TIM4, DISABLE);       <span class="comment">// 关定时器</span></span><br><span class="line">    <span class="keyword">if</span>(Time &gt; <span class="number">235</span>) Time = <span class="number">0</span>;      <span class="comment">// 超 4 米算无效（23.5ms ≈ 4m）</span></span><br><span class="line">    <span class="keyword">return</span> ((Time * <span class="number">0.0001f</span>) * <span class="number">34000</span>) / <span class="number">2</span>;   <span class="comment">// 时间×声速÷2</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>时间 → 距离的换算很直白：一格 0.1ms &#x3D; <code>0.0001s × 34000cm/s ÷ 2 = 1.7cm</code>，所以 <code>Time</code> 的值 ×1.7 就是厘米数。大概 20cm 左右会误差 ±1cm。</p>
+<h3 id="6-3-避障：舵机带超声波”左中右”三向扫描"><a href="#6-3-避障：舵机带超声波”左中右”三向扫描" class="headerlink" title="6.3 避障：舵机带超声波”左中右”三向扫描"></a>6.3 避障：舵机带超声波”左中右”三向扫描</h3><p>这个工程的功能逻辑在 <code>Avoidance()</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">     前方距离</span><br><span class="line">        │</span><br><span class="line"> ┌──────▼──────┐</span><br><span class="line"> │ 前方 ≤ 20cm ? │</span><br><span class="line"> └───┬──────┬───┘</span><br><span class="line">   是│      │否</span><br><span class="line">停车，舵机扫描  │ 直行</span><br><span class="line">左150° 测 L     │</span><br><span class="line">右30°  测 R     │</span><br><span class="line">    │           │</span><br><span class="line">L ≥ R ? → 向左转（倒车→原地左转 600ms）</span><br><span class="line">否则    → 向右转（倒车→原地右转 600ms）</span><br></pre></td></tr></table></figure>
+
+<p>代码骨架：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">Avoidance</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_M = HCSR04_GetValue();        <span class="comment">// 先测正前方</span></span><br><span class="line">    <span class="keyword">if</span>(HCSR04_M &gt; <span class="number">0</span> &amp;&amp; HCSR04_M &lt;= <span class="number">20</span>)   <span class="comment">// 前方 ≤ 20cm 才避障</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停车</span></span><br><span class="line">        HCSR04_getData();                <span class="comment">// 舵机转到左右测距</span></span><br><span class="line">        <span class="keyword">if</span>(HCSR04_L &gt;= HCSR04_R)         <span class="comment">// 左边空间大 → 左转</span></span><br><span class="line">        &#123;</span><br><span class="line">            Set_Car_Speed(<span class="number">-2600</span>,<span class="number">-2600</span>);  <span class="comment">// 倒车</span></span><br><span class="line">            Delay_ms(<span class="number">500</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停一下再转</span></span><br><span class="line">            Delay_ms(<span class="number">200</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">-2500</span>,<span class="number">2500</span>);   <span class="comment">// 原地左转</span></span><br><span class="line">            Delay_ms(<span class="number">600</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123; <span class="comment">/* 对称的右转分支 */</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);        <span class="comment">// 没障碍 → 直行</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>三向扫描靠的是舵机：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HCSR04_getData</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 转中间</span></span><br><span class="line">    HCSR04_M = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">150</span>);   <span class="comment">// 转左边</span></span><br><span class="line">    HCSR04_L = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">30</span>);    <span class="comment">// 转右边</span></span><br><span class="line">    HCSR04_R = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 归位</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这套”先看前方，近了再扫左右，往开阔一侧走”的逻辑，就是<strong>最简单的壁障式避障</strong>——不建图、不规划路径，只做局部决策。够用，但谈不上聪明，后文会分析它的代价。</p>
+<h3 id="6-4-循迹：四路红外组合判断"><a href="#6-4-循迹：四路红外组合判断" class="headerlink" title="6.4 循迹：四路红外组合判断"></a>6.4 循迹：四路红外组合判断</h3><p>四个红外传感器横向排开（X1~X4），每个返回 0&#x2F;1。代码用一组 <code>if</code> 判断”线在车底下哪个位置”，然后差速修正：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 白地 = 1，压到黑线 = 0（极性以你的模块实测为准）</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);  <span class="comment">// 中间两路压线 → 直行</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2500</span>,<span class="number">0</span>);     <span class="comment">// 线偏右 → 右转</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">1</span>)            Set_Car_Speed(<span class="number">0</span>,<span class="number">2500</span>);     <span class="comment">// 线偏左 → 左转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">1</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">0</span>)  Set_Car_Speed(<span class="number">3000</span>,<span class="number">0</span>);  <span class="comment">// 最右压线 → 大右转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">0</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">1</span>)  Set_Car_Speed(<span class="number">0</span>,<span class="number">3000</span>);  <span class="comment">// 最左压线 → 大左转</span></span><br></pre></td></tr></table></figure>
+
+<p>直角弯是循迹的难点，教程用”原地转圈直到出线”来处理：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 右直角弯：右侧两个传感器都出线</span></span><br><span class="line"><span class="keyword">if</span>(X3==<span class="number">0</span> &amp;&amp; X4==<span class="number">0</span>)</span><br><span class="line">&#123;</span><br><span class="line">    Delay_ms(<span class="number">200</span>);</span><br><span class="line">    Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停一下</span></span><br><span class="line">    Delay_ms(<span class="number">500</span>);</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">3000</span>,<span class="number">-3000</span>);   <span class="comment">// 原地右转</span></span><br><span class="line">    &#125; <span class="keyword">while</span>(X1==<span class="number">0</span>);                  <span class="comment">// 转到左传感器从线上出来为止</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="七、架构分析：优点与不足"><a href="#七、架构分析：优点与不足" class="headerlink" title="七、架构分析：优点与不足"></a>七、架构分析：优点与不足</h2><h3 id="优点（值得保留的）"><a href="#优点（值得保留的）" class="headerlink" title="优点（值得保留的）"></a>优点（值得保留的）</h3><table>
+<thead>
+<tr>
+<th align="left">#</th>
+<th align="left">优点</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left"><strong>驱动与业务分离</strong></td>
+<td align="left">电机、超声波、循迹的”怎么用”在 HARDWARE，业务逻辑全在 mycontrol.c</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left"><strong>唯一入口</strong></td>
+<td align="left">所有运动都走 <code>Set_Car_Speed()</code>，上层不需要知道 PWM 和 TB6612 的细节</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left"><strong>指令协议极简</strong></td>
+<td align="left">一个字节 7 种命令，蓝牙联调零负担</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left"><strong>模块独立性好</strong></td>
+<td align="left">每模块自包含 init + 操作函数，单测&#x2F;复用都方便</td>
+</tr>
+</tbody></table>
+<h3 id="不足（HAL-重写要消灭的）"><a href="#不足（HAL-重写要消灭的）" class="headerlink" title="不足（HAL 重写要消灭的）"></a>不足（HAL 重写要消灭的）</h3><table>
+<thead>
+<tr>
+<th align="left">#</th>
+<th align="left">不足</th>
+<th align="left">后果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left"><strong>main 大杂烩 switch</strong></td>
+<td align="left">新功能只能不断加 case，没有”状态”概念，加行为容易，加”流程”很难</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left"><strong>全程阻塞式</strong></td>
+<td align="left"><code>Delay_ms(500)</code>、超声波等 100ms、舵机内部还带 500ms 延时——<strong>任意时刻只有一个任务在跑</strong>，避障时蓝牙指令完全不理</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left"><strong>中断写、主循环读的裸全局变量</strong></td>
+<td align="left"><code>RxData</code> 没有 <code>volatile</code> 修饰，属于”理论上未定义、实际上能跑”的边缘行为</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left"><strong>延时与运动耦合</strong></td>
+<td align="left">“倒车 500ms → 停 200ms → 转 600ms”是死时间，速度变化&#x2F;障碍变化都不会打断它</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left"><strong>注释与代码不一致</strong></td>
+<td align="left">USART1.c 头注释写”波特率 115200”，实际 main 传的是 9600；<code>Set_Car_Speed</code> 注释范围 -7200~7200，实际 ARR&#x3D;7199 时最大 7199</td>
+</tr>
+</tbody></table>
+<h2 id="八、发现的坑：TIME-h-无效引用，编译却通过了"><a href="#八、发现的坑：TIME-h-无效引用，编译却通过了" class="headerlink" title="八、发现的坑：TIME.h 无效引用，编译却通过了"></a>八、发现的坑：TIME.h 无效引用，编译却通过了</h2><p>读 HCSR04.c 时发现开头有一行：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;TIME.h&quot;</span>         <span class="comment">// 时间管理头文件（延时等）</span></span></span><br></pre></td></tr></table></figure>
+
+<p>但整个工程里<strong>根本没有 TIME.h</strong> 这个文件（TIME 文件夹里只有 TIM3_PWM.h）。按理说 GCC 找不到头文件应该报 <code>fatal error</code>，工程却编译烧录成功了。我用 ARM GCC 单独编译 HCSR04.c 验证，确实零报错。</p>
+<p>原因：<strong>Windows 文件系统不区分大小写</strong>。<code>#include &quot;TIME.h&quot;</code> 在项目里找不到后，GCC 继续往系统 include 目录找，大小写不敏感地匹配到了 ARM 工具链自带的 C 标准库 <code>time.h</code>——一个只声明了 <code>time()</code> 等函数的无害头文件，于是静默编译通过。但是如果交叉编译到 Linux，对大小写有区别的话，会当场报错；如果匹配到有副作用的头文件，会引入查不出来的 bug。</p>
+<p><strong>应该怎么做：</strong></p>
+<ol>
+<li><strong>立即修复</strong>：删掉 HCSR04.c 里这行 <code>#include &quot;TIME.h&quot;</code>——第 4 行的 <code>delay.h</code> 已经提供了它用到的 <code>Delay_ms</code>&#x2F;<code>Delay_us</code>，这行本来就是多余的，删完重新编译烧录验证</li>
+<li><strong>以后写 include 精确拼写</strong>：文件名、大小写必须和实际文件完全一致，写错就要当场报错，而不是被编译器”好心”兜住</li>
+<li><strong>排查工具</strong>：<code>gcc -H xxx.c</code> 会把实际包含的头文件树全部打印出来，怀疑多包含&#x2F;少包含时用它核对</li>
+</ol>
+<h2 id="九、下一步：HAL-重写架构预告"><a href="#九、下一步：HAL-重写架构预告" class="headerlink" title="九、下一步：HAL 重写架构预告"></a>九、下一步：HAL 重写架构预告</h2><p>标准库版已完整跑通，接下来按计划用 CubeMX + HAL 重写。重写不是翻译代码，而是<strong>按上面的不足逐条解决</strong>，目标架构：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">app/                  # 应用层：状态机（遥控/避障/循迹 三个状态）</span><br><span class="line">  ├── main.c          #   主循环只做状态调度，绝不写 Delay</span><br><span class="line">  ├── car_remote.c    #   遥控状态</span><br><span class="line">  ├── car_avoid.c     #   避障状态</span><br><span class="line">  └── car_trace.c     #   循迹状态</span><br><span class="line">speed_ctrl/           # 中间层：速度控制</span><br><span class="line">  └── Speed_Ctrl_SetTarget(left_cm, right_cm)   # 开环 PWM 直给，</span><br><span class="line">                                                 # 将来换 PID 闭环只改内部</span><br><span class="line">bsp/                  # 驱动层：硬件抽象</span><br><span class="line">  ├── bsp_motor.c     #   TB6612 + TIM PWM</span><br><span class="line">  ├── bsp_oled.c      #   硬件 IIC</span><br><span class="line">  ├── bsp_usart.c     #   串口（DMA 接收）</span><br><span class="line">  ├── bsp_servo.c     #   舵机</span><br><span class="line">  ├── bsp_sr04.c      #   超声波（定时器输入捕获）</span><br><span class="line">  └── bsp_trace.c     #   循迹</span><br></pre></td></tr></table></figure>
+
+<p>三样规范：</p>
+<ul>
+<li>**业务不直接调 <code>HAL_Delay()</code>**，统一走 <code>Delay_Ms()</code>——将来上 FreeRTOS 只改这一处；</li>
+<li><strong>中断只置标志位</strong>，业务全部放主循环状态机里——将来每个状态就是一个小 task；</li>
+<li><strong>速度接口预留 PID</strong>：<code>Speed_Ctrl_SetTarget()</code> 内部现在是”占空比直给”，换成 PID 闭环后上层一行不用改。</li>
+</ul>
+<h2 id="十、总结"><a href="#十、总结" class="headerlink" title="十、总结"></a>十、总结</h2><table>
+<thead>
+<tr>
+<th align="left">知识点</th>
+<th align="left">要点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">工程分层</td>
+<td align="left">User（应用）&#x2F; HARDWARE（驱动）&#x2F; System（基础）&#x2F; Library+Start（官方库）</td>
+</tr>
+<tr>
+<td align="left">蓝牙指令协议</td>
+<td align="left">一字节 7 命令，中断收 → 主循环 switch 分发</td>
+</tr>
+<tr>
+<td align="left">电机控制</td>
+<td align="left">数值绝对值 &#x3D; PWM 占空比，正负号 &#x3D; 方向位，差速 &#x3D; 左右不同</td>
+</tr>
+<tr>
+<td align="left">超声波</td>
+<td align="left">TIM4 更新中断掐表 Echo 高电平时间 ×1.7cm&#x2F;格</td>
+</tr>
+<tr>
+<td align="left">避障</td>
+<td align="left">前向 ≤20cm → 舵机三向扫描 → 往开阔侧转</td>
+</tr>
+<tr>
+<td align="left">循迹</td>
+<td align="left">X1~X4 组合判断 + 直角弯原地转</td>
+</tr>
+<tr>
+<td align="left">最大短板</td>
+<td align="left">阻塞式 + 无状态机，任何延时期间所有任务冻结</td>
+</tr>
+<tr>
+<td align="left">隐藏坑</td>
+<td align="left"><code>#include &quot;TIME.h&quot;</code> 大小写不敏感匹配到标准库 time.h，静默通过</td>
+</tr>
+</tbody></table>
+<p>标准库版的价值在于<strong>让人完整理解一辆车所有外设的原始协作方式</strong>——它不够优雅，但足够透明。</p>
+<p>参考资源</p>
+<ul>
+<li>B站up陈加油嗯STM32智能小车入门教程：<a href="https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&amp;vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></li>
+<li>上篇：Keil 工程迁移到 VS Code + EIDE（Keil_to_VSCode_EIDE_Migration）</li>
+<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>嵌入式</tag>
+        <tag>STM32</tag>
+        <tag>智能小车</tag>
+        <tag>标准库</tag>
+        <tag>架构</tag>
+        <tag>TB6612</tag>
+        <tag>PWM</tag>
       </tags>
   </entry>
   <entry>
