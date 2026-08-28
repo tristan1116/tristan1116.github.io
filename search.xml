@@ -3397,6 +3397,168 @@
 <figure class="highlight text"><table><tr><td class="code"><pre><span class="line">0 Google</span><br><span class="line">1 Runoob</span><br><span class="line">2 Taobao</span><br></pre></td></tr></table></figure>
 
 <p><code>enumerate</code> 同时返回下标和元素，等价于 C 里”用下标访问数组元素”，但更省事。</p>
+<hr>
+<h1 id="函数"><a href="#函数" class="headerlink" title="函数"></a>函数</h1><p>函数是<strong>组织好的、可重复使用的代码段</strong>，用来实现单一或相关联的功能。Python 提供了很多内置函数（print()、len() 等），自己定义的就叫<strong>用户自定义函数</strong>。C 里有函数，Python 里也有，区别在格式和灵活性。</p>
+<h2 id="一、定义函数"><a href="#一、定义函数" class="headerlink" title="一、定义函数"></a>一、定义函数</h2><p>规则：</p>
+<ul>
+<li>以 <code>def</code> 关键字开头，后接<strong>函数名 + 圆括号 ()</strong></li>
+<li>参数放在圆括号里（可空）</li>
+<li>函数体以<strong>冒号 <code>:</code></strong> 起始，用<strong>缩进</strong>表示（和 if &#x2F; while 一样）</li>
+<li><code>return [表达式]</code> 结束函数，选择性地返回一个值；不带表达式的 return 相当于返回 None</li>
+</ul>
+<p>语法：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">函数名</span>(<span class="params">参数列表</span>):</span><br><span class="line">    函数体</span><br></pre></td></tr></table></figure>
+
+<p>最简单的例子：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">hello</span>():</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;Hello World!&quot;</span>)</span><br><span class="line"></span><br><span class="line">hello()    <span class="comment"># Hello World!</span></span><br></pre></td></tr></table></figure>
+
+<p>带参数：比较两个数，返回较大的：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">max</span>(<span class="params">a, b</span>):</span><br><span class="line">    <span class="keyword">if</span> a &gt; b:</span><br><span class="line">        <span class="keyword">return</span> a</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">return</span> b</span><br><span class="line"></span><br><span class="line">a = <span class="number">4</span></span><br><span class="line">b = <span class="number">5</span></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">max</span>(a, b))    <span class="comment"># 5</span></span><br></pre></td></tr></table></figure>
+
+<p>计算面积：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 计算面积函数</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">area</span>(<span class="params">width, height</span>):</span><br><span class="line">    <span class="keyword">return</span> width * height</span><br><span class="line"></span><br><span class="line"><span class="comment"># 打印欢迎信息函数（没有返回值）</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">print_welcome</span>(<span class="params">name</span>):</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;Welcome&quot;</span>, name)</span><br><span class="line"></span><br><span class="line">print_welcome(<span class="string">&quot;Runoob&quot;</span>)    <span class="comment"># Welcome Runoob</span></span><br><span class="line">w = <span class="number">4</span></span><br><span class="line">h = <span class="number">5</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;width =&quot;</span>, w, <span class="string">&quot; height =&quot;</span>, h, <span class="string">&quot; area =&quot;</span>, area(w, h))</span><br><span class="line"><span class="comment"># width = 4  height = 5  area = 20</span></span><br></pre></td></tr></table></figure>
+
+<p>C 对照：C 定义函数要写返回类型（<code>int max(int a, int b)</code>），Python 不用——返回什么类型运行时决定。</p>
+<h2 id="二、函数调用"><a href="#二、函数调用" class="headerlink" title="二、函数调用"></a>二、函数调用</h2><p>函数定义好之后，通过<strong>函数名加括号</strong>调用：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 定义函数</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">printme</span>(<span class="params"><span class="built_in">str</span></span>):</span><br><span class="line">    <span class="comment"># 打印任何传入的字符串</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="built_in">str</span>)</span><br><span class="line">    <span class="keyword">return</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 调用函数</span></span><br><span class="line">printme(<span class="string">&quot;我要调用用户自定义函数!&quot;</span>)    <span class="comment"># 我要调用用户自定义函数!</span></span><br><span class="line">printme(<span class="string">&quot;再次调用同一函数&quot;</span>)           <span class="comment"># 再次调用同一函数</span></span><br></pre></td></tr></table></figure>
+
+<p>同一函数可以反复调用，这就是”复用”。<code>return</code> 单独出现（不带值）表示结束函数，返回 None。</p>
+<h2 id="三、参数传递（重点）"><a href="#三、参数传递（重点）" class="headerlink" title="三、参数传递（重点）"></a>三、参数传递（重点）</h2><h3 id="先分清：变量是”引用”，对象才有类型"><a href="#先分清：变量是”引用”，对象才有类型" class="headerlink" title="先分清：变量是”引用”，对象才有类型"></a>先分清：变量是”引用”，对象才有类型</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]</span><br><span class="line">a = <span class="string">&quot;Runoob&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>[1, 2, 3]</code> 是列表对象，”Runoob” 是字符串对象，而变量 a <strong>没有类型</strong>——它只是对象的<strong>引用</strong>（类似 C 的指针），先指向列表对象，再指向字符串对象。</p>
+<h3 id="可变-vs-不可变对象"><a href="#可变-vs-不可变对象" class="headerlink" title="可变 vs 不可变对象"></a>可变 vs 不可变对象</h3><ul>
+<li><strong>不可变</strong>：数字、字符串、元组——改值 &#x3D; 生成新对象整体替换</li>
+<li><strong>可变</strong>：列表、字典——可以原地改内容（内存地址不变）</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = <span class="number">5</span></span><br><span class="line">a = <span class="number">10</span>       <span class="comment"># 新生成 int 对象 10，让 a 指向它，5 被丢弃</span></span><br><span class="line"></span><br><span class="line">la = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]</span><br><span class="line">la[<span class="number">2</span>] = <span class="number">5</span>    <span class="comment"># 改的是列表内部的值，列表本身还是那个列表</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="传不可变对象：函数内改了，不影响外面"><a href="#传不可变对象：函数内改了，不影响外面" class="headerlink" title="传不可变对象：函数内改了，不影响外面"></a>传不可变对象：函数内改了，不影响外面</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">change</span>(<span class="params">a</span>):</span><br><span class="line">    <span class="built_in">print</span>(<span class="built_in">id</span>(a))    <span class="comment"># 4379369136   刚进来，和外面是同一个对象</span></span><br><span class="line">    a = <span class="number">10</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="built_in">id</span>(a))    <span class="comment"># 4379369424   函数内重新赋值，生成了新对象</span></span><br><span class="line"></span><br><span class="line">a = <span class="number">1</span></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">id</span>(a))        <span class="comment"># 4379369136</span></span><br><span class="line">change(a)</span><br><span class="line"><span class="built_in">print</span>(a)            <span class="comment"># 1    外面的 a 没变</span></span><br></pre></td></tr></table></figure>
+
+<p>形参 a 和实参 a 一开始指向同一个对象（id 相同）；函数里 <code>a = 10</code> 是让形参指向<strong>新对象</strong>，外面的变量不受影响。</p>
+<h3 id="为什么”指向同一个对象，外面却不变”：和-C-的区别"><a href="#为什么”指向同一个对象，外面却不变”：和-C-的区别" class="headerlink" title="为什么”指向同一个对象，外面却不变”：和 C 的区别"></a>为什么”指向同一个对象，外面却不变”：和 C 的区别</h3><p>先理解为什么形参实参会指向同一块内存：Python 传参的本质是<strong>拷贝”引用”<strong>（引用 ≈ C 的指针）。调用 <code>change(a)</code> 时，Python 把实参 a 指向的对象的地址复制一份给形参，所以两者</strong>一开始指向同一个对象</strong>（id 相同）——但形参是新变量，只是恰好拿着同一个地址。</p>
+<p>C 对照：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">C 传值：</span><br><span class="line">  实参 a ──拷贝数据──► 形参（栈上新开一块内存，存值的副本）</span><br><span class="line">  两者地址不同，改形参不影响实参</span><br><span class="line"></span><br><span class="line">Python（任何参数）：</span><br><span class="line">  实参 a ──────────► 对象(1) @0x1000</span><br><span class="line">  形参 a ──────────► 对象(1) @0x1000   ← 拷贝的是&quot;引用&quot;，都指向同一块内存</span><br></pre></td></tr></table></figure>
+
+<p>C 里只有<strong>传指针</strong>时才出现”两个变量指向同一块内存”；Python 里<strong>任何参数都是这个行为</strong>——拷贝引用，形参实参永远先指向同一个对象。</p>
+<p>那为什么外面没变？关键不在”传的什么”，而在<strong>对象本身不可变</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">change</span>(<span class="params">a</span>):</span><br><span class="line">    a = <span class="number">10</span>      <span class="comment"># 只是让形参 a 改指到 对象(10)，对象(1) 原封不动</span></span><br><span class="line"></span><br><span class="line">a = <span class="number">1</span></span><br><span class="line">change(a)</span><br><span class="line"><span class="built_in">print</span>(a)        <span class="comment"># 1</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">调用前：  实参 a ──► 对象(1) @0x1000</span><br><span class="line">         形参 a ──► 对象(1) @0x1000</span><br><span class="line">执行后：  实参 a ──► 对象(1) @0x1000   ← 还在</span><br><span class="line">         形参 a ──► 对象(10) @0x2000  ← 形参换了指向，实参不受影响</span><br></pre></td></tr></table></figure>
+
+<p>数字不可变，没法”原地改内容”，<code>a = 10</code> 只能让形参换个对象指，所以外面不变——<strong>表现上和 C 传值一样，但机制不同</strong>（C 是副本，Python 是换指向）。</p>
+<p>传列表时，列表<strong>可变</strong>，函数内 <code>mylist.append(...)</code> 是<strong>原地改内容</strong>，形参实参指向同一个列表，所以外面也变——表现上和 C 传指针一样。</p>
+<p>一句话总结：<strong>Python 传参永远传引用（地址相同），外面变不变取决于对象可不可变，而不是传参方式。</strong></p>
+<h3 id="传可变对象：函数内改了，外面也变"><a href="#传可变对象：函数内改了，外面也变" class="headerlink" title="传可变对象：函数内改了，外面也变"></a>传可变对象：函数内改了，外面也变</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">changeme</span>(<span class="params">mylist</span>):</span><br><span class="line">    <span class="string">&quot;修改传入的列表&quot;</span></span><br><span class="line">    mylist.append([<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>])    <span class="comment"># 改的是列表内部</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;函数内取值: &quot;</span>, mylist)</span><br><span class="line"></span><br><span class="line">mylist = [<span class="number">10</span>, <span class="number">20</span>, <span class="number">30</span>]</span><br><span class="line">changeme(mylist)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;函数外取值: &quot;</span>, mylist)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">函数内取值:  [10, 20, 30, [1, 2, 3, 4]]</span><br><span class="line">函数外取值:  [10, 20, 30, [1, 2, 3, 4]]</span><br></pre></td></tr></table></figure>
+
+<p>和 C 对照：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">C：传值    —— 函数内改形参，外部变量不变</span><br><span class="line">C：传指针  —— 函数内改 *p，外部变量跟着变</span><br><span class="line">Python：传不可变对象 —— 相当于 C 传值（数字、字符串、元组）</span><br><span class="line">Python：传可变对象   —— 相当于 C 传指针（列表、字典）</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、必需参数"><a href="#四、必需参数" class="headerlink" title="四、必需参数"></a>四、必需参数</h2><p>必需参数<strong>必须按顺序传、数量必须一致</strong>，少传会报错：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">printme</span>(<span class="params"><span class="built_in">str</span></span>):</span><br><span class="line">    <span class="built_in">print</span>(<span class="built_in">str</span>)</span><br><span class="line"></span><br><span class="line">printme()    <span class="comment"># 不传参数</span></span><br><span class="line"><span class="comment"># TypeError: printme() missing 1 required positional argument: &#x27;str&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="五、关键字参数"><a href="#五、关键字参数" class="headerlink" title="五、关键字参数"></a>五、关键字参数</h2><p>调用时用 <code>参数名=值</code> 传参，Python 按<strong>名字</strong>匹配，顺序可以打乱：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">printinfo</span>(<span class="params">name, age</span>):</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;名字: &quot;</span>, name)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;年龄: &quot;</span>, age)</span><br><span class="line"></span><br><span class="line">printinfo(age=<span class="number">50</span>, name=<span class="string">&quot;runoob&quot;</span>)    <span class="comment"># 顺序反了也没关系</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">名字:  runoob</span><br><span class="line">年龄:  50</span><br></pre></td></tr></table></figure>
+
+<h2 id="六、默认参数"><a href="#六、默认参数" class="headerlink" title="六、默认参数"></a>六、默认参数</h2><p>调用时不传该参数，就使用默认值：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">printinfo</span>(<span class="params">name, age=<span class="number">35</span></span>):    <span class="comment"># age 有默认值 35</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;名字: &quot;</span>, name)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;年龄: &quot;</span>, age)</span><br><span class="line"></span><br><span class="line">printinfo(age=<span class="number">50</span>, name=<span class="string">&quot;runoob&quot;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;------------------------&quot;</span>)</span><br><span class="line">printinfo(name=<span class="string">&quot;runoob&quot;</span>)        <span class="comment"># 不传 age，用默认值 35</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">名字:  runoob</span><br><span class="line">年龄:  50</span><br><span class="line">------------------------</span><br><span class="line">名字:  runoob</span><br><span class="line">年龄:  35</span><br></pre></td></tr></table></figure>
+
+<p>注意：<strong>带默认值的参数必须放在不带默认值的参数后面</strong>（name 在前，age&#x3D;35 在后），反过来写会语法报错。</p>
+<h2 id="七、不定长参数"><a href="#七、不定长参数" class="headerlink" title="七、不定长参数"></a>七、不定长参数</h2><p>函数可能处理比声明时更多的参数：</p>
+<h3 id="args：多余的参数打包成元组"><a href="#args：多余的参数打包成元组" class="headerlink" title="*args：多余的参数打包成元组"></a>*args：多余的参数打包成元组</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">printinfo</span>(<span class="params">arg1, *vartuple</span>):</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;输出: &quot;</span>)</span><br><span class="line">    <span class="built_in">print</span>(arg1)</span><br><span class="line">    <span class="built_in">print</span>(vartuple)</span><br><span class="line"></span><br><span class="line">printinfo(<span class="number">70</span>, <span class="number">60</span>, <span class="number">50</span>)    <span class="comment"># 多出的 60、50 打包成元组</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">输出: </span><br><span class="line">70</span><br><span class="line">(60, 50)</span><br></pre></td></tr></table></figure>
+
+<p>不传多余参数时，它是一个空元组：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">printinfo</span>(<span class="params">arg1, *vartuple</span>):</span><br><span class="line">    <span class="built_in">print</span>(arg1)</span><br><span class="line">    <span class="keyword">for</span> var <span class="keyword">in</span> vartuple:    <span class="comment"># 用 for 遍历不定长参数</span></span><br><span class="line">        <span class="built_in">print</span>(var)</span><br><span class="line"></span><br><span class="line">printinfo(<span class="number">10</span>)          <span class="comment"># 10</span></span><br><span class="line">printinfo(<span class="number">70</span>, <span class="number">60</span>, <span class="number">50</span>)  <span class="comment"># 70 60 50</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="kwargs：多余的”名-值”参数打包成字典"><a href="#kwargs：多余的”名-值”参数打包成字典" class="headerlink" title="**kwargs：多余的”名&#x3D;值”参数打包成字典"></a>**kwargs：多余的”名&#x3D;值”参数打包成字典</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">printinfo</span>(<span class="params">arg1, **vardict</span>):</span><br><span class="line">    <span class="built_in">print</span>(arg1)</span><br><span class="line">    <span class="built_in">print</span>(vardict)</span><br><span class="line"></span><br><span class="line">printinfo(<span class="number">1</span>, a=<span class="number">2</span>, b=<span class="number">3</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">输出: </span><br><span class="line">1</span><br><span class="line">&#123;&#x27;a&#x27;: 2, &#x27;b&#x27;: 3&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="单独的-：后面的参数必须用关键字传"><a href="#单独的-：后面的参数必须用关键字传" class="headerlink" title="单独的 *：后面的参数必须用关键字传"></a>单独的 *：后面的参数必须用关键字传</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">f</span>(<span class="params">a, b, *, c</span>):</span><br><span class="line">    <span class="keyword">return</span> a + b + c</span><br><span class="line"></span><br><span class="line">f(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>)    <span class="comment"># ❌ 报错：c 必须用关键字传入</span></span><br><span class="line"><span class="comment"># TypeError: f() takes 2 positional arguments but 3 were given</span></span><br><span class="line"></span><br><span class="line">f(<span class="number">1</span>, <span class="number">2</span>, c=<span class="number">3</span>)  <span class="comment"># ✅ 6</span></span><br></pre></td></tr></table></figure>
+
+<p>C 对照：C 的变参函数（printf 那种）要用 <code>va_list</code> 一堆宏，Python 一个 <code>*args</code> 搞定。</p>
+<h2 id="八、匿名函数-lambda"><a href="#八、匿名函数-lambda" class="headerlink" title="八、匿名函数 lambda"></a>八、匿名函数 lambda</h2><p>lambda 创建<strong>匿名函数</strong>——不用 def 定义、没有函数名的函数：</p>
+<ul>
+<li>lambda 是<strong>表达式</strong>，不是代码块，函数体比 def 简单得多，只能封装有限逻辑（只能写一个表达式，不能写 if、赋值等语句）</li>
+<li>虽然只有一行，但<strong>不等于 C&#x2F;C++ 的内联函数</strong>——内联函数是为了减少函数调用开销，lambda 没有这个目的</li>
+</ul>
+<p>语法：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">lambda</span> [arg1, arg2, ...]: 表达式</span><br></pre></td></tr></table></figure>
+
+<p>单个参数：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">x = <span class="keyword">lambda</span> a: a + <span class="number">10</span></span><br><span class="line"><span class="built_in">print</span>(x(<span class="number">5</span>))    <span class="comment"># 15</span></span><br></pre></td></tr></table></figure>
+
+<p>多个参数：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="built_in">sum</span> = <span class="keyword">lambda</span> arg1, arg2: arg1 + arg2</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;相加后的值为 : &quot;</span>, <span class="built_in">sum</span>(<span class="number">10</span>, <span class="number">20</span>))    <span class="comment"># 相加后的值为 :  30</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;相加后的值为 : &quot;</span>, <span class="built_in">sum</span>(<span class="number">20</span>, <span class="number">20</span>))    <span class="comment"># 相加后的值为 :  40</span></span><br></pre></td></tr></table></figure>
+
+<p>lambda 可以封装在函数里，同一个函数创建多个不同的匿名函数：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">myfunc</span>(<span class="params">n</span>):</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">lambda</span> a: a * n    <span class="comment"># 返回一个&quot;乘 n&quot;的函数</span></span><br><span class="line"></span><br><span class="line">mydoubler = myfunc(<span class="number">2</span>)    <span class="comment"># 得到一个&quot;乘2&quot;的函数</span></span><br><span class="line">mytripler = myfunc(<span class="number">3</span>)    <span class="comment"># 得到一个&quot;乘3&quot;的函数</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(mydoubler(<span class="number">11</span>))    <span class="comment"># 22</span></span><br><span class="line"><span class="built_in">print</span>(mytripler(<span class="number">11</span>))    <span class="comment"># 33</span></span><br></pre></td></tr></table></figure>
+
+<p>C 对照：C 没有匿名函数，只能写函数指针；C++ 11 起才有 lambda，Python 的写法更简洁。</p>
+<h2 id="九、return-语句"><a href="#九、return-语句" class="headerlink" title="九、return 语句"></a>九、return 语句</h2><p><code>return [表达式]</code> 退出函数并返回结果；不带表达式的 return（或没有 return）返回 <strong>None</strong>：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">sum</span>(<span class="params">arg1, arg2</span>):</span><br><span class="line">    total = arg1 + arg2</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;函数内 : &quot;</span>, total)</span><br><span class="line">    <span class="keyword">return</span> total    <span class="comment"># 把结果返回给调用方</span></span><br><span class="line"></span><br><span class="line">total = <span class="built_in">sum</span>(<span class="number">10</span>, <span class="number">20</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;函数外 : &quot;</span>, total)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">函数内 :  30</span><br><span class="line">函数外 :  30</span><br></pre></td></tr></table></figure>
+
+<p>函数里没有 return 时，调用结果就是 None：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">hello</span>():</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;hi&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(hello())    <span class="comment"># 先输出 hi，再输出 None</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="十、强制位置参数（Python-3-8-）"><a href="#十、强制位置参数（Python-3-8-）" class="headerlink" title="十、强制位置参数（Python 3.8+）"></a>十、强制位置参数（Python 3.8+）</h2><p><code>/</code> 和 <code>*</code> 可以限定参数的传入方式：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">f</span>(<span class="params">a, b, /, c, d, *, e, f</span>):</span><br><span class="line">    <span class="built_in">print</span>(a, b, c, d, e, f)</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>/</code> <strong>之前</strong>的参数（a、b）：只能按位置传，不能用 <code>b=20</code></li>
+<li><code>/</code> 和 <code>*</code> <strong>之间</strong>的参数（c、d）：位置、关键字都行</li>
+<li><code>*</code> <strong>之后</strong>的参数（e、f）：只能用关键字传</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">f(<span class="number">10</span>, <span class="number">20</span>, <span class="number">30</span>, d=<span class="number">40</span>, e=<span class="number">50</span>, f=<span class="number">60</span>)           <span class="comment"># ✅ 正确</span></span><br><span class="line">f(<span class="number">10</span>, b=<span class="number">20</span>, c=<span class="number">30</span>, d=<span class="number">40</span>, e=<span class="number">50</span>, f=<span class="number">60</span>)       <span class="comment"># ❌ b 不能用关键字传</span></span><br><span class="line">f(<span class="number">10</span>, <span class="number">20</span>, <span class="number">30</span>, <span class="number">40</span>, <span class="number">50</span>, f=<span class="number">60</span>)               <span class="comment"># ❌ e 必须用关键字传</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="十一、参数类型小结"><a href="#十一、参数类型小结" class="headerlink" title="十一、参数类型小结"></a>十一、参数类型小结</h2><table>
+<thead>
+<tr>
+<th>参数类型</th>
+<th>写法</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>必需参数</td>
+<td><code>def f(a, b)</code></td>
+<td>按顺序传，数量必须一致</td>
+</tr>
+<tr>
+<td>关键字参数</td>
+<td><code>f(a=1, b=2)</code></td>
+<td>按名字匹配，顺序可乱</td>
+</tr>
+<tr>
+<td>默认参数</td>
+<td><code>def f(a, b=5)</code></td>
+<td>不传就用默认值，必须放后面</td>
+</tr>
+<tr>
+<td>不定长参数</td>
+<td><code>*args</code> &#x2F; <code>**kwargs</code></td>
+<td>多余参数打包成元组&#x2F;字典</td>
+</tr>
+<tr>
+<td>强制位置</td>
+<td><code>/</code></td>
+<td>之前的参数只能用位置传</td>
+</tr>
+<tr>
+<td>强制关键字</td>
+<td><code>*</code></td>
+<td>之后的参数只能用关键字传</td>
+</tr>
+</tbody></table>
 <p>​                                                                                                              </p>
 ]]></content>
       <categories>
@@ -10635,6 +10797,340 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32智能小车——标准库工程整体架构解析</title>
+    <url>/2026/08/12/SmartCar_StdPeriph_Architecture/</url>
+    <content><![CDATA[<h2 id="一、从上一篇到这篇"><a href="#一、从上一篇到这篇" class="headerlink" title="一、从上一篇到这篇"></a>一、从上一篇到这篇</h2><p>上一篇《<a href="https://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">Keil 工程迁移到 VS Code + EIDE</a>》完成了把 Keil 标准库工程迁移到 VS Code 里编译烧录。接下来我一步步组装部件，把程序烧录到小车上，让小车成功跑了起来。<img src="/./../images/SmartCar_StdPeriph_Architecture/50b02f84e45a5d75b09044f0c7f524eb.jpg" alt="50b02f84e45a5d75b09044f0c7f524eb"></p>
+<p>但”能跑”和”看懂”是两回事。标准库工程虽然只有十几二十个文件，但对外设的调用像一张网——这篇博客就把这张网完整地拆开：</p>
+<ul>
+<li>工程怎么分层？每个文件夹是干什么的？</li>
+<li>蓝牙 APP 发一个指令，到电机转动，中间走了哪几步？</li>
+<li>避障、循迹这两个”自动驾驶”功能是怎么实现的？</li>
+<li>这个架构好在哪、坑在哪？为什么我计划用 HAL 重写？</li>
+</ul>
+<h2 id="二、工程目录全景：一个清晰的三层结构"><a href="#二、工程目录全景：一个清晰的三层结构" class="headerlink" title="二、工程目录全景：一个清晰的三层结构"></a>二、工程目录全景：一个清晰的三层结构</h2><p>先看整体。忽略 <code>.cmsis</code>（EIDE 插件自带的设备描述，不用管）和 <code>Library</code> 里的杂项，工程其实只有三层：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">stdperiph/                         # 我命名的 EIDE工程根目录</span><br><span class="line">│</span><br><span class="line">├── User/                          # 🟢 应用层：业务逻辑，唯一&quot;动脑子&quot;的地方</span><br><span class="line">│   ├── main.c                     #    主流程：初始化 + 蓝牙指令分发（switch）</span><br><span class="line">│   ├── mycontrol.c / .h           #    避障、循迹算法</span><br><span class="line">│   └── stm32f10x_it.c             #    中断服务框架（本工程中断写在各模块里）</span><br><span class="line">│</span><br><span class="line">├── HARDWARE/                      # 🟡 驱动层：一外设一目录，封装寄存器操作</span><br><span class="line">│   ├── LED/                       #    板载 LED（PC13）</span><br><span class="line">│   ├── MOTOR/                     #    TB6612 电机驱动：Set_Car_Speed()</span><br><span class="line">│   ├── TIME/                      #    TIM3 输出两路 PWM（5kHz），给电机调速</span><br><span class="line">│   ├── Servo/                     #    TIM2 输出 PWM（50Hz），控制 SG90 舵机</span><br><span class="line">│   ├── HCSR04/                    #    超声波测距（TIM4 中断计时法）</span><br><span class="line">│   ├── TRACE/                     #    四路红外循迹：X1~X4 宏</span><br><span class="line">│   ├── OLED/                      #    OLED 显示（软件 IIC + 字库）</span><br><span class="line">│   └── USART/                     #    USART1：接 JDY-31 蓝牙，中断收指令</span><br><span class="line">│</span><br><span class="line">├── System/                        # 🔵 基础层</span><br><span class="line">│   ├── Delay.c                    #    SysTick 延时：Delay_us / ms / s</span><br><span class="line">│   └── sys/                       #    位带操作宏（PAout 等）+ NVIC 配置</span><br><span class="line">│</span><br><span class="line">├── Library/                       # ⚪ 标准外设库（官方 SPL 3.5.0，不修改）</span><br><span class="line">├── Start/                         # ⚪ CMSIS 启动：startup + core_cm3 + system_stm32f10x</span><br><span class="line">└── .eide/                         # EIDE 插件工程配置（eide.yml 等）</span><br></pre></td></tr></table></figure>
+
+<p><strong>这个分层是教科书级的</strong>：<code>Library</code> 和 <code>Start</code> 是官方库、永远不改；<code>HARDWARE</code> 只关心”某个外设怎么驱动”，不管业务；<code>User</code> 只关心”车要干什么”，不碰寄存器。</p>
+<blockquote>
+<p><img src="/./../images/SmartCar_StdPeriph_Architecture/image-20260812214352244.png" alt="image-20260812214352244"></p>
+</blockquote>
+<h2 id="三、硬件资源分配总表"><a href="#三、硬件资源分配总表" class="headerlink" title="三、硬件资源分配总表"></a>三、硬件资源分配总表</h2><p>整个小车的外设全部集中在 <strong>PA、PB、PC 三个端口</strong>上。这张表是”地图”，后面讲每个模块都要回头看它：</p>
+<table>
+<thead>
+<tr>
+<th align="left">外设</th>
+<th align="left">引脚</th>
+<th align="left">用途</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">TIM3_CH2</td>
+<td align="left">PA7</td>
+<td align="left">左电机调速</td>
+<td align="left">PWM 5kHz</td>
+</tr>
+<tr>
+<td align="left">TIM3_CH1</td>
+<td align="left">PA6</td>
+<td align="left">右电机调速</td>
+<td align="left">PWM 5kHz</td>
+</tr>
+<tr>
+<td align="left">TB6612</td>
+<td align="left">PB5&#x2F;PB6</td>
+<td align="left">AIN1&#x2F;AIN2：左电机方向</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">TB6612</td>
+<td align="left">PB7&#x2F;PB8</td>
+<td align="left">BIN1&#x2F;BIN2：右电机方向</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">TIM2_CH1</td>
+<td align="left">PA0</td>
+<td align="left">SG90 舵机</td>
+<td align="left">PWM 50Hz，周期 20ms</td>
+</tr>
+<tr>
+<td align="left">HC-SR04</td>
+<td align="left">PA4</td>
+<td align="left">Trig：触发脉冲输出</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">HC-SR04</td>
+<td align="left">PA5</td>
+<td align="left">Echo：回波电平输入</td>
+<td align="left">下拉输入</td>
+</tr>
+<tr>
+<td align="left">USART1</td>
+<td align="left">PA9&#x2F;PA10</td>
+<td align="left">JDY-31 蓝牙 TX&#x2F;RX</td>
+<td align="left">波特率 9600</td>
+</tr>
+<tr>
+<td align="left">OLED</td>
+<td align="left">PA11&#x2F;PA12</td>
+<td align="left">SCL&#x2F;SDA（软件 IIC）</td>
+<td align="left">⚠️ 见文末踩坑</td>
+</tr>
+<tr>
+<td align="left">循迹</td>
+<td align="left">PB0&#x2F;PB1&#x2F;PB10&#x2F;PB11</td>
+<td align="left">X1~X4 四路红外输入</td>
+<td align="left">下拉输入</td>
+</tr>
+<tr>
+<td align="left">板载 LED</td>
+<td align="left">PC13</td>
+<td align="left">指示灯</td>
+<td align="left">低电平点亮</td>
+</tr>
+</tbody></table>
+<p>注意一个细节：<strong>电机调速用了 TIM3 的两个通道，舵机单独用了 TIM2，超声波计时用了 TIM4</strong>——三个定时器各司其职，谁都不打架。这是选定时器时的基本思路：看通道够不够、时钟域冲突不冲突。</p>
+<h2 id="四、模块职责速览"><a href="#四、模块职责速览" class="headerlink" title="四、模块职责速览"></a>四、模块职责速览</h2><table>
+<thead>
+<tr>
+<th align="left">模块</th>
+<th align="left">对外接口</th>
+<th align="left">一句话职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">MOTOR</td>
+<td align="left"><code>Set_Car_Speed(left, right)</code></td>
+<td align="left">唯一的电机入口：正负号定方向，数值定速度</td>
+</tr>
+<tr>
+<td align="left">TIM3_PWM</td>
+<td align="left"><code>TIM3_PWM_Init(arr, psc)</code></td>
+<td align="left">出两路 5kHz PWM，喂给 TB6612 调速</td>
+</tr>
+<tr>
+<td align="left">Servo</td>
+<td align="left"><code>myServo_Init()</code> &#x2F; <code>Servo_SetAngle(angle)</code></td>
+<td align="left">把超声波转到 30°&#x2F;90°&#x2F;150° 三方向</td>
+</tr>
+<tr>
+<td align="left">HCSR04</td>
+<td align="left"><code>HCSR04_Init()</code> &#x2F; <code>HCSR04_GetValue()</code></td>
+<td align="left">返回前方距离（cm）</td>
+</tr>
+<tr>
+<td align="left">TRACE</td>
+<td align="left"><code>Trace_Init()</code> + 宏 <code>X1~X4</code></td>
+<td align="left">直接读四个红外传感器电平</td>
+</tr>
+<tr>
+<td align="left">USART1</td>
+<td align="left"><code>USART1_Init(9600)</code></td>
+<td align="left">中断接收蓝牙指令，写全局 <code>RxData</code></td>
+</tr>
+<tr>
+<td align="left">OLED</td>
+<td align="left"><code>OLED_ShowString/Num(...)</code></td>
+<td align="left">显示指令、距离、循迹状态</td>
+</tr>
+<tr>
+<td align="left">LED</td>
+<td align="left"><code>LED_Init()</code> &#x2F; <code>LED_Flash()</code></td>
+<td align="left">板载灯</td>
+</tr>
+</tbody></table>
+<p>应用层只有两个函数：<code>Avoidance()</code>（避障）和 <code>Trace_task()</code>（循迹），都放在 <code>mycontrol.c</code> 里——<strong>业务与驱动分离</strong>，这是这个工程值得学习的地方。</p>
+<h2 id="五、主流程：蓝牙指令协议与命令分发"><a href="#五、主流程：蓝牙指令协议与命令分发" class="headerlink" title="五、主流程：蓝牙指令协议与命令分发"></a>五、主流程：蓝牙指令协议与命令分发</h2><h3 id="5-1-指令协议"><a href="#5-1-指令协议" class="headerlink" title="5.1 指令协议"></a>5.1 指令协议</h3><p>main 的主循环非常简单，本质是一个”命令分发器”：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">switch</span>(RxData)                 <span class="comment">// RxData：蓝牙中断收进来的指令字节</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x00</span>: Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停车</span></span><br><span class="line">                   HCSR04_Distance = HCSR04_GetValue();  <span class="comment">// 顺带测距</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x01</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">6500</span>);    <span class="comment">// 直行</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x02</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">-6500</span>);  <span class="comment">// 后退</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x03</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">6500</span>);   <span class="comment">// 左转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x04</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">-6500</span>);   <span class="comment">// 右转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x05</span>: Avoidance();                 <span class="comment">// 自动避障</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x06</span>: Trace_task();                <span class="comment">// 自动循迹</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// OLED 刷新：指令号、距离、循迹状态</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>手机蓝牙 APP 发一个字节，就能切换小车的 7 种行为。这个协议表（0x00~0x06）就是手机 APP 和单片机之间唯一的”接口文档”——<strong>协议越简单，联调越不容易出幺蛾子</strong>。</p>
+<h3 id="5-2-一条指令的完整链路（数据流全链路）"><a href="#5-2-一条指令的完整链路（数据流全链路）" class="headerlink" title="5.2 一条指令的完整链路（数据流全链路）"></a>5.2 一条指令的完整链路（数据流全链路）</h3><p>以”手机上按直行键”为例，数据从手机到车轮，一共经过 7 站：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">手机蓝牙APP                单片机内部</span><br><span class="line">      │                        │</span><br><span class="line">  ① 发送 0x01                  │</span><br><span class="line">      ▼                        │</span><br><span class="line"> JDY-31 蓝牙模块 ──TX──►  USART1 RX (PA10)      ← 9600 波特率</span><br><span class="line">                               │</span><br><span class="line">                          ② USART1_IRQHandler 中断</span><br><span class="line">                             RxData = USART_ReceiveData(USART1);</span><br><span class="line">                               │            （中断写，main 读）</span><br><span class="line">                               ▼</span><br><span class="line">                        ③ while(1) 主循环</span><br><span class="line">                           switch(RxData) 命中 case 0x01</span><br><span class="line">                               │</span><br><span class="line">                               ▼</span><br><span class="line">                        ④ Set_Car_Speed(6500, 6500)</span><br><span class="line">                               │</span><br><span class="line">                 ┌─────────────┴─────────────┐</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑤ 左电机：TIM3_CH2 占空比   右电机：TIM3_CH1 占空比</span><br><span class="line">            6500/7200 ≈ 90%        6500/7200 ≈ 90%</span><br><span class="line">            AIN1=0, AIN2=1         BIN1=0, BIN2=1   ← 方向位</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑥ TB6612 双路电机驱动芯片   ← 同时输出 5kHz PWM 到两电机</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑦ 左电机正转 90% 力        右电机正转 90% 力  → 小车直行</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键点：整条链路上，唯一的”人机接口”是中断里的 <code>RxData</code>，唯一的”执行接口”是 <code>Set_Car_Speed()</code>。</strong> 中间每一个环节都是独立模块，任何一个坏了都能单独排查。</p>
+<h2 id="六、核心算法详解"><a href="#六、核心算法详解" class="headerlink" title="六、核心算法详解"></a>六、核心算法详解</h2><h3 id="6-1-电机控制：为什么一个函数能表达所有运动"><a href="#6-1-电机控制：为什么一个函数能表达所有运动" class="headerlink" title="6.1 电机控制：为什么一个函数能表达所有运动"></a>6.1 电机控制：为什么一个函数能表达所有运动</h3><p><code>Set_Car_Speed(Left_speed, Right_speed)</code> 的参数范围是 -7200~7200，正负号表达方向。看看它怎么把”正负号”翻译成硬件动作（以左电机为例）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(Left_speed &gt; <span class="number">0</span>)                    <span class="comment">// 正转：方向位 AIN1=0/AIN2=1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, Left_speed);          <span class="comment">// 占空比 = 速度值</span></span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);            <span class="comment">// AIN2 = 1</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_5);          <span class="comment">// AIN1 = 0</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(Left_speed &lt; <span class="number">0</span>)               <span class="comment">// 反转：方向位反过来</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, -Left_speed);         <span class="comment">// 取绝对值给 PWM</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span>                                  <span class="comment">// 0：刹停，方向位全置 1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, <span class="number">0</span>);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>设计很巧妙：</p>
+<ul>
+<li><strong>速度 &#x3D; 数值的绝对值</strong>，直接写进 TIM3 的比较寄存器 <code>CCR</code>，变成 PWM 占空比（5kHz 方波，占空比越大电机越有力）；</li>
+<li><strong>方向 &#x3D; 数值的正负号</strong>，翻译成 TB6612 的方向引脚 AIN1&#x2F;AIN2 的高低电平；</li>
+<li><strong>差速 &#x3D; 左右两个数不同</strong>。左转 &#x3D; 左轮反转右轮正转（原地转），拐弯 &#x3D; 一快一慢。</li>
+</ul>
+<p>所以”直行、后退、左转、右转”四个动作在代码里只是<strong>四个不同的二元组</strong>，一条指令一个 case，简单粗暴但极其直观。</p>
+<h3 id="6-2-超声波测距：TIM4-中断”掐表”法"><a href="#6-2-超声波测距：TIM4-中断”掐表”法" class="headerlink" title="6.2 超声波测距：TIM4 中断”掐表”法"></a>6.2 超声波测距：TIM4 中断”掐表”法</h3><p>HC-SR04 的原理是声波往返计时：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">MCU ──Trig 高电平 45μs──►  模块发射超声波</span><br><span class="line">模块 ──Echo 高电平──►  MCU     （回波期间 Echo 保持高电平）</span><br><span class="line">距离 = Echo高电平时间 × 声速(34000cm/s) ÷ 2   ← 往返除 2</span><br></pre></td></tr></table></figure>
+
+<p>代码的实现方式值得细看——<strong>用 TIM4 的更新中断来掐表</strong>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">TIM4_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>          <span class="comment">// 每 0.1ms 进一次</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (TIM_GetITStatus(TIM4, TIM_IT_Update) == SET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// Echo 是高电平 → 计数器 +1（每格 = 0.1ms）</span></span><br><span class="line">        <span class="keyword">if</span> (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_5) == <span class="number">1</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            Time++;</span><br><span class="line">        &#125;</span><br><span class="line">        TIM_ClearITPendingBit(TIM4, TIM_IT_Update);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>测量时：Trig 拉高 45μs 触发超声波 → <code>Time=0</code> 启动 TIM4 → 中断里盯着 Echo，高电平就 <code>Time++</code> → 等 100ms 后关定时器：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">uint16_t</span> <span class="title function_">HCSR04_GetValue</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_Start();               <span class="comment">// 发 Trig 脉冲 + 启动 TIM4</span></span><br><span class="line">    Delay_ms(<span class="number">100</span>);                <span class="comment">// 等一个完整测距周期（官方建议 ≥60ms）</span></span><br><span class="line">    TIM_Cmd(TIM4, DISABLE);       <span class="comment">// 关定时器</span></span><br><span class="line">    <span class="keyword">if</span>(Time &gt; <span class="number">235</span>) Time = <span class="number">0</span>;      <span class="comment">// 超 4 米算无效（23.5ms ≈ 4m）</span></span><br><span class="line">    <span class="keyword">return</span> ((Time * <span class="number">0.0001f</span>) * <span class="number">34000</span>) / <span class="number">2</span>;   <span class="comment">// 时间×声速÷2</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>时间 → 距离的换算很直白：一格 0.1ms &#x3D; <code>0.0001s × 34000cm/s ÷ 2 = 1.7cm</code>，所以 <code>Time</code> 的值 ×1.7 就是厘米数。大概 20cm 左右会误差 ±1cm。</p>
+<h3 id="6-3-避障：舵机带超声波”左中右”三向扫描"><a href="#6-3-避障：舵机带超声波”左中右”三向扫描" class="headerlink" title="6.3 避障：舵机带超声波”左中右”三向扫描"></a>6.3 避障：舵机带超声波”左中右”三向扫描</h3><p>这个工程的功能逻辑在 <code>Avoidance()</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">     前方距离</span><br><span class="line">        │</span><br><span class="line"> ┌──────▼──────┐</span><br><span class="line"> │ 前方 ≤ 20cm ? │</span><br><span class="line"> └───┬──────┬───┘</span><br><span class="line">   是│      │否</span><br><span class="line">停车，舵机扫描  │ 直行</span><br><span class="line">左150° 测 L     │</span><br><span class="line">右30°  测 R     │</span><br><span class="line">    │           │</span><br><span class="line">L ≥ R ? → 向左转（倒车→原地左转 600ms）</span><br><span class="line">否则    → 向右转（倒车→原地右转 600ms）</span><br></pre></td></tr></table></figure>
+
+<p>代码骨架：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">Avoidance</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_M = HCSR04_GetValue();        <span class="comment">// 先测正前方</span></span><br><span class="line">    <span class="keyword">if</span>(HCSR04_M &gt; <span class="number">0</span> &amp;&amp; HCSR04_M &lt;= <span class="number">20</span>)   <span class="comment">// 前方 ≤ 20cm 才避障</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停车</span></span><br><span class="line">        HCSR04_getData();                <span class="comment">// 舵机转到左右测距</span></span><br><span class="line">        <span class="keyword">if</span>(HCSR04_L &gt;= HCSR04_R)         <span class="comment">// 左边空间大 → 左转</span></span><br><span class="line">        &#123;</span><br><span class="line">            Set_Car_Speed(<span class="number">-2600</span>,<span class="number">-2600</span>);  <span class="comment">// 倒车</span></span><br><span class="line">            Delay_ms(<span class="number">500</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停一下再转</span></span><br><span class="line">            Delay_ms(<span class="number">200</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">-2500</span>,<span class="number">2500</span>);   <span class="comment">// 原地左转</span></span><br><span class="line">            Delay_ms(<span class="number">600</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123; <span class="comment">/* 对称的右转分支 */</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);        <span class="comment">// 没障碍 → 直行</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>三向扫描靠的是舵机：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HCSR04_getData</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 转中间</span></span><br><span class="line">    HCSR04_M = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">150</span>);   <span class="comment">// 转左边</span></span><br><span class="line">    HCSR04_L = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">30</span>);    <span class="comment">// 转右边</span></span><br><span class="line">    HCSR04_R = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 归位</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这套”先看前方，近了再扫左右，往开阔一侧走”的逻辑，就是<strong>最简单的壁障式避障</strong>——不建图、不规划路径，只做局部决策。够用，但谈不上聪明，后文会分析它的代价。</p>
+<h3 id="6-4-循迹：四路红外组合判断"><a href="#6-4-循迹：四路红外组合判断" class="headerlink" title="6.4 循迹：四路红外组合判断"></a>6.4 循迹：四路红外组合判断</h3><p>四个红外传感器横向排开（X1~X4），每个返回 0&#x2F;1。代码用一组 <code>if</code> 判断”线在车底下哪个位置”，然后差速修正：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 白地 = 1，压到黑线 = 0（极性以你的模块实测为准）</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);  <span class="comment">// 中间两路压线 → 直行</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2500</span>,<span class="number">0</span>);     <span class="comment">// 线偏右 → 右转</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">1</span>)            Set_Car_Speed(<span class="number">0</span>,<span class="number">2500</span>);     <span class="comment">// 线偏左 → 左转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">1</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">0</span>)  Set_Car_Speed(<span class="number">3000</span>,<span class="number">0</span>);  <span class="comment">// 最右压线 → 大右转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">0</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">1</span>)  Set_Car_Speed(<span class="number">0</span>,<span class="number">3000</span>);  <span class="comment">// 最左压线 → 大左转</span></span><br></pre></td></tr></table></figure>
+
+<p>直角弯是循迹的难点，教程用”原地转圈直到出线”来处理：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 右直角弯：右侧两个传感器都出线</span></span><br><span class="line"><span class="keyword">if</span>(X3==<span class="number">0</span> &amp;&amp; X4==<span class="number">0</span>)</span><br><span class="line">&#123;</span><br><span class="line">    Delay_ms(<span class="number">200</span>);</span><br><span class="line">    Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停一下</span></span><br><span class="line">    Delay_ms(<span class="number">500</span>);</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">3000</span>,<span class="number">-3000</span>);   <span class="comment">// 原地右转</span></span><br><span class="line">    &#125; <span class="keyword">while</span>(X1==<span class="number">0</span>);                  <span class="comment">// 转到左传感器从线上出来为止</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="七、架构分析：优点与不足"><a href="#七、架构分析：优点与不足" class="headerlink" title="七、架构分析：优点与不足"></a>七、架构分析：优点与不足</h2><h3 id="优点（值得保留的）"><a href="#优点（值得保留的）" class="headerlink" title="优点（值得保留的）"></a>优点（值得保留的）</h3><table>
+<thead>
+<tr>
+<th align="left">#</th>
+<th align="left">优点</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left"><strong>驱动与业务分离</strong></td>
+<td align="left">电机、超声波、循迹的”怎么用”在 HARDWARE，业务逻辑全在 mycontrol.c</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left"><strong>唯一入口</strong></td>
+<td align="left">所有运动都走 <code>Set_Car_Speed()</code>，上层不需要知道 PWM 和 TB6612 的细节</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left"><strong>指令协议极简</strong></td>
+<td align="left">一个字节 7 种命令，蓝牙联调零负担</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left"><strong>模块独立性好</strong></td>
+<td align="left">每模块自包含 init + 操作函数，单测&#x2F;复用都方便</td>
+</tr>
+</tbody></table>
+<h3 id="不足（HAL-重写要消灭的）"><a href="#不足（HAL-重写要消灭的）" class="headerlink" title="不足（HAL 重写要消灭的）"></a>不足（HAL 重写要消灭的）</h3><table>
+<thead>
+<tr>
+<th align="left">#</th>
+<th align="left">不足</th>
+<th align="left">后果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left"><strong>main 大杂烩 switch</strong></td>
+<td align="left">新功能只能不断加 case，没有”状态”概念，加行为容易，加”流程”很难</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left"><strong>全程阻塞式</strong></td>
+<td align="left"><code>Delay_ms(500)</code>、超声波等 100ms、舵机内部还带 500ms 延时——<strong>任意时刻只有一个任务在跑</strong>，避障时蓝牙指令完全不理</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left"><strong>中断写、主循环读的裸全局变量</strong></td>
+<td align="left"><code>RxData</code> 没有 <code>volatile</code> 修饰，属于”理论上未定义、实际上能跑”的边缘行为</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left"><strong>延时与运动耦合</strong></td>
+<td align="left">“倒车 500ms → 停 200ms → 转 600ms”是死时间，速度变化&#x2F;障碍变化都不会打断它</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left"><strong>注释与代码不一致</strong></td>
+<td align="left">USART1.c 头注释写”波特率 115200”，实际 main 传的是 9600；<code>Set_Car_Speed</code> 注释范围 -7200~7200，实际 ARR&#x3D;7199 时最大 7199</td>
+</tr>
+</tbody></table>
+<h2 id="八、发现的坑：TIME-h-无效引用，编译却通过了"><a href="#八、发现的坑：TIME-h-无效引用，编译却通过了" class="headerlink" title="八、发现的坑：TIME.h 无效引用，编译却通过了"></a>八、发现的坑：TIME.h 无效引用，编译却通过了</h2><p>读 HCSR04.c 时发现开头有一行：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;TIME.h&quot;</span>         <span class="comment">// 时间管理头文件（延时等）</span></span></span><br></pre></td></tr></table></figure>
+
+<p>但整个工程里<strong>根本没有 TIME.h</strong> 这个文件（TIME 文件夹里只有 TIM3_PWM.h）。按理说 GCC 找不到头文件应该报 <code>fatal error</code>，工程却编译烧录成功了。我用 ARM GCC 单独编译 HCSR04.c 验证，确实零报错。</p>
+<p>原因：<strong>Windows 文件系统不区分大小写</strong>。<code>#include &quot;TIME.h&quot;</code> 在项目里找不到后，GCC 继续往系统 include 目录找，大小写不敏感地匹配到了 ARM 工具链自带的 C 标准库 <code>time.h</code>——一个只声明了 <code>time()</code> 等函数的无害头文件，于是静默编译通过。但是如果交叉编译到 Linux，对大小写有区别的话，会当场报错；如果匹配到有副作用的头文件，会引入查不出来的 bug。</p>
+<p><strong>应该怎么做：</strong></p>
+<ol>
+<li><strong>立即修复</strong>：删掉 HCSR04.c 里这行 <code>#include &quot;TIME.h&quot;</code>——第 4 行的 <code>delay.h</code> 已经提供了它用到的 <code>Delay_ms</code>&#x2F;<code>Delay_us</code>，这行本来就是多余的，删完重新编译烧录验证</li>
+<li><strong>以后写 include 精确拼写</strong>：文件名、大小写必须和实际文件完全一致，写错就要当场报错，而不是被编译器”好心”兜住</li>
+<li><strong>排查工具</strong>：<code>gcc -H xxx.c</code> 会把实际包含的头文件树全部打印出来，怀疑多包含&#x2F;少包含时用它核对</li>
+</ol>
+<h2 id="九、下一步：HAL-重写架构预告"><a href="#九、下一步：HAL-重写架构预告" class="headerlink" title="九、下一步：HAL 重写架构预告"></a>九、下一步：HAL 重写架构预告</h2><p>标准库版已完整跑通，接下来按计划用 CubeMX + HAL 重写。重写不是翻译代码，而是<strong>按上面的不足逐条解决</strong>，目标架构：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">app/                  # 应用层：状态机（遥控/避障/循迹 三个状态）</span><br><span class="line">  ├── main.c          #   主循环只做状态调度，绝不写 Delay</span><br><span class="line">  ├── car_remote.c    #   遥控状态</span><br><span class="line">  ├── car_avoid.c     #   避障状态</span><br><span class="line">  └── car_trace.c     #   循迹状态</span><br><span class="line">speed_ctrl/           # 中间层：速度控制</span><br><span class="line">  └── Speed_Ctrl_SetTarget(left_cm, right_cm)   # 开环 PWM 直给，</span><br><span class="line">                                                 # 将来换 PID 闭环只改内部</span><br><span class="line">bsp/                  # 驱动层：硬件抽象</span><br><span class="line">  ├── bsp_motor.c     #   TB6612 + TIM PWM</span><br><span class="line">  ├── bsp_oled.c      #   硬件 IIC</span><br><span class="line">  ├── bsp_usart.c     #   串口（DMA 接收）</span><br><span class="line">  ├── bsp_servo.c     #   舵机</span><br><span class="line">  ├── bsp_sr04.c      #   超声波（定时器输入捕获）</span><br><span class="line">  └── bsp_trace.c     #   循迹</span><br></pre></td></tr></table></figure>
+
+<p>三样规范：</p>
+<ul>
+<li>**业务不直接调 <code>HAL_Delay()</code>**，统一走 <code>Delay_Ms()</code>——将来上 FreeRTOS 只改这一处；</li>
+<li><strong>中断只置标志位</strong>，业务全部放主循环状态机里——将来每个状态就是一个小 task；</li>
+<li><strong>速度接口预留 PID</strong>：<code>Speed_Ctrl_SetTarget()</code> 内部现在是”占空比直给”，换成 PID 闭环后上层一行不用改。</li>
+</ul>
+<h2 id="十、总结"><a href="#十、总结" class="headerlink" title="十、总结"></a>十、总结</h2><table>
+<thead>
+<tr>
+<th align="left">知识点</th>
+<th align="left">要点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">工程分层</td>
+<td align="left">User（应用）&#x2F; HARDWARE（驱动）&#x2F; System（基础）&#x2F; Library+Start（官方库）</td>
+</tr>
+<tr>
+<td align="left">蓝牙指令协议</td>
+<td align="left">一字节 7 命令，中断收 → 主循环 switch 分发</td>
+</tr>
+<tr>
+<td align="left">电机控制</td>
+<td align="left">数值绝对值 &#x3D; PWM 占空比，正负号 &#x3D; 方向位，差速 &#x3D; 左右不同</td>
+</tr>
+<tr>
+<td align="left">超声波</td>
+<td align="left">TIM4 更新中断掐表 Echo 高电平时间 ×1.7cm&#x2F;格</td>
+</tr>
+<tr>
+<td align="left">避障</td>
+<td align="left">前向 ≤20cm → 舵机三向扫描 → 往开阔侧转</td>
+</tr>
+<tr>
+<td align="left">循迹</td>
+<td align="left">X1~X4 组合判断 + 直角弯原地转</td>
+</tr>
+<tr>
+<td align="left">最大短板</td>
+<td align="left">阻塞式 + 无状态机，任何延时期间所有任务冻结</td>
+</tr>
+<tr>
+<td align="left">隐藏坑</td>
+<td align="left"><code>#include &quot;TIME.h&quot;</code> 大小写不敏感匹配到标准库 time.h，静默通过</td>
+</tr>
+</tbody></table>
+<p>标准库版的价值在于<strong>让人完整理解一辆车所有外设的原始协作方式</strong>——它不够优雅，但足够透明。</p>
+<p>参考资源</p>
+<ul>
+<li>B站up陈加油嗯STM32智能小车入门教程：<a href="https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&amp;vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></li>
+<li>上篇：Keil 工程迁移到 VS Code + EIDE（Keil_to_VSCode_EIDE_Migration）</li>
+<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>嵌入式</tag>
+        <tag>STM32</tag>
+        <tag>智能小车</tag>
+        <tag>标准库</tag>
+        <tag>架构</tag>
+        <tag>TB6612</tag>
+        <tag>PWM</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>Hello World</title>
     <url>/2026/07/06/hello-world/</url>
     <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
@@ -17375,340 +17871,6 @@
       </categories>
       <tags>
         <tag>暴力&amp;枚举</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>STM32智能小车——标准库工程整体架构解析</title>
-    <url>/2026/08/12/SmartCar_StdPeriph_Architecture/</url>
-    <content><![CDATA[<h2 id="一、从上一篇到这篇"><a href="#一、从上一篇到这篇" class="headerlink" title="一、从上一篇到这篇"></a>一、从上一篇到这篇</h2><p>上一篇《<a href="https://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">Keil 工程迁移到 VS Code + EIDE</a>》完成了把 Keil 标准库工程迁移到 VS Code 里编译烧录。接下来我一步步组装部件，把程序烧录到小车上，让小车成功跑了起来。<img src="/./../images/SmartCar_StdPeriph_Architecture/50b02f84e45a5d75b09044f0c7f524eb.jpg" alt="50b02f84e45a5d75b09044f0c7f524eb"></p>
-<p>但”能跑”和”看懂”是两回事。标准库工程虽然只有十几二十个文件，但对外设的调用像一张网——这篇博客就把这张网完整地拆开：</p>
-<ul>
-<li>工程怎么分层？每个文件夹是干什么的？</li>
-<li>蓝牙 APP 发一个指令，到电机转动，中间走了哪几步？</li>
-<li>避障、循迹这两个”自动驾驶”功能是怎么实现的？</li>
-<li>这个架构好在哪、坑在哪？为什么我计划用 HAL 重写？</li>
-</ul>
-<h2 id="二、工程目录全景：一个清晰的三层结构"><a href="#二、工程目录全景：一个清晰的三层结构" class="headerlink" title="二、工程目录全景：一个清晰的三层结构"></a>二、工程目录全景：一个清晰的三层结构</h2><p>先看整体。忽略 <code>.cmsis</code>（EIDE 插件自带的设备描述，不用管）和 <code>Library</code> 里的杂项，工程其实只有三层：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">stdperiph/                         # 我命名的 EIDE工程根目录</span><br><span class="line">│</span><br><span class="line">├── User/                          # 🟢 应用层：业务逻辑，唯一&quot;动脑子&quot;的地方</span><br><span class="line">│   ├── main.c                     #    主流程：初始化 + 蓝牙指令分发（switch）</span><br><span class="line">│   ├── mycontrol.c / .h           #    避障、循迹算法</span><br><span class="line">│   └── stm32f10x_it.c             #    中断服务框架（本工程中断写在各模块里）</span><br><span class="line">│</span><br><span class="line">├── HARDWARE/                      # 🟡 驱动层：一外设一目录，封装寄存器操作</span><br><span class="line">│   ├── LED/                       #    板载 LED（PC13）</span><br><span class="line">│   ├── MOTOR/                     #    TB6612 电机驱动：Set_Car_Speed()</span><br><span class="line">│   ├── TIME/                      #    TIM3 输出两路 PWM（5kHz），给电机调速</span><br><span class="line">│   ├── Servo/                     #    TIM2 输出 PWM（50Hz），控制 SG90 舵机</span><br><span class="line">│   ├── HCSR04/                    #    超声波测距（TIM4 中断计时法）</span><br><span class="line">│   ├── TRACE/                     #    四路红外循迹：X1~X4 宏</span><br><span class="line">│   ├── OLED/                      #    OLED 显示（软件 IIC + 字库）</span><br><span class="line">│   └── USART/                     #    USART1：接 JDY-31 蓝牙，中断收指令</span><br><span class="line">│</span><br><span class="line">├── System/                        # 🔵 基础层</span><br><span class="line">│   ├── Delay.c                    #    SysTick 延时：Delay_us / ms / s</span><br><span class="line">│   └── sys/                       #    位带操作宏（PAout 等）+ NVIC 配置</span><br><span class="line">│</span><br><span class="line">├── Library/                       # ⚪ 标准外设库（官方 SPL 3.5.0，不修改）</span><br><span class="line">├── Start/                         # ⚪ CMSIS 启动：startup + core_cm3 + system_stm32f10x</span><br><span class="line">└── .eide/                         # EIDE 插件工程配置（eide.yml 等）</span><br></pre></td></tr></table></figure>
-
-<p><strong>这个分层是教科书级的</strong>：<code>Library</code> 和 <code>Start</code> 是官方库、永远不改；<code>HARDWARE</code> 只关心”某个外设怎么驱动”，不管业务；<code>User</code> 只关心”车要干什么”，不碰寄存器。</p>
-<blockquote>
-<p><img src="/./../images/SmartCar_StdPeriph_Architecture/image-20260812214352244.png" alt="image-20260812214352244"></p>
-</blockquote>
-<h2 id="三、硬件资源分配总表"><a href="#三、硬件资源分配总表" class="headerlink" title="三、硬件资源分配总表"></a>三、硬件资源分配总表</h2><p>整个小车的外设全部集中在 <strong>PA、PB、PC 三个端口</strong>上。这张表是”地图”，后面讲每个模块都要回头看它：</p>
-<table>
-<thead>
-<tr>
-<th align="left">外设</th>
-<th align="left">引脚</th>
-<th align="left">用途</th>
-<th align="left">说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">TIM3_CH2</td>
-<td align="left">PA7</td>
-<td align="left">左电机调速</td>
-<td align="left">PWM 5kHz</td>
-</tr>
-<tr>
-<td align="left">TIM3_CH1</td>
-<td align="left">PA6</td>
-<td align="left">右电机调速</td>
-<td align="left">PWM 5kHz</td>
-</tr>
-<tr>
-<td align="left">TB6612</td>
-<td align="left">PB5&#x2F;PB6</td>
-<td align="left">AIN1&#x2F;AIN2：左电机方向</td>
-<td align="left"></td>
-</tr>
-<tr>
-<td align="left">TB6612</td>
-<td align="left">PB7&#x2F;PB8</td>
-<td align="left">BIN1&#x2F;BIN2：右电机方向</td>
-<td align="left"></td>
-</tr>
-<tr>
-<td align="left">TIM2_CH1</td>
-<td align="left">PA0</td>
-<td align="left">SG90 舵机</td>
-<td align="left">PWM 50Hz，周期 20ms</td>
-</tr>
-<tr>
-<td align="left">HC-SR04</td>
-<td align="left">PA4</td>
-<td align="left">Trig：触发脉冲输出</td>
-<td align="left"></td>
-</tr>
-<tr>
-<td align="left">HC-SR04</td>
-<td align="left">PA5</td>
-<td align="left">Echo：回波电平输入</td>
-<td align="left">下拉输入</td>
-</tr>
-<tr>
-<td align="left">USART1</td>
-<td align="left">PA9&#x2F;PA10</td>
-<td align="left">JDY-31 蓝牙 TX&#x2F;RX</td>
-<td align="left">波特率 9600</td>
-</tr>
-<tr>
-<td align="left">OLED</td>
-<td align="left">PA11&#x2F;PA12</td>
-<td align="left">SCL&#x2F;SDA（软件 IIC）</td>
-<td align="left">⚠️ 见文末踩坑</td>
-</tr>
-<tr>
-<td align="left">循迹</td>
-<td align="left">PB0&#x2F;PB1&#x2F;PB10&#x2F;PB11</td>
-<td align="left">X1~X4 四路红外输入</td>
-<td align="left">下拉输入</td>
-</tr>
-<tr>
-<td align="left">板载 LED</td>
-<td align="left">PC13</td>
-<td align="left">指示灯</td>
-<td align="left">低电平点亮</td>
-</tr>
-</tbody></table>
-<p>注意一个细节：<strong>电机调速用了 TIM3 的两个通道，舵机单独用了 TIM2，超声波计时用了 TIM4</strong>——三个定时器各司其职，谁都不打架。这是选定时器时的基本思路：看通道够不够、时钟域冲突不冲突。</p>
-<h2 id="四、模块职责速览"><a href="#四、模块职责速览" class="headerlink" title="四、模块职责速览"></a>四、模块职责速览</h2><table>
-<thead>
-<tr>
-<th align="left">模块</th>
-<th align="left">对外接口</th>
-<th align="left">一句话职责</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">MOTOR</td>
-<td align="left"><code>Set_Car_Speed(left, right)</code></td>
-<td align="left">唯一的电机入口：正负号定方向，数值定速度</td>
-</tr>
-<tr>
-<td align="left">TIM3_PWM</td>
-<td align="left"><code>TIM3_PWM_Init(arr, psc)</code></td>
-<td align="left">出两路 5kHz PWM，喂给 TB6612 调速</td>
-</tr>
-<tr>
-<td align="left">Servo</td>
-<td align="left"><code>myServo_Init()</code> &#x2F; <code>Servo_SetAngle(angle)</code></td>
-<td align="left">把超声波转到 30°&#x2F;90°&#x2F;150° 三方向</td>
-</tr>
-<tr>
-<td align="left">HCSR04</td>
-<td align="left"><code>HCSR04_Init()</code> &#x2F; <code>HCSR04_GetValue()</code></td>
-<td align="left">返回前方距离（cm）</td>
-</tr>
-<tr>
-<td align="left">TRACE</td>
-<td align="left"><code>Trace_Init()</code> + 宏 <code>X1~X4</code></td>
-<td align="left">直接读四个红外传感器电平</td>
-</tr>
-<tr>
-<td align="left">USART1</td>
-<td align="left"><code>USART1_Init(9600)</code></td>
-<td align="left">中断接收蓝牙指令，写全局 <code>RxData</code></td>
-</tr>
-<tr>
-<td align="left">OLED</td>
-<td align="left"><code>OLED_ShowString/Num(...)</code></td>
-<td align="left">显示指令、距离、循迹状态</td>
-</tr>
-<tr>
-<td align="left">LED</td>
-<td align="left"><code>LED_Init()</code> &#x2F; <code>LED_Flash()</code></td>
-<td align="left">板载灯</td>
-</tr>
-</tbody></table>
-<p>应用层只有两个函数：<code>Avoidance()</code>（避障）和 <code>Trace_task()</code>（循迹），都放在 <code>mycontrol.c</code> 里——<strong>业务与驱动分离</strong>，这是这个工程值得学习的地方。</p>
-<h2 id="五、主流程：蓝牙指令协议与命令分发"><a href="#五、主流程：蓝牙指令协议与命令分发" class="headerlink" title="五、主流程：蓝牙指令协议与命令分发"></a>五、主流程：蓝牙指令协议与命令分发</h2><h3 id="5-1-指令协议"><a href="#5-1-指令协议" class="headerlink" title="5.1 指令协议"></a>5.1 指令协议</h3><p>main 的主循环非常简单，本质是一个”命令分发器”：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">switch</span>(RxData)                 <span class="comment">// RxData：蓝牙中断收进来的指令字节</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x00</span>: Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停车</span></span><br><span class="line">                   HCSR04_Distance = HCSR04_GetValue();  <span class="comment">// 顺带测距</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x01</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">6500</span>);    <span class="comment">// 直行</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x02</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">-6500</span>);  <span class="comment">// 后退</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x03</span>: Set_Car_Speed(<span class="number">-6500</span>,<span class="number">6500</span>);   <span class="comment">// 左转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x04</span>: Set_Car_Speed(<span class="number">6500</span>,<span class="number">-6500</span>);   <span class="comment">// 右转（差速）</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x05</span>: Avoidance();                 <span class="comment">// 自动避障</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0x06</span>: Trace_task();                <span class="comment">// 自动循迹</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// OLED 刷新：指令号、距离、循迹状态</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>手机蓝牙 APP 发一个字节，就能切换小车的 7 种行为。这个协议表（0x00~0x06）就是手机 APP 和单片机之间唯一的”接口文档”——<strong>协议越简单，联调越不容易出幺蛾子</strong>。</p>
-<h3 id="5-2-一条指令的完整链路（数据流全链路）"><a href="#5-2-一条指令的完整链路（数据流全链路）" class="headerlink" title="5.2 一条指令的完整链路（数据流全链路）"></a>5.2 一条指令的完整链路（数据流全链路）</h3><p>以”手机上按直行键”为例，数据从手机到车轮，一共经过 7 站：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">手机蓝牙APP                单片机内部</span><br><span class="line">      │                        │</span><br><span class="line">  ① 发送 0x01                  │</span><br><span class="line">      ▼                        │</span><br><span class="line"> JDY-31 蓝牙模块 ──TX──►  USART1 RX (PA10)      ← 9600 波特率</span><br><span class="line">                               │</span><br><span class="line">                          ② USART1_IRQHandler 中断</span><br><span class="line">                             RxData = USART_ReceiveData(USART1);</span><br><span class="line">                               │            （中断写，main 读）</span><br><span class="line">                               ▼</span><br><span class="line">                        ③ while(1) 主循环</span><br><span class="line">                           switch(RxData) 命中 case 0x01</span><br><span class="line">                               │</span><br><span class="line">                               ▼</span><br><span class="line">                        ④ Set_Car_Speed(6500, 6500)</span><br><span class="line">                               │</span><br><span class="line">                 ┌─────────────┴─────────────┐</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑤ 左电机：TIM3_CH2 占空比   右电机：TIM3_CH1 占空比</span><br><span class="line">            6500/7200 ≈ 90%        6500/7200 ≈ 90%</span><br><span class="line">            AIN1=0, AIN2=1         BIN1=0, BIN2=1   ← 方向位</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑥ TB6612 双路电机驱动芯片   ← 同时输出 5kHz PWM 到两电机</span><br><span class="line">                 │                           │</span><br><span class="line">                 ▼                           ▼</span><br><span class="line">         ⑦ 左电机正转 90% 力        右电机正转 90% 力  → 小车直行</span><br></pre></td></tr></table></figure>
-
-<p><strong>关键点：整条链路上，唯一的”人机接口”是中断里的 <code>RxData</code>，唯一的”执行接口”是 <code>Set_Car_Speed()</code>。</strong> 中间每一个环节都是独立模块，任何一个坏了都能单独排查。</p>
-<h2 id="六、核心算法详解"><a href="#六、核心算法详解" class="headerlink" title="六、核心算法详解"></a>六、核心算法详解</h2><h3 id="6-1-电机控制：为什么一个函数能表达所有运动"><a href="#6-1-电机控制：为什么一个函数能表达所有运动" class="headerlink" title="6.1 电机控制：为什么一个函数能表达所有运动"></a>6.1 电机控制：为什么一个函数能表达所有运动</h3><p><code>Set_Car_Speed(Left_speed, Right_speed)</code> 的参数范围是 -7200~7200，正负号表达方向。看看它怎么把”正负号”翻译成硬件动作（以左电机为例）：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(Left_speed &gt; <span class="number">0</span>)                    <span class="comment">// 正转：方向位 AIN1=0/AIN2=1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, Left_speed);          <span class="comment">// 占空比 = 速度值</span></span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);            <span class="comment">// AIN2 = 1</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_5);          <span class="comment">// AIN1 = 0</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(Left_speed &lt; <span class="number">0</span>)               <span class="comment">// 反转：方向位反过来</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, -Left_speed);         <span class="comment">// 取绝对值给 PWM</span></span><br><span class="line">    GPIO_ResetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span>                                  <span class="comment">// 0：刹停，方向位全置 1</span></span><br><span class="line">&#123;</span><br><span class="line">    TIM_SetCompare2(TIM3, <span class="number">0</span>);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_5);</span><br><span class="line">    GPIO_SetBits(GPIOB, GPIO_Pin_6);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>设计很巧妙：</p>
-<ul>
-<li><strong>速度 &#x3D; 数值的绝对值</strong>，直接写进 TIM3 的比较寄存器 <code>CCR</code>，变成 PWM 占空比（5kHz 方波，占空比越大电机越有力）；</li>
-<li><strong>方向 &#x3D; 数值的正负号</strong>，翻译成 TB6612 的方向引脚 AIN1&#x2F;AIN2 的高低电平；</li>
-<li><strong>差速 &#x3D; 左右两个数不同</strong>。左转 &#x3D; 左轮反转右轮正转（原地转），拐弯 &#x3D; 一快一慢。</li>
-</ul>
-<p>所以”直行、后退、左转、右转”四个动作在代码里只是<strong>四个不同的二元组</strong>，一条指令一个 case，简单粗暴但极其直观。</p>
-<h3 id="6-2-超声波测距：TIM4-中断”掐表”法"><a href="#6-2-超声波测距：TIM4-中断”掐表”法" class="headerlink" title="6.2 超声波测距：TIM4 中断”掐表”法"></a>6.2 超声波测距：TIM4 中断”掐表”法</h3><p>HC-SR04 的原理是声波往返计时：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">MCU ──Trig 高电平 45μs──►  模块发射超声波</span><br><span class="line">模块 ──Echo 高电平──►  MCU     （回波期间 Echo 保持高电平）</span><br><span class="line">距离 = Echo高电平时间 × 声速(34000cm/s) ÷ 2   ← 往返除 2</span><br></pre></td></tr></table></figure>
-
-<p>代码的实现方式值得细看——<strong>用 TIM4 的更新中断来掐表</strong>：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">TIM4_IRQHandler</span><span class="params">(<span class="type">void</span>)</span>          <span class="comment">// 每 0.1ms 进一次</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (TIM_GetITStatus(TIM4, TIM_IT_Update) == SET)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// Echo 是高电平 → 计数器 +1（每格 = 0.1ms）</span></span><br><span class="line">        <span class="keyword">if</span> (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_5) == <span class="number">1</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            Time++;</span><br><span class="line">        &#125;</span><br><span class="line">        TIM_ClearITPendingBit(TIM4, TIM_IT_Update);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>测量时：Trig 拉高 45μs 触发超声波 → <code>Time=0</code> 启动 TIM4 → 中断里盯着 Echo，高电平就 <code>Time++</code> → 等 100ms 后关定时器：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">uint16_t</span> <span class="title function_">HCSR04_GetValue</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_Start();               <span class="comment">// 发 Trig 脉冲 + 启动 TIM4</span></span><br><span class="line">    Delay_ms(<span class="number">100</span>);                <span class="comment">// 等一个完整测距周期（官方建议 ≥60ms）</span></span><br><span class="line">    TIM_Cmd(TIM4, DISABLE);       <span class="comment">// 关定时器</span></span><br><span class="line">    <span class="keyword">if</span>(Time &gt; <span class="number">235</span>) Time = <span class="number">0</span>;      <span class="comment">// 超 4 米算无效（23.5ms ≈ 4m）</span></span><br><span class="line">    <span class="keyword">return</span> ((Time * <span class="number">0.0001f</span>) * <span class="number">34000</span>) / <span class="number">2</span>;   <span class="comment">// 时间×声速÷2</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>时间 → 距离的换算很直白：一格 0.1ms &#x3D; <code>0.0001s × 34000cm/s ÷ 2 = 1.7cm</code>，所以 <code>Time</code> 的值 ×1.7 就是厘米数。大概 20cm 左右会误差 ±1cm。</p>
-<h3 id="6-3-避障：舵机带超声波”左中右”三向扫描"><a href="#6-3-避障：舵机带超声波”左中右”三向扫描" class="headerlink" title="6.3 避障：舵机带超声波”左中右”三向扫描"></a>6.3 避障：舵机带超声波”左中右”三向扫描</h3><p>这个工程的功能逻辑在 <code>Avoidance()</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">     前方距离</span><br><span class="line">        │</span><br><span class="line"> ┌──────▼──────┐</span><br><span class="line"> │ 前方 ≤ 20cm ? │</span><br><span class="line"> └───┬──────┬───┘</span><br><span class="line">   是│      │否</span><br><span class="line">停车，舵机扫描  │ 直行</span><br><span class="line">左150° 测 L     │</span><br><span class="line">右30°  测 R     │</span><br><span class="line">    │           │</span><br><span class="line">L ≥ R ? → 向左转（倒车→原地左转 600ms）</span><br><span class="line">否则    → 向右转（倒车→原地右转 600ms）</span><br></pre></td></tr></table></figure>
-
-<p>代码骨架：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">Avoidance</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    HCSR04_M = HCSR04_GetValue();        <span class="comment">// 先测正前方</span></span><br><span class="line">    <span class="keyword">if</span>(HCSR04_M &gt; <span class="number">0</span> &amp;&amp; HCSR04_M &lt;= <span class="number">20</span>)   <span class="comment">// 前方 ≤ 20cm 才避障</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停车</span></span><br><span class="line">        HCSR04_getData();                <span class="comment">// 舵机转到左右测距</span></span><br><span class="line">        <span class="keyword">if</span>(HCSR04_L &gt;= HCSR04_R)         <span class="comment">// 左边空间大 → 左转</span></span><br><span class="line">        &#123;</span><br><span class="line">            Set_Car_Speed(<span class="number">-2600</span>,<span class="number">-2600</span>);  <span class="comment">// 倒车</span></span><br><span class="line">            Delay_ms(<span class="number">500</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);          <span class="comment">// 停一下再转</span></span><br><span class="line">            Delay_ms(<span class="number">200</span>);</span><br><span class="line">            Set_Car_Speed(<span class="number">-2500</span>,<span class="number">2500</span>);   <span class="comment">// 原地左转</span></span><br><span class="line">            Delay_ms(<span class="number">600</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123; <span class="comment">/* 对称的右转分支 */</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);        <span class="comment">// 没障碍 → 直行</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>三向扫描靠的是舵机：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HCSR04_getData</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 转中间</span></span><br><span class="line">    HCSR04_M = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">150</span>);   <span class="comment">// 转左边</span></span><br><span class="line">    HCSR04_L = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">30</span>);    <span class="comment">// 转右边</span></span><br><span class="line">    HCSR04_R = HCSR04_GetValue();</span><br><span class="line">    Servo_SetAngle(<span class="number">90</span>);    <span class="comment">// 归位</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这套”先看前方，近了再扫左右，往开阔一侧走”的逻辑，就是<strong>最简单的壁障式避障</strong>——不建图、不规划路径，只做局部决策。够用，但谈不上聪明，后文会分析它的代价。</p>
-<h3 id="6-4-循迹：四路红外组合判断"><a href="#6-4-循迹：四路红外组合判断" class="headerlink" title="6.4 循迹：四路红外组合判断"></a>6.4 循迹：四路红外组合判断</h3><p>四个红外传感器横向排开（X1~X4），每个返回 0&#x2F;1。代码用一组 <code>if</code> 判断”线在车底下哪个位置”，然后差速修正：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 白地 = 1，压到黑线 = 0（极性以你的模块实测为准）</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2800</span>,<span class="number">2800</span>);  <span class="comment">// 中间两路压线 → 直行</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">0</span>)            Set_Car_Speed(<span class="number">2500</span>,<span class="number">0</span>);     <span class="comment">// 线偏右 → 右转</span></span><br><span class="line"><span class="keyword">if</span>(X1==<span class="number">0</span> &amp;&amp; X3==<span class="number">1</span>)            Set_Car_Speed(<span class="number">0</span>,<span class="number">2500</span>);     <span class="comment">// 线偏左 → 左转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">1</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">0</span>)  Set_Car_Speed(<span class="number">3000</span>,<span class="number">0</span>);  <span class="comment">// 最右压线 → 大右转</span></span><br><span class="line"><span class="keyword">if</span>(X2==<span class="number">0</span> &amp;&amp; X1==<span class="number">1</span> &amp;&amp; X3==<span class="number">1</span> &amp;&amp; X4==<span class="number">1</span>)  Set_Car_Speed(<span class="number">0</span>,<span class="number">3000</span>);  <span class="comment">// 最左压线 → 大左转</span></span><br></pre></td></tr></table></figure>
-
-<p>直角弯是循迹的难点，教程用”原地转圈直到出线”来处理：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 右直角弯：右侧两个传感器都出线</span></span><br><span class="line"><span class="keyword">if</span>(X3==<span class="number">0</span> &amp;&amp; X4==<span class="number">0</span>)</span><br><span class="line">&#123;</span><br><span class="line">    Delay_ms(<span class="number">200</span>);</span><br><span class="line">    Set_Car_Speed(<span class="number">0</span>,<span class="number">0</span>);              <span class="comment">// 停一下</span></span><br><span class="line">    Delay_ms(<span class="number">500</span>);</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">        Set_Car_Speed(<span class="number">3000</span>,<span class="number">-3000</span>);   <span class="comment">// 原地右转</span></span><br><span class="line">    &#125; <span class="keyword">while</span>(X1==<span class="number">0</span>);                  <span class="comment">// 转到左传感器从线上出来为止</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h2 id="七、架构分析：优点与不足"><a href="#七、架构分析：优点与不足" class="headerlink" title="七、架构分析：优点与不足"></a>七、架构分析：优点与不足</h2><h3 id="优点（值得保留的）"><a href="#优点（值得保留的）" class="headerlink" title="优点（值得保留的）"></a>优点（值得保留的）</h3><table>
-<thead>
-<tr>
-<th align="left">#</th>
-<th align="left">优点</th>
-<th align="left">说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">1</td>
-<td align="left"><strong>驱动与业务分离</strong></td>
-<td align="left">电机、超声波、循迹的”怎么用”在 HARDWARE，业务逻辑全在 mycontrol.c</td>
-</tr>
-<tr>
-<td align="left">2</td>
-<td align="left"><strong>唯一入口</strong></td>
-<td align="left">所有运动都走 <code>Set_Car_Speed()</code>，上层不需要知道 PWM 和 TB6612 的细节</td>
-</tr>
-<tr>
-<td align="left">3</td>
-<td align="left"><strong>指令协议极简</strong></td>
-<td align="left">一个字节 7 种命令，蓝牙联调零负担</td>
-</tr>
-<tr>
-<td align="left">4</td>
-<td align="left"><strong>模块独立性好</strong></td>
-<td align="left">每模块自包含 init + 操作函数，单测&#x2F;复用都方便</td>
-</tr>
-</tbody></table>
-<h3 id="不足（HAL-重写要消灭的）"><a href="#不足（HAL-重写要消灭的）" class="headerlink" title="不足（HAL 重写要消灭的）"></a>不足（HAL 重写要消灭的）</h3><table>
-<thead>
-<tr>
-<th align="left">#</th>
-<th align="left">不足</th>
-<th align="left">后果</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">1</td>
-<td align="left"><strong>main 大杂烩 switch</strong></td>
-<td align="left">新功能只能不断加 case，没有”状态”概念，加行为容易，加”流程”很难</td>
-</tr>
-<tr>
-<td align="left">2</td>
-<td align="left"><strong>全程阻塞式</strong></td>
-<td align="left"><code>Delay_ms(500)</code>、超声波等 100ms、舵机内部还带 500ms 延时——<strong>任意时刻只有一个任务在跑</strong>，避障时蓝牙指令完全不理</td>
-</tr>
-<tr>
-<td align="left">3</td>
-<td align="left"><strong>中断写、主循环读的裸全局变量</strong></td>
-<td align="left"><code>RxData</code> 没有 <code>volatile</code> 修饰，属于”理论上未定义、实际上能跑”的边缘行为</td>
-</tr>
-<tr>
-<td align="left">4</td>
-<td align="left"><strong>延时与运动耦合</strong></td>
-<td align="left">“倒车 500ms → 停 200ms → 转 600ms”是死时间，速度变化&#x2F;障碍变化都不会打断它</td>
-</tr>
-<tr>
-<td align="left">5</td>
-<td align="left"><strong>注释与代码不一致</strong></td>
-<td align="left">USART1.c 头注释写”波特率 115200”，实际 main 传的是 9600；<code>Set_Car_Speed</code> 注释范围 -7200~7200，实际 ARR&#x3D;7199 时最大 7199</td>
-</tr>
-</tbody></table>
-<h2 id="八、发现的坑：TIME-h-无效引用，编译却通过了"><a href="#八、发现的坑：TIME-h-无效引用，编译却通过了" class="headerlink" title="八、发现的坑：TIME.h 无效引用，编译却通过了"></a>八、发现的坑：TIME.h 无效引用，编译却通过了</h2><p>读 HCSR04.c 时发现开头有一行：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;TIME.h&quot;</span>         <span class="comment">// 时间管理头文件（延时等）</span></span></span><br></pre></td></tr></table></figure>
-
-<p>但整个工程里<strong>根本没有 TIME.h</strong> 这个文件（TIME 文件夹里只有 TIM3_PWM.h）。按理说 GCC 找不到头文件应该报 <code>fatal error</code>，工程却编译烧录成功了。我用 ARM GCC 单独编译 HCSR04.c 验证，确实零报错。</p>
-<p>原因：<strong>Windows 文件系统不区分大小写</strong>。<code>#include &quot;TIME.h&quot;</code> 在项目里找不到后，GCC 继续往系统 include 目录找，大小写不敏感地匹配到了 ARM 工具链自带的 C 标准库 <code>time.h</code>——一个只声明了 <code>time()</code> 等函数的无害头文件，于是静默编译通过。但是如果交叉编译到 Linux，对大小写有区别的话，会当场报错；如果匹配到有副作用的头文件，会引入查不出来的 bug。</p>
-<p><strong>应该怎么做：</strong></p>
-<ol>
-<li><strong>立即修复</strong>：删掉 HCSR04.c 里这行 <code>#include &quot;TIME.h&quot;</code>——第 4 行的 <code>delay.h</code> 已经提供了它用到的 <code>Delay_ms</code>&#x2F;<code>Delay_us</code>，这行本来就是多余的，删完重新编译烧录验证</li>
-<li><strong>以后写 include 精确拼写</strong>：文件名、大小写必须和实际文件完全一致，写错就要当场报错，而不是被编译器”好心”兜住</li>
-<li><strong>排查工具</strong>：<code>gcc -H xxx.c</code> 会把实际包含的头文件树全部打印出来，怀疑多包含&#x2F;少包含时用它核对</li>
-</ol>
-<h2 id="九、下一步：HAL-重写架构预告"><a href="#九、下一步：HAL-重写架构预告" class="headerlink" title="九、下一步：HAL 重写架构预告"></a>九、下一步：HAL 重写架构预告</h2><p>标准库版已完整跑通，接下来按计划用 CubeMX + HAL 重写。重写不是翻译代码，而是<strong>按上面的不足逐条解决</strong>，目标架构：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">app/                  # 应用层：状态机（遥控/避障/循迹 三个状态）</span><br><span class="line">  ├── main.c          #   主循环只做状态调度，绝不写 Delay</span><br><span class="line">  ├── car_remote.c    #   遥控状态</span><br><span class="line">  ├── car_avoid.c     #   避障状态</span><br><span class="line">  └── car_trace.c     #   循迹状态</span><br><span class="line">speed_ctrl/           # 中间层：速度控制</span><br><span class="line">  └── Speed_Ctrl_SetTarget(left_cm, right_cm)   # 开环 PWM 直给，</span><br><span class="line">                                                 # 将来换 PID 闭环只改内部</span><br><span class="line">bsp/                  # 驱动层：硬件抽象</span><br><span class="line">  ├── bsp_motor.c     #   TB6612 + TIM PWM</span><br><span class="line">  ├── bsp_oled.c      #   硬件 IIC</span><br><span class="line">  ├── bsp_usart.c     #   串口（DMA 接收）</span><br><span class="line">  ├── bsp_servo.c     #   舵机</span><br><span class="line">  ├── bsp_sr04.c      #   超声波（定时器输入捕获）</span><br><span class="line">  └── bsp_trace.c     #   循迹</span><br></pre></td></tr></table></figure>
-
-<p>三样规范：</p>
-<ul>
-<li>**业务不直接调 <code>HAL_Delay()</code>**，统一走 <code>Delay_Ms()</code>——将来上 FreeRTOS 只改这一处；</li>
-<li><strong>中断只置标志位</strong>，业务全部放主循环状态机里——将来每个状态就是一个小 task；</li>
-<li><strong>速度接口预留 PID</strong>：<code>Speed_Ctrl_SetTarget()</code> 内部现在是”占空比直给”，换成 PID 闭环后上层一行不用改。</li>
-</ul>
-<h2 id="十、总结"><a href="#十、总结" class="headerlink" title="十、总结"></a>十、总结</h2><table>
-<thead>
-<tr>
-<th align="left">知识点</th>
-<th align="left">要点</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">工程分层</td>
-<td align="left">User（应用）&#x2F; HARDWARE（驱动）&#x2F; System（基础）&#x2F; Library+Start（官方库）</td>
-</tr>
-<tr>
-<td align="left">蓝牙指令协议</td>
-<td align="left">一字节 7 命令，中断收 → 主循环 switch 分发</td>
-</tr>
-<tr>
-<td align="left">电机控制</td>
-<td align="left">数值绝对值 &#x3D; PWM 占空比，正负号 &#x3D; 方向位，差速 &#x3D; 左右不同</td>
-</tr>
-<tr>
-<td align="left">超声波</td>
-<td align="left">TIM4 更新中断掐表 Echo 高电平时间 ×1.7cm&#x2F;格</td>
-</tr>
-<tr>
-<td align="left">避障</td>
-<td align="left">前向 ≤20cm → 舵机三向扫描 → 往开阔侧转</td>
-</tr>
-<tr>
-<td align="left">循迹</td>
-<td align="left">X1~X4 组合判断 + 直角弯原地转</td>
-</tr>
-<tr>
-<td align="left">最大短板</td>
-<td align="left">阻塞式 + 无状态机，任何延时期间所有任务冻结</td>
-</tr>
-<tr>
-<td align="left">隐藏坑</td>
-<td align="left"><code>#include &quot;TIME.h&quot;</code> 大小写不敏感匹配到标准库 time.h，静默通过</td>
-</tr>
-</tbody></table>
-<p>标准库版的价值在于<strong>让人完整理解一辆车所有外设的原始协作方式</strong>——它不够优雅，但足够透明。</p>
-<p>参考资源</p>
-<ul>
-<li>B站up陈加油嗯STM32智能小车入门教程：<a href="https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1CAe5zjEBv/?spm_id_from=333.337.search-card.all.click&amp;vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></li>
-<li>上篇：Keil 工程迁移到 VS Code + EIDE（Keil_to_VSCode_EIDE_Migration）</li>
-<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>嵌入式</tag>
-        <tag>STM32</tag>
-        <tag>智能小车</tag>
-        <tag>标准库</tag>
-        <tag>架构</tag>
-        <tag>TB6612</tag>
-        <tag>PWM</tag>
       </tags>
   </entry>
   <entry>
