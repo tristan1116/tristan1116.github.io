@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="从hello world 讲起，走过程序的一生、操作系统眼中的硬件机器、进程&#x2F;地址空间&#x2F;文件三大抽象、系统调用、操作系统结构与启动过程，搭起操作系统的整体骨架。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="操作系统总览">
+<meta property="og:url" content="http://tristan1116.github.io/2026/09/03/OS_Overview/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="从hello world 讲起，走过程序的一生、操作系统眼中的硬件机器、进程&#x2F;地址空间&#x2F;文件三大抽象、系统调用、操作系统结构与启动过程，搭起操作系统的整体骨架。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-09-03T19:45:00.000Z">
+<meta property="article:modified_time" content="2026-09-03T19:45:00.000Z">
+<meta property="article:tag" content="操作系统">
+<meta property="article:tag" content="四大件">
+<meta property="article:tag" content="系统调用">
+<meta property="article:tag" content="进程">
+<meta property="article:tag" content="线程">
+<meta property="article:tag" content="虚拟内存">
+<meta property="article:tag" content="文件">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/09/03/OS_Overview/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>操作系统总览 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<style>mjx-container[jax="SVG"] {
+  direction: ltr;
+}
+
+mjx-container[jax="SVG"] > svg {
+  overflow: visible;
+}
+
+mjx-container[jax="SVG"][display="true"] {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+}
+
+mjx-container[jax="SVG"][justify="left"] {
+  text-align: left;
+}
+
+mjx-container[jax="SVG"][justify="right"] {
+  text-align: right;
+}
+
+g[data-mml-node="merror"] > g {
+  fill: red;
+  stroke: red;
+}
+
+g[data-mml-node="merror"] > rect[data-background] {
+  fill: yellow;
+  stroke: none;
+}
+
+g[data-mml-node="mtable"] > line[data-line] {
+  stroke-width: 70px;
+  fill: none;
+}
+
+g[data-mml-node="mtable"] > rect[data-frame] {
+  stroke-width: 70px;
+  fill: none;
+}
+
+g[data-mml-node="mtable"] > .mjx-dashed {
+  stroke-dasharray: 140;
+}
+
+g[data-mml-node="mtable"] > .mjx-dotted {
+  stroke-linecap: round;
+  stroke-dasharray: 0,140;
+}
+
+g[data-mml-node="mtable"] > svg {
+  overflow: visible;
+}
+
+[jax="SVG"] mjx-tool {
+  display: inline-block;
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+[jax="SVG"] mjx-tool > mjx-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+mjx-tool > mjx-tip {
+  display: inline-block;
+  padding: .2em;
+  border: 1px solid #888;
+  font-size: 70%;
+  background-color: #F8F8F8;
+  color: black;
+  box-shadow: 2px 2px 5px #AAAAAA;
+}
+
+g[data-mml-node="maction"][data-toggle] {
+  cursor: pointer;
+}
+
+mjx-status {
+  display: block;
+  position: fixed;
+  left: 1em;
+  bottom: 1em;
+  min-width: 25%;
+  padding: .2em .4em;
+  border: 1px solid #888;
+  font-size: 90%;
+  background-color: #F8F8F8;
+  color: black;
+}
+
+foreignObject[data-mjx-xml] {
+  font-family: initial;
+  line-height: normal;
+  overflow: visible;
+}
+
+.MathJax path {
+  stroke-width: 3;
+}
+
+mjx-container[display="true"] {
+  overflow: auto hidden;
+}
+
+mjx-container[display="true"] + br {
+  display: none;
+}
+</style></head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/09/03/OS_Overview/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          操作系统总览
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-09-03 19:45:00" itemprop="dateCreated datePublished" datetime="2026-09-03T19:45:00+00:00">2026-09-03</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" itemprop="url" rel="index"><span itemprop="name">操作系统</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>22k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>20 分钟</span>
+            </span>
+            <div class="post-description">从hello world 讲起，走过程序的一生、操作系统眼中的硬件机器、进程/地址空间/文件三大抽象、系统调用、操作系统结构与启动过程，搭起操作系统的整体骨架。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="为什么需要操作系统"><a href="#为什么需要操作系统" class="headerlink" title="为什么需要操作系统"></a>为什么需要操作系统</h2><p>一台计算机由硬件和软件组成，硬件包括处理器、内存、磁盘、键盘、鼠标、显示器、网卡等。可问题是：程序员不可能亲手去操作这些硬件，也不可能掌握所有硬件的细节。于是硬件之上盖了一层软件——操作系统，它替用户程序扛下所有脏活累活。</p>
+<p>操作系统扮演两种角色：</p>
+<ul>
+<li><strong>扩展机器（Extended Machine）</strong>：把丑陋的硬件抽象成一种”更清晰、更好用的计算机模型”，比如用”文件”来代表磁盘、用”进程”来代表 CPU 的占用。</li>
+<li><strong>资源管理器（Resource Manager）</strong>：管理 CPU、内存、I/O 这些稀缺资源，决定谁先用、用多少，并防止坏程序把系统搞垮。</li>
+</ul>
+<blockquote>
+<p>平时看到的操作系统还有一层”皮”：带图形界面的叫 <strong>GUI</strong>（Windows、macOS），基于文本命令行的叫 <strong>Shell</strong>。它们本质都是用户接口程序，往下才是真正干活的内核。</p>
+</blockquote>
+<hr>
+<h2 id="一、程序的一生：从源码到运行"><a href="#一、程序的一生：从源码到运行" class="headerlink" title="一、程序的一生：从源码到运行"></a>一、程序的一生：从源码到运行</h2><h3 id="1-1-信息是什么：context-byte"><a href="#1-1-信息是什么：context-byte" class="headerlink" title="1.1 信息是什么：context + byte"></a>1.1 信息是什么：context + byte</h3><p>从大家最熟的 <code>hello world</code> 入手，看一个程序的完整生命周期。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">{</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"hello world\n"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>在计算机里<strong>所有信息都是二进制</strong>——一句源码、一张图片、一段视频，底层都是 0 和 1 组成的位序列。8 个位合成一个<strong>字节</strong>，每个字节代表某个字符。</p>
+<p>问题来了：同样是一串字节，它到底是整数、字符、浮点数，还是机器指令？<strong>唯一的判别依据就是”环境”（context / 语境）</strong>。</p>
+<p>举个语文题的例子：一句”林冲大叫一声’啊也！’”，单独摘出来，你不懂它是什么情感；放到上下文里，才知道是惊吓还是愤怒。程序也一样——一个函数、一个变量、一个地址，必须放进它所在的环境（编译时或运行时的上下文）才能理解它的含义。</p>
+<p>子程序之于程序、进程之于操作系统、App 的一屏之于 App，都是一个道理：执行到某个子程序时，它要用到之前的一些结果（外部变量、对象等）；App 点进新界面，也要保存”你是从哪个屏幕跳来的”，返回时才能跳回去。这就是 context——**可以通俗理解成”环境”**。</p>
+<h3 id="1-2-编译系统四步"><a href="#1-2-编译系统四步" class="headerlink" title="1.2 编译系统四步"></a>1.2 编译系统四步</h3><p>操作系统其实<strong>看不懂你写的高级语言</strong>（C、Java、C++）。要让程序跑起来，每一条语句（以分号结束）都必须先被翻译成操作系统能识别、能执行的<strong>机器语言指令</strong>，再打包成<strong>可执行目标文件</strong>（二进制磁盘文件）。这个过程由编译器完成。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc -o hello hello.c    <span class="comment"># -o 指定输出文件名；不加 -o 默认生成 a.out</span></span><br></pre></td></tr></table></figure>
+
+<p>这里用 <code>gcc</code> 演示，整个流程分四步：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">flowchart LR</span><br><span class="line">    A["📄 源文件&lt;br/&gt;hello.c"] --&gt;|"预处理 gcc -E"| B["📄 预处理后&lt;br/&gt;hello.i"]</span><br><span class="line">    B --&gt;|"编译 gcc -S"| C["📄 汇编&lt;br/&gt;hello.s"]</span><br><span class="line">    C --&gt;|"汇编 gcc -c"| D["📦 目标文件&lt;br/&gt;hello.o"]</span><br><span class="line">    D --&gt;|"链接 ld"| E["🚀 可执行文件&lt;br/&gt;hello"]</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li><strong>预处理（<code>gcc -E</code>）</strong>：把以 <code>#</code> 开头的命令（如 <code>#include</code>）展开，把引用的头文件内容全部插入源文件对应位置，得到完整的 <code>hello.i</code>。</li>
+<li><strong>编译（<code>gcc -S</code>）</strong>：编译器把 <code>hello.i</code> 翻译成汇编程序 <code>hello.s</code>。这一步让”语言”和”机器”解耦——不同语言用不同编译器，最后都汇成同一套通用汇编语言。</li>
+<li><strong>汇编（<code>gcc -c</code>）</strong>：汇编器把 <code>.s</code> 翻译成机器语言指令，打包成<strong>可重定位目标文件</strong> <code>.o</code>。这是二进制文件，人直接打开只能看到乱码。</li>
+<li><strong>链接（<code>gcc hello.o -o hello</code>）</strong>：把多个目标文件合并。比如 <code>printf</code> 其实是预编译好的 <code>printf.o</code>（在标准库里），链接器把它和你的 <code>hello.o</code> 拼成一个可执行文件。</li>
+</ol>
+<blockquote>
+<p>详细展开（预处理、链接、静态库/动态库、为什么会出现 <code>undefined reference</code>）我在《从源代码到可执行文件——初步理解编译、链接与软件构造体系》那篇写过。这里只讲它在操作系统里的位置。</p>
+</blockquote>
+<p><strong>为什么还要懂编译系统？</strong> 三个原因：</p>
+<ul>
+<li><strong>优化性能</strong>：<code>switch</code> 一定比 <code>if-else</code> 快吗？<code>while</code> 和 <code>for</code> 谁更高效？指针和数组索引谁更快？这些选择的”代价”藏在编译器的实现里。</li>
+<li><strong>理解链接错误</strong>：最让人头疼的往往不是逻辑 bug，而是链接错误——比如”无法解析一个引用”。为什么会在运行时报错、有些编译时就报？这跟编译、链接机制有关。</li>
+<li><strong>安全问题</strong>：栈溢出、缓冲区溢出是大多数网络服务器漏洞的主因。理解数据和控制信息怎么在堆栈里存放，才能明白漏洞从哪来。</li>
+</ul>
+<h3 id="1-3-运行：shell-与可执行文件"><a href="#1-3-运行：shell-与可执行文件" class="headerlink" title="1.3 运行：shell 与可执行文件"></a>1.3 运行：shell 与可执行文件</h3><p>编译好的可执行文件躺在磁盘上，怎么让操作系统跑它？把文件名敲进 <strong>shell</strong>。</p>
+<p>先解释一下shell是什么：</p>
+<ul>
+<li><strong>它是用户和操作系统之间的接口（桥梁）</strong>：Linux/Unix 的关键组件，敲的命令第一步落在它身上，由它解析并调用相应的操作系统服务去执行；</li>
+<li><strong>本质是一个用 C 语言编写的应用程序</strong>，运行在<strong>用户态</strong>——和 GUI 一样，是内核外面裹着的一层”皮”，往下才是真正干活的内核；</li>
+<li><strong>既是一种命令语言，又是一种程序设计语言</strong>：逐条敲命令，它解释执行；把一串命令写成文本文件就是脚本，可以自动化。</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">flowchart LR</span><br><span class="line">    U["👤 用户"] --&gt;|"输入命令行"| S["🐚 shell 应用程序（用户态）"]</span><br><span class="line">    S --&gt;|"内置命令（cd / pwd 等）"| E["🔧 直接执行"]</span><br><span class="line">    S --&gt;|"外部命令（./hello）"| K["🧠 调用内核服务"]</span><br><span class="line">    K --&gt;|"指挥"| H["⚙️ 硬件真正干活"]</span><br></pre></td></tr></table></figure>
+
+<p><strong>shell 从哪来？</strong> 以UNIX系统为例，用户登录 UNIX 系统时，系统会启动一个 shell 进程，并把<strong>用户的终端</strong>设置为它的标准输入/输出设备——所以 shell 一启动就显示提示符（<code>$</code> 或 <code>#</code>），等着敲命令。UNIX 里的 shell 还有多种实现：<code>sh</code>（Bourne Shell，先驱）、<code>csh</code>、<code>ksh</code>、<code>bash</code> 等，现在最常见的是 bash；不同 shell 语法略有差异，但角色都一样——那道”接口”。</p>
+<p><strong>shell 不是 UNIX 独有的</strong>——“用户和操作系统之间的接口”这个角色，任何系统都得找人扮演：</p>
+<table>
+<thead>
+<tr>
+<th>系统</th>
+<th>代表 shell</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td><code>cmd.exe</code>（命令提示符，承自 DOS 的 COMMAND.COM）＋ <strong>PowerShell</strong>（现代主推，还能跨平台跑在 Linux/macOS 上）</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>zsh</code>（早期版本曾默认 <code>bash</code>，2019 年后改为 <code>zsh</code>）</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td><code>bash</code>（主流），常见的还有 <code>zsh</code>、<code>fish</code> 等</td>
+</tr>
+</tbody></table>
+<p>它们的命令语法各不相同（ Windows 里拷文件是 <code>copy</code>，Linux 里是 <code>cp</code>），但做的事完全相同：解析用户的输入，帮用户运行程序。</p>
+<p>注意一个容易混淆的点：<strong>shell 不一定是命令行</strong>。Windows 语境里说 “Windows shell”，通常指的是 <strong>explorer.exe</strong>（资源管理器）；macOS 的 Finder、Linux 的 GNOME/KDE 桌面环境同理。所以 shell 分两种：</p>
+<ul>
+<li><strong>文本型 shell（CLI）</strong>：cmd、PowerShell、bash……可以打字的那种；</li>
+<li><strong>图形型 shell（GUI）</strong>：Explorer、Finder、桌面环境——同样包在内核外面，只是长成一幅图。</li>
+</ul>
+<p>无论是哪种，它们都是 1.3 开头说的那层”皮”：站在内核和用户之间，把命令交给内核。</p>
+<p>shell 的工作流程：显示提示符（<code>$</code> 或 <code>#</code>），等用户输入命令行，然后分两类处理：</p>
+<ul>
+<li><strong>内置命令</strong>：shell 自带的命令（如 <code>cd</code>、<code>pwd</code>），直接执行；</li>
+<li><strong>外部命令</strong>：shell 把它<strong>当成一个可执行文件的名字</strong>去查找并运行——这就是为什么我们写 <code>./hello</code>（<code>./</code> 表示当前目录；直接敲 <code>hello</code> 的话，得靠 PATH 环境变量里配置的路径才能找到它）。</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ ./hello</span><br><span class="line">hello world</span><br></pre></td></tr></table></figure>
+
+<p>shell 的四大作用：</p>
+<ul>
+<li><strong>命令解释器</strong>：解析输入的命令，内置命令直接执行，否则查找并运行对应的可执行文件；</li>
+<li><strong>脚本语言</strong>：把一串 shell 命令写成文本文件，实现自动化；</li>
+<li><strong>环境配置</strong>：管理环境变量（默认编辑器、路径等）；</li>
+<li><strong>批处理</strong>：按顺序执行一系列命令。</li>
+</ul>
+<blockquote>
+<p>shell 执行外部命令时自己并不跑程序，而是靠 <code>fork + execve</code> 创建子进程去执行</p>
+</blockquote>
+<p>真正运行那段是硬件在工作，所以<strong>操作系统和硬件不能分开看</strong>。要搞懂程序运行时发生了什么，必须先了解硬件组织。</p>
+<hr>
+<h2 id="二、操作系统所处的位置"><a href="#二、操作系统所处的位置" class="headerlink" title="二、操作系统所处的位置"></a>二、操作系统所处的位置</h2><p>先看一张操作系统的分层示意图：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│  用户态  │  用户接口程序（shell / GUI）      │</span><br><span class="line">│         │  应用程序（浏览器、播放器、邮件…）  │</span><br><span class="line">├─────────┼─────────────────────────────────┤</span><br><span class="line">│  内核态  │  操作系统内核                      │</span><br><span class="line">│         │  （内存分配、进程调度、设备驱动…）    │</span><br><span class="line">├─────────┼─────────────────────────────────┤</span><br><span class="line">│  硬件    │  处理器 / 内存 / 磁盘 / 网卡 / I/O │</span><br><span class="line">└─────────┴─────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>最底下是<strong>硬件</strong>，所有计算和存储都在这里发生。</li>
+<li>硬件之上是软件。计算机有两种运行模式：<strong>内核态</strong>（又称管态、核心态）和<strong>用户态</strong>。操作系统内核运行在<strong>内核态</strong>，能直接管硬件。</li>
+<li><strong>用户接口程序（shell 或 GUI）处于用户态</strong>，且位于用户态最低层，允许用户运行其他程序（浏览器、播放器）。</li>
+<li><strong>越靠近用户态的应用程序越容易编写</strong>：你不喜欢某个邮件阅读器，可以自己重写一个；但你不能自己写一个操作系统或中断处理程序——这部分由硬件保护，防外部修改。</li>
+</ul>
+<blockquote>
+<p>操作系统位于硬件与用户之间，起管理和协调作用。用户态应用<strong>无法直接访问硬件</strong>，必须通过内核提供的服务间接访问。这样既提高了安全性（坏程序/恶意软件碰不到硬件），也让应用程序更容易编写维护（不用管底层硬件细节）。</p>
+</blockquote>
+<hr>
+<h2 id="三、硬件速览：OS-眼中的机器"><a href="#三、硬件速览：OS-眼中的机器" class="headerlink" title="三、硬件速览：OS 眼中的机器"></a>三、硬件速览：OS 眼中的机器</h2><p>操作系统和运行它的硬件关系极密切——它要扩展指令集、管理资源，就必须足够了解硬件。这里把一台个人电脑抽象成一个模型：<strong>CPU、内存、I/O 设备都挂在总线上，通过总线通信。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">CPU           内存           I/O设备</span><br><span class="line"> │              │              │</span><br><span class="line"> └──────────────┼──────────────┘</span><br><span class="line">             中央总线</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-1-CPU"><a href="#3-1-CPU" class="headerlink" title="3.1 CPU"></a>3.1 CPU</h3><p>CPU 的作用就是处理和执行指令。它是”大脑”，但大脑下命令也要知道命令在哪——它通过<strong>程序计数器（PC）</strong>这个寄存器，始终指向主存中下一条要执行的指令地址。</p>
+<p>处理器执行一条指令的流程：从 <strong>PC</strong> 取出指令地址 → 取指令 → 用<strong>算术/逻辑单元（ALU）</strong>算出更新后的地址和值 → 更新 PC → 继续下一条。如此循环。</p>
+<p>CPU 还遵循一套<strong>指令集架构（ISA）</strong>。现代处理器又把 ISA 和<strong>微体系结构</strong>分开：</p>
+<ul>
+<li><strong>ISA</strong> 描述每条机器代码的效果（行为规范）；</li>
+<li><strong>微体系结构</strong> 描述处理器具体怎么实现。同一 ISA 可以有多种微体系结构，比如 Intel 和 AMD 都生产 x86 处理器，但内部实现差别很大。这样软件开发只管 ISA，硬件设计师可以自由优化实现。</li>
+</ul>
+<p>所以，<strong>不同架构的 CPU 之间不能直接执行彼此的程序</strong>：x86 能跑的，ARM 装不上，因为指令集和寄存器布局都不同。</p>
+<p>CPU 内有一些<strong>通用寄存器</strong>存放关键变量和临时结果（因为从内存取数比执行指令慢得多，寄存器提供了高速暂存）。指令通常有三类：</p>
+<ul>
+<li><strong>加载指令</strong>：内存 → 寄存器；</li>
+<li><strong>存储指令</strong>：寄存器 → 内存；</li>
+<li><strong>运算指令</strong>：对操作数做运算（如 <code>add</code> 把两个操作数相加）。</li>
+</ul>
+<p>特殊的、对程序员可见的寄存器：</p>
+<ul>
+<li><strong>程序计数器（PC）</strong>：下一条要取的指令地址，取完自动更新，保证顺序执行。</li>
+<li><strong>堆栈指针（SP）</strong>：指向当前栈顶，管理函数调用时的参数、局部变量、返回地址。</li>
+<li><strong>程序状态字（PSW）</strong>：记录当前系统状态（如零标志 ZF、进位标志 CF、溢出标志 OF）。用户程序能读整个 PSW，但通常只能改其中某些字段。</li>
+</ul>
+<p><strong>函数调用怎么用堆栈？</strong></p>
+<p>假设：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">add</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> {</span><br><span class="line">    <span class="keyword">return</span> a + b;</span><br><span class="line">}</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> {</span><br><span class="line">    <span class="type">int</span> result = add(<span class="number">5</span>, <span class="number">7</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"The sum is: %d\n"</span>, result);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>调用过程：<code>main</code> 先把参数 5、7 压栈并保存返回地址 → 调 <code>add</code>；<code>add</code> 进入后保存当前栈指针（<code>push ebp / mov ebp, esp</code>），从栈弹出参数执行加法和；返回时通过 <code>ret</code> 回到 <code>main</code>，栈指针恢复到调用前的状态。</p>
+<blockquote>
+<p>操作系统必须”认识”所有这些寄存器。时间多路复用（多个程序在单个 CPU 上交替执行，让每个程序都像独占 CPU）时，OS 每次暂停一个程序，都要<strong>保存全部寄存器的值</strong>，之后才能正确恢复。</p>
+</blockquote>
+<h4 id="流水线与超标量"><a href="#流水线与超标量" class="headerlink" title="流水线与超标量"></a>流水线与超标量</h4><p>早期 CPU 一次只取一条指令、解码一条、执行一条。现代 CPU 能同时处理多条：执行第 N 条时，同时解码第 N+1 条、读取第 N+2 条——这叫<strong>流水线（pipeline）</strong>。</p>
+<p>更进一步的<strong>超标量（superscalar）</strong>有多个执行单元（整数、浮点、布尔各一个），多条指令可同时取、解码、放入缓冲区，只要哪个执行单元空闲就取走执行。这种设计下，指令经常是<strong>乱序执行</strong>的，但硬件会保证结果和顺序执行时一致。</p>
+<h4 id="内核态与用户态"><a href="#内核态与用户态" class="headerlink" title="内核态与用户态"></a>内核态与用户态</h4><p>除了嵌入式里特别简单的 CPU，<strong>大多数 CPU 有两种操作模式：内核态和用户态</strong>，通常靠 PSW 里一个二进制位来控制。</p>
+<ul>
+<li><strong>内核态</strong>：可执行指令集里任何指令，能访问硬件全部功能。</li>
+<li><strong>用户态</strong>：只能执行部分指令、访问部分硬件，无法执行 I/O 和内存保护相关指令，也无法改 PSW 的模式位进入内核态。</li>
+</ul>
+<p><strong>为什么嵌入式系统也要把一部分代码放内核态、一部分放用户态？</strong> 综合考量：</p>
+<ul>
+<li><strong>安全性</strong>：用户态应用受限，防止坏程序破坏系统、篡改数据；内核态代码才能碰硬件，隔离了系统资源。</li>
+<li><strong>资源管理</strong>：内核态负责分配资源（内存、文件、网络），用户态通过<strong>系统调用</strong>请求服务；用户态权限受限，防滥用。</li>
+<li><strong>灵活性</strong>：用户态程序可单独更新替换，不用重编整个系统；也更容易调试维护。</li>
+<li><strong>性能</strong>：实时控制等性能敏感任务放内核态保证低延迟，非实时任务放用户态减轻内核负担。</li>
+<li><strong>兼容性</strong>：借鉴桌面/服务器设计，保持一致性；用户态可用现成工具链和开源库，开发更简便。</li>
+</ul>
+<p><strong>用户程序怎么进入内核？</strong> 靠<strong>系统调用（system call）</strong>，它把执行模式从用户态切到内核态。执行 <strong>TRAP</strong> 指令触发切换；完成后，系统调用后面的指令把控制权交还给用户程序。系统调用过程中还可能遇到 <strong>trap（陷阱）</strong>——硬件检测到的异常（比如除以零、浮点下溢），由操作系统接管处理。</p>
+<h4 id="多线程、多核、GPU"><a href="#多线程、多核、GPU" class="headerlink" title="多线程、多核、GPU"></a>多线程、多核、GPU</h4><ul>
+<li><strong>多线程（超线程）</strong>：允许 CPU 几乎同时维持两个线程状态，能在纳秒级切换。当一个线程等内存取数（要几个时钟周期）时，切换去跑另一个线程。<strong>注意：多线程不是真并行，任一时刻仍只有一个线程在执行</strong>，只是靠快速切换提高利用率。对 OS 来说，每个线程就像一台独立 CPU——两个物理核各跑两线程，OS 会看成四个 CPU。</li>
+<li><strong>多核</strong>：一块芯片上集成多个完整处理器核，每个核有独立 CPU，能<strong>真正并行</strong>处理多任务。</li>
+<li><strong>GPU</strong>：由成千上万个微核组成的处理器，擅长大量并行的简单计算，核心数量远超普通 CPU。</li>
+</ul>
+<h4 id="并发与并行"><a href="#并发与并行" class="headerlink" title="并发与并行"></a>并发与并行</h4><p>上文一会儿说”多线程不是真并行”，一会儿说”多核真正并行”——这里涉及到一对经常出现的概念：</p>
+<ul>
+<li><strong>并发（concurrency）</strong>：多个任务在<strong>重叠的时间段</strong>里交替或同时进行，重点在”<strong>逻辑上同时</strong>“——任意时刻物理上可能只有一个任务在跑，但多个任务都处于”进行中”的状态，看起来像同时。单核 CPU 也能并发：时间片轮转，多个进程轮流上 CPU。</li>
+<li><strong>并行（parallelism）</strong>：多个任务在<strong>同一精确时刻</strong>真正同时执行，重点在”<strong>物理上同时</strong>“——多个核心各干各的活。只有多核/多处理器才谈得上并行。</li>
+</ul>
+<p>并发让系统<strong>能同时处理更多任务</strong>（提到吞吐量、响应性）——靠调度维持”多个活动同时存在”并有序推进；并行让系统<strong>跑得更快</strong>——利用多核硬件。第四章进程里的”时间片轮转”、第五章系统调用里”OS 暂停当前进程、调度其他就绪进程”，都是并发的日常；本节前面”多线程靠快速切换提高利用率”，说的也是并发。</p>
+<h3 id="3-2-内存层次结构"><a href="#3-2-内存层次结构" class="headerlink" title="3.2 内存层次结构"></a>3.2 内存层次结构</h3><p>内存是计算机第二大组件。理想的存储要快、大、便宜，但技术无法同时满足，于是做成<strong>层次结构</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    A["寄存器&lt;br/&gt;最快 · 最小 · 最贵"] --&gt; B["高速缓存 L1/L2&lt;br/&gt;硬件控制 · 快"]</span><br><span class="line">    B --&gt; C["主存 RAM&lt;br/&gt;断电丢失 · 容量大"]</span><br><span class="line">    C --&gt; D["磁盘 / SSD&lt;br/&gt;最慢 · 容量最大 · 最便宜"]</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>寄存器</strong>：顶部，速度与 CPU 相同，程序须在软件里自行管理。</li>
+<li><strong>高速缓存</strong>：寄存器之下，主要由硬件控制。主存被分成<strong>高速缓存行</strong>（通常 64 字节）。CPU 要读数据时，缓存硬件先查对应行在不在——<strong>命中（cache hit）</strong>只需约 2 个时钟周期；不命中就必须去主存取，慢得多。缓存行数量受成本限制，有的机器有两三级缓存（每级更大但略慢）。</li>
+<li><strong>主存（RAM）</strong>：缓存不命中的访问最终都到主存。RAM 可读可写，<strong>断电丢失</strong>。</li>
+<li><strong>磁盘</strong>：比 RAM 每比特成本低两个数量级、容量高两个数量级，但随机访问慢约三个数量级。</li>
+</ul>
+<p><strong>为什么会有缓存？</strong> 硬件速度发展到瓶颈，处理器和内存的速度差距越来越大。与其砸钱提速内存，不如在处理器端引入高速缓存，利用程序的<strong>局部性原理</strong>，让大多数内存操作在缓存里就能完成，减少访问主存次数。</p>
+<p><strong>局部性原理</strong>：CPU 访问存储器（无论是取指令还是存取数据），所访问的存储单元总聚集在一个较小连续区域里。分为两种：</p>
+<ul>
+<li><strong>时间局部性</strong>：某个内存位置被重复引用。</li>
+<li><strong>空间局部性</strong>：某个位置被引用后，它附近的位置很快也被引用。</li>
+</ul>
+<blockquote>
+<p>局部性原理可以用程序验证：遍历一个 <code>[10000][10000]</code> 的二维数组，<code>dataArray[i][j]</code>（按行）和 <code>dataArray[j][i]</code>（按列）的耗时差异，就是空间局部性好坏的直观体现。</p>
+</blockquote>
+<p>缓存不只在 CPU，OS 也在用：比如把常用文件驻留在主存，避免反复读磁盘；把路径名到磁盘地址的转换结果缓存；把 URL 到 IP 的转换结果缓存。</p>
+<p><strong>任何缓存系统都要回答四个问题</strong>：何时把新内容放进来？放哪一行？没空位时移除谁？被移除的内容放到大存储器的哪里？——不同场景答案不同。</p>
+<p>现代 CPU 通常有两级缓存：<strong>L1 cache</strong> 在 CPU 内部（存放已解码指令和常用关键字，约 16KB，无延迟）；<strong>L2 cache</strong> 更大（兆字节级），访问有 1–2 个时钟周期延迟。</p>
+<blockquote>
+<p><strong>时钟周期</strong>：CPU 速度由振荡器两个脉冲之间的时间决定，每秒脉冲数越高越快，单位是 Hz（兆赫/千兆赫）。例如 4GHz 处理器每秒执行 40 亿个时钟周期。现代处理器每个周期可执行多条指令。</p>
+</blockquote>
+<p><strong>主存之外的非易失性存储</strong>：</p>
+<ul>
+<li><strong>ROM（只读存储器）</strong>：内容一旦写入就不变，速度快成本低。启动用的引导程序（bootstrap）通常存这里。</li>
+<li><strong>EEPROM / 闪存</strong>：可擦写重写，能修正程序错误；闪存常用于移动设备，介于 RAM 和磁盘之间，但有擦写寿命限制。</li>
+<li><strong>CMOS</strong>：断电会丢数据（易失性），但常用来保存当前时间和日期。</li>
+</ul>
+<p><strong>磁盘</strong>：机械装置，有一个或多个金属盘片以 5400/7200/10800rpm 旋转，机械臂悬在盘面上。信息写在同心圆上，一个臂位置的所有磁道合起来是<strong>柱面</strong>。每个磁道分成若干<strong>扇区</strong>（512 字节）。<strong>固态硬盘（SSD）不是磁盘</strong>——它没有可动部分，用闪存存储，只是同样断电不丢数据。现代计算机支持<strong>虚拟内存</strong>机制：把主存当成一部分缓存，最常用的程序放主存，其余放磁盘；地址映射由 CPU 里的<strong>存储器管理单元（MMU）</strong>完成。</p>
+<blockquote>
+<p>缓存和 MMU 对性能影响很大。在多道程序系统里，从一个程序切到另一个程序的机制叫<strong>上下文切换（context switch）</strong>，必要时还要把缓存里修改过的数据写回磁盘。</p>
+</blockquote>
+<h3 id="3-3-I-O-设备"><a href="#3-3-I-O-设备" class="headerlink" title="3.3 I/O 设备"></a>3.3 I/O 设备</h3><p>CPU 和存储器只是 OS 管理范围的冰山一角，I/O 设备同样重要。I/O 设备通常分两部分：</p>
+<ul>
+<li><strong>设备控制器</strong>：一块或一组芯片，直接控制物理设备，接受并执行 OS 的指令。它设计了一个<strong>简化接口</strong>给 OS 用，屏蔽底层物理细节（类似加一层代理简化复杂）。</li>
+<li><strong>设备本身</strong>：接口相对简单且已标准化。比如标准化的 SATA 磁盘控制器能适配任意 SATA 磁盘。</li>
+</ul>
+<blockquote>
+<p><code>ATA</code> 是 IBM 第二代 PC 的高级技术成果，<code>SATA</code> 是串行 ATA，现在是很多计算机的标准硬盘接口。OS 看到的是对”控制器”的接口，和”设备”接口差别很大。</p>
+</blockquote>
+<p>每种设备控制器不同，需要不同软件控制。专门和控制器通信、发命令、收响应的软件叫<strong>设备驱动程序（device driver）</strong>。</p>
+<p><strong>怎样把驱动程序装进操作系统（在内核态运行）？</strong> 三种途径：</p>
+<ol>
+<li>把内核和驱动程序重新连接，然后重启（UNIX 常用）；</li>
+<li>在一个 OS 文件里设置入口，重启时 OS 寻找并装载（Windows 常用）；</li>
+<li>OS 运行时动态装载，无需重启（热插拔设备如 USB、IEEE 1394 需要）。</li>
+</ol>
+<p>每个设备控制器都有些寄存器（比如指定磁盘地址、内存地址、扇区计数）。驱动程序从 OS 取一条指令，翻译成值写进设备寄存器，<strong>所有设备寄存器的集合就是 I/O 端口空间</strong>。设备寄存器有的被映射到可用地址空间（像内存一样读写）；有的放在专门 I/O 端口空间（用 <code>IN</code>/<code>OUT</code> 指令读写，需内核态）。</p>
+<p><strong>实现输入的三种方式</strong>：</p>
+<ol>
+<li><strong>忙等待（busy waiting）</strong>：用户程序发起系统调用 → 内核转成驱动程序调用 → 驱动启动 I/O 后<strong>循环检查</strong>设备是否完成。缺点是<strong>一直占着 CPU</strong>，一直轮询直到完成。</li>
+<li><strong>中断（interrupt）</strong>：驱动启动设备后立刻返回，OS 安排其他工作；设备完成时发一个<strong>中断</strong>通知。中断流程：驱动写寄存器告诉控制器做什么 → 控制器启动设备 → 完成后向中断控制器发信号 → 中断控制器在 CPU 引脚上声明，并把设备编号放到总线上 → CPU 响应，把 PC 和 PSW 压栈并切到内核态 → 用设备编号查<strong>中断向量</strong>找到处理程序 → 处理完成后恢复用户程序继续执行。注意：<strong>中断可以在不合宜的时间发生</strong>，CPU 可暂时禁中断，但多个中断同时到来时由中断控制器按优先级裁决。</li>
+<li><strong>DMA（直接存储器访问）</strong>：专门的 DMA 芯片控制内存和控制器之间的位流，<strong>无需 CPU 干预</strong>。CPU 只需设置要传送的字节数、设备/内存地址和方向，DMA 完成后发中断。</li>
+</ol>
+<h3 id="3-4-总线"><a href="#3-4-总线" class="headerlink" title="3.4 总线"></a>3.4 总线</h3><p>总线的英文 <code>bus</code> 直译”公共汽车”，比喻很贴切：总线是数据通道，沿线连接的设备像公交站，数据包像乘客，知道起点终点、沿途停靠。总线有容量限制，通常按固定长度”字”传输（当前多为 4 字节/32 位或 8 字节/64 位），还需要一个”控制器”协调各设备访问顺序，避免冲突。</p>
+<p>早期总线多是<strong>共享总线架构</strong>（多条线路并行传同一数据字，多设备共用一组线），需要仲裁机制。<strong>PCIe</strong> 则彻底改用<strong>端到端链路</strong>（点对点串行通道，每个设备与目标设备独立连接）。对比：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>共享总线架构</th>
+<th>端到端链路（PCIe）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>共享性</td>
+<td>多设备共享同一物理总线</td>
+<td>每个设备有独立连接</td>
+</tr>
+<tr>
+<td>带宽</td>
+<td>被所有设备共享，易成瓶颈</td>
+<td>每条链路独立带宽，互不影响</td>
+</tr>
+<tr>
+<td>传输方式</td>
+<td>并行</td>
+<td>串行（可用多条 Lane 并行）</td>
+</tr>
+<tr>
+<td>扩展性</td>
+<td>设备越多性能越差</td>
+<td>新设备加链路即可，扩展性好</td>
+</tr>
+<tr>
+<td>管理复杂度</td>
+<td>需复杂仲裁机制</td>
+<td>无共享资源问题，管理简单</td>
+</tr>
+</tbody></table>
+<p>现代 x86 系统里总线很多：高速缓存、内存（DDR3）、PCIe、PCI、USB、SATA、DMI，各司其职。比如 CPU 通过 DDR3 与内存交互、通过 PCIe 连 GPU、通过 DMI 连集成控制中心，再通过 SATA 接硬盘和 DVD、通过串行总线接 USB 设备。<strong>USB</strong> 从 1.0（12Mb/s）→ 2.0（480Mb/s）→ 3.0（≥5Gb/s），实现即插即用；<strong>SCSI</strong> 速度可达 640MB/s，多在服务器/工作站。</p>
+<hr>
+<h2 id="四、操作系统的三大核心抽象"><a href="#四、操作系统的三大核心抽象" class="headerlink" title="四、操作系统的三大核心抽象"></a>四、操作系统的三大核心抽象</h2><p><code>📄 文件</code> → 屏蔽 I/O 设备细节；<code>🧠 虚拟内存</code> → 屏蔽主存+磁盘；<code>⚙️ 进程</code> → 屏蔽处理器+主存+I/O。</p>
+<h3 id="4-1-进程"><a href="#4-1-进程" class="headerlink" title="4.1 进程"></a>4.1 进程</h3><p>每个进程都带一个独立的<strong>地址空间</strong>（从 0 到某个最大值的一段连续存储区域），里面放可执行代码、数据、以及函数调用和局部变量用的栈。除了地址空间，进程还关联一串<strong>资源</strong>：寄存器（PC、SP）、打开的文件列表、待处理信号、相关进程列表等。简而言之，进程是一个装了运行所需所有信息的容器。</p>
+<p><strong>多任务怎么”同时”跑？</strong> 靠上下文切换。假设你开了视频编辑器、Web 浏览器、后台邮件检查三个进程，其实同一时刻 CPU 只跑一个；OS 通过时间片轮转等调度策略，周期性地挂起一个启动另一个，让所有进程公平分到 CPU。当进程被挂起时，必须<strong>精确保存状态</strong>（地址空间内容 + 寄存器值 + 文件位置等上下文信息），存在<strong>进程表</strong>里，之后才能无缝恢复。</p>
+<p><strong>进程的父子关系</strong>：进程可以创建子进程，子进程再创建子进程，形成一棵<strong>进程树</strong>。比如 shell 收到一条编译命令，就创建一个子进程去编译，编译完自毁。理论上进程可以无限增长，但实际 OS 会限制最大进程数。</p>
+<p>进程之间协作要交换信息，机制叫<strong>进程间通信（IPC）</strong>。OS 还提供一批系统调用管理进程：申请/释放内存、等待子进程完成并收集结果、用新程序替换当前进程映像等。</p>
+<p>进程有时需要接收外部信息（比如网络发消息后，设一个定时器，超时没收到确认就重传）。定时器到期后 OS 会给进程发<strong>警告信号</strong>，中断当前执行、保存寄存器、触发信号处理例程。这些信号其实是<strong>软件模拟的硬件中断</strong>，发射原因很多：定时器到期、非法指令、访问无效内存等。</p>
+<p><strong>身份标识</strong>：每个进程分配唯一 <strong>UID</strong>（标识运行者），新进程继承父进程 UID。用户可以属于一个或多个组，每个组有唯一 <strong>GID</strong>。UNIX 类系统还有个特殊 <strong>超级用户</strong>（Windows 里叫管理员），权限更高，能执行违反常规保护规则的操作。</p>
+<h3 id="4-2-线程"><a href="#4-2-线程" class="headerlink" title="4.2 线程"></a>4.2 线程</h3><p>进程和线程都是对 CPU 工作时间段的抽象，<strong>只是颗粒度不同</strong>：进程描述更大的执行环境，线程是更细的执行单元。</p>
+<p>假设程序 A 要依次执行 a、b、c 三个模块。CPU 拿到程序 A 的控制权、加载它的上下文后，依次跑 a、b、c。注意：<strong>a、b、c 共享的是程序 A（进程）的上下文环境</strong>，所以在这些段之间切换，是<strong>线程级上下文切换</strong>，不是更重的进程级切换——开销小得多，CPU 利用率更高。</p>
+<blockquote>
+<p>注意：编程语言里说的”进程/线程”是语言层的具体实现，和 OS 层的概念是”具体化”的关系，别混为一谈。</p>
+</blockquote>
+<h3 id="4-3-地址空间与虚拟内存"><a href="#4-3-地址空间与虚拟内存" class="headerlink" title="4.3 地址空间与虚拟内存"></a>4.3 地址空间与虚拟内存</h3><p><strong>地址空间</strong>：早期简单 OS 一次只跑一个程序，要开第二个就得把第一个整个移出内存，多任务能力极差。后来允许多个程序同时加载到内存并行执行，靠硬件+OS 实现隔离保护。每个进程被分配一个<strong>专属地址集合</strong>，通常从 0 连续编号到某个最大值。</p>
+<blockquote>
+<p>理论上，32 位架构的虚拟地址空间可达 (2^{32}) 字节，64 位可达 (2^{64}) 字节，远超物理内存容量。正是<strong>虚拟内存</strong>技术解决了”地址空间比物理内存大”的问题。</p>
+</blockquote>
+<p><strong>虚拟内存</strong>：允许直接把物理内存暴露给程序是<strong>危险且低效</strong>的——安全风险增加（可破坏系统稳定性、数据泄露）、资源利用率低（碎片化）、内存管理复杂。虚拟内存作为物理内存和进程间的<strong>抽象层</strong>：给每个进程一个独立的、看似无限大的内存空间。每个进程都以为独占整个内存，实际只是在访问 OS 精心管理的虚拟地址空间。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph VS["进程的虚拟地址空间（高地址在上，低地址在下）"]</span><br><span class="line">        A["内核内存区&lt;br/&gt;（OS 专用，用户不可见）"]</span><br><span class="line">        B["堆栈区 Stack&lt;br/&gt;（参数、局部变量、返回地址）从高地址往低地址增长"]</span><br><span class="line">        C["共享库区&lt;br/&gt;（printf 等库代码）"]</span><br><span class="line">        D["堆区 Heap&lt;br/&gt;（malloc 动态分配）从低地址往高地址增长"]</span><br><span class="line">        E["进程代码与数据区&lt;br/&gt;只读段 + 可读写段"]</span><br><span class="line">    end</span><br></pre></td></tr></table></figure>
+
+<p>这张图从<strong>低地址（下）</strong>到<strong>高地址（上）</strong>排列，内核区在最上方（高地址），用户进程看不见它。从下往上看：</p>
+<ul>
+<li><strong>进程代码与数据区</strong>：最顶部承载可执行文件核心内容，分<strong>只读段</strong>（机器指令、只读数据如字符串常量）和<strong>可读写段</strong>（全局变量、静态变量，运行时允许修改）。</li>
+<li><strong>堆数据区（heap）</strong>：C 程序动态内存分配区，<code>malloc/calloc/realloc</code> 申请、<code>free</code> 释放，从低地址向高地址扩展。</li>
+<li><strong>共享库区</strong>：存放系统/第三方库代码（如 <code>printf</code>），多个进程共享同一份库代码，节省内存。</li>
+<li><strong>堆栈区（stack）</strong>：管理函数调用和局部变量，每个函数调用建一个<strong>栈帧</strong>（存参数、局部变量、返回地址），从高地址向低地址扩展。</li>
+<li><strong>内核内存区</strong>：最高地址处，内核专用的代码、数据和系统资源，用户进程不可见、无法访问，保证 OS 安全。</li>
+</ul>
+<h3 id="4-4-文件"><a href="#4-4-文件" class="headerlink" title="4.4 文件"></a>4.4 文件</h3><p>几乎所有 OS 都支持文件系统。OS 的一个核心功能就是屏蔽磁盘和其他 I/O 设备细节，给程序员一个<strong>与设备无关的抽象文件模型</strong>。创建、删除、读写文件都要通过系统调用。读文件前先”打开”（定位并验证权限），读完”关闭”。</p>
+<p>现代 OS 引入了<strong>目录</strong>概念，作为文件系统基本构成单元，允许用户按逻辑分组文件，形成<strong>树状结构</strong>（目录本身也是特殊文件，可嵌套包含文件或其他目录）。系统调用包括创建/删除目录、移动文件等。</p>
+<p>进程树和文件系统树都像树，但差异明显：进程树层次浅（很少超三层）、生命周期短（几分钟）；文件系统树更深（可达四五层）、<strong>持久存在</strong>。权限管理也不同：进程有明确父子关系，父进程能控制子进程；文件访问权限更灵活，不只限所有者。</p>
+<p><strong>路径</strong>：每个文件用唯一路径名定位，从根目录向下，各层目录用斜杠分隔。如 <code>/Faculty/Prof.Brown/Courses/CS101</code>，首个斜杠表示根目录。Windows 用反斜杠 <code>\</code>，Linux/Unix 用正斜杠 <code>/</code>。每个进程还拥有一个<strong>工作目录</strong>，作为相对路径的基准。</p>
+<p><strong>打开文件</strong>后分配一个<strong>文件描述符</strong>（非负整数），用于后续读写；拒绝访问则返回错误代码。</p>
+<p><strong>特殊文件</strong>：为了让 I/O 设备像普通文件一样读写。有两种特殊文件类型：</p>
+<ul>
+<li><strong>块特殊文件</strong>：可随机访问的块设备（如磁盘），打开后可直接访问第 N 块。</li>
+<li><strong>字符特殊文件</strong>：处理字符流的设备（如打印机、调制解调器）。<br>按惯例放在 <code>/dev</code> 目录，如 <code>/dev/lp0</code> 表示打印机。</li>
+</ul>
+<blockquote>
+<p>特殊文件是 <strong>UNIX/Linux 家族（POSIX）特有</strong>的设计——背后的哲学是 UNIX 的”<strong>一切皆文件</strong>“：设备、磁盘、终端统统统一成文件接口，开发者只要会读写文件，就会操作一切外设。Windows 没有这个机制：设备是系统里的”对象”，走 Win32 API 访问，只保留了 <code>CON</code>、<code>NUL</code>、<code>PRN</code> 等几个从 DOS 继承的设备名。现代 Linux 还把这一思想推进了一大步：<code>/proc</code>、<code>/sys</code> 等<strong>虚拟文件系统</strong>把内核信息、硬件状态也映射成了文件——<code>cat /proc/cpuinfo</code> 就能”读”到 CPU 信息，如同读一个普通文件。</p>
+</blockquote>
+<p><strong>管道（pipe）</strong>：一种与进程、文件都相关的重要特性，本质是<strong>存在内存里的一段空间</strong>，专门用于两个进程之间传输数据。注意”虚拟文件”的含义：它不是存储在磁盘上的实体，却能用文件那套操作来使用。</p>
+<p>两个进程用管道通信的流程：先创建一个管道，然后——</p>
+<ul>
+<li>进程 A 把数据”写”进管道，就像写一个普通的<strong>输出文件</strong>；</li>
+<li>进程 B 从管道”读”数据，就像读一个普通的<strong>输入文件</strong>；</li>
+<li>数据并不落到磁盘上，而是<strong>实时地</strong>直接送到另一端：A 写进去的字节，B 马上就能读到。</li>
+</ul>
+<p>管道价值的本质：开发人员可以用<strong>熟悉的文件操作接口</strong>来实现进程间通信——两个进程无需直接接触、互不干扰，数据就传输完毕了。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="built_in">cat</span> file1 file2 file3 | <span class="built_in">sort</span> &gt; /dev/lp</span><br></pre></td></tr></table></figure>
+
+<p><code>|</code> 就是管道操作符：左边命令的标准输出（stdout），直接变成右边命令的标准输入（stdin）。上面这句把三个文件用 <code>cat</code> 合并 → 通过 <code>|</code> 传给 <code>sort</code> 排序 → 最后的 <code>&gt;</code> 是重定向（<code>&lt;</code> 反向，把文件内容喂给命令），把排序结果写进 <code>/dev/lp</code>—本小节前面讲的<strong>字符特殊文件</strong>（打印机）。shell 把这些符号串起来，一条命令就完成了”合并 → 排序 → 打印”三连。</p>
+<h3 id="4-5-保护：rwx-权限"><a href="#4-5-保护：rwx-权限" class="headerlink" title="4.5 保护：rwx 权限"></a>4.5 保护：rwx 权限</h3><p>以 UNIX 为例，每个文件分配一个<strong>9 位二进制保护代码</strong>，分成三段：第一段给<strong>所有者</strong>，第二段给<strong>同组用户</strong>，第三段给<strong>其他用户</strong>。每段三位，分别控制<strong>读（r）、写（w）、执行（x）</strong>，即经典的”rwx 位”。</p>
+<p>例如 <code>rwxr-x--x</code>：</p>
+<ul>
+<li>所有者（owner）：r、w、x 全有；</li>
+<li>同组用户（group）：只有 r（读）和 x（执行），不能改；</li>
+<li>其他用户（others）：只有 x（执行），不能读也不能写。</li>
+</ul>
+<hr>
+<h2 id="五、系统调用：用户态进入内核的大门"><a href="#五、系统调用：用户态进入内核的大门" class="headerlink" title="五、系统调用：用户态进入内核的大门"></a>五、系统调用：用户态进入内核的大门</h2><p>上一节里的文件、进程、权限，都是通过系统调用实现”抽象接口 + 资源管理”的——现代操作系统普遍采用系统调用，尽管各系统间细节各异，但<strong>基本原理相通</strong>。此处入门仅需了解即可。</p>
+<ul>
+<li><strong>任何单 CPU 计算机，在任意时刻都只能执行一条指令。</strong> 所以进程在用户态执行用户程序时（比如读文件数据），如果想把控制权转移给操作系统，就必须执行一条特定指令——<strong>异常指令</strong>或<strong>系统调用指令</strong>，光靠普通 C 代码是”够不着”内核的。</li>
+<li><strong>系统调用的触发依赖计算机底层的机制，通常需要通过汇编语言来精确表达。</strong> C 语言里没有”把控制权交给内核”这种语句——所以 C 程序要经由 <strong>库函数</strong> 中转：库函数内部用汇编把系统调用编号放进寄存器、执行 TRAP 指令。这也是为什么平时的代码只调 <code>read</code> 函数，而不是直接”调用内核”。</li>
+</ul>
+<p>控制权交到内核后，操作系统先执行<strong>参数检查</strong>（确认目标进程、其所需调用的服务），确认无误后执行系统调用，控制权暂时转交给内核态的相应指令序列。</p>
+<blockquote>
+<p>简而言之，<strong>系统调用类似于一种特殊的过程调用</strong>，但它和普通过程调用有本质区别：普通过程调用只能在同一运行模式下跳来跳去，而系统调用<strong>能够跨越用户态与内核态的界限</strong>——正是这一点，才让用户程序”合法地”碰得到硬件。</p>
+</blockquote>
+<p>这里以**<code>read</code> 系统调用举例**：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">count = read(fd, buffer, nbytes);</span><br></pre></td></tr></table></figure>
+
+<p>三个参数：文件描述符（指定文件）、缓冲区指针（数据放哪）、要读的字节数。成功返回实际读取字节数（可能小于请求值）；失败返回 -1，并在全局变量 <code>errno</code> 里记录错误代码。所以程序<strong>必须检查返回值</strong>。</p>
+<p>read 调用历经 <strong>11 个步骤</strong>（完整流程见下图，①~⑪ 与下面文字一一对应）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph U["🎩 用户空间（用户进程）"]</span><br><span class="line">        direction TB</span><br><span class="line">        S1["① 压入 nbytes"] --&gt; S2["② 压入 &amp;buffer"]</span><br><span class="line">        S2 --&gt; S3["③ 压入 fd"]</span><br><span class="line">        S3 --&gt; S4["④ 调用 read 库函数"]</span><br><span class="line">        S4 --&gt; S5["⑤ 系统调用编号放入指定寄存器"]</span><br><span class="line">        S5 --&gt; S6["⑥ TRAP：陷入内核"]</span><br><span class="line">        S9["⑨ 返回用户态的函数调用库"] --&gt; S10["⑩ 返回给调用者&lt;br/&gt;read 之后的下一条指令"]</span><br><span class="line">        S10 --&gt; S11["⑪ 增加 SP：清理压入的参数"]</span><br><span class="line">    end</span><br><span class="line">    subgraph K["🔒 内核空间（操作系统）"]</span><br><span class="line">        direction TB</span><br><span class="line">        S7["⑦ 解析编号，查 dispatch 表定位处理器"] --&gt; S8["⑧ 执行系统调用处理程序"]</span><br><span class="line">    end</span><br><span class="line">    S6 --&gt; S7</span><br><span class="line">    S8 --&gt; S9</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>read</code> 的完整执行步骤</strong>（C/C++ 编译器对函数调用按<strong>逆序压参</strong>）：把参数压入堆栈 → 程序调用 <code>read</code> 库函数 → 底层需要更深的系统调用 → 把系统调用编号放进指定寄存器 → 执行 <strong>TRAP</strong> 指令（切到内核态，跳转到内核预定义地址）→ 内核解析编号，用 <strong>dispatch 表</strong>定位系统调用处理器 → 执行服务 → 控制权返回到用户态函数调用库 → 返回发起调用的应用。最后一步是系统调用返回后<strong>调整堆栈指针</strong>，把之前压入的参数清掉——让堆栈回到调用前的状态。若调用阻塞（如等键盘输入），OS 可能暂停当前进程、调度其他就绪进程；条件满足再唤醒。</p>
+<blockquote>
+<p>TRAP 和普通过程调用有两点不同：它改变了执行模式；跳转目标受限于硬件/OS 定义，而非任意地址。</p>
+</blockquote>
+<p>刚才的 <code>read</code> 只是系统调用世界的一个例子——一共 有100 多个系统调用。在列出之前，补充一个问题：<strong>为什么 <code>read</code>、<code>fork</code> 这些名字，在 Linux 上敲、在 macOS 上敲，全都一模一样？</strong> 答案就是 POSIX。</p>
+<p><strong>POSIX 是什么？</strong> 它是一门<strong>标准</strong>——IEEE 制定的”可移植操作系统接口”（Portable Operating System Interface），规定操作系统<strong>应该给应用程序提供哪些接口</strong>：系统调用名、参数、库函数、命令行约定，通通写进标准条文。它要解决的只有一个问题：<strong>可移植性</strong>。因为有了 POSIX，同样的 <code>open</code>/<code>read</code>/<code>fork</code>，在 Linux、macOS、FreeBSD、Solaris 上名字一模一样、参数一模一样——写一次代码，换平台重编译就能跑。</p>
+<p>注意：POSIX 是<strong>标准条文</strong>（规定”应该长什么样”），不是某个具体的操作系统。Linux 内核 + glibc 实现了它，macOS（BSD 血统）也实现了它。打个比方：POSIX 像”同一本单词书”，Linux 和 macOS 是”两家出版社印的实体书”——程序只认标准拼写，在哪一本里都查得到，自然就跨平台了。</p>
+<p><strong>常用 POSIX 系统调用</strong>：</p>
+<p><strong>进程管理</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pid = fork()</code></td>
+<td>创建与父进程相同的子进程</td>
+</tr>
+<tr>
+<td><code>pid = waitpid(pid, &amp;statloc, options)</code></td>
+<td>等待一个子进程终止</td>
+</tr>
+<tr>
+<td><code>s = execve(name, argv, environp)</code></td>
+<td>替换一个进程的核心映像</td>
+</tr>
+<tr>
+<td><code>exit(status)</code></td>
+<td>终止进程并返回状态</td>
+</tr>
+</tbody></table>
+<p><strong>文件管理</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fd = open(file, how, ...)</code></td>
+<td>打开文件用于读、写</td>
+</tr>
+<tr>
+<td><code>s = close(fd)</code></td>
+<td>关闭文件</td>
+</tr>
+<tr>
+<td><code>n = read(fd, buffer, nbytes)</code></td>
+<td>从文件读数据到缓冲区</td>
+</tr>
+<tr>
+<td><code>n = write(fd, buffer, nbytes)</code></td>
+<td>从缓冲区写数据到文件</td>
+</tr>
+<tr>
+<td><code>position = lseek(fd, offset, whence)</code></td>
+<td>移动文件指针</td>
+</tr>
+<tr>
+<td><code>s = stat(name, &amp;buf)</code></td>
+<td>取得文件状态信息</td>
+</tr>
+</tbody></table>
+<p><strong>目录和文件系统管理</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>s = mkdir(name, mode)</code></td>
+<td>创建新目录</td>
+</tr>
+<tr>
+<td><code>s = rmdir(name)</code></td>
+<td>删除空目录</td>
+</tr>
+<tr>
+<td><code>s = link(name1, name2)</code></td>
+<td>创建新目录项指向已有文件</td>
+</tr>
+<tr>
+<td><code>s = unlink(name)</code></td>
+<td>删除一个目录项</td>
+</tr>
+<tr>
+<td><code>s = mount(special, name, flag)</code></td>
+<td>安装一个文件系统</td>
+</tr>
+<tr>
+<td><code>s = umount(special)</code></td>
+<td>卸载一个文件系统</td>
+</tr>
+</tbody></table>
+<p><strong>其他</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>s = chdir(dirname)</code></td>
+<td>改变工作目录</td>
+</tr>
+<tr>
+<td><code>s = chmod(name, mode)</code></td>
+<td>修改文件保护位</td>
+</tr>
+<tr>
+<td><code>s = kill(pid, signal)</code></td>
+<td>发送信号给进程</td>
+</tr>
+<tr>
+<td><code>seconds = time(&amp;seconds)</code></td>
+<td>获取从 1970-01-01 至今的时间</td>
+</tr>
+</tbody></table>
+<p><strong>几个关键系统调用解读</strong>：</p>
+<ul>
+<li><p><strong><code>fork</code><strong>：POSIX 下创建进程的唯一机制。它复制当前进程（父进程）——包括文件描述符、寄存器值等；复制地址空间 = 先共享，</strong>需要写入时才真正复制（写时复制 COW）</strong>。<code>fork</code> 返回一个特殊值：<strong>子进程里返回 0，父进程里返回子进程 PID</strong>。通过检查返回值，程序就知道自己是在父还是子进程里。<code>fork</code> 后父子进程各自独立修改自己的变量。</p>
+</li>
+<li><p>**<code>waitpid</code>**：父进程等待一个或多个子进程结束。第一个参数为 -1 时等待任意子进程；第二个参数返回退出状态（正常/异常终止和退出码）；第三个参数指定选项（如没有已退出子进程时立即返回）。</p>
+</li>
+<li><p><strong><code>execve</code><strong>：加载并执行第一个参数指定的程序，</strong>替换当前进程映像</strong>。三个参数：文件名（字符串指针）、参数向量（以 null 结尾的字符串数组）、环境变量（<code>name=value</code> 形式数组）。注意程序入口是 <code>int main(int argc, char *argv[], char *envp[])</code>——<code>argc</code> 是参数个数（含程序名本身），<code>argv</code> 是参数字符串数组，<code>envp</code> 是环境变量数组。</p>
+<p><strong>shell 常用 <code>fork + execve</code> 组合</strong>，典型伪代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (TRUE) {</span><br><span class="line">    type_prompt();                         <span class="comment">// 显示提示符</span></span><br><span class="line">    <span class="keyword">if</span> (read_command(command, parameters) == <span class="number">-1</span>) <span class="keyword">break</span>;</span><br><span class="line">    <span class="type">pid_t</span> pid = fork();</span><br><span class="line">    <span class="keyword">if</span> (pid &lt; <span class="number">0</span>)            { perror(<span class="string">"fork failed"</span>); <span class="built_in">exit</span>(<span class="number">1</span>); }</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (pid &gt; <span class="number">0</span>)       waitpid(pid, &amp;status, <span class="number">0</span>);   <span class="comment">// 父进程等待</span></span><br><span class="line">    <span class="keyword">else</span> {</span><br><span class="line">        execve(command, parameters, <span class="literal">NULL</span>); <span class="comment">// 子进程执行命令</span></span><br><span class="line">        perror(<span class="string">"execve failed"</span>); <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>比如敲了 <code>cp file1 file2</code>，shell 先 <code>fork</code> 建子进程，子进程再 <code>execve</code> 执行 <code>cp</code>，传 <code>file1</code>、<code>file2</code> 作为参数。</p>
+</li>
+<li><p>**<code>exit</code>**：终止当前进程，返回 0–255 的状态码给父进程（通过 <code>waitpid</code> 的 <code>statloc</code> 返回）。</p>
+</li>
+<li><p><strong>UNIX 进程的内存划分</strong>：<code>text segment</code>（文本区，程序代码）、<code>data segment</code>（数据区，变量）、<code>stack segment</code>（栈区）。数据向上增长、堆栈向下增长，夹在中间的是空闲区。数据段扩展通过 <code>brk</code> 系统调用显式进行（但 <code>brk</code> 不是 POSIX 标准，标准鼓励用 <code>malloc</code>，<code>malloc</code> 内部实现不适合标准化）。</p>
+</li>
+</ul>
+<p><strong>文件和目录系统调用小结</strong>：<code>open</code> 需指定绝对/相对路径名和访问模式（<code>O_RDONLY</code>/<code>O_WRONLY</code>/<code>O_RDWR</code>，新建加 <code>O_CREATE</code>），成功返回文件描述符。<code>read/write</code> 最常用。<code>lseek</code> 改变文件读写位置指针，参数为文件描述符、偏移量、起始标志（<code>SEEK_SET</code> 文件开头 / <code>SEEK_CUR</code> 当前位置 / <code>SEEK_END</code> 文件末尾），成功返回新位置的绝对偏移。<code>stat</code> 查询文件元数据（类型、大小、修改时间），<code>fstat</code> 对已打开文件用。</p>
+<p>目录相关：<code>mkdir</code>/<code>rmdir</code> 创建/删空目录。**<code>link(name1, name2)</code>** 让同一文件以两个或多个名称出现（多用在不同目录），它利用已有文件的 <strong>i-number（i-节点编号）</strong> 创建新目录项。UNIX 每个文件有唯一的 i-编号，是 <strong>i-节点表</strong> 的索引（记录谁拥有文件、磁盘块在哪）。目录其实是一组 <code>(i编号, ASCII名)</code> 映射。<code>unlink</code> 删一个目录项；当指向文件的目录项全部移除时，文件才被真正删除。**<code>mount(special, name, flag)</code>** 把两个文件系统合并，如 <code>mount("/dev/sdb0", "/mnt", 0)</code> 把 USB 盘挂到根文件系统；<code>umount</code> 卸载。</p>
+<p><strong>其他系统调用</strong>：<code>chdir("/usr/ast/test")</code> 改变工作目录（省得每次输入长路径）；<code>chmod("file", 0644)</code> 改文件保护位（让文件对所有者之外可读）；<code>kill</code> 发送信号（进程有信号处理程序就跑它，没准备好信号会杀掉进程）；<code>time</code> 返回从 1970-01-01 到现在的秒数，32 位下最大 <code>(2^32)-1</code> 秒约 136 年，所以 2106 年 32 位 UNIX 会”发飙”。</p>
+<h3 id="Win32-API-对比"><a href="#Win32-API-对比" class="headerlink" title="Win32 API 对比"></a>Win32 API 对比</h3><p>UNIX 里 <code>read</code> 系统调用和 <code>read</code> 库函数几乎一对一；<strong>Windows 则完全不同</strong>：库函数调用和实际系统调用几乎不对应，微软定义了一大套过程叫 <strong>Win32 应用编程接口（API）</strong>，程序员通过这套标准接口实现系统调用，支持从 Win95 以来所有版本。Win32 API 数量极大（几千个），但<strong>不都在内核态运行</strong>，很多在用户态（管理视窗、几何图形、文本、字体、对话框、菜单等 GUI 功能）。</p>
+<table>
+<thead>
+<tr>
+<th>UNIX</th>
+<th>Win32</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fork</code></td>
+<td><code>CreateProcess</code></td>
+<td>创建新进程</td>
+</tr>
+<tr>
+<td><code>waitpid</code></td>
+<td><code>WaitForSingleObject</code></td>
+<td>等待进程退出</td>
+</tr>
+<tr>
+<td><code>execve</code></td>
+<td>无</td>
+<td><code>CreateProcess</code> = fork + execve</td>
+</tr>
+<tr>
+<td><code>exit</code></td>
+<td><code>ExitProcess</code></td>
+<td>终止执行</td>
+</tr>
+<tr>
+<td><code>open</code></td>
+<td><code>CreateFile</code></td>
+<td>创建/打开文件</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td><code>CloseHandle</code></td>
+<td>关闭文件</td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td><code>ReadFile</code></td>
+<td>从文件读数据</td>
+</tr>
+<tr>
+<td><code>write</code></td>
+<td><code>WriteFile</code></td>
+<td>向文件写数据</td>
+</tr>
+<tr>
+<td><code>lseek</code></td>
+<td><code>SetFilePointer</code></td>
+<td>移动文件指针</td>
+</tr>
+<tr>
+<td><code>stat</code></td>
+<td><code>GetFileAttributesEx</code></td>
+<td>获取文件属性</td>
+</tr>
+<tr>
+<td><code>mkdir</code></td>
+<td><code>CreateDirectory</code></td>
+<td>创建目录</td>
+</tr>
+<tr>
+<td><code>rmdir</code></td>
+<td><code>RemoveDirectory</code></td>
+<td>删除空目录</td>
+</tr>
+<tr>
+<td><code>link</code> / <code>mount</code> / <code>umount</code> / <code>chmod</code> / <code>kill</code></td>
+<td>无</td>
+<td>Win32 不支持</td>
+</tr>
+<tr>
+<td><code>unlink</code></td>
+<td><code>DeleteFile</code></td>
+<td>删除文件</td>
+</tr>
+<tr>
+<td><code>chdir</code></td>
+<td><code>SetCurrentDirectory</code></td>
+<td>切换工作目录</td>
+</tr>
+<tr>
+<td><code>time</code></td>
+<td><code>GetLocalTime</code></td>
+<td>获取当前时间</td>
+</tr>
+</tbody></table>
+<p><strong>关键差异</strong>：Windows 无 <code>fork</code>/<code>execve</code>，<code>CreateProcess</code> 把两者合成一个。<strong>Windows 没有父子进程层次</strong>——进程创建后，创建者和被创建者是平等的（UNIX 有清晰父子关系与进程树）。<code>CreateProcess</code> 有大量参数指定新进程性质。Win32 没有文件 link、mount、umount、chmod、kill；但也有大量 UNIX 没有的调用，尤其是 GUI 管理。</p>
+<hr>
+<h2 id="六、操作系统结构"><a href="#六、操作系统结构" class="headerlink" title="六、操作系统结构"></a>六、操作系统结构</h2><h3 id="6-1-单体内核（Monolithic-Kernel）"><a href="#6-1-单体内核（Monolithic-Kernel）" class="headerlink" title="6.1 单体内核（Monolithic Kernel）"></a>6.1 单体内核（Monolithic Kernel）</h3><p>传统很多系统用单体内核：<strong>整个操作系统作为一个大型、单一二进制程序在内核态运行</strong>，把进程管理、内存管理、文件系统、设备驱动等组件紧密集成为一个可执行文件。</p>
+<ul>
+<li><strong>优点</strong>：所有组件在同一地址空间，组件间交互高效，减少上下文切换开销。</li>
+<li><strong>缺点</strong>：系统庞大复杂，维护调试难；**”一荣俱荣，一损俱损”**——内核任何部分出问题，整个系统都可能崩溃。</li>
+</ul>
+<p>开发遵循：主程序（初始化并调度）+ 服务过程（处理系统调用）+ 辅助服务程序（数据处理、资源管理，形成层次化服务）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">┌────────────────────────────────────────────────────┐</span><br><span class="line">│                  主程序（init）                      │  ← 初始化内核并调度</span><br><span class="line">├────────────────────────────────────────────────────┤</span><br><span class="line">│   服务程序 A（进程管理）   服务程序 B（内存管理）       │</span><br><span class="line">│   服务程序 C（文件系统）   服务程序 D（设备驱动）       │  ← 处理系统调用</span><br><span class="line">├────────────────────────────────────────────────────┤</span><br><span class="line">│   辅助服务程序：数据处理、资源管理等（若干小模块）        │  ← 实用程序</span><br><span class="line">└────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>注意这张图：<strong>逻辑上分了三层，物理上还是一个大型二进制程序、全部运行在内核态</strong>——分层只是”为了管理复杂性而划分”（理解、维护方便），并没有真正把哪层独立出来。</p>
+<p>为了增强模块性和可扩展性，现代系统引入<strong>共享库</strong>（UNIX）和<strong>动态链接库 DLL</strong>（Windows）动态加载扩展功能。</p>
+<h3 id="6-2-分层系统（Layered-System）"><a href="#6-2-分层系统（Layered-System）" class="headerlink" title="6.2 分层系统（Layered System）"></a>6.2 分层系统（Layered System）</h3><p>分层系统通过<strong>层级</strong>隔离功能模块：每一层只和相邻层通信，用下层提供的服务实现自身功能，层间通信走预定义接口。</p>
+<p>著名实例是 Dijkstra 团队开发的 <strong>THE 系统</strong>，六层结构：</p>
+<table>
+<thead>
+<tr>
+<th>层号</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>5</td>
+<td>操作员</td>
+</tr>
+<tr>
+<td>4</td>
+<td>用户程序</td>
+</tr>
+<tr>
+<td>3</td>
+<td>输入/输出管理</td>
+</tr>
+<tr>
+<td>2</td>
+<td>操作员-进程通信</td>
+</tr>
+<tr>
+<td>1</td>
+<td>存储器和磁鼓管理</td>
+</tr>
+<tr>
+<td>0</td>
+<td>处理器分配和多道程序编程</td>
+</tr>
+</tbody></table>
+<ul>
+<li>第 0 层：处理器分配，中断/定时器超时时做进程切换；之上是相互协作的进程。</li>
+<li>第 1 层：内存管理，为主存进程分配空间、控制页面调入调出。</li>
+<li>第 2 层：进程与操作员控制台通信。</li>
+<li>第 3 层：管理 I/O 设备及缓冲区。</li>
+<li>第 4 层：用户程序所在层，无需关心进程/内存/控制台/I/O 细节。</li>
+<li>第 5 层：系统操作员与系统的交互界面。</li>
+</ul>
+<p>分层提高了模块化、可维护性和扩展性。</p>
+<h3 id="6-3-微内核（Microkernel）"><a href="#6-3-微内核（Microkernel）" class="headerlink" title="6.3 微内核（Microkernel）"></a>6.3 微内核（Microkernel）</h3><p>分层设计需要明确划分<strong>内核-用户边界</strong>。传统把所有层放内核，但实际上<strong>内核里的错误难以处理、一出错整个系统就崩</strong>。所以反过来想：<strong>尽量减少内核功能</strong>，让内核最小化。</p>
+<p>微内核把 OS 分成小型、功能明确的模块，<strong>只有一个微内核运行在特权模式（内核态）</strong>，其他模块（设备驱动、文件系统）作为<strong>普通用户进程</strong>运行——即使这些模块崩溃，也不会影响整个系统。<strong>MINIX 3</strong> 是微内核代表作，它的具体结构如下（对比上面的单体内核：这里只有最下面一条灰条在内核态）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">用户态 │ ┌──────────────────────────────────────────┐</span><br><span class="line">       │ │  用户程序：  shell       Make      Other  │  ← 用户进程</span><br><span class="line">       │ ├──────────────────────────────────────────┤</span><br><span class="line">       │ │  服务器：    FS        Proc     Reinc     │  ← 文件/进程/重生</span><br><span class="line">       │ │              Other                        │</span><br><span class="line">       │ ├──────────────────────────────────────────┤</span><br><span class="line">       │ │  设备驱动：  Disk  TTY  New  Print  Other │  ← 无权直接碰 I/O</span><br><span class="line">       │ │        （构造结构 + 系统调用，辗转进内核）   │</span><br><span class="line">       │ ═════════════════════════════════════════════</span><br><span class="line">内核态 │ │  微内核：中断处理 · 进程调度 · 进程通信      │  ← 唯一特权模块</span><br><span class="line">       │ │          （旁挂 Clock、Sys 等小服务）       │</span><br><span class="line">       │ └──────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>有意思的是：<strong>文件系统、进程管理器这些”操作系统核心业务”，在微内核里是作为用户进程跑的</strong>——它们和你的 shell 平级，谁也压不过谁；一旦某个服务器崩溃，只有它自己消失，系统照样运行。</p>
+<ul>
+<li>最底层：设备驱动程序（运行在用户态，无法直接访问 I/O 端口，需构造结构 + 系统调用间接交互）；</li>
+<li>之上一层：<strong>服务器</strong>，包括文件服务器（文件系统）、进程管理器（创建/销毁/管理进程），还有一个特殊的<strong>重生服务器</strong>——检测并修复服务器和驱动程序的故障，无需用户干预自动恢复。</li>
+<li>微内核体现<strong>机制与策略分离</strong>：内核只实现”选择最高优先级进程运行”这个<strong>机制</strong>，而”如何分配优先级”这个<strong>策略</strong>由用户态进程管理器决定。内核精简、易维护、易扩展。</li>
+</ul>
+<h3 id="6-4-客户-服务器模式（Client-Server）"><a href="#6-4-客户-服务器模式（Client-Server）" class="headerlink" title="6.4 客户-服务器模式（Client-Server）"></a>6.4 客户-服务器模式（Client-Server）</h3><p>微内核思想把进程分成两类：<strong>服务器</strong>（提供服务）和<strong>客户端</strong>（使用服务），这就是客户-服务器模式。它有两种载体：一是在一台计算机上既当客户端又当服务器（OS 会优化）；普遍情况是客户端和服务器在<strong>不同机器</strong>上，通过局域网/广域网连接。</p>
+<p><strong>客户端不知道消息在本地还是远程处理</strong>——两种情形对客户端一样：发请求、收回应。现代 Web 就是典型：PC 向某服务器请求网页，服务器返回。越来越多系统（包括家用 PC）成为客户端，某地运行的大型机器成为服务器。</p>
+<hr>
+<h2 id="七、计算机是如何启动的"><a href="#七、计算机是如何启动的" class="headerlink" title="七、计算机是如何启动的"></a>七、计算机是如何启动的</h2><p>主板（母板）上有 <strong>BIOS（基本输入输出系统）</strong>，内含底层 I/O 软件（读键盘、写屏幕、磁盘 I/O 等），如今存在闪存里（非易失但可更新）。</p>
+<p>启动流程：</p>
+<ol>
+<li><strong>BIOS 自检</strong>：检查装了多大 RAM、键盘等基础设备是否正常响应。</li>
+<li><strong>扫描总线</strong>：扫描 PCIe/PCI 总线，找出所有设备，记录即插即用设备；若设备和上次不同则重新配置。</li>
+<li><strong>从 CMOS 清单找启动设备</strong>：CMOS 是主板上可读写的 RAM 芯片，用来保存 BIOS 设置后硬件参数（有时把 BIOS 设置叫 CMOS 设置）。用户可进 BIOS 配置程序修改设备清单，也可判定能否从 CD-ROM/USB 启动。</li>
+<li><strong>从硬盘启动</strong>：启动失败则从硬盘启动，把启动设备<strong>第一个扇区</strong>读入内存执行。它通常检查分区表确定哪个分区是活动的，再从该分区读入<strong>引导加载程序</strong>，这个加载器从活动分区读取操作系统并启动它。</li>
+<li><strong>OS 加载设备驱动</strong>：OS 询问 BIOS 获取配置信息，逐个设备检查是否有驱动；没有则问用户装（CD-ROM 或下载）。有驱动就加载进内核，初始化表、创建后台进程、启动登录程序或 GUI。</li>
+</ol>
+<hr>
+<h2 id="八、操作系统博物馆"><a href="#八、操作系统博物馆" class="headerlink" title="八、操作系统博物馆"></a>八、操作系统博物馆</h2><p>操作系统存在大半个世纪，种类繁多。按应用场景分：</p>
+<ul>
+<li><strong>大型机操作系统</strong>：高端，在大型公司数据中心。I/O 容量与 PC 天差地别，一个大型机有 1000 个磁盘、数百万 G 容量很正常。也用于高端 Web 服务器、大型电商站点。</li>
+<li><strong>服务器操作系统</strong>：运行在服务器上（大型 PC、工作站或大型机），通过网络为多个用户服务、共享软硬件资源，可提供打印/文件/Web 服务。典型：Solaris、FreeBSD、Linux、Windows Server。</li>
+<li><strong>多处理器操作系统</strong>：把多个 CPU 连成一个系统（并行计算机/多计算机/多处理器），需要专门 OS（配通信、连接、一致性功能）。个人电脑多核芯片出现后，Windows/Linux 也能跑多核。</li>
+<li><strong>个人计算机操作系统</strong>：支持多道处理，启动时常有几十个程序在跑，为单个用户提供良好支持（字处理、表格、游戏、上网）。如 Linux、FreeBSD、Windows 7/8、macOS。</li>
+<li><strong>掌上计算机操作系统</strong>：平板、智能手机、PDA，市场被 Android 和 iOS 主导。</li>
+<li><strong>嵌入式操作系统</strong>：控制设备（微波炉、汽车、DVD 刻录机、手机、MP3）里的计算机，不允许用户装软件。所有软件跑在 ROM，应用间无保护，较简化。典型：Linux、QNX、VxWorks。</li>
+<li><strong>传感器节点操作系统</strong>：微小传感器节点网络（可互相通信、用无线基站），用于建筑周边保护、国境界保卫、森林火灾探测、气象预测。每个节点是带 CPU、RAM、ROM 和传感器的真计算机，跑小型事件驱动 OS。</li>
+<li><strong>实时操作系统</strong>：把时间当关键参数。<strong>硬实时</strong>应在规定时刻发生（工业控制、民航、军事）；<strong>软实时</strong>偶尔违反时限还能接受、无永久损害（数字音频/多媒体、智能手机）。</li>
+<li><strong>智能卡操作系统</strong>：最小的 OS，跑在智能卡上（带 CPU 芯片的信用卡），能耗和存储极受限。有的是单功能电子支付，有的是面向 Java（ROM 里有 JVM 解释器）。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag"># 操作系统</a>
+              <a href="/tags/%E5%9B%9B%E5%A4%A7%E4%BB%B6/" rel="tag"># 四大件</a>
+              <a href="/tags/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/" rel="tag"># 系统调用</a>
+              <a href="/tags/%E8%BF%9B%E7%A8%8B/" rel="tag"># 进程</a>
+              <a href="/tags/%E7%BA%BF%E7%A8%8B/" rel="tag"># 线程</a>
+              <a href="/tags/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98/" rel="tag"># 虚拟内存</a>
+              <a href="/tags/%E6%96%87%E4%BB%B6/" rel="tag"># 文件</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/09/02/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/" rel="prev" title="大一四级635，六级614，心得分享">
+      <i class="fa fa-chevron-left"></i> 大一四级635，六级614，心得分享
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F"><span class="nav-number">1.</span> <span class="nav-text">为什么需要操作系统</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E7%A8%8B%E5%BA%8F%E7%9A%84%E4%B8%80%E7%94%9F%EF%BC%9A%E4%BB%8E%E6%BA%90%E7%A0%81%E5%88%B0%E8%BF%90%E8%A1%8C"><span class="nav-number">2.</span> <span class="nav-text">一、程序的一生：从源码到运行</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-%E4%BF%A1%E6%81%AF%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9Acontext-byte"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 信息是什么：context + byte</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-%E7%BC%96%E8%AF%91%E7%B3%BB%E7%BB%9F%E5%9B%9B%E6%AD%A5"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 编译系统四步</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-%E8%BF%90%E8%A1%8C%EF%BC%9Ashell-%E4%B8%8E%E5%8F%AF%E6%89%A7%E8%A1%8C%E6%96%87%E4%BB%B6"><span class="nav-number">2.3.</span> <span class="nav-text">1.3 运行：shell 与可执行文件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E6%89%80%E5%A4%84%E7%9A%84%E4%BD%8D%E7%BD%AE"><span class="nav-number">3.</span> <span class="nav-text">二、操作系统所处的位置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E7%A1%AC%E4%BB%B6%E9%80%9F%E8%A7%88%EF%BC%9AOS-%E7%9C%BC%E4%B8%AD%E7%9A%84%E6%9C%BA%E5%99%A8"><span class="nav-number">4.</span> <span class="nav-text">三、硬件速览：OS 眼中的机器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-CPU"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 CPU</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%B5%81%E6%B0%B4%E7%BA%BF%E4%B8%8E%E8%B6%85%E6%A0%87%E9%87%8F"><span class="nav-number">4.1.1.</span> <span class="nav-text">流水线与超标量</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%86%85%E6%A0%B8%E6%80%81%E4%B8%8E%E7%94%A8%E6%88%B7%E6%80%81"><span class="nav-number">4.1.2.</span> <span class="nav-text">内核态与用户态</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%A4%9A%E7%BA%BF%E7%A8%8B%E3%80%81%E5%A4%9A%E6%A0%B8%E3%80%81GPU"><span class="nav-number">4.1.3.</span> <span class="nav-text">多线程、多核、GPU</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B9%B6%E5%8F%91%E4%B8%8E%E5%B9%B6%E8%A1%8C"><span class="nav-number">4.1.4.</span> <span class="nav-text">并发与并行</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E5%86%85%E5%AD%98%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 内存层次结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-I-O-%E8%AE%BE%E5%A4%87"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 I&#x2F;O 设备</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E6%80%BB%E7%BA%BF"><span class="nav-number">4.4.</span> <span class="nav-text">3.4 总线</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%B8%89%E5%A4%A7%E6%A0%B8%E5%BF%83%E6%8A%BD%E8%B1%A1"><span class="nav-number">5.</span> <span class="nav-text">四、操作系统的三大核心抽象</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E8%BF%9B%E7%A8%8B"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 进程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-%E7%BA%BF%E7%A8%8B"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 线程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4%E4%B8%8E%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 地址空间与虚拟内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-%E6%96%87%E4%BB%B6"><span class="nav-number">5.4.</span> <span class="nav-text">4.4 文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-%E4%BF%9D%E6%8A%A4%EF%BC%9Arwx-%E6%9D%83%E9%99%90"><span class="nav-number">5.5.</span> <span class="nav-text">4.5 保护：rwx 权限</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%EF%BC%9A%E7%94%A8%E6%88%B7%E6%80%81%E8%BF%9B%E5%85%A5%E5%86%85%E6%A0%B8%E7%9A%84%E5%A4%A7%E9%97%A8"><span class="nav-number">6.</span> <span class="nav-text">五、系统调用：用户态进入内核的大门</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Win32-API-%E5%AF%B9%E6%AF%94"><span class="nav-number">6.1.</span> <span class="nav-text">Win32 API 对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E7%BB%93%E6%9E%84"><span class="nav-number">7.</span> <span class="nav-text">六、操作系统结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-%E5%8D%95%E4%BD%93%E5%86%85%E6%A0%B8%EF%BC%88Monolithic-Kernel%EF%BC%89"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 单体内核（Monolithic Kernel）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-%E5%88%86%E5%B1%82%E7%B3%BB%E7%BB%9F%EF%BC%88Layered-System%EF%BC%89"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 分层系统（Layered System）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-%E5%BE%AE%E5%86%85%E6%A0%B8%EF%BC%88Microkernel%EF%BC%89"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 微内核（Microkernel）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-%E5%AE%A2%E6%88%B7-%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%A8%A1%E5%BC%8F%EF%BC%88Client-Server%EF%BC%89"><span class="nav-number">7.4.</span> <span class="nav-text">6.4 客户-服务器模式（Client-Server）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E8%AE%A1%E7%AE%97%E6%9C%BA%E6%98%AF%E5%A6%82%E4%BD%95%E5%90%AF%E5%8A%A8%E7%9A%84"><span class="nav-number">8.</span> <span class="nav-text">七、计算机是如何启动的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%8D%9A%E7%89%A9%E9%A6%86"><span class="nav-number">9.</span> <span class="nav-text">八、操作系统博物馆</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">46</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">72</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">417k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:19</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>
