@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="python项目&quot;NBA 球员信息统计及可视化&quot;全流程复盘：清洗（TOT 去重）、四类统计、KMeans 聚类与六算法预测、交互式球星分析、线上可视化网站。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NBA 球员信息统计及可视化项目">
+<meta property="og:url" content="http://tristan1116.github.io/2026/09/07/nba-data-analysis-visualization/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="python项目&quot;NBA 球员信息统计及可视化&quot;全流程复盘：清洗（TOT 去重）、四类统计、KMeans 聚类与六算法预测、交互式球星分析、线上可视化网站。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/tot_rows.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/clean_steps.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/season_table.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/player_info.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/system_modules.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/overall_stats.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/decade_stats.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/decade.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/position_stats.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/corr_stats.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/top20.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/kmeans.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/gmm.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/dbscan.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/linear.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/forest.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/gbrt.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/radar.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/transfer.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/dual_compare.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/nba-data-analysis/web_arch.png">
+<meta property="article:published_time" content="2026-09-07T23:30:00.000Z">
+<meta property="article:modified_time" content="2026-09-07T23:30:00.000Z">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="数据分析">
+<meta property="article:tag" content="机器学习">
+<meta property="article:tag" content="数据挖掘">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/nba-data-analysis/tot_rows.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/09/07/nba-data-analysis-visualization/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>NBA 球员信息统计及可视化项目 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/09/07/nba-data-analysis-visualization/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          NBA 球员信息统计及可视化项目
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-09-07 23:30:00" itemprop="dateCreated datePublished" datetime="2026-09-07T23:30:00+00:00">2026-09-07</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Python/" itemprop="url" rel="index"><span itemprop="name">Python</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>10k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+            <div class="post-description">python项目"NBA 球员信息统计及可视化"全流程复盘：清洗（TOT 去重）、四类统计、KMeans 聚类与六算法预测、交互式球星分析、线上可视化网站。</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>这篇博客是该项目的完整复盘，每个环节做了什么、为什么这么做、遇到了什么问题。</p>
+<h2 id="背景与目标"><a href="#背景与目标" class="headerlink" title="背景与目标"></a>背景与目标</h2><p>这是我们软件开发实践课的大作业，我们挑了题目库里的”NBA 球员信息统计及可视化”</p>
+<p>目标是一个完整的分析系统：加载、清洗、统计、可视化、挖掘，最后回答几个具体问题：球员的技术风格能分成哪几类？基础统计能不能预测得分？球员转会对个人数据的影响有多大？</p>
+<p>技术栈：Python + pandas（表格处理）+ matplotlib（静态图表）+ scikit-learn（机器学习算法）。</p>
+<p>系统形态是命令行交互菜单，9 个功能项：数据概览、清洗、统计、可视化、聚类、预测、一键跑完，后来又新增了两个交互功能（球星生涯画像与双球星对比）。</p>
+<h2 id="数据源与四个问题"><a href="#数据源与四个问题" class="headerlink" title="数据源与四个问题"></a>数据源与四个问题</h2><p>数据来自 Kaggle 公开数据集 <strong>NBA Players stats since 1950</strong>（作者 drgilermo，爬取自 Basketball Reference 网站），覆盖 1950~2017 赛季共 68 个赛季：</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>规模</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>player_data.csv</td>
+<td>4550 行</td>
+<td>球员基本信息（姓名、起止年份、位置、身高、体重、出生日期、大学）</td>
+</tr>
+<tr>
+<td>Seasons_Stats.csv</td>
+<td>24691 行 × 53 列</td>
+<td>球员-赛季级统计（每行 &#x3D; 一名球员一个赛季的全部指标）</td>
+</tr>
+<tr>
+<td>Players.csv</td>
+<td>3922 行</td>
+<td>球员出生地信息（扩展分析用）</td>
+</tr>
+</tbody></table>
+<p>数据的核心单位是”球员 × 赛季”记录：一行就是一名球员在一个赛季的统计，是最小分析单元。</p>
+<p>拿到数据先探查，总共发现四个问题，全都影响后续分析。这也是全项目最大价值点之一，下面逐个说。</p>
+<h3 id="问题-1：两个拼写错误的噪声列"><a href="#问题-1：两个拼写错误的噪声列" class="headerlink" title="问题 1：两个拼写错误的噪声列"></a>问题 1：两个拼写错误的噪声列</h3><p>列名 <code>blanl</code>、<code>blank2</code>（应为 blank）和一个匿名索引列，是爬虫遗留的垃圾列，直接删除。</p>
+<h3 id="问题-2：TOT-合计行"><a href="#问题-2：TOT-合计行" class="headerlink" title="问题 2：TOT 合计行"></a>问题 2：TOT 合计行</h3><p>因为每行是”球员 × 赛季 × 球队”的统计，所以一名球员赛季中途转会的话，一年会占好几行。比如先在 A 队、再去 B 队，数据源按球队拆成两行，最后再加一行 TOT 合计行（Total，该球员当季跨所有球队的总和）。</p>
+<p>拿艾弗森举例：2006 年 12 月他从 76 人交易到掘金，表里就是”76 人 15 场、掘金 50 场、TOT 65 场”三行，一个球员变成了三个”球员”。这类 TOT 行共有 2123 行，不处理的话，一人一赛季不唯一，后续的统计、聚类、预测全都会出问题。</p>
+<p><img src="/./../images/nba-data-analysis/tot_rows.png" alt="TOT 行的三行记录"><br><em>原始数据里艾弗森 2007 赛季的 TOT 三行（WPS 打开效果）。</em></p>
+<h3 id="问题-3：累计值不等于场均"><a href="#问题-3：累计值不等于场均" class="headerlink" title="问题 3：累计值不等于场均"></a>问题 3：累计值不等于场均</h3><p>PTS（总得分）、MP（总上场分钟）、TRB（总篮板）、AST（总助攻）等 8 个字段是赛季累计值，不是场均。库里 2016 赛季出战 79 场、总分 2375，赛场上大家说的是”场均 30 分”（2375÷79≈30），表里存的是 2375。</p>
+<p>拿累计值比谁得分多会被出场次数绑架（打 80 场的人天然占优），所以统一转成场均口径（<code>PTS_PG = PTS / G</code> 这类 <code>*_PG</code> 列）。</p>
+<p>第一遍跑 AI 生成的代码时我们还翻了个车：AI 初版把累计值直接拿去预测，MAE 高达 44 分。场均得分正常不到 30 分，误差 44 分显然哪里错了。抽查库里这行数据（79 场 2375 分）确认是累计值，修正后 MAE 降到 0.77 分。详见 AI 协作一节。</p>
+<h3 id="问题4：出场-0-场的赛季"><a href="#问题4：出场-0-场的赛季" class="headerlink" title="问题4：出场 0 场的赛季"></a>问题4：出场 0 场的赛季</h3><p>有的赛季球员登记了却一场没打，算场均时”除以 0”会出问题，构建生涯表前要剔除。</p>
+<h2 id="清洗五步，两张表，一张生涯表"><a href="#清洗五步，两张表，一张生涯表" class="headerlink" title="清洗五步，两张表，一张生涯表"></a>清洗五步，两张表，一张生涯表</h2><p>清洗有五步：删噪声列、删无效行、TOT 去重、位置规范化、单位换算。</p>
+<p><img src="/./../images/nba-data-analysis/clean_steps.png" alt="清洗五步运行输出"></p>
+<h3 id="TOT-去重：有-TOT-就保-TOT"><a href="#TOT-去重：有-TOT-就保-TOT" class="headerlink" title="TOT 去重：有 TOT 就保 TOT"></a>TOT 去重：有 TOT 就保 TOT</h3><p>规则可以总结为：按（球员，赛季）分组，组内有 TOT 行就只保留 TOT 行。因为 TOT 才是”当季跨球队的完整总和”，单队行只是”一半”：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 清洗核心：TOT 去重（data_clean.py）</span></span><br><span class="line">df[<span class="string">&quot;_is_tot&quot;</span>] = df[<span class="string">&quot;Tm&quot;</span>] == <span class="string">&quot;TOT&quot;</span></span><br><span class="line">df = df.sort_values(<span class="string">&quot;_is_tot&quot;</span>, ascending=<span class="literal">False</span>)\</span><br><span class="line">       .drop_duplicates(subset=[<span class="string">&quot;Player&quot;</span>, <span class="string">&quot;Year&quot;</span>], keep=<span class="string">&quot;first&quot;</span>)</span><br><span class="line">df = df.drop(columns=<span class="string">&quot;_is_tot&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>排序让 TOT 行排最前，去重”保留第一行”就是保 TOT。清洗后 24624 → 20286 行，校验 0 组残留重复。</p>
+<h3 id="位置规范化与单位换算"><a href="#位置规范化与单位换算" class="headerlink" title="位置规范化与单位换算"></a>位置规范化与单位换算</h3><p>复合位置（<code>F-C</code> 表示前锋或中锋都能打）取第一个前缀当主位置（<code>F-C → F</code>），空值记 <code>U</code>；身高 <code>&quot;6-9&quot;</code>（英尺-英寸）转成 81 英寸，两张表的身高体重单位统一。</p>
+<h3 id="产出结果：两张基础表-一张生涯表"><a href="#产出结果：两张基础表-一张生涯表" class="headerlink" title="产出结果：两张基础表 + 一张生涯表"></a>产出结果：两张基础表 + 一张生涯表</h3><p>清洗产出两张干净的基础表：</p>
+<ul>
+<li><strong>赛季表</strong>（20286 行）：一行就是”某球员 × 某赛季”，TOT 去重后一人一赛季唯一；</li>
+<li><strong>球员信息表</strong>（4550 人）：身高、体重、位置这些不变的基本属性。</li>
+</ul>
+<p><img src="/./../images/nba-data-analysis/season_table.png" alt="赛季表（WPS 打开效果）"><br><img src="/./../images/nba-data-analysis/player_info.png" alt="球员信息表"></p>
+<p>因为我们的比较单位是”球员个体”，不是”赛季”，所以这里我们更进一步，把一个人所有赛季的行合成一行：场均类指标取生涯平均，累计类（总得分、总出场、征战赛季数）取总和，再拼上球员信息表的身高、体重、位置：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">build_career_df</span>(<span class="params">seasons, players</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;构造球员级生涯汇总表：每名球员一行，含生涯平均表现 + 球员基本信息。&quot;&quot;&quot;</span></span><br><span class="line">    tmp = seasons[seasons[<span class="string">&quot;G&quot;</span>] &gt; <span class="number">0</span>].copy()          <span class="comment"># 排除出场 0 场（除零会出 NaN）</span></span><br><span class="line">    <span class="keyword">for</span> c <span class="keyword">in</span> [<span class="string">&quot;MP&quot;</span>, <span class="string">&quot;PTS&quot;</span>, <span class="string">&quot;TRB&quot;</span>, <span class="string">&quot;AST&quot;</span>, <span class="string">&quot;STL&quot;</span>, <span class="string">&quot;BLK&quot;</span>, <span class="string">&quot;FGA&quot;</span>, <span class="string">&quot;3PA&quot;</span>]:</span><br><span class="line">        tmp[c + <span class="string">&quot;_PG&quot;</span>] = tmp[c] / tmp[<span class="string">&quot;G&quot;</span>]          <span class="comment"># 转为场均口径</span></span><br><span class="line"></span><br><span class="line">    career = (</span><br><span class="line">        tmp.groupby(<span class="string">&quot;Player&quot;</span>)</span><br><span class="line">        .agg(**&#123;c + <span class="string">&quot;_PG&quot;</span>: (c + <span class="string">&quot;_PG&quot;</span>, <span class="string">&quot;mean&quot;</span>) <span class="keyword">for</span> c <span class="keyword">in</span></span><br><span class="line">                [<span class="string">&quot;MP&quot;</span>, <span class="string">&quot;PTS&quot;</span>, <span class="string">&quot;TRB&quot;</span>, <span class="string">&quot;AST&quot;</span>, <span class="string">&quot;STL&quot;</span>, <span class="string">&quot;BLK&quot;</span>]&#125;,</span><br><span class="line">             PER=(<span class="string">&quot;PER&quot;</span>, <span class="string">&quot;mean&quot;</span>),</span><br><span class="line">             PTS_TOT=(<span class="string">&quot;PTS&quot;</span>, <span class="string">&quot;sum&quot;</span>),                <span class="comment"># 生涯总得分</span></span><br><span class="line">             Games=(<span class="string">&quot;G&quot;</span>, <span class="string">&quot;sum&quot;</span>), Seeds=(<span class="string">&quot;Year&quot;</span>, <span class="string">&quot;nunique&quot;</span>))</span><br><span class="line">        .reset_index().rename(columns=&#123;<span class="string">&quot;Player&quot;</span>: <span class="string">&quot;name&quot;</span>&#125;)</span><br><span class="line">    )</span><br><span class="line">    info = players.drop_duplicates(subset=[<span class="string">&quot;name&quot;</span>], keep=<span class="string">&quot;first&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> career.merge(info, on=<span class="string">&quot;name&quot;</span>, how=<span class="string">&quot;left&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>这就是生涯表，3921 名球员，每人一行。后面统计、画图、聚类、预测都以它为地基。注意：生涯表不单独落盘，是运行中实时生成的中间表（pandas DataFrame），真正导出的是两张清洗表加 4 张统计结果表。</p>
+<p>简单来说，赛季表看”一个赛季”、信息表看”一个人”、生涯表看”整个生涯”。</p>
+<p><img src="/./../images/nba-data-analysis/system_modules.png" alt="系统功能模块图"><br><em>系统功能模块图：7 个模块各管一件事，交互分析单独一个模块。</em></p>
+<h2 id="四类统计分析"><a href="#四类统计分析" class="headerlink" title="四类统计分析"></a>四类统计分析</h2><p>基于两组表做了四类统计，两类用赛季表、两类用生涯表。</p>
+<h3 id="1-整体描述（赛季表）"><a href="#1-整体描述（赛季表）" class="headerlink" title="1. 整体描述（赛季表）"></a>1. 整体描述（赛季表）</h3><p>全表平均年龄 26.6 岁、平均每赛季出战 56.35 场、效率值 PER 均值 12.84。PER 是把一赛季所有数据折算成一个总分，15 为联盟平均，30+ 是超级巨星水平。数据里出现 PER&#x3D;-90.6 &#x2F; 129.1 这种异常值，是数据源爬虫错误，占比极低，只记录不删除。</p>
+<p><img src="/./../images/nba-data-analysis/overall_stats.png" alt="整体描述性统计输出"></p>
+<h3 id="2-按年代分组（赛季表）：小球时代的数据证据"><a href="#2-按年代分组（赛季表）：小球时代的数据证据" class="headerlink" title="2. 按年代分组（赛季表）：小球时代的数据证据"></a>2. 按年代分组（赛季表）：小球时代的数据证据</h3><p>三分出手从 1990s 的 61 次&#x2F;季涨到 2010s 的 108 次&#x2F;季（+77%）。这是”小球时代”三分席卷联盟的量化证据。人均总得分与篮板从历史高位回落（防守强化、节奏变慢），PER 保持稳定（12.5~13.3）。</p>
+<p><img src="/./../images/nba-data-analysis/decade_stats.png" alt="按年代分组统计输出"></p>
+<p><img src="/./../images/nba-data-analysis/decade.png" alt="年代风格演变"><br><em>人均三分出手 &#x2F; 得分 &#x2F; 效率值的年代演变。</em></p>
+<h3 id="3-按位置分组（生涯表）：体型与分工吻合"><a href="#3-按位置分组（生涯表）：体型与分工吻合" class="headerlink" title="3. 按位置分组（生涯表）：体型与分工吻合"></a>3. 按位置分组（生涯表）：体型与分工吻合</h3><p>中锋最高最重（82.93 英寸 ≈ 2.11 米、242.3 磅）且篮板最多（3.81）；后卫最矮最轻（75.13 英寸、189.91 磅）但助攻显著最高（1.97 vs 0.71），得分反而略高于中锋。后卫承担大量外线得分。体型特征与篮球位置分工完全吻合。</p>
+<p><img src="/./../images/nba-data-analysis/position_stats.png" alt="按位置分组统计输出"></p>
+<h3 id="4-相关性分析（生涯表）"><a href="#4-相关性分析（生涯表）" class="headerlink" title="4. 相关性分析（生涯表）"></a>4. 相关性分析（生涯表）</h3><p>身高与体重 r&#x3D;0.823（强正相关）；身高与助攻 r&#x3D;-0.454（负相关，越高越不像后卫）；身高与篮板 r&#x3D;0.383（正相关）；得分与篮板 r&#x3D;0.677、得分与助攻 r&#x3D;0.669（核心球员各项指标同向强相关）。</p>
+<p><img src="/./../images/nba-data-analysis/corr_stats.png" alt="相关性分析输出"></p>
+<p>注意：相关不等于因果。身高体重高度相关，不代表”长得高就长胖”，而是同一身体机制的结果。</p>
+<p>统计之外我们生成 8 张静态图（位置分布饼图、身高体重分布直方图、身高体重散点、生涯总得分 TOP20、年代演变、位置身高箱线图、出生地分布）。生涯总得分 TOP20 很有记忆点：卡里姆·阿卜杜尔-贾巴尔 38387 分领跑，马龙 36928、科比 33643、乔丹 32292，典型长尾形态。</p>
+<p><img src="/./../images/nba-data-analysis/top20.png" alt="生涯总得分TOP20"></p>
+<h2 id="聚类分析：三种算法，一类技术风格"><a href="#聚类分析：三种算法，一类技术风格" class="headerlink" title="聚类分析：三种算法，一类技术风格"></a>聚类分析：三种算法，一类技术风格</h2><p>我们的一个目标是把球员的技术风格根据不同的特征分类，这是无监督学习问题：数据没有标签，让算法自己分。</p>
+<h3 id="KMeans（主算法）：五步走"><a href="#KMeans（主算法）：五步走" class="headerlink" title="KMeans（主算法）：五步走"></a>KMeans（主算法）：五步走</h3><ol>
+<li><strong>选特征</strong>：7 个生涯场均特征，上场时间、得分、篮板、助攻、抢断、盖帽、效率值 PER；</li>
+<li><strong>筛样本</strong>：只挑生涯 ≥3 赛季的球员（只打一两个赛季的样本没代表性），3921 人 → 2008 人。这一步本身就是第一层调优：全样本聚类轮廓系数只有 0.230，过滤后才拿到 0.276；</li>
+<li><strong>标准化</strong>：指标单位差异大（上场时间二十几、得分十几、盖帽不到 1），不标准化的话 KMeans 按”数值大小”算距离，分钟数直接霸榜。<code>StandardScaler</code> 把 7 个指标拉到同一把尺子上（均值 0、方差 1）；</li>
+<li><strong>调参</strong>：唯一核心参数是簇数 K。把 K 从 2 到 8 全部跑一遍，每档看两件事：① 轮廓系数（越高分得越开）② 簇的可解读性（K&#x3D;2<del>3 只有”强&#x2F;弱”两堆，没篮球含义；K&#x3D;7</del>8 出现几百人一团的模糊簇），最终拍板 K&#x3D;5，正好对应五类有语义的群体。另外两个参数固定在代码里：<code>n_init=10</code>（随机初始化跑 10 次取最好，KMeans 对初始点敏感）、<code>random_state=42</code>（固定随机种子，不固定的话同一个 K 每次结果都可能不一样，和报告数字就对不上了）；</li>
+<li><strong>评估</strong>：轮廓系数 0.276（取值 -1<del>1，越接近 1 簇内越紧凑、簇间分离越好。0.25</del>0.5 算”弱到中等”，我们接受它，因为篮球风格本来就是渐变带，可解读性优先）。</li>
+</ol>
+<p>产出是 5 个质心反标准化回原始单位，每个簇给出特征画像和得分 Top5 代表球员：</p>
+<table>
+<thead>
+<tr>
+<th>簇</th>
+<th>人数</th>
+<th>场均上场</th>
+<th>场均得分</th>
+<th>场均篮板</th>
+<th>场均助攻</th>
+<th>平均 PER</th>
+<th>人群画像</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>簇0</td>
+<td>484</td>
+<td>21.8 分钟</td>
+<td>8.72</td>
+<td>2.68</td>
+<td>2.39</td>
+<td>12.5</td>
+<td>常规均衡型</td>
+</tr>
+<tr>
+<td>簇1</td>
+<td>376</td>
+<td>21.2 分钟</td>
+<td>7.96</td>
+<td>5.32</td>
+<td>1.08</td>
+<td>13.5</td>
+<td>蓝领内线（盖帽 0.73 最多）</td>
+</tr>
+<tr>
+<td>簇2</td>
+<td>256</td>
+<td>30.9 分钟</td>
+<td>15.08</td>
+<td>3.95</td>
+<td><strong>4.53</strong></td>
+<td>16.3</td>
+<td><strong>顶级持球得分手</strong>（乔丹&#x2F;詹姆斯&#x2F;艾弗森）</td>
+</tr>
+<tr>
+<td>簇3</td>
+<td>125</td>
+<td>31.0 分钟</td>
+<td>15.07</td>
+<td><strong>8.89</strong></td>
+<td>2.13</td>
+<td><strong>18.1</strong></td>
+<td><strong>高效内线</strong>（杜兰特&#x2F;贾巴尔&#x2F;奥尼尔）</td>
+</tr>
+<tr>
+<td>簇4</td>
+<td>767</td>
+<td>12.0 分钟</td>
+<td>3.97</td>
+<td>2.10</td>
+<td>0.79</td>
+<td>9.8</td>
+<td>边缘角色球员</td>
+</tr>
+</tbody></table>
+<p>这点最有说服力：算法没有任何人工标签，仅凭 7 项统计，自动把乔丹、詹姆斯、艾弗森聚成一簇，把杜兰特、贾巴尔、奥尼尔聚成另一簇。”得分手”与”高效内线”两类风格截然分开，和篮球常识完全吻合。人数最多的簇 767 人对应联盟金字塔底层的角色球员。</p>
+<p><img src="/./../images/nba-data-analysis/kmeans.png" alt="KMeans 聚类散点图"></p>
+<h3 id="GMM-与-DBSCAN：为什么最终没选它们"><a href="#GMM-与-DBSCAN：为什么最终没选它们" class="headerlink" title="GMM 与 DBSCAN：为什么最终没选它们"></a>GMM 与 DBSCAN：为什么最终没选它们</h3><p>除了kmeans，我们又跑了 GMM 与 DBSCAN，同一份标准化数据、同一批球员，公平对比。</p>
+<p>GMM（高斯混合）是”更灵活的 KMeans”：KMeans 分得很硬（一个球员要么这簇要么那簇，默认每簇是圆球），GMM 给每个球员算概率归属（八成属这簇、两成属那簇），簇形状也能拉长变形。跑出来轮廓系数只有 0.125。原因很直接：GMM 比 KMeans 多估一堆参数（每簇形状加权重），参数一多，摊到每个参数头上的样本就少了，2008 人 × 7 指标的数据量撑不起它的”灵活配置”。模型越灵活越吃数据，数据不够时反而不如参数少的 KMeans。</p>
+<p>DBSCAN（密度聚类）是”不看中心、看密度”：以每个球员为中心画半径 eps 的圈，圈里有足够邻居说明”密度够”，一圈圈往外扩成一坨；圈里孤零零的球员标成噪声（拒绝归簇）。它不用预设簇数，但参数敏感。我们用网格搜索：输入范围 0.6~2.5、步长 0.1，每个候选半径跑一遍，淘汰”单簇&#x2F;噪声&gt;50%”的退化结果，剩下的用轮廓系数打分，取最高分（eps&#x3D;1.1，轮廓 0.380，比 KMeans 还高）。</p>
+<p>0.380 恰恰是它不能用的原因：这个最高分只分出了 2 簇，噪声 6.5%。轮廓越高簇数越少，对于”给球员分 5 类可解读风格”的目标来说，2 簇等于没区分度（好比把一个班只分成”学得好的”和”学得一般的”两堆），还会丢弃 6.5% 的球员。</p>
+<p><img src="/./../images/nba-data-analysis/gmm.png" alt="GMM 聚类散点图"><br><img src="/./../images/nba-data-analysis/dbscan.png" alt="DBSCAN 聚类散点图"></p>
+<p>三种算法用的是同一份标准化数据、同一批 2008 名球员，对比结果：</p>
+<table>
+<thead>
+<tr>
+<th>算法</th>
+<th>簇数</th>
+<th>轮廓系数</th>
+<th>噪声占比</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>KMeans</td>
+<td>5</td>
+<td>0.276</td>
+<td>0</td>
+<td>各簇规模可控，质心可反标准化逐簇画像</td>
+</tr>
+<tr>
+<td>GMM（高斯混合）</td>
+<td>5</td>
+<td>0.125</td>
+<td>0</td>
+<td>软聚类，轮廓系数明显低于 KMeans</td>
+</tr>
+<tr>
+<td>DBSCAN（eps&#x3D;1.0，固定网格 0.2 步长）</td>
+<td>3</td>
+<td>0.319</td>
+<td>8.7%</td>
+<td>轮廓略高但簇数不可控、丢弃无法归簇的球员</td>
+</tr>
+<tr>
+<td>DBSCAN（eps&#x3D;1.1，细网格 0.1 步长）</td>
+<td><strong>2</strong></td>
+<td><strong>0.380</strong></td>
+<td>6.5%</td>
+<td>轮廓最高却只剩 2 簇，区分度反而更差</td>
+</tr>
+</tbody></table>
+<p>结论三条：DBSCAN 轮廓可以很高但簇数不可控、丢球员；GMM 与 KMeans 同类但数据量小反而更差；KMeans 簇数可控（K&#x3D;5 领域知识直接定）、全员覆盖（噪声 0）、质心可反标准化解读。算法不是越新越好，是对任务可解释性最好。</p>
+<h2 id="得分预测：6-种算法竞速"><a href="#得分预测：6-种算法竞速" class="headerlink" title="得分预测：6 种算法竞速"></a>得分预测：6 种算法竞速</h2><p>除了给球员分类，我们还要尝试用基础统计预测赛季的场均得分，这是监督学习中的回归问题：给了”特征 + 答案”，学一个”基础统计 → 得分”的函数。</p>
+<p>数据回到赛季表取值。过滤出特征与目标都有效、出场 &gt;0 的 15520 条球员-赛季记录。输入 9 个特征（出场数 G、上场时间、投篮出手、三分出手、篮板、助攻、抢断、盖帽，后 7 项场均口径，加年龄），预测目标是该赛季场均得分（<code>PTS_PG = PTS / G</code>）。</p>
+<p>划分：15520 条按 80%&#x2F;20% 随机切小一份训练集、一份测试集（固定 random_state&#x3D;42），6 种算法共用同一份划分。同一份训练集训练、同一份测试集评分，考同一张试卷才公平。</p>
+<p>6 种算法：线性回归（基线，可解释）、岭&#x2F;套索回归（线性+正则化）、决策树&#x2F;随机森林&#x2F;梯度提升（非线性与集成）。评估三个指标：R²（解释了数据变动的比例，1 完美）、MAE（平均偏差，0.73 分）、RMSE（放大大误差）。</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>R²</th>
+<th>MAE（场均得分的偏差，分&#x2F;场）</th>
+<th>RMSE（均方根误差）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>线性回归（基线）</td>
+<td>0.9690</td>
+<td>0.77</td>
+<td>1.10</td>
+</tr>
+<tr>
+<td>岭回归</td>
+<td>0.9690</td>
+<td>0.77</td>
+<td>1.10</td>
+</tr>
+<tr>
+<td>套索回归</td>
+<td>0.9689</td>
+<td>0.77</td>
+<td>1.10</td>
+</tr>
+<tr>
+<td>决策树回归</td>
+<td>0.9567</td>
+<td>0.89</td>
+<td>1.30</td>
+</tr>
+<tr>
+<td>随机森林</td>
+<td>0.9708</td>
+<td>0.74</td>
+<td>1.07</td>
+</tr>
+<tr>
+<td><strong>梯度提升（GBRT）</strong></td>
+<td><strong>0.9716</strong></td>
+<td><strong>0.73</strong></td>
+<td><strong>1.05</strong></td>
+</tr>
+</tbody></table>
+<p>结果解读：6 种算法 R² 全部超 0.95，线性回归（0.9690）几乎追平集成模型（0.9716）。基础统计与得分的关联基本是线性的，得分预测任务本身并不复杂。单决策树最弱（0.9567，单树方差大），森林与 GBRT 通过集成收敛到最好，GBRT 每棵专补上一棵的错，精度最高（误差控制在 ±0.8 分&#x2F;场内）。</p>
+<p><img src="/./../images/nba-data-analysis/linear.png" alt="线性回归预测效果"><br><img src="/./../images/nba-data-analysis/forest.png" alt="随机森林预测效果"><br><img src="/./../images/nba-data-analysis/gbrt.png" alt="梯度提升预测效果"></p>
+<p>这里存在一个问题（信息泄漏）：80&#x2F;20 切分切的是”球员-赛季记录”，不是”球员”。同一名球员的赛季会横跨训练集和测试集（比如库里 2016 赛季在训练集、2017 赛季在测试集），历史赛季给模型提供了”强先验”，分数比”无先验预测新秀”偏高。我们的改进方案：按年代切分（1990s 训练、2010s 测试）做时序验证。</p>
+<h2 id="交互式球星分析"><a href="#交互式球星分析" class="headerlink" title="交互式球星分析"></a>交互式球星分析</h2><p>到上面这里，我们这个项目还少了点交互的功能，于是下面我们尝试做了一些交互式球星分析：</p>
+<h3 id="1-球星生涯画像"><a href="#1-球星生涯画像" class="headerlink" title="1. 球星生涯画像"></a>1. 球星生涯画像</h3><p>模糊匹配：数据源里很多人名带星号（<code>Michael Jordan*</code>），统一去星号归一化再匹配，候选按生涯总得分排序，检索 <code>jordan</code> 直接命中迈克尔·乔丹。</p>
+<p>名人堂名录：输入 <code>f</code> 浏览 30 位名人堂球星（乔丹、詹姆斯、科比、贾巴尔、杜兰特、姚明等），按序号直接选。</p>
+<p>选中后生成生涯汇总卡（赛季数、总得分、场均、巅峰赛季、转会记录）加 7 维能力雷达。雷达相对联盟平均水平归一化（生涯 ≥3 赛季的 2008 人有效样本均值为 1.0 倍基准，超出一倍就是高于联盟平均）。</p>
+<p>艾弗森画像：14 年 914 场、24368 分，巅峰 2006 赛季场均 33.0 分；雷达显示得分 3.27 倍、助攻 3.35 倍、抢断 3.21 倍，盖帽 0.44 倍，”小个子持球得分手”的能力轮廓一目了然。</p>
+<p><img src="/./../images/nba-data-analysis/radar.png" alt="艾弗森 7 维雷达"></p>
+<h3 id="2-转会前后对比：双规则转会检测"><a href="#2-转会前后对比：双规则转会检测" class="headerlink" title="2. 转会前后对比：双规则转会检测"></a>2. 转会前后对比：双规则转会检测</h3><p>转会检测靠两个规则：</p>
+<p>规则一（赛季中转会）：某赛季存在 TOT 合计行，该球员赛季中换过球队，非 TOT 行按数据源行序拆成”转会前&#x2F;转会后”两段（艾弗森 2007：76 人 15 场 → 掘金 50 场）；</p>
+<p>规则二（跨赛季换队）：只看 TOT 会漏掉休赛期换队，比如勒布朗 2011 骑士→热火、2015 热火→骑士。这种相邻两个赛季球队记录不同的，用清洗后的赛季表逐季检查：不同且非转会年，判为跨赛季换队，对比取”换队前一个完整赛季 vs 新队首个完整赛季”的整季表现。</p>
+<p>两类转会统一登记成一份”转会清单”（标注类型：赛季中&#x2F;跨赛季），列年份、类型、球队、前后场次，任意选看。艾弗森 3 次赛季中、勒布朗 2 次跨赛季，都能查到。</p>
+<p>选艾弗森 2007 赛季看结果：上场时间几乎不变（42.67→42.42），但场均得分 31.20→24.82（-20.4%）、PER 23.50→18.40（-21.7%）。他在掘金让渡了部分球权（掘金已有安东尼等得分点），数据形态随角色变化，这正是”转会不仅影响球队，也直接改变球员数据”的实证。</p>
+<p><img src="/./../images/nba-data-analysis/transfer.png" alt="艾弗森转会前后对比"></p>
+<p>各项指标的变化（转会前 76 人 15 场 vs 转会后掘金 50 场）：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>转会前（PHI，15 场）</th>
+<th>转会后（DEN，50 场）</th>
+<th>变化率</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>场均得分</td>
+<td>31.20</td>
+<td>24.82</td>
+<td><strong>-20.4%</strong></td>
+</tr>
+<tr>
+<td>效率值 PER</td>
+<td>23.50</td>
+<td>18.40</td>
+<td><strong>-21.7%</strong></td>
+</tr>
+<tr>
+<td>场均抢断</td>
+<td>2.20</td>
+<td>1.80</td>
+<td>-18.2%</td>
+</tr>
+<tr>
+<td>场均助攻</td>
+<td>7.27</td>
+<td>7.18</td>
+<td>-1.2%</td>
+</tr>
+<tr>
+<td>场均上场时间</td>
+<td>42.67</td>
+<td>42.42</td>
+<td>-0.6%</td>
+</tr>
+</tbody></table>
+<p>注：后来发现杜兰特 2009 年 <code>SEA→OKC</code> 也被标成换队，但那是超音速整体搬迁改名雷霆（同一支 franchise），不是转会。于是我们全量扫描数据（旧球队在搬迁年后彻底消失+多数球员跟随），定了 28 组”球队迁址&#x2F;改名”名单（超音速→雷霆、灰熊搬家、篮网易址、国王历史长链等），检测时排除。真实转会保留，迁址不误标。</p>
+<h3 id="3-双球星对比"><a href="#3-双球星对比" class="headerlink" title="3. 双球星对比"></a>3. 双球星对比</h3><p>选两人：7 项生涯指标画雷达图（按两人较大值归一化）加差值表，差值超 15% 自动点评。乔丹 vs 詹姆斯：得分 +7.9%、抢断 +27.8%（乔丹占优）；篮板 -15.9%、助攻 -26.9%（詹姆斯占优），PER 27.37 vs 27.70 几乎持平。”得分手”对标”组织前锋”，各领风骚。</p>
+<p><img src="/./../images/nba-data-analysis/dual_compare.png" alt="双球星对比雷达"></p>
+<h2 id="Web-可视化网站"><a href="#Web-可视化网站" class="headerlink" title="Web 可视化网站"></a>Web 可视化网站</h2><p>命令行终究单调，我们做了一个线上可视化网站，部署在 GitHub Pages（项目站点）：<a href="https://tristan1116.github.io/nba-visualization/">https://tristan1116.github.io/nba-visualization/</a></p>
+<h3 id="技术选型"><a href="#技术选型" class="headerlink" title="技术选型"></a>技术选型</h3><p>原生 HTML + 原生 JS（ES Modules）。ES Modules 是 JS 官方自带的模块化写法：代码拆成独立文件，页面需要哪个就 <code>import</code> 哪个（类比 C 的 <code>#include</code>），浏览器原生支持，不需要 webpack。网站就是一堆普通文件，拷到任何电脑直接打开，断网也能演示。</p>
+<p>ECharts 5 是开源 JS 图表库（前端版 matplotlib），画折线、雷达、饼图、柱状图，而且能交互：鼠标悬浮看数值、点图例开关曲线、拖拽缩放，这是 matplotlib 静态 PNG 做不到的。</p>
+<p>配色”暗夜红金”：黑蓝底 #070F1E、官方红 #C8102E、金字 #FDB927。</p>
+<h3 id="数据契约"><a href="#数据契约" class="headerlink" title="数据契约"></a>数据契约</h3><p>网站本身不分析任何数据。我们写了一个 <code>web_generate.py</code>，把前面所有模块（清洗&#x2F;统计&#x2F;挖掘&#x2F;画像）跑出来的结果直接导出成一批 JSON 文件：生涯表拆成”球员列表”（3919 人一个文件）和”每人一份生涯明细”（三千多个文件），加上四类统计表、聚类结果、预测算法对比、名人堂名录，一共六类。</p>
+<p>前端 <code>api.js</code> 统一按固定的地址规则读取：一个地址对应一类数据（球员列表一个地址、某球员明细一个地址）。因为所有数字都是 Python 预先算好存成文件的，网页只负责展示和查询，切页面根本不用重新计算，点哪页哪页秒开。而且和命令行完全同源，同一个函数出的数，口径绝对一致。</p>
+<p><img src="/./../images/nba-data-analysis/web_arch.png" alt="Web 可视化前端架构图"></p>
+<h3 id="四个页面"><a href="#四个页面" class="headerlink" title="四个页面"></a>四个页面</h3><ul>
+<li><strong>首页</strong>：数据卡（3919 人 &#x2F; 20286 条 &#x2F; 1950~2017）+ 即时搜索（权重：全名&gt;姓氏&gt;名字&gt;子串）+ 30 位名人堂 + 全量列表（位置筛选 + 分页）；</li>
+<li><strong>球星页</strong>：生涯汇总卡 + 多指标叠加走势图（得分&#x2F;效率值&#x2F;上场时间同屏比，转会红&#x2F;青竖线区分赛季中&#x2F;跨赛季，球队时期色块直接标图上）+ 7 维雷达 + 转会对比卡片 + 聚类归属；</li>
+<li><strong>对比页</strong>：双选择器、双星雷达、差值表、自动点评；</li>
+<li><strong>总览页</strong>：模块图&#x2F;流程图、四类统计表（中英双语表头）、图像画廊、三聚类对比表、6 算法结论条。</li>
+</ul>
+<h3 id="两个工程细节"><a href="#两个工程细节" class="headerlink" title="两个工程细节"></a>两个工程细节</h3><p>缓存版本号机制：浏览器会把静态文件缓存住，改了数据刷新还是旧内容。在 api.js 顶部放一个 <code>VER</code> 常量，URL 全部带 <code>?v=VER</code>，数据更新后改一下数字，全站强制取新数据。</p>
+<p>部署：GitHub Pages 选 “Deploy from a branch”（零构建、仓库内容即站点、push 即更新）。这和博客（Hexo + GitHub Actions 云端构建）走了不同的路径，这个站点纯静态，不需要构建脚本。</p>
+<p>站点所有数字与命令行完全一致（3919 人&#x2F;轮廓 0.275&#x2F;GBRT 0.9716&#x2F;艾弗森 -20.4%），前端只是”展示层”，分析结论零二次加工。线上效果见：<a href="https://tristan1116.github.io/nba-visualization/">https://tristan1116.github.io/nba-visualization/</a></p>
+<h2 id="AI-协作与工程经验"><a href="#AI-协作与工程经验" class="headerlink" title="AI 协作与工程经验"></a>AI 协作与工程经验</h2><p>整个项目，我们用 Claude Code接入 DeepSeek 模型生成代码、人工核验。下面是一些人机协作问题：</p>
+<ol>
+<li><strong>口径错误</strong>：AI 初版把累计值当场均拿去预测，MAE&#x3D;44 分。抽查库里 2016 赛季（79 场 2375 分）确认是累计值，统一转场均后 MAE 从 44 分降到 0.77 分。数据项目必须人工确认数据语义，不能依赖 AI 生成内容的表面合理性；</li>
+<li><strong>TOT 行差点被误删</strong>：初版清洗直接”去重复行”，会按原顺序留单队行、丢 TOT 行。改规则”有 TOT 保 TOT”后 24624→20286 行，校验 0 组残留；</li>
+<li><strong>中文乱码</strong>：matplotlib 默认字体没中文字形，标题全是方框。统一配置黑体（SimHei）放全局一处生效。</li>
+<li>ai生成的文字ai味道太浓烈😅😅😅，非常无语</li>
+</ol>
+<p>回看整个项目，最重要的工程素质只有一条：可复现性。固定随机种子、参数集中配置、一键演示流程，任何人在同一环境跑，结果和这篇博客里一字不差。</p>
+<h2 id="结尾"><a href="#结尾" class="headerlink" title="结尾"></a>结尾</h2><p>从”下载一个 Kaggle 数据集”到”线上可访问的可视化网站”，完整走了一遍数据分析流水线。回头看最值得说的有三件事。</p>
+<p>数据语义最重要。累计值&#x2F;场均、TOT 行，搞错任何一个，后面的结论全废。</p>
+<p>算法选型要看任务。KMeans 不是最先进的，但”簇数可控 + 质心可解读 + 全员覆盖”，对”给球员分风格”就是要选它。轮廓系数 0.380 比 KMeans 高，但只有 2 簇，等于没分。</p>
+<p>展示方式决定价值。同样的分析，命令行只能”跑给你看”，部署到线上之后，任何人都能点开查一名球星的生涯故事。</p>
+<p>改进空间也有：数据截至 2017 赛季（可爬最新数据）、跨代同名球员错配、预测的信息泄漏（按年代时序验证）——这些都在报告里如实写了。</p>
+<blockquote>
+<p>项目代码：<code>main.py</code>（菜单入口）+ 七模块（缓存&#x2F;清洗&#x2F;统计&#x2F;可视化&#x2F;挖掘&#x2F;交互&#x2F;配置）；在线站点：<a href="https://tristan1116.github.io/nba-visualization/">https://tristan1116.github.io/nba-visualization/</a>；本地预览：<code>python web_generate.py</code> 后 <code>cd web &amp;&amp; python -m http.server 8080</code>。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Python/" rel="tag"># Python</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90/" rel="tag"># 数据分析</a>
+              <a href="/tags/%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/" rel="tag"># 机器学习</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E6%8C%96%E6%8E%98/" rel="tag"># 数据挖掘</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/09/03/%E6%B4%9B%E8%B0%B7P2670%E6%89%AB%E9%9B%B7%E6%B8%B8%E6%88%8F%E9%A2%98%E8%A7%A3/" rel="prev" title="洛谷P2670-扫雷游戏-题解">
+      <i class="fa fa-chevron-left"></i> 洛谷P2670-扫雷游戏-题解
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%83%8C%E6%99%AF%E4%B8%8E%E7%9B%AE%E6%A0%87"><span class="nav-number">1.</span> <span class="nav-text">背景与目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%BA%90%E4%B8%8E%E5%9B%9B%E4%B8%AA%E9%97%AE%E9%A2%98"><span class="nav-number">2.</span> <span class="nav-text">数据源与四个问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%98-1%EF%BC%9A%E4%B8%A4%E4%B8%AA%E6%8B%BC%E5%86%99%E9%94%99%E8%AF%AF%E7%9A%84%E5%99%AA%E5%A3%B0%E5%88%97"><span class="nav-number">2.1.</span> <span class="nav-text">问题 1：两个拼写错误的噪声列</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%98-2%EF%BC%9ATOT-%E5%90%88%E8%AE%A1%E8%A1%8C"><span class="nav-number">2.2.</span> <span class="nav-text">问题 2：TOT 合计行</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%98-3%EF%BC%9A%E7%B4%AF%E8%AE%A1%E5%80%BC%E4%B8%8D%E7%AD%89%E4%BA%8E%E5%9C%BA%E5%9D%87"><span class="nav-number">2.3.</span> <span class="nav-text">问题 3：累计值不等于场均</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%984%EF%BC%9A%E5%87%BA%E5%9C%BA-0-%E5%9C%BA%E7%9A%84%E8%B5%9B%E5%AD%A3"><span class="nav-number">2.4.</span> <span class="nav-text">问题4：出场 0 场的赛季</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B8%85%E6%B4%97%E4%BA%94%E6%AD%A5%EF%BC%8C%E4%B8%A4%E5%BC%A0%E8%A1%A8%EF%BC%8C%E4%B8%80%E5%BC%A0%E7%94%9F%E6%B6%AF%E8%A1%A8"><span class="nav-number">3.</span> <span class="nav-text">清洗五步，两张表，一张生涯表</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#TOT-%E5%8E%BB%E9%87%8D%EF%BC%9A%E6%9C%89-TOT-%E5%B0%B1%E4%BF%9D-TOT"><span class="nav-number">3.1.</span> <span class="nav-text">TOT 去重：有 TOT 就保 TOT</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%8D%E7%BD%AE%E8%A7%84%E8%8C%83%E5%8C%96%E4%B8%8E%E5%8D%95%E4%BD%8D%E6%8D%A2%E7%AE%97"><span class="nav-number">3.2.</span> <span class="nav-text">位置规范化与单位换算</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%A7%E5%87%BA%E7%BB%93%E6%9E%9C%EF%BC%9A%E4%B8%A4%E5%BC%A0%E5%9F%BA%E7%A1%80%E8%A1%A8-%E4%B8%80%E5%BC%A0%E7%94%9F%E6%B6%AF%E8%A1%A8"><span class="nav-number">3.3.</span> <span class="nav-text">产出结果：两张基础表 + 一张生涯表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E7%B1%BB%E7%BB%9F%E8%AE%A1%E5%88%86%E6%9E%90"><span class="nav-number">4.</span> <span class="nav-text">四类统计分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E6%95%B4%E4%BD%93%E6%8F%8F%E8%BF%B0%EF%BC%88%E8%B5%9B%E5%AD%A3%E8%A1%A8%EF%BC%89"><span class="nav-number">4.1.</span> <span class="nav-text">1. 整体描述（赛季表）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E6%8C%89%E5%B9%B4%E4%BB%A3%E5%88%86%E7%BB%84%EF%BC%88%E8%B5%9B%E5%AD%A3%E8%A1%A8%EF%BC%89%EF%BC%9A%E5%B0%8F%E7%90%83%E6%97%B6%E4%BB%A3%E7%9A%84%E6%95%B0%E6%8D%AE%E8%AF%81%E6%8D%AE"><span class="nav-number">4.2.</span> <span class="nav-text">2. 按年代分组（赛季表）：小球时代的数据证据</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E6%8C%89%E4%BD%8D%E7%BD%AE%E5%88%86%E7%BB%84%EF%BC%88%E7%94%9F%E6%B6%AF%E8%A1%A8%EF%BC%89%EF%BC%9A%E4%BD%93%E5%9E%8B%E4%B8%8E%E5%88%86%E5%B7%A5%E5%90%BB%E5%90%88"><span class="nav-number">4.3.</span> <span class="nav-text">3. 按位置分组（生涯表）：体型与分工吻合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E7%9B%B8%E5%85%B3%E6%80%A7%E5%88%86%E6%9E%90%EF%BC%88%E7%94%9F%E6%B6%AF%E8%A1%A8%EF%BC%89"><span class="nav-number">4.4.</span> <span class="nav-text">4. 相关性分析（生涯表）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E7%B1%BB%E5%88%86%E6%9E%90%EF%BC%9A%E4%B8%89%E7%A7%8D%E7%AE%97%E6%B3%95%EF%BC%8C%E4%B8%80%E7%B1%BB%E6%8A%80%E6%9C%AF%E9%A3%8E%E6%A0%BC"><span class="nav-number">5.</span> <span class="nav-text">聚类分析：三种算法，一类技术风格</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#KMeans%EF%BC%88%E4%B8%BB%E7%AE%97%E6%B3%95%EF%BC%89%EF%BC%9A%E4%BA%94%E6%AD%A5%E8%B5%B0"><span class="nav-number">5.1.</span> <span class="nav-text">KMeans（主算法）：五步走</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GMM-%E4%B8%8E-DBSCAN%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%9C%80%E7%BB%88%E6%B2%A1%E9%80%89%E5%AE%83%E4%BB%AC"><span class="nav-number">5.2.</span> <span class="nav-text">GMM 与 DBSCAN：为什么最终没选它们</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BE%97%E5%88%86%E9%A2%84%E6%B5%8B%EF%BC%9A6-%E7%A7%8D%E7%AE%97%E6%B3%95%E7%AB%9E%E9%80%9F"><span class="nav-number">6.</span> <span class="nav-text">得分预测：6 种算法竞速</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%A4%E4%BA%92%E5%BC%8F%E7%90%83%E6%98%9F%E5%88%86%E6%9E%90"><span class="nav-number">7.</span> <span class="nav-text">交互式球星分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E7%90%83%E6%98%9F%E7%94%9F%E6%B6%AF%E7%94%BB%E5%83%8F"><span class="nav-number">7.1.</span> <span class="nav-text">1. 球星生涯画像</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E8%BD%AC%E4%BC%9A%E5%89%8D%E5%90%8E%E5%AF%B9%E6%AF%94%EF%BC%9A%E5%8F%8C%E8%A7%84%E5%88%99%E8%BD%AC%E4%BC%9A%E6%A3%80%E6%B5%8B"><span class="nav-number">7.2.</span> <span class="nav-text">2. 转会前后对比：双规则转会检测</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E5%8F%8C%E7%90%83%E6%98%9F%E5%AF%B9%E6%AF%94"><span class="nav-number">7.3.</span> <span class="nav-text">3. 双球星对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Web-%E5%8F%AF%E8%A7%86%E5%8C%96%E7%BD%91%E7%AB%99"><span class="nav-number">8.</span> <span class="nav-text">Web 可视化网站</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8A%80%E6%9C%AF%E9%80%89%E5%9E%8B"><span class="nav-number">8.1.</span> <span class="nav-text">技术选型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%A5%91%E7%BA%A6"><span class="nav-number">8.2.</span> <span class="nav-text">数据契约</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9B%9B%E4%B8%AA%E9%A1%B5%E9%9D%A2"><span class="nav-number">8.3.</span> <span class="nav-text">四个页面</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%A4%E4%B8%AA%E5%B7%A5%E7%A8%8B%E7%BB%86%E8%8A%82"><span class="nav-number">8.4.</span> <span class="nav-text">两个工程细节</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AI-%E5%8D%8F%E4%BD%9C%E4%B8%8E%E5%B7%A5%E7%A8%8B%E7%BB%8F%E9%AA%8C"><span class="nav-number">9.</span> <span class="nav-text">AI 协作与工程经验</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E5%B0%BE"><span class="nav-number">10.</span> <span class="nav-text">结尾</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">48</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">76</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">429k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:30</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>
