@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="操作系统进程模型总览">
+<meta property="og:type" content="article">
+<meta property="og:title" content="操作系统：进程模型">
+<meta property="og:url" content="http://tristan1116.github.io/2026/09/11/OS_Process_Model/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="操作系统进程模型总览">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-09-11T15:30:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T15:30:00.000Z">
+<meta property="article:tag" content="操作系统">
+<meta property="article:tag" content="进程">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/09/11/OS_Process_Model/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>操作系统：进程模型 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/09/11/OS_Process_Model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          操作系统：进程模型
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-09-11 15:30:00" itemprop="dateCreated datePublished" datetime="2026-09-11T15:30:00+00:00">2026-09-11</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" itemprop="url" rel="index"><span itemprop="name">操作系统</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>16k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>15 分钟</span>
+            </span>
+            <div class="post-description">操作系统进程模型总览</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>进程是操作系统里最古老的概念之一，也是最核心的那个。几乎所有的操作系统功能都围着它转：调度器调度的是它，内存管理分配地址空间的单位是它，文件系统记录的是它打开了哪些文件。可以毫不夸张地说，没有进程这个抽象，现代操作系统根本无法实现。</p>
+<hr>
+<h2 id="先看看系统里到底跑着什么"><a href="#先看看系统里到底跑着什么" class="headerlink" title="先看看系统里到底跑着什么"></a>先看看系统里到底跑着什么</h2><p>在讨论进程怎么被管理之前，先得能看见它们。Linux 提供了几个常用工具，从不同角度把进程的状态铺开给人看。</p>
+<h3 id="ps：静态快照"><a href="#ps：静态快照" class="headerlink" title="ps：静态快照"></a>ps：静态快照</h3><p><code>ps</code> 是最常见的进程查看工具，它给出的是<strong>当前时刻各进程信息的静态快照</strong>，通过不同选项可以控制拍什么：</p>
+<table>
+<thead>
+<tr>
+<th align="center">选项</th>
+<th align="left">含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>a</code></td>
+<td align="left">显示当前终端下的所有进程，包括其他用户的进程</td>
+</tr>
+<tr>
+<td align="center"><code>u</code></td>
+<td align="left">以用户为主的格式显示进程状态</td>
+</tr>
+<tr>
+<td align="center"><code>x</code></td>
+<td align="left">通常和 <code>a</code> 一起用，显示当前用户在所有终端下的进程</td>
+</tr>
+<tr>
+<td align="center"><code>-e</code></td>
+<td align="left">显示系统内所有进程</td>
+</tr>
+<tr>
+<td align="center"><code>-l</code></td>
+<td align="left">用长格式显示</td>
+</tr>
+<tr>
+<td align="center"><code>-f</code></td>
+<td align="left">用完整格式显示</td>
+</tr>
+</tbody></table>
+<p>两个最常用的组合是 <code>ps aux</code> 和 <code>ps -elf</code>。前者按用户视角列出，输出大致长这样：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND</span><br><span class="line">root         1  0.0  0.1 169432 13156 ?        Ss   09:12   0:03 /sbin/init</span><br><span class="line">fan       2317  0.2  0.8 912344 65432 pts/0    Sl   10:05   0:12 /usr/bin/bash</span><br></pre></td></tr></table></figure>
+
+<p><code>USER</code> 是进程所属用户，<code>PID</code> 是进程号，<code>%CPU</code> 和 <code>%MEM</code> 是 CPU 与内存占用百分比，<code>VSZ</code> 是虚拟内存大小，<code>RSS</code> 是常驻物理内存，<code>TTY</code> 是进程挂在哪个终端上（<code>?</code> 表示不占终端，多半是后台守护进程），<code>STAT</code> 是进程状态，<code>START</code> 是启动时间，<code>TIME</code> 是累计占用 CPU 的时间，最后一列是启动命令。</p>
+<p><code>ps -elf</code> 则用长格式给出更丰富的内容，父进程 PID、优先级这些都会列出来，排查进程间的父子关系时更方便。</p>
+<h3 id="top：动态刷新"><a href="#top：动态刷新" class="headerlink" title="top：动态刷新"></a>top：动态刷新</h3><p><code>ps</code> 拍完照就结束，<code>top</code> 则是全屏交互式地持续刷新，默认每三秒更新一次，把进程按资源占用排个名次，谁在吃 CPU、谁在占内存一目了然。它承担的角色和 Windows 里的任务管理器差不多。</p>
+<h3 id="pgrep-与-pstree"><a href="#pgrep-与-pstree" class="headerlink" title="pgrep 与 pstree"></a>pgrep 与 pstree</h3><p><code>pgrep</code> 按属性查 PID，进程名、运行用户或所在终端都行。比如查用户 <code>fan</code> 正在运行的所有进程：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pgrep -u fan</span><br></pre></td></tr></table></figure>
+
+<p><code>pstree</code> 则把进程按树形结构打出来，父子关系一眼可见。这条命令在理解”进程是有层次的”这件事上特别直观，后面讲进程树时还会用到。</p>
+<hr>
+<h2 id="为什么需要”进程”这个抽象"><a href="#为什么需要”进程”这个抽象" class="headerlink" title="为什么需要”进程”这个抽象"></a>为什么需要”进程”这个抽象</h2><h3 id="从一台-Web-服务器说起"><a href="#从一台-Web-服务器说起" class="headerlink" title="从一台 Web 服务器说起"></a>从一台 Web 服务器说起</h3><p>想象一台 Web 服务器在处理页面请求：每个请求到达时，先查本地缓存，缓存没命中就去读磁盘。而读磁盘这个过程很慢，如果这段时间服务器只能干等，那吞吐量会很低。</p>
+<p>实际上服务器不会干等，它在等待磁盘响应的时候继续接收新请求。如果机器上挂了多块磁盘，还能同时向多块盘发起请求，第一块盘还没返回，第二块的结果可能已经到了。</p>
+<p>桌面上也是一样。哪怕只有你一个用户，系统启动后后台也跑着一堆东西：收邮件、提供网页服务、处理打印作业等等。再加上你自己开的浏览器、编辑器、终端，几十上百个进程同时存在是常态。</p>
+<p>一个能同时容纳这么多进程的<strong>多道程序系统</strong>，就成了现代计算机的基础架构。</p>
+<h3 id="伪并行与真并行"><a href="#伪并行与真并行" class="headerlink" title="伪并行与真并行"></a>伪并行与真并行</h3><p>CPU 在多个进程之间快速切换，每个进程一次只跑几十到几百毫秒。任一时刻，一个 CPU 核心严格来说只能执行一个进程的指令；但把观察尺度放到一秒，看上去就像所有进程在同时推进。这种效果被称为<strong>伪并行</strong>或<strong>并发</strong>。</p>
+<p>要和<strong>真并行</strong>区分开：真并行是多处理器系统里多个 CPU 同时执行不同任务，物理上真的在同时干活。并发是逻辑上的同时，单核也能做到，靠的是轮流；并行是物理上的同时，必须有多核。</p>
+<p>伪并行的代价是 CPU 时间片的分配带有不确定性，某个进程这一轮分到多少时间、下一轮还剩多少，都不固定。</p>
+<p>而因为切换的速度太快，我们根本没法直接追踪多个并行推进的进程到底执行到哪了。为了能分析和推理，操作系统设计者提出了一个概念模型，<strong>顺序进程模型</strong>。</p>
+<hr>
+<h2 id="进程模型"><a href="#进程模型" class="headerlink" title="进程模型"></a>进程模型</h2><h3 id="顺序进程"><a href="#顺序进程" class="headerlink" title="顺序进程"></a>顺序进程</h3><p>在进程模型里，计算机上运行的所有软件，包括操作系统本身，都被逻辑地组织成一系列<strong>顺序进程</strong>（Sequential Processes），简称<strong>进程</strong>（Processes）。</p>
+<p>一个进程，是某个正在执行中的程序的一个具体实例。它包含的东西不止代码：</p>
+<ul>
+<li>程序的代码</li>
+<li>程序计数器的当前值</li>
+<li>寄存器的当前状态</li>
+<li>程序里变量的即时值</li>
+</ul>
+<p>每个进程在抽象层面都像是配了一台专属的虚拟 CPU，可以独立推进。物理层面当然只有一颗 CPU，它在多个进程间快速切换，制造出并发的假象。</p>
+<h3 id="四个程序计数器"><a href="#四个程序计数器" class="headerlink" title="四个程序计数器"></a>四个程序计数器</h3><p>这是理解进程模型的一张概念图。假设有四个程序ABCD在跑：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">     程序计数器</span><br><span class="line">     ┌──────────┐</span><br><span class="line">A    │    ↓     │   ← 物理 PC 当前指向 A 的某条指令</span><br><span class="line">     ├──────────┤</span><br><span class="line">B    │    ↓     │</span><br><span class="line">     ├──────────┤      进程切换</span><br><span class="line">C    │    ↓     │</span><br><span class="line">     ├──────────┤</span><br><span class="line">D    │    ↓     │</span><br><span class="line">     └──────────┘</span><br></pre></td></tr></table></figure>
+
+<p>把每个程序抽象成一个独立进程后，每个进程都拥有属于自己的<strong>逻辑程序计数器</strong>（逻辑 PC），各自记录着自己执行到了哪条指令。但物理上，机器只有<strong>一个</strong>物理程序计数器。</p>
+<p>两者的配合方式是这样的：</p>
+<ol>
+<li>某个进程要运行时，把它的逻辑 PC 当前值<strong>加载</strong>进物理 PC，CPU 据此执行指令序列；</li>
+<li>该进程被切走时，物理 PC 的值（也就是它执行到的位置）被<strong>记录下来</strong>，复制回这个进程自己的逻辑 PC 中；</li>
+<li>下次再轮到它，从逻辑 PC 恢复，接着往下跑。</li>
+</ol>
+<pre class="mermaid">flowchart LR
+    A["进程 A 的逻辑 PC"] -->|"① 加载"| P["物理 PC<br/>（只有一个）"]
+    P -->|"② 执行指令"| E["CPU 执行"]
+    E -->|"③ 切走时保存回去"| A</pre>
+
+<p>正是这套”加载—保存—恢复”的机制，让多个程序能在单个物理 CPU 上实现逻辑上的并行。观察足够长的一段时间，所有进程都前进过；但在任何一个给定的瞬间，真正在运行的只有一个。</p>
+<h3 id="进程和程序的关系"><a href="#进程和程序的关系" class="headerlink" title="进程和程序的关系"></a>进程和程序的关系</h3><p>设想一位精通烹饪的计算机科学家要给女儿烤生日蛋糕，他需要一本食谱，一些食材，根据食谱对食材进行操作。</p>
+<p>烤到一半，科学家的儿子跑来说，他被蜜蜂蜇了。科学家会暂停烘焙，记下当前进度（蛋糕在烤箱里烤了多久、下一步该做什么），转去查急救手册处理伤口。等处理完再回到烘焙进程，从暂停点接着干。</p>
+<p>这就是<strong>进程切换</strong>：CPU 从”烘焙蛋糕”切到”医疗救助”，处理完再切回来。我们也可以看出，一个进程所需的要素，包含<strong>程序、输入输出和状态信息</strong>这三样。</p>
+<table>
+<thead>
+<tr>
+<th align="left">概念</th>
+<th align="left">对应物</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">CPU</td>
+<td align="left">科学家本人</td>
+</tr>
+<tr>
+<td align="left">程序</td>
+<td align="left">烘焙蛋糕的食谱</td>
+</tr>
+<tr>
+<td align="left">输入数据</td>
+<td align="left">面粉、鸡蛋等食材</td>
+</tr>
+<tr>
+<td align="left">进程</td>
+<td align="left">从读食谱、备料、烘烤到出炉这一整套连贯动作</td>
+</tr>
+</tbody></table>
+<p>另外，<strong>即便程序代码相同，每个进程实例的执行也是独立且唯一的</strong>。同一个程序启动两次，就是创建了两个不同的进程。</p>
+<hr>
+<h2 id="进程的创建"><a href="#进程的创建" class="headerlink" title="进程的创建"></a>进程的创建</h2><p>操作系统需要一些机制来创建进程，常见的有四种途径：</p>
+<ul>
+<li>系统初始化（<code>init</code>）</li>
+<li>正在运行的程序执行了创建进程的系统调用（比如 <code>fork</code>）</li>
+<li>用户请求创建一个新进程</li>
+<li>初始化一个批处理工作</li>
+</ul>
+<h3 id="系统初始化"><a href="#系统初始化" class="headerlink" title="系统初始化"></a>系统初始化</h3><p>系统启动过程中会批量创建进程。这些进程按功能分成两类：一类是<strong>前台进程</strong>，职责是直接和用户交互，响应用户操作；另一类跑在后台，不面向特定用户，专注执行系统级或服务级的任务。</p>
+<p>后台进程的典型工作方式是：大部分时间休眠以节省资源，一旦有新任务就立刻被唤醒干活，干完继续睡。负责收邮件的进程平时躺着，检测到新邮件到达才醒过来收信；负责网页服务的进程就监听网络请求，请求来了才处理。</p>
+<p>这类默默待在后台、处理邮件收取和网页服务等任务的进程，在 UNIX&#x2F;Linux 里有个专门的称呼：<strong>守护进程</strong>（daemon）。大型系统上服务种类多，跑着大量守护进程是正常现象。</p>
+<p>查看它们的工具前面已经见过：UNIX&#x2F;Linux 下用 <code>ps</code>，Windows 下用任务管理器。</p>
+<h3 id="系统调用创建"><a href="#系统调用创建" class="headerlink" title="系统调用创建"></a>系统调用创建</h3><p>启动阶段之外，新进程也可以在运行期间被动态创建。典型场景是大规模数据处理：一个进程专门从网络读数据放进共享缓冲区，另一个进程专门从缓冲区取数据处理。分工之后任务管理更简单，吞吐量也更高。在多处理器系统上，把不同进程分给不同 CPU 核心，还能真正并行起来。</p>
+<h3 id="用户请求创建"><a href="#用户请求创建" class="headerlink" title="用户请求创建"></a>用户请求创建</h3><p>在交互式系统里，用户敲一条命令或者双击一个桌面图标，就能启动一个程序，这些操作都会触发新进程的创建。</p>
+<p>UNIX 系统上通过 X Window 启动程序时，新创建的进程通常会接管与之关联的图形窗口界面，保证用户交互顺畅。Windows 的做法不同，启动进程时并不总是立刻创建窗口，但进程随时可以按需创建一个或多个窗口来展示信息、接收输入。每个窗口是一个独立的交互界面，背后对应着某个进程，用户用鼠标或键盘在窗口间切换，就是在和不同的进程打交道。</p>
+<p>游戏、浏览器、IDE 这类以人机之间大量交互为特征的系统，都属于交互式系统。</p>
+<h3 id="批处理创建"><a href="#批处理创建" class="headerlink" title="批处理创建"></a>批处理创建</h3><p>大型机的批处理系统里还有另一种场景。用户提交一批作业交给操作系统管理，当系统资源允许、判定还能处理更多任务时，操作系统主动创建新进程，从作业队列里挑出下一个待执行的作业运行。</p>
+<p>到这里为止，我们把四种创建方式都过了一遍。不管是在批处理系统、用户交互环境（比如通过键盘或鼠标操作），还是自动运行的批处理程序里，新进程的创建最终都要落实成<strong>系统调用的执行</strong>。系统调用是软件和操作系统之间沟通的桥梁，它指示操作系统启动一个新的进程实例，并可能指定要在这个进程里运行的程序。</p>
+<h3 id="UNIX的系统调用：fork-与-execve"><a href="#UNIX的系统调用：fork-与-execve" class="headerlink" title="UNIX的系统调用：fork 与 execve"></a>UNIX的系统调用：fork 与 execve</h3><p>UNIX 提供的这个系统调用叫 <code>fork</code>。它的行为很特别：生成一个和当前进程（父进程）<strong>几乎完全相同</strong>的副本，内存映像、环境变量、打开的文件描述符统统复制一份。这个副本就是子进程。</p>
+<p>复制出来之后，父子进程要分道扬镳，分叉的依据是 <code>fork()</code> 的返回值。UNIX 里每个进程都有一个唯一的整型<strong>进程标识符</strong>（PID）。<code>fork()</code> 一次调用、两次返回：子进程拿到 <code>0</code>，父进程拿到子进程的 PID。两个进程都从 <code>fork()</code> 之后的指令继续往下走，各自判断返回值就知道自己是谁。</p>
+<pre class="mermaid">flowchart LR
+    P["父进程"] --> F(["pid = fork()"])
+    F -->|"pid 非 0：父进程"| W(["wait()"])
+    W --> R["父进程继续执行"]
+    F -->|"pid 为 0：子进程"| E(["exec()"])
+    E --> X(["exit()"])
+    X --> W</pre>
+
+<p>父进程这一路拿到的是子进程的 PID，它调用 <code>wait()</code> 把自己挂起，等子进程结束再继续。子进程这一路调用 <code>execve</code>，用新程序<strong>替换</strong>掉自己当前的内存映像，程序跑完后通过 <code>exit()</code> 退出。子进程的退出会唤醒父进程的 <code>wait()</code>，父进程从那里接着往下走。</p>
+<p>以用户在 shell 里执行 <code>sort</code> 命令为例：</p>
+<p>第一步是 <code>fork</code>。shell 调用它复制出一个和自己一模一样的子进程，父进程的内存映像、环境变量和打开的文件描述符都有一份拷贝。第二步是 <code>execve</code>，由子进程调用，把刚刚复制来的内存映像整个换成 <code>sort</code> 程序，从此它就变成了 <code>sort</code>。这期间 shell 本身不干活，它在 <code>fork</code> 之后调用 <code>wait</code> 把自己挂起，等子进程执行完再恢复。</p>
+<pre class="mermaid">flowchart LR
+    S["🐚 shell"] -->|"① fork()"| C["👶 子进程<br/>（shell 的副本）"]
+    C -->|"② execve('/usr/bin/sort')"| T["📊 sort 程序<br/>（内存映像被替换）"]
+    S -->|"③ wait() 等待"| W["⏸️ shell 挂起"]
+    T -->|"④ 执行完毕"| W2["▶️ shell 恢复"]</pre>
+
+<p>为什么要拆成两步？因为 <code>fork</code> 和 <code>execve</code> 之间留出了一段空隙，子进程可以在这段空隙里做准备工作，重定向标准输入、输出、错误流就是在这儿做的。等准备工作做完再 <code>execve</code>，新程序一启动就已经拿到了正确的上下文环境。</p>
+<h3 id="C-代码演示"><a href="#C-代码演示" class="headerlink" title="C 代码演示"></a>C 代码演示</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/wait.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">pid_t</span> pid;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* fork a child process */</span></span><br><span class="line">    pid = fork();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (pid &lt; <span class="number">0</span>) &#123;                  <span class="comment">/* error occurred */</span></span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Fork Failed&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (pid == <span class="number">0</span>) &#123;            <span class="comment">/* child process */</span></span><br><span class="line">        execlp(<span class="string">&quot;/bin/ls&quot;</span>, <span class="string">&quot;ls&quot;</span>, <span class="literal">NULL</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span> &#123;                          <span class="comment">/* parent process */</span></span><br><span class="line">        <span class="comment">/* parent will wait for the child to complete */</span></span><br><span class="line">        wait(<span class="literal">NULL</span>);</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Child Complete&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>pid = fork()</code>：调用后系统里多了一个进程。父进程继续往下走，子进程也从这一行之后开始走。</li>
+<li><code>pid &lt; 0</code>：<code>fork</code> 失败（比如系统进程数已达上限），打印错误并返回。</li>
+<li><code>pid == 0</code>：只有子进程会走到这个分支。它调用 <code>execlp</code>，用 <code>/bin/ls</code> 这个程序覆盖掉自己的地址空间，从此它变成了 <code>ls</code>。</li>
+<li><code>else</code>（<code>pid &gt; 0</code>）：父进程走到这里，拿到的 <code>pid</code> 是子进程的 PID。它调用 <code>wait(NULL)</code> 把自己移出就绪队列，一直等到子进程终止才继续，然后打印 <code>Child Complete</code>。</li>
+</ul>
+<p>这里有个细节：<code>execlp</code> 是 <code>exec</code> 家族的一个版本，作用是加载新程序并执行。因为新程序<strong>覆盖了</strong>原来进程的地址空间，所以 <code>exec</code> 调用除非出错，否则<strong>不会返回</strong>，原来的代码已经被换掉了，没有”返回”这回事。</p>
+<p>子进程除了 <code>pid</code> 值为 0 之外，还继承了父进程的权限、调度属性以及某些资源（比如已经打开的文件）。</p>
+<h3 id="Windows-的做法：CreateProcess"><a href="#Windows-的做法：CreateProcess" class="headerlink" title="Windows 的做法：CreateProcess"></a>Windows 的做法：CreateProcess</h3><p>UNIX 是”先复制自己，再换成新程序”，两件事拆成两个调用；Windows 则是<strong>一个调用全包</strong>，<code>CreateProcess</code> 直接把指定的程序加载进新进程。</p>
+<p>但是这个调用有 <strong>10 个参数</strong>，涵盖要执行的程序与命令行参数、安全属性和句柄继承控制位、优先级信息以及窗口规格，还有一个指向结构的指针，新进程的信息通过它返回给调用者。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;windows.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(VOID)</span></span><br><span class="line">&#123;</span><br><span class="line">    STARTUPINFO si;</span><br><span class="line">    PROCESS_INFORMATION pi;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* allocate memory */</span></span><br><span class="line">    ZeroMemory(&amp;si, <span class="keyword">sizeof</span>(si));</span><br><span class="line">    si.cb = <span class="keyword">sizeof</span>(si);</span><br><span class="line">    ZeroMemory(&amp;pi, <span class="keyword">sizeof</span>(pi));</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* create child process */</span></span><br><span class="line">    <span class="keyword">if</span> (!CreateProcess(<span class="literal">NULL</span>,                        <span class="comment">/* use command line */</span></span><br><span class="line">         <span class="string">&quot;C:\\WINDOWS\\system32\\mspaint.exe&quot;</span>,      <span class="comment">/* command */</span></span><br><span class="line">         <span class="literal">NULL</span>,                                      <span class="comment">/* don&#x27;t inherit process handle */</span></span><br><span class="line">         <span class="literal">NULL</span>,                                      <span class="comment">/* don&#x27;t inherit thread handle */</span></span><br><span class="line">         FALSE,                                     <span class="comment">/* disable handle inheritance */</span></span><br><span class="line">         <span class="number">0</span>,                                         <span class="comment">/* no creation flags */</span></span><br><span class="line">         <span class="literal">NULL</span>,                                      <span class="comment">/* use parent&#x27;s environment block */</span></span><br><span class="line">         <span class="literal">NULL</span>,                                      <span class="comment">/* use parent&#x27;s existing directory */</span></span><br><span class="line">         &amp;si,</span><br><span class="line">         &amp;pi))</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;CreateProcess Failed&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* parent will wait for the child to complete */</span></span><br><span class="line">    WaitForSingleObject(pi.hProcess, INFINITE);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Child Complete&quot;</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* close handles */</span></span><br><span class="line">    CloseHandle(pi.hProcess);</span><br><span class="line">    CloseHandle(pi.hThread);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码创建了一个子进程并加载 <code>mspaint.exe</code>，10 个参数里大部分用了默认值。两个结构体实例的作用分别是：</p>
+<ul>
+<li><code>STARTUPINFO</code>：指定新进程的特性，比如窗口大小和外观、标准输入输出的文件句柄</li>
+<li><code>PROCESS_INFORMATION</code>：装着新进程及其线程的句柄与标识符</li>
+</ul>
+<p>调用之前先用 <code>ZeroMemory()</code> 把这两个结构体清零。前两个参数是应用程序名和命令行参数，这里应用程序名传 <code>NULL</code>，表示由命令行参数来指定要加载的程序。其余参数走系统默认：继承进程和线程句柄、无创建标志、沿用父进程的环境块和启动目录。</p>
+<p>对应的等待方式也不同。UNIX 下父进程调 <code>wait()</code> 等子进程，Windows 下是 <code>WaitForSingleObject()</code>，参数传子进程的句柄 <code>pi.hProcess</code>。子进程一退出，控制权就从这里回到父进程。最后两句 <code>CloseHandle</code> 关掉句柄，避免句柄泄漏。</p>
+<h3 id="两大系统的系统调用对照"><a href="#两大系统的系统调用对照" class="headerlink" title="两大系统的系统调用对照"></a>两大系统的系统调用对照</h3><p>下表列出了 UNIX 和 Win32 在进程与文件管理上的对应关系。表里每一行都能对上一个”同功能”调用，但对照着看会发现：两边的调用在<strong>数量、参数和组织方式</strong>上并不对称，这种不对称正是两个系统设计思路差异的直接产物：</p>
+<table>
+<thead>
+<tr>
+<th align="left">UNIX</th>
+<th align="left">Win32</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>fork</code></td>
+<td align="left"><code>CreateProcess</code></td>
+<td align="left">创建一个新进程</td>
+</tr>
+<tr>
+<td align="left"><code>waitpid</code></td>
+<td align="left"><code>WaitForSingleObject</code></td>
+<td align="left">等待一个进程退出</td>
+</tr>
+<tr>
+<td align="left"><code>execve</code></td>
+<td align="left">none</td>
+<td align="left"><code>CreateProcess</code> &#x3D; <code>fork</code> + <code>execve</code> 的合并版</td>
+</tr>
+<tr>
+<td align="left"><code>exit</code></td>
+<td align="left"><code>ExitProcess</code></td>
+<td align="left">终止执行</td>
+</tr>
+<tr>
+<td align="left"><code>open</code></td>
+<td align="left"><code>CreateFile</code></td>
+<td align="left">创建或打开一个已有文件</td>
+</tr>
+<tr>
+<td align="left"><code>close</code></td>
+<td align="left"><code>CloseHandle</code></td>
+<td align="left">关闭文件</td>
+</tr>
+<tr>
+<td align="left"><code>read</code></td>
+<td align="left"><code>ReadFile</code></td>
+<td align="left">从文件中读取数据</td>
+</tr>
+<tr>
+<td align="left"><code>write</code></td>
+<td align="left"><code>WriteFile</code></td>
+<td align="left">向文件写数据</td>
+</tr>
+<tr>
+<td align="left"><code>lseek</code></td>
+<td align="left"><code>SetFilePointer</code></td>
+<td align="left">移动文件指针</td>
+</tr>
+<tr>
+<td align="left"><code>stat</code></td>
+<td align="left"><code>GetFileAttributesEx</code></td>
+<td align="left">获得文件属性</td>
+</tr>
+<tr>
+<td align="left"><code>mkdir</code></td>
+<td align="left"><code>CreateDirectory</code></td>
+<td align="left">创建新目录</td>
+</tr>
+<tr>
+<td align="left"><code>rmdir</code></td>
+<td align="left"><code>RemoveDirectory</code></td>
+<td align="left">移除空目录</td>
+</tr>
+<tr>
+<td align="left"><code>link</code></td>
+<td align="left">none</td>
+<td align="left">Win32 不支持 link</td>
+</tr>
+<tr>
+<td align="left"><code>unlink</code></td>
+<td align="left"><code>DeleteFile</code></td>
+<td align="left">销毁一个已有文件</td>
+</tr>
+<tr>
+<td align="left"><code>mount</code></td>
+<td align="left">none</td>
+<td align="left">Win32 不支持 mount</td>
+</tr>
+<tr>
+<td align="left"><code>umount</code></td>
+<td align="left">none</td>
+<td align="left">同上，不支持 mount 也就谈不上 umount</td>
+</tr>
+<tr>
+<td align="left"><code>chdir</code></td>
+<td align="left"><code>SetCurrentDirectory</code></td>
+<td align="left">切换当前工作目录</td>
+</tr>
+<tr>
+<td align="left"><code>chmod</code></td>
+<td align="left">none</td>
+<td align="left">Win32 不支持安全</td>
+</tr>
+<tr>
+<td align="left"><code>kill</code></td>
+<td align="left">none</td>
+<td align="left">Win32 不支持信号</td>
+</tr>
+<tr>
+<td align="left"><code>time</code></td>
+<td align="left"><code>GetLocalTime</code></td>
+<td align="left">获取当前时间</td>
+</tr>
+</tbody></table>
+<h4 id="思路一：UNIX-的”先复制、再替换”"><a href="#思路一：UNIX-的”先复制、再替换”" class="headerlink" title="思路一：UNIX 的”先复制、再替换”"></a>思路一：UNIX 的”先复制、再替换”</h4><p>UNIX 把”造出一个新进程”拆成了两个独立系统调用，<strong>复制</strong>和<strong>替换</strong>：</p>
+<ul>
+<li><code>fork</code>：克隆当前进程，产生一个内存映像、环境变量、打开的文件描述符都几乎一致的子进程。克隆出来的子进程跑的<strong>还是父进程的程序</strong>。</li>
+<li><code>execve</code>：加载另一个可执行文件，覆盖掉当前进程的内存空间。进程本身不变（还是同一个 PID、同一个进程表项），但里面跑的代码和已经是另一个程序了。</li>
+</ul>
+<p>拆成两步，关键就在于<strong>中间那段空隙</strong>。在 <code>fork</code> 返回之后、<code>execve</code> 执行之前，子进程有一段只属于自己的执行时间，可以在里面先把环境布置好，再让新程序接手。第 10 页讲 shell 执行 <code>sort</code> 时的说法是：</p>
+<blockquote>
+<p>这种两步法的优势在于，它允许子进程在 <code>fork</code> 与 <code>execve</code> 之间执行一些必要的准备工作，比如重定向标准输入、输出和错误流，从而为即将运行的程序提供必要的上下文环境。</p>
+</blockquote>
+<p>拿 <code>ls &gt; out.txt</code> 举例，shell 的执行过程是：</p>
+<pre class="mermaid">flowchart LR
+    A["shell 调用 fork()"] --> B["子进程：把标准输出<br/>重定向到 out.txt"]
+    B --> C["子进程调用 execve()<br/>加载 /bin/ls"]
+    C --> D["ls 以为自己在往终端写<br/>实际写进了 out.txt"]</pre>
+
+<p>重定向发生在 <code>execve</code> <strong>之前</strong>，改的是子进程自己的文件描述符表。等 <code>ls</code> 被加载进来时，它看到的标准输出已经是 <code>out.txt</code> 了，而它自己完全不知情。这套机制到了 Linux 才暴露出真正的威力。因为重定向在 <code>exec</code> 之前，所以管道、输入输出重定向这些 shell 功能对<strong>任何</strong>程序都自动生效，被加载的程序不用为此写一行代码。UNIX 的工具因此可以写得很小，只干一件事，组合和拼接交给 shell。</p>
+<p>代价是两次系统调用、两次从用户态陷入内核，以及一次”明知会被丢掉”的地址空间复制。前者是设计换来的灵活性，后者就是后面写时复制要解决的问题。</p>
+<h4 id="思路二：Windows-的”一步到位”"><a href="#思路二：Windows-的”一步到位”" class="headerlink" title="思路二：Windows 的”一步到位”"></a>思路二：Windows 的”一步到位”</h4><p>Windows 走了另一条路：**没有 <code>fork</code>，也没有单独的 <code>execve</code>**，而是用 <code>CreateProcess</code> 把两件事一次做完。</p>
+<p>从表里能直接读出这条设计路线的三个特点。</p>
+<p><strong>1. 调用少，参数多。</strong> <code>fork</code> 不需要参数，<code>execve</code> 三个参数，而 <code>CreateProcess</code> 有 10 个参数。因为”用哪个程序、命令行是什么、安全属性怎么给、优先级多少、窗口什么规格”这些决定，在 UNIX 里是分给 <code>fork</code> 之后的准备动作去做的，在 Windows 里必须在创建进程的<strong>这一刻</strong>全部确定。</p>
+<p><strong>2. 没有中间窗口，也就不需要重定向技巧。</strong> 子进程一诞生就带着目标程序，不存在”先跑着父进程的代码、等会儿再换掉”的阶段。所以 Windows 上做输入输出重定向，靠的是创建时传入的 <code>STARTUPINFO</code>。博客前面那段代码里，<code>STARTUPINFO</code> 的作用正是”指定新进程的特性，比如窗口大小和外观、标准输入输出的文件句柄”，而不是像 UNIX 那样在 <code>fork</code> 之后去改子进程的描述符表。</p>
+<p><strong>3. 只管创建，不管”接下来干什么”。</strong> UNIX 里父进程可以 <code>fork</code> 出一堆子进程，让它们继续跑同一份程序的不同分支。典型的例子就是网络服务器，父进程 <code>fork</code> 之后，子进程和父进程走同一个代码里不同的 <code>if</code> 分支。Windows 的 <code>CreateProcess</code> 则总要绑定一个外部可执行文件，不能”复制自己但暂时不换程序”。</p>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">UNIX</th>
+<th align="left">Windows</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">基本单元</td>
+<td align="left">两个小调用 <code>fork</code> + <code>execve</code></td>
+<td align="left">一个大调用 <code>CreateProcess</code></td>
+</tr>
+<tr>
+<td align="left">参数</td>
+<td align="left"><code>fork</code> 无参，<code>execve</code> 三个</td>
+<td align="left">10 个</td>
+</tr>
+<tr>
+<td align="left">灵活性的来源</td>
+<td align="left">两步之间的空隙（重定向、设置环境）</td>
+<td align="left">调用本身带全套选项（安全属性、句柄继承、优先级）</td>
+</tr>
+<tr>
+<td align="left">缺点</td>
+<td align="left">两次陷入内核 + 多一次地址空间复制</td>
+<td align="left">调用笨重，创建时必须想清楚所有参数</td>
+</tr>
+</tbody></table>
+<p>UNIX 的组合式设计给了 shell 和工具链极大的自由度，管道和重定向就是直接架在”两步之间的空隙”上的，”一切皆文件””小程序组合”的哲学跟它一脉相承；Windows 的整合式设计则是把进程创建需要的所有信息一次性摆到台面上，但是调用本身笨重。但不管怎么选，”复制一份再换程序”这种方式对操作系统本身是个不小的负担，所以也就有了下面的写时复制。</p>
+<h3 id="写时复制"><a href="#写时复制" class="headerlink" title="写时复制"></a>写时复制</h3><p>不管哪个系统，进程创建机制都保证了一件事：父子进程各有独立的地址空间。一个进程改了自己地址空间里的数据，另一个进程看不见，数据隔离性由此保证。</p>
+<p>UNIX 的实现细节值得一提。子进程的地址空间是父进程的一份<strong>初始副本</strong>，但两个地址空间在逻辑上完全独立：即便初始数据相同，任何修改都只发生在发起修改的那个进程里。</p>
+<p>不过，如果 <code>fork</code> 真的把父进程的整个地址空间逐字节复制一遍，开销会非常大，而实际上大多数子进程紧接着就要 <code>execve</code> 换掉整个地址空间，fork的这步复制会被浪费。于是 UNIX 用了<strong>写时复制</strong>（copy-on-write）来优化：</p>
+<pre class="mermaid">flowchart TB
+    F["fork() 之后"] --> S1["父子进程共享同一份物理内存页<br/>（只读）"]
+    S1 -->|"子进程尝试写入"| C["内核触发页错误<br/>把该页复制一份给子进程"]
+    C --> S2["子进程在私有副本上修改<br/>父进程不受影响"]
+    S1 -->|"双方都只读"| S3["始终共享，一次复制都不发生"]</pre>
+
+<p>在子进程尝试修改某个可写区域之前，这块内容一直和父进程共享；真的发生写入时，内核才把那一页复制到子进程的新位置。至于只读段（比如代码段）这类本来就不需要修改的区域，则设计成始终共享。</p>
+<p>地址空间隔离并不妨碍进程间共享资源，打开的文件描述符就是例子。新创建的子进程能继承并访问父进程已经打开的文件。</p>
+<p>Windows 的做法更直接：从进程创建的那一刻起，父子进程的地址空间就被明确划分成两个完全不同的空间。它同样提供了进程间通信和资源共享的机制，只是这些机制不走”共享地址空间”这条路。</p>
+<hr>
+<h2 id="进程的终止"><a href="#进程的终止" class="headerlink" title="进程的终止"></a>进程的终止</h2><p>进程不会永远跑下去。触发的条件有四类：</p>
+<ul>
+<li>正常退出（自愿的）</li>
+<li>错误退出（自愿的）</li>
+<li>严重错误（非自愿的）</li>
+<li>被其他进程杀死（非自愿的）</li>
+</ul>
+<h3 id="正常退出"><a href="#正常退出" class="headerlink" title="正常退出"></a>正常退出</h3><p>大多数终止是自然发生的：进程完成预定任务后自行结束。编程语境下，这个动作由特定的系统调用触发，通知操作系统”我干完了，可以回收资源了”。</p>
+<p>UNIX 里是 <code>exit</code> 调用。它不仅标志进程结束，还允许进程向操作系统传递一个<strong>退出码</strong>，用来表示自己是成功还是失败。Windows 里对应的是 <code>ExitProcess</code>，作用相同：通知系统当前进程执行完毕，请求清理资源。</p>
+<p>这类终止不一定都要程序员写代码触发。面向用户的软件通常会在界面上提供图标、按钮或菜单项让用户主动关闭，点一下关闭按钮，软件先做一系列清理（删除自己创建的临时文件等），然后调用系统调用正式终止进程。</p>
+<h3 id="错误退出"><a href="#错误退出" class="headerlink" title="错误退出"></a>错误退出</h3><p>第二类终止来自运行中遭遇的严重错误：文件缺失、权限不足或参数错误。</p>
+<p>编译场景很典型：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc foo.c</span><br></pre></td></tr></table></figure>
+
+<p>如果 <code>foo.c</code> 根本不存在，GCC 找不到文件，识别出这是严重错误，输出错误消息到控制台，然后调用 <code>exit</code>（UNIX）或 <code>ExitProcess</code>（Windows）终止自己。这种终止立即且不可逆转，没有源文件，编译任务不可能继续。</p>
+<p>交互式程序遇到可恢复的错误时，处理方式通常更友好。它不会立刻退出，而是弹个对话框说明情况，给出”重试””取消””退出”之类的选项让用户决策。比如文本编辑器打开一个不存在的文件，会提示”无法找到文件，请检查文件名后重试，或选择取消”。这样可用性更好。</p>
+<h3 id="严重错误"><a href="#严重错误" class="headerlink" title="严重错误"></a>严重错误</h3><p>第三类来自程序自身的内部错误：编程疏忽、逻辑错误或是运行时异常。典型的有执行非法指令、访问无效内存地址、做除零运算。这些会让进程的运行状态变得不稳定，进而触发终止。</p>
+<p>UNIX 为此提供了一套更灵活的机制：<strong>信号</strong>（signal）。信号可以理解成一种<strong>软中断</strong>，用来通知进程发生了某个特定事件。</p>
+<p>进程收到信号后，可以根据信号类型和自己的设置决定怎么响应：有些信号可以选择忽略（如果系统允许），也可以注册一个<strong>信号处理程序</strong>（signal handler）来自定义响应动作。</p>
+<p>举个例子，进程尝试访问非法内存地址时，操作系统会向它发送一个段错误信号（通常是 <code>SIGSEGV</code>）。如果进程没为这个信号提供处理程序，默认行为就是终止它；如果进程注册了处理程序，那它可以在处理程序里做点清理工作再安全退出，或者尝试恢复到稳定状态继续执行。</p>
+<p>信号机制让进程面对错误时能做出更灵活适当的响应，而不只有”被干掉”一条路。</p>
+<h3 id="被其他进程杀死"><a href="#被其他进程杀死" class="headerlink" title="被其他进程杀死"></a>被其他进程杀死</h3><p>第四类终止，是某个进程（通常要有相应权限）主动请求操作系统结束另一个进程。</p>
+<p>UNIX 下用 <code>kill</code> 系统调用实现。它向目标进程发送一个信号，该信号可以被接收方解释为终止指令。比如进程 A 想结束进程 B，可以通过 <code>kill</code> 发送 <code>SIGTERM</code>（软件终止信号）给 B，B 收到后通常会先做清理工作再退出。</p>
+<p>Windows 没有和 UNIX <code>kill</code> 对等的系统级接口，但提供 <code>TerminateProcess</code> 函数。这里有个区别需要注意：**<code>TerminateProcess</code> 不是系统调用**，它是 Win32 API 的一部分，由 Windows 的应用程序接口层提供。它允许一个进程立即终止另一个进程，不给目标进程任何清理资源或保存状态的机会。正因为如此，使用它要格外小心，可能导致数据丢失或其他副作用。</p>
+<p>实际操作的差别：UNIX 下要终止名为 <code>example_process</code> 的进程，先用 <code>ps</code> 查到它的 PID，然后 <code>kill [PID]</code> 发送终止信号。Windows 下则可能通过任务管理器，或者编程调用 <code>TerminateProcess</code> 并传入目标进程的句柄或 PID。考虑到 <code>TerminateProcess</code> 的潜在风险，更推荐用温和一些的方式，比如给应用程序窗口发送 <code>WM_CLOSE</code> 消息，让程序有机会走完有序关闭的流程。</p>
+<hr>
+<h2 id="进程的层次结构"><a href="#进程的层次结构" class="headerlink" title="进程的层次结构"></a>进程的层次结构</h2><h3 id="UNIX：以-init-为根的进程树"><a href="#UNIX：以-init-为根的进程树" class="headerlink" title="UNIX：以 init 为根的进程树"></a>UNIX：以 init 为根的进程树</h3><p>UNIX 及其衍生系统里，进程之间通过明确的<strong>父子关系</strong>构成层次结构。父进程创建子进程，子进程还能继续创建自己的子进程，一层层展开形成<strong>进程树</strong>。</p>
+<p>除了父子关系，UNIX 里还有<strong>进程组</strong>的概念：一个进程和它的所有后代进程（直接子进程、子进程的子进程……）可以共同属于一个或多个进程组。进程组主要是为信号处理服务的。用户从终端（比如键盘）发出一个信号时，这个信号通常会被送到与终端关联的<strong>当前前台进程组</strong>中的所有成员，每个成员再各自决定怎么响应：捕获、忽略，还是执行默认操作。</p>
+<p>进程树在系统启动过程的体现：</p>
+<pre class="mermaid">flowchart TB
+    I["init（PID 1）<br/>所有其他进程的根"] --> T1["getty / 终端进程<br/>（每个可用终端一个）"]
+    I --> T2["getty / 终端进程"]
+    T1 -->|"用户登录"| L["login 进程"]
+    L -->|"登录成功"| S["shell 环境"]
+    S -->|"输入命令"| C1["用户启动的进程"]
+    C1 --> C2["它再创建的子进程"]</pre>
+
+<p><code>init</code> 是系统启动时最先被创建的特殊进程，作为所有其他进程的根，负责系统初始化和后续进程的创建。它会根据系统配置读取信息，为每个可用的终端创建一个进程，这些进程负责等待用户登录。用户登录成功后，登录进程启动一个 shell 环境，用户在里面敲命令启动新进程，新进程还可能再创建自己的子进程，一棵以 <code>init</code> 为根的庞大进程树就是这样长出来的。</p>
+<p>（现代 Linux 发行版多数用 <code>systemd</code> 接替了传统的 <code>init</code>，但”第一个进程是所有进程的根”这个位置没有变。）</p>
+<h3 id="Windows：所有进程一律平等"><a href="#Windows：所有进程一律平等" class="headerlink" title="Windows：所有进程一律平等"></a>Windows：所有进程一律平等</h3><p>Windows 不采用 UNIX 的进程层次结构模型。在 Windows 里，所有进程都被视为<strong>平等的实体</strong>，彼此之间不存在直接的父子关系或层次结构。</p>
+<p>那它怎么管理进程？靠<strong>句柄</strong>。一个进程创建另一个进程时，父进程会拿到一个句柄，通过这个句柄可以对子进程做某些操作，比如查询状态或者终止它。但这个句柄<strong>不代表层次结构</strong>，它甚至可以被传递给其他进程，那样一来就和最初的创建者失去直接联系了。</p>
+<p>两种设计各有考量：UNIX 的层次结构在信号处理、资源管理等场景下提供了便利，Windows 的灵活性和独立性则在跨进程通信、安全模型等方面展现出优势。</p>
+<hr>
+<h2 id="进程状态"><a href="#进程状态" class="headerlink" title="进程状态"></a>进程状态</h2><p>进程是独立的执行实体，各有专属的程序计数器和内部状态，但进程之间又必须协作。看个例子：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> chapter1 chapter2 chapter3 | grep tree</span><br></pre></td></tr></table></figure>
+
+<p><code>cat</code> 进程负责连续输出三个文件的内容，<code>grep</code> 进程负责从收到的输入里筛选出含 <code>tree</code> 的行。</p>
+<p>两个进程的执行速度受各自逻辑复杂度和系统资源分配（尤其是 CPU 时间片）影响，不可能总是一致。很可能会出现这种局面：<code>grep</code> 已经准备就绪要处理输入了，<code>cat</code> 还没读完文件。为了防止数据丢失或处理出错，操作系统会让 <code>grep</code> 进入<strong>阻塞</strong>状态暂停执行，直到 <code>cat</code> 把数据完整传过来。</p>
+<p>这就是进程状态概念的由来。</p>
+<h3 id="三种核心状态"><a href="#三种核心状态" class="headerlink" title="三种核心状态"></a>三种核心状态</h3><pre class="mermaid">flowchart LR
+    R(["🟢 运行态<br/>Running"]) -->|"1 等待输入/事件"| B(["🔴 阻塞态<br/>Blocked"])
+    B -->|"4 事件出现"| Y(["🟡 就绪态<br/>Ready"])
+    Y -->|"3 被调度选中"| R
+    R -->|"2 时间片用完"| Y</pre>
+
+<p><strong>运行态（Running）</strong>：进程正在实际占用 CPU 时间片执行。比如文本编辑器进程正在处理键盘输入并实时显示到屏幕上时，它就处于运行态。</p>
+<p><strong>就绪态（Ready）</strong>：进程已经准备好执行，但 CPU 正被其他进程占用，只能等着轮到自己。这就像运动员在起跑线上等着发令枪响，都做好了起跑准备，但比赛还没开始。</p>
+<p><strong>阻塞态（Blocked）</strong>：进程因为等待某个外部事件（I&#x2F;O 操作完成、信号量释放等）而无法继续执行。除非这个事件发生，否则即便 CPU 空闲着，它也不能运行。比如进程尝试从网络读数据，但数据还没到达，这时它就进入阻塞态。</p>
+<p>逻辑上，运行态和就绪态在”可运行性”上是相似的，区别只在于有没有真的拿到 CPU 时间。阻塞态和它们有本质不同，外部条件没满足，它就无法执行，跟 CPU有没有空闲没关系。</p>
+<h3 id="四种状态转换"><a href="#四种状态转换" class="headerlink" title="四种状态转换"></a>四种状态转换</h3><p>上图三种核心状态的四种转换，各自由不同原因触发：</p>
+<table>
+<thead>
+<tr>
+<th align="center">转换</th>
+<th align="left">方向</th>
+<th align="left">触发原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><strong>1</strong></td>
+<td align="left">运行 → 阻塞</td>
+<td align="left">进程等待输入或某个事件。某些系统里进程调用 <code>pause</code> 之类的系统调用主动获取阻塞状态；UNIX 里从管道或特殊文件（比如终端）读取时没有可用输入，进程也会被自动终止</td>
+</tr>
+<tr>
+<td align="center"><strong>2</strong></td>
+<td align="left">运行 → 就绪</td>
+<td align="left">进程调度器认定当前进程已经运行了足够长的时间，该把 CPU 让给别的进程了</td>
+</tr>
+<tr>
+<td align="center"><strong>3</strong></td>
+<td align="left">就绪 → 运行</td>
+<td align="left">轮到该进程获得 CPU 时间片。所有其他进程都运行过之后，第一个进程重新获得时间片时就会发生</td>
+</tr>
+<tr>
+<td align="center"><strong>4</strong></td>
+<td align="left">阻塞 → 就绪</td>
+<td align="left">进程等待的外部事件发生了（比如输入数据到达）。如果此时没有其他进程在运行，立刻触发转换 3 让它开始跑；否则它先进就绪队列，等 CPU 空闲再说</td>
+</tr>
+</tbody></table>
+<p>转换 2 和转换 3 都是由进程调度程序引起的，进程本身不知道调度程序的存在。它以为自己一直在独占 CPU，实际上被切来切去。</p>
+<h3 id="调度程序的位置"><a href="#调度程序的位置" class="headerlink" title="调度程序的位置"></a>调度程序的位置</h3><p>顺着上面的讨论，可以得到这样一个模型：操作系统的核心基石是<strong>调度程序</strong>，它位于系统架构的最底层，上面跑着众多进程。调度程序负责处理所有与中断管理、进程启动与终止相关的复杂细节。</p>
+<pre class="mermaid">flowchart BT
+    P0["进程 0"]
+    P1["进程 1"]
+    PD["..."]
+    P2["进程 n-2"]
+    P3["进程 n-1"]
+    S["调 度 程 序"]
+    S --- P0
+    S --- P1
+    S --- PD
+    S --- P2
+    S --- P3</pre>
+
+<p>基于进程的操作系统中，最底层的是中断和调度处理，在该层之上是顺序进程。</p>
+<p>尽管承担的任务繁重，调度程序本身设计得相当精简，一小段精心编写的、体积小巧但功能强大的程序。这个设计哲学保证了它能高效运行、快速响应系统需求，同时少占系统资源。</p>
+<p>举例来说，系统收到外部中断信号（键盘输入、网络数据包到达）时，调度程序立即介入，根据当前系统状态和优先级规则，决定是马上处理这个中断还是挂起等待。决定启动或停止某个进程时，它也会综合考虑进程优先级、系统负载等因素，确保资源分配合理。</p>
+<hr>
+<h2 id="进程的实现"><a href="#进程的实现" class="headerlink" title="进程的实现"></a>进程的实现</h2><p>前面讲的都是概念，现在落到实现层面：操作系统到底用什么数据结构来管理这一堆进程。</p>
+<h3 id="进程表"><a href="#进程表" class="headerlink" title="进程表"></a>进程表</h3><p>答案是<strong>进程表</strong>（Process Table）。系统为每个处于运行、就绪或阻塞状态的进程在表里维护一个表项，这张表是管理和调度进程的核心组件。</p>
+<p>每个表项封装了进程运行所必需的全部状态参数：</p>
+<ul>
+<li><strong>程序计数器（Program Counter）</strong>：指示进程下一次要执行指令的内存地址，是控制流的核心指针</li>
+<li><strong>堆栈指针（Stack Pointer）</strong>：指向进程调用栈的顶部，用于管理函数调用、局部变量和返回地址</li>
+<li><strong>内存分配状况（Memory Allocation Status）</strong>：记录进程占用了哪些内存区域及其访问权限</li>
+<li><strong>所打开文件的状态（File Status）</strong>：进程打开的所有文件描述符及其当前状态，比如读写位置、打开模式</li>
+<li><strong>账号信息（Account Information）</strong>：进程的所有者、权限等安全相关属性</li>
+<li><strong>调度信息（Scheduling Information）</strong>：进程优先级、等待时间以及时间片等，供调度算法使用</li>
+</ul>
+<p>除此之外，表项还要存放进程在状态转换（从运行态转到就绪态或阻塞态）时必须保存的信息。这样进程因外部事件被挂起后，上下文环境能完整保留下来，等时机合适，比如资源可用、优先级提升时，再恢复执行，仿佛从未被中断过。</p>
+<p>实际系统里的进程表字段通常按功能分成三组：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────┬────────────────────────┬──────────────────┐</span><br><span class="line">│      进程管理        │        存储管理         │     文件管理      │</span><br><span class="line">├─────────────────────┼────────────────────────┼──────────────────┤</span><br><span class="line">│ 寄存器              │ text segment 的指针     │ 根目录            │</span><br><span class="line">│ 程序计数器          │ data segment 的指针     │ 工作目录          │</span><br><span class="line">│ 程序状态字          │ stack segment 的指针    │ 文件描述符        │</span><br><span class="line">│ 堆栈指针            │                        │ 用户 ID           │</span><br><span class="line">│ 进程状态            │                        │ 组 ID             │</span><br><span class="line">│ 优先级              │                        │                  │</span><br><span class="line">│ 调度参数            │                        │                  │</span><br><span class="line">│ 进程 ID             │                        │                  │</span><br><span class="line">│ 父进程              │                        │                  │</span><br><span class="line">│ 进程组              │                        │                  │</span><br><span class="line">│ 信号                │                        │                  │</span><br><span class="line">│ 进程开始时间        │                        │                  │</span><br><span class="line">│ 使用的 CPU 时间     │                        │                  │</span><br><span class="line">│ 子进程的 CPU 时间   │                        │                  │</span><br><span class="line">│ 下次定时器时间      │                        │                  │</span><br><span class="line">└─────────────────────┴────────────────────────┴──────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>三列分别对应进程管理、存储管理和文件管理。注意第一列里那句”子进程的 CPU 时间”，它说明进程表不只在描述单个进程，还记着进程之间的关系。</p>
+<h3 id="中断处理与进程切换"><a href="#中断处理与进程切换" class="headerlink" title="中断处理与进程切换"></a>中断处理与进程切换</h3><p>有了进程表，接下来看单个 CPU 是怎么营造出同时运行多个顺序进程的错觉的。核心机制是<strong>中断处理与进程调度的紧密协作</strong>。</p>
+<p>每一类 I&#x2F;O 操作都关联着一个特定的<strong>中断向量</strong>，它位于内存底部的一个固定区域，存放着对应中断服务程序（ISR）的入口地址。</p>
+<p>以磁盘 I&#x2F;O 为例。磁盘中断发生时，假设用户进程 3 正在执行，整个流程分成硬件和软件两段。</p>
+<p>硬件这一段的动作是：把当前的程序计数器（PC）、程序状态字（PSW）以及可能的一个或多个寄存器值<strong>压入堆栈</strong>，保存进程 3 的上下文；然后根据中断向量里存的地址，<strong>跳转</strong>到相应的中断服务程序开始执行。到此硬件完成职责范围内的工作。</p>
+<p>软件这一段由中断服务程序接手（通常是个 C 程序），负责处理中断引发的具体事务，比如把磁盘数据读到缓存。处理完之后它通知操作系统，此时可能有进程因为等待的 I&#x2F;O 完成而变为就绪态。操作系统接着调用调度程序，按调度算法（轮转调度、优先级调度等）决定下一个该运行哪个进程。</p>
+<p>调度决策做出后，控制权又转移到一段汇编代码，由它为新进程恢复上下文：从进程表里加载寄存器值、设置堆栈指针指向正确的内存区域，最后启动执行。</p>
+<p>完整的八步是这样的：</p>
+<pre class="mermaid">flowchart TB
+    A["① 硬件压栈<br/>PC、PSW、寄存器入栈"] --> B["② 硬件跳转<br/>按中断向量跳到 ISR"]
+    B --> C["③ 汇编保存上下文<br/>保存当前进程的状态"]
+    C --> D["④ 设置新堆栈<br/>（如果需要）"]
+    D --> E["⑤ C 中断服务程序执行<br/>处理 I/O 等具体事务"]
+    E --> F["⑥ 调度器决策<br/>决定下一个运行的进程"]
+    F --> G["⑦ C 到汇编的转移<br/>准备切换进程"]
+    G --> H["⑧ 汇编恢复上下文并启动<br/>加载登记项、设置栈指针、开始执行"]</pre>
+
+<p>一个进程在其生命周期中可能会经历<strong>数千次中断</strong>。靠这套精心设计的上下文保存与恢复机制，每次中断后被中断的进程都能准确回到中断发生前的执行状态，系统的稳定性和进程执行的连续性就是这么保证的。</p>
+<hr>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><ul>
+<li><strong>进程</strong>是对”正在执行的程序”的高级抽象，包含代码、程序计数器、寄存器状态和变量值。它的存在让多个程序能在单 CPU 上并发推进，同时为每个程序提供隔离的执行环境。</li>
+<li><strong>创建</strong>在 UNIX 里是 <code>fork</code> + <code>execve</code> 两步走，Windows 里是 <code>CreateProcess</code> 一步到位；地址空间靠写时复制（UNIX）实现高效隔离。</li>
+<li><strong>终止</strong>分自愿和非自愿两类，UNIX 的信号机制让进程能对错误做出更灵活的响应。</li>
+<li><strong>层次结构</strong>上，UNIX 是以 <code>init</code> 为根的进程树，Windows 是所有进程一律平等。</li>
+<li><strong>状态</strong>有运行、就绪、阻塞三种，四种转换靠调度程序推动，进程自己对此毫不知情。</li>
+<li><strong>实现</strong>落在进程表上，中断处理与进程调度配合完成上下文切换，让”同时运行多个进程”这个错觉得以成立。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag"># 操作系统</a>
+              <a href="/tags/%E8%BF%9B%E7%A8%8B/" rel="tag"># 进程</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/09/07/nba-data-analysis-visualization/" rel="prev" title="NBA 球员信息统计及可视化项目">
+      <i class="fa fa-chevron-left"></i> NBA 球员信息统计及可视化项目
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%88%E7%9C%8B%E7%9C%8B%E7%B3%BB%E7%BB%9F%E9%87%8C%E5%88%B0%E5%BA%95%E8%B7%91%E7%9D%80%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">先看看系统里到底跑着什么</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#ps%EF%BC%9A%E9%9D%99%E6%80%81%E5%BF%AB%E7%85%A7"><span class="nav-number">1.1.</span> <span class="nav-text">ps：静态快照</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#top%EF%BC%9A%E5%8A%A8%E6%80%81%E5%88%B7%E6%96%B0"><span class="nav-number">1.2.</span> <span class="nav-text">top：动态刷新</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#pgrep-%E4%B8%8E-pstree"><span class="nav-number">1.3.</span> <span class="nav-text">pgrep 与 pstree</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E2%80%9D%E8%BF%9B%E7%A8%8B%E2%80%9D%E8%BF%99%E4%B8%AA%E6%8A%BD%E8%B1%A1"><span class="nav-number">2.</span> <span class="nav-text">为什么需要”进程”这个抽象</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%8E%E4%B8%80%E5%8F%B0-Web-%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%AF%B4%E8%B5%B7"><span class="nav-number">2.1.</span> <span class="nav-text">从一台 Web 服务器说起</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%AA%E5%B9%B6%E8%A1%8C%E4%B8%8E%E7%9C%9F%E5%B9%B6%E8%A1%8C"><span class="nav-number">2.2.</span> <span class="nav-text">伪并行与真并行</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.</span> <span class="nav-text">进程模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A1%BA%E5%BA%8F%E8%BF%9B%E7%A8%8B"><span class="nav-number">3.1.</span> <span class="nav-text">顺序进程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9B%9B%E4%B8%AA%E7%A8%8B%E5%BA%8F%E8%AE%A1%E6%95%B0%E5%99%A8"><span class="nav-number">3.2.</span> <span class="nav-text">四个程序计数器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E5%92%8C%E7%A8%8B%E5%BA%8F%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-number">3.3.</span> <span class="nav-text">进程和程序的关系</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%88%9B%E5%BB%BA"><span class="nav-number">4.</span> <span class="nav-text">进程的创建</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">4.1.</span> <span class="nav-text">系统初始化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E5%88%9B%E5%BB%BA"><span class="nav-number">4.2.</span> <span class="nav-text">系统调用创建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%A8%E6%88%B7%E8%AF%B7%E6%B1%82%E5%88%9B%E5%BB%BA"><span class="nav-number">4.3.</span> <span class="nav-text">用户请求创建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%B9%E5%A4%84%E7%90%86%E5%88%9B%E5%BB%BA"><span class="nav-number">4.4.</span> <span class="nav-text">批处理创建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#UNIX%E7%9A%84%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%EF%BC%9Afork-%E4%B8%8E-execve"><span class="nav-number">4.5.</span> <span class="nav-text">UNIX的系统调用：fork 与 execve</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#C-%E4%BB%A3%E7%A0%81%E6%BC%94%E7%A4%BA"><span class="nav-number">4.6.</span> <span class="nav-text">C 代码演示</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Windows-%E7%9A%84%E5%81%9A%E6%B3%95%EF%BC%9ACreateProcess"><span class="nav-number">4.7.</span> <span class="nav-text">Windows 的做法：CreateProcess</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%A4%E5%A4%A7%E7%B3%BB%E7%BB%9F%E7%9A%84%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E5%AF%B9%E7%85%A7"><span class="nav-number">4.8.</span> <span class="nav-text">两大系统的系统调用对照</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF%E4%B8%80%EF%BC%9AUNIX-%E7%9A%84%E2%80%9D%E5%85%88%E5%A4%8D%E5%88%B6%E3%80%81%E5%86%8D%E6%9B%BF%E6%8D%A2%E2%80%9D"><span class="nav-number">4.8.1.</span> <span class="nav-text">思路一：UNIX 的”先复制、再替换”</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF%E4%BA%8C%EF%BC%9AWindows-%E7%9A%84%E2%80%9D%E4%B8%80%E6%AD%A5%E5%88%B0%E4%BD%8D%E2%80%9D"><span class="nav-number">4.8.2.</span> <span class="nav-text">思路二：Windows 的”一步到位”</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E6%97%B6%E5%A4%8D%E5%88%B6"><span class="nav-number">4.9.</span> <span class="nav-text">写时复制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E7%BB%88%E6%AD%A2"><span class="nav-number">5.</span> <span class="nav-text">进程的终止</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A3%E5%B8%B8%E9%80%80%E5%87%BA"><span class="nav-number">5.1.</span> <span class="nav-text">正常退出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E9%80%80%E5%87%BA"><span class="nav-number">5.2.</span> <span class="nav-text">错误退出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%A5%E9%87%8D%E9%94%99%E8%AF%AF"><span class="nav-number">5.3.</span> <span class="nav-text">严重错误</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A2%AB%E5%85%B6%E4%BB%96%E8%BF%9B%E7%A8%8B%E6%9D%80%E6%AD%BB"><span class="nav-number">5.4.</span> <span class="nav-text">被其他进程杀死</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84"><span class="nav-number">6.</span> <span class="nav-text">进程的层次结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#UNIX%EF%BC%9A%E4%BB%A5-init-%E4%B8%BA%E6%A0%B9%E7%9A%84%E8%BF%9B%E7%A8%8B%E6%A0%91"><span class="nav-number">6.1.</span> <span class="nav-text">UNIX：以 init 为根的进程树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Windows%EF%BC%9A%E6%89%80%E6%9C%89%E8%BF%9B%E7%A8%8B%E4%B8%80%E5%BE%8B%E5%B9%B3%E7%AD%89"><span class="nav-number">6.2.</span> <span class="nav-text">Windows：所有进程一律平等</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81"><span class="nav-number">7.</span> <span class="nav-text">进程状态</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%89%E7%A7%8D%E6%A0%B8%E5%BF%83%E7%8A%B6%E6%80%81"><span class="nav-number">7.1.</span> <span class="nav-text">三种核心状态</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2"><span class="nav-number">7.2.</span> <span class="nav-text">四种状态转换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B0%83%E5%BA%A6%E7%A8%8B%E5%BA%8F%E7%9A%84%E4%BD%8D%E7%BD%AE"><span class="nav-number">7.3.</span> <span class="nav-text">调度程序的位置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">8.</span> <span class="nav-text">进程的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E8%A1%A8"><span class="nav-number">8.1.</span> <span class="nav-text">进程表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E4%B8%8E%E8%BF%9B%E7%A8%8B%E5%88%87%E6%8D%A2"><span class="nav-number">8.2.</span> <span class="nav-text">中断处理与进程切换</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">9.</span> <span class="nav-text">小结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">77</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">444k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:44</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>

@@ -32,9 +32,9 @@
 <meta property="article:published_time" content="2026-09-03T19:45:00.000Z">
 <meta property="article:modified_time" content="2026-09-03T19:45:00.000Z">
 <meta property="article:tag" content="操作系统">
+<meta property="article:tag" content="进程">
 <meta property="article:tag" content="四大件">
 <meta property="article:tag" content="系统调用">
-<meta property="article:tag" content="进程">
 <meta property="article:tag" content="线程">
 <meta property="article:tag" content="虚拟内存">
 <meta property="article:tag" content="文件">
@@ -407,7 +407,11 @@ mjx-container[display="true"] + br {
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc -o hello hello.c    <span class="comment"># -o 指定输出文件名；不加 -o 默认生成 a.out</span></span><br></pre></td></tr></table></figure>
 
 <p>这里用 <code>gcc</code> 演示，整个流程分四步：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">flowchart LR</span><br><span class="line">    A["📄 源文件&lt;br/&gt;hello.c"] --&gt;|"预处理 gcc -E"| B["📄 预处理后&lt;br/&gt;hello.i"]</span><br><span class="line">    B --&gt;|"编译 gcc -S"| C["📄 汇编&lt;br/&gt;hello.s"]</span><br><span class="line">    C --&gt;|"汇编 gcc -c"| D["📦 目标文件&lt;br/&gt;hello.o"]</span><br><span class="line">    D --&gt;|"链接 ld"| E["🚀 可执行文件&lt;br/&gt;hello"]</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart LR
+    A["📄 源文件<br>hello.c"] --&gt;|"预处理 gcc -E"| B["📄 预处理后<br>hello.i"]
+    B --&gt;|"编译 gcc -S"| C["📄 汇编<br>hello.s"]
+    C --&gt;|"汇编 gcc -c"| D["📦 目标文件<br>hello.o"]
+    D --&gt;|"链接 ld"| E["🚀 可执行文件<br>hello"]</pre>
 
 <ol>
 <li><strong>预处理（<code>gcc -E</code>）</strong>：把以 <code>#</code> 开头的命令（如 <code>#include</code>）展开，把引用的头文件内容全部插入源文件对应位置，得到完整的 <code>hello.i</code>。</li>
@@ -431,7 +435,11 @@ mjx-container[display="true"] + br {
 <li><strong>本质是一个用 C 语言编写的应用程序</strong>，运行在<strong>用户态</strong>——和 GUI 一样，是内核外面裹着的一层”皮”，往下才是真正干活的内核；</li>
 <li><strong>既是一种命令语言，又是一种程序设计语言</strong>：逐条敲命令，它解释执行；把一串命令写成文本文件就是脚本，可以自动化。</li>
 </ul>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">flowchart LR</span><br><span class="line">    U["👤 用户"] --&gt;|"输入命令行"| S["🐚 shell 应用程序（用户态）"]</span><br><span class="line">    S --&gt;|"内置命令（cd / pwd 等）"| E["🔧 直接执行"]</span><br><span class="line">    S --&gt;|"外部命令（./hello）"| K["🧠 调用内核服务"]</span><br><span class="line">    K --&gt;|"指挥"| H["⚙️ 硬件真正干活"]</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart LR
+    U["👤 用户"] --&gt;|"输入命令行"| S["🐚 shell 应用程序（用户态）"]
+    S --&gt;|"内置命令（cd / pwd 等）"| E["🔧 直接执行"]
+    S --&gt;|"外部命令（./hello）"| K["🧠 调用内核服务"]
+    K --&gt;|"指挥"| H["⚙️ 硬件真正干活"]</pre>
 
 <p><strong>shell 从哪来？</strong> 以UNIX系统为例，用户登录 UNIX 系统时，系统会启动一个 shell 进程，并把<strong>用户的终端</strong>设置为它的标准输入/输出设备——所以 shell 一启动就显示提示符（<code>$</code> 或 <code>#</code>），等着敲命令。UNIX 里的 shell 还有多种实现：<code>sh</code>（Bourne Shell，先驱）、<code>csh</code>、<code>ksh</code>、<code>bash</code> 等，现在最常见的是 bash；不同 shell 语法略有差异，但角色都一样——那道”接口”。</p>
 <p><strong>shell 不是 UNIX 独有的</strong>——“用户和操作系统之间的接口”这个角色，任何系统都得找人扮演：</p>
@@ -552,7 +560,10 @@ mjx-container[display="true"] + br {
 </ul>
 <p>并发让系统<strong>能同时处理更多任务</strong>（提到吞吐量、响应性）——靠调度维持”多个活动同时存在”并有序推进；并行让系统<strong>跑得更快</strong>——利用多核硬件。第四章进程里的”时间片轮转”、第五章系统调用里”OS 暂停当前进程、调度其他就绪进程”，都是并发的日常；本节前面”多线程靠快速切换提高利用率”，说的也是并发。</p>
 <h3 id="3-2-内存层次结构"><a href="#3-2-内存层次结构" class="headerlink" title="3.2 内存层次结构"></a>3.2 内存层次结构</h3><p>内存是计算机第二大组件。理想的存储要快、大、便宜，但技术无法同时满足，于是做成<strong>层次结构</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    A["寄存器&lt;br/&gt;最快 · 最小 · 最贵"] --&gt; B["高速缓存 L1/L2&lt;br/&gt;硬件控制 · 快"]</span><br><span class="line">    B --&gt; C["主存 RAM&lt;br/&gt;断电丢失 · 容量大"]</span><br><span class="line">    C --&gt; D["磁盘 / SSD&lt;br/&gt;最慢 · 容量最大 · 最便宜"]</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart TB
+    A["寄存器<br>最快 · 最小 · 最贵"] --&gt; B["高速缓存 L1/L2<br>硬件控制 · 快"]
+    B --&gt; C["主存 RAM<br>断电丢失 · 容量大"]
+    C --&gt; D["磁盘 / SSD<br>最慢 · 容量最大 · 最便宜"]</pre>
 
 <ul>
 <li><strong>寄存器</strong>：顶部，速度与 CPU 相同，程序须在软件里自行管理。</li>
@@ -662,7 +673,14 @@ mjx-container[display="true"] + br {
 <p>理论上，32 位架构的虚拟地址空间可达 (2^{32}) 字节，64 位可达 (2^{64}) 字节，远超物理内存容量。正是<strong>虚拟内存</strong>技术解决了”地址空间比物理内存大”的问题。</p>
 </blockquote>
 <p><strong>虚拟内存</strong>：允许直接把物理内存暴露给程序是<strong>危险且低效</strong>的——安全风险增加（可破坏系统稳定性、数据泄露）、资源利用率低（碎片化）、内存管理复杂。虚拟内存作为物理内存和进程间的<strong>抽象层</strong>：给每个进程一个独立的、看似无限大的内存空间。每个进程都以为独占整个内存，实际只是在访问 OS 精心管理的虚拟地址空间。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph VS["进程的虚拟地址空间（高地址在上，低地址在下）"]</span><br><span class="line">        A["内核内存区&lt;br/&gt;（OS 专用，用户不可见）"]</span><br><span class="line">        B["堆栈区 Stack&lt;br/&gt;（参数、局部变量、返回地址）从高地址往低地址增长"]</span><br><span class="line">        C["共享库区&lt;br/&gt;（printf 等库代码）"]</span><br><span class="line">        D["堆区 Heap&lt;br/&gt;（malloc 动态分配）从低地址往高地址增长"]</span><br><span class="line">        E["进程代码与数据区&lt;br/&gt;只读段 + 可读写段"]</span><br><span class="line">    end</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart TB
+    subgraph VS["进程的虚拟地址空间（高地址在上，低地址在下）"]
+        A["内核内存区<br>（OS 专用，用户不可见）"]
+        B["堆栈区 Stack<br>（参数、局部变量、返回地址）从高地址往低地址增长"]
+        C["共享库区<br>（printf 等库代码）"]
+        D["堆区 Heap<br>（malloc 动态分配）从低地址往高地址增长"]
+        E["进程代码与数据区<br>只读段 + 可读写段"]
+    end</pre>
 
 <p>这张图从<strong>低地址（下）</strong>到<strong>高地址（上）</strong>排列，内核区在最上方（高地址），用户进程看不见它。从下往上看：</p>
 <ul>
@@ -718,7 +736,23 @@ mjx-container[display="true"] + br {
 
 <p>三个参数：文件描述符（指定文件）、缓冲区指针（数据放哪）、要读的字节数。成功返回实际读取字节数（可能小于请求值）；失败返回 -1，并在全局变量 <code>errno</code> 里记录错误代码。所以程序<strong>必须检查返回值</strong>。</p>
 <p>read 调用历经 <strong>11 个步骤</strong>（完整流程见下图，①~⑪ 与下面文字一一对应）：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph U["🎩 用户空间（用户进程）"]</span><br><span class="line">        direction TB</span><br><span class="line">        S1["① 压入 nbytes"] --&gt; S2["② 压入 &amp;buffer"]</span><br><span class="line">        S2 --&gt; S3["③ 压入 fd"]</span><br><span class="line">        S3 --&gt; S4["④ 调用 read 库函数"]</span><br><span class="line">        S4 --&gt; S5["⑤ 系统调用编号放入指定寄存器"]</span><br><span class="line">        S5 --&gt; S6["⑥ TRAP：陷入内核"]</span><br><span class="line">        S9["⑨ 返回用户态的函数调用库"] --&gt; S10["⑩ 返回给调用者&lt;br/&gt;read 之后的下一条指令"]</span><br><span class="line">        S10 --&gt; S11["⑪ 增加 SP：清理压入的参数"]</span><br><span class="line">    end</span><br><span class="line">    subgraph K["🔒 内核空间（操作系统）"]</span><br><span class="line">        direction TB</span><br><span class="line">        S7["⑦ 解析编号，查 dispatch 表定位处理器"] --&gt; S8["⑧ 执行系统调用处理程序"]</span><br><span class="line">    end</span><br><span class="line">    S6 --&gt; S7</span><br><span class="line">    S8 --&gt; S9</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart TB
+    subgraph U["🎩 用户空间（用户进程）"]
+        direction TB
+        S1["① 压入 nbytes"] --&gt; S2["② 压入 &amp;buffer"]
+        S2 --&gt; S3["③ 压入 fd"]
+        S3 --&gt; S4["④ 调用 read 库函数"]
+        S4 --&gt; S5["⑤ 系统调用编号放入指定寄存器"]
+        S5 --&gt; S6["⑥ TRAP：陷入内核"]
+        S9["⑨ 返回用户态的函数调用库"] --&gt; S10["⑩ 返回给调用者<br>read 之后的下一条指令"]
+        S10 --&gt; S11["⑪ 增加 SP：清理压入的参数"]
+    end
+    subgraph K["🔒 内核空间（操作系统）"]
+        direction TB
+        S7["⑦ 解析编号，查 dispatch 表定位处理器"] --&gt; S8["⑧ 执行系统调用处理程序"]
+    end
+    S6 --&gt; S7
+    S8 --&gt; S9</pre>
 
 <p><strong><code>read</code> 的完整执行步骤</strong>（C/C++ 编译器对函数调用按<strong>逆序压参</strong>）：把参数压入堆栈 → 程序调用 <code>read</code> 库函数 → 底层需要更深的系统调用 → 把系统调用编号放进指定寄存器 → 执行 <strong>TRAP</strong> 指令（切到内核态，跳转到内核预定义地址）→ 内核解析编号，用 <strong>dispatch 表</strong>定位系统调用处理器 → 执行服务 → 控制权返回到用户态函数调用库 → 返回发起调用的应用。最后一步是系统调用返回后<strong>调整堆栈指针</strong>，把之前压入的参数清掉——让堆栈回到调用前的状态。若调用阻塞（如等键盘输入），OS 可能暂停当前进程、调度其他就绪进程；条件满足再唤醒。</p>
 <blockquote>
@@ -1053,9 +1087,9 @@ mjx-container[display="true"] + br {
       <footer class="post-footer">
           <div class="post-tags">
               <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag"># 操作系统</a>
+              <a href="/tags/%E8%BF%9B%E7%A8%8B/" rel="tag"># 进程</a>
               <a href="/tags/%E5%9B%9B%E5%A4%A7%E4%BB%B6/" rel="tag"># 四大件</a>
               <a href="/tags/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/" rel="tag"># 系统调用</a>
-              <a href="/tags/%E8%BF%9B%E7%A8%8B/" rel="tag"># 进程</a>
               <a href="/tags/%E7%BA%BF%E7%A8%8B/" rel="tag"># 线程</a>
               <a href="/tags/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98/" rel="tag"># 虚拟内存</a>
               <a href="/tags/%E6%96%87%E4%BB%B6/" rel="tag"># 文件</a>
@@ -1148,7 +1182,7 @@ mjx-container[display="true"] + br {
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">48</span>
+          <span class="site-state-item-count">49</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1197,12 +1231,12 @@ mjx-container[display="true"] + br {
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">429k</span>
+    <span title="站点总字数">444k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">6:30</span>
+    <span title="站点阅读时长">6:44</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>
@@ -1276,6 +1310,19 @@ mjx-container[display="true"] + br {
 
 
 
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
 
 
   

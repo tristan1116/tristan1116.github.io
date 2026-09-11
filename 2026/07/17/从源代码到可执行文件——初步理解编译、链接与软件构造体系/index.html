@@ -257,14 +257,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>7.5k</span>
+              <span>6.7k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>6 分钟</span>
             </span>
             <div class="post-description">以通俗易懂的方式，结合图解和代码示例，剖析从预处理到编译、汇编、链接的完整软件构造流程。</div>
 
@@ -285,7 +285,11 @@
 <p>于是我查阅了一些资料，和claude一起，尝试把这件事彻底弄清楚。</p>
 <hr>
 <h2 id="一、全景图：四步走"><a href="#一、全景图：四步走" class="headerlink" title="一、全景图：四步走"></a>一、全景图：四步走</h2><p>一个 C&#x2F;C++ 程序从源码到可执行文件，要经历四个阶段：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">flowchart LR</span><br><span class="line">    A[&quot;📄 源代码&lt;br/&gt;main.c / hello.cpp&quot;] --&gt;|&quot;预处理器 cpp&quot;| B[&quot;📄 预处理后源文件&lt;br/&gt;main.i / hello.ii&quot;]</span><br><span class="line">    B --&gt;|&quot;编译器 gcc/g++&quot;| C[&quot;📄 汇编代码&lt;br/&gt;main.s / hello.s&quot;]</span><br><span class="line">    C --&gt;|&quot;汇编器 as&quot;| D[&quot;📦 目标文件&lt;br/&gt;main.o / hello.o&quot;]</span><br><span class="line">    D --&gt;|&quot;链接器 ld&quot;| E[&quot;🚀 可执行文件&lt;br/&gt;main.exe / a.out&quot;]</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart LR
+    A["📄 源代码<br/>main.c / hello.cpp"] -->|"预处理器 cpp"| B["📄 预处理后源文件<br/>main.i / hello.ii"]
+    B -->|"编译器 gcc/g++"| C["📄 汇编代码<br/>main.s / hello.s"]
+    C -->|"汇编器 as"| D["📦 目标文件<br/>main.o / hello.o"]
+    D -->|"链接器 ld"| E["🚀 可执行文件<br/>main.exe / a.out"]</pre>
 
 <blockquote>
 <p>日常中说的”编译”，通常指的是这四步的总和。但在技术上，这四步各有分工。</p>
@@ -328,7 +332,16 @@
 </tbody></table>
 <h3 id="2-2-为什么需要预处理"><a href="#2-2-为什么需要预处理" class="headerlink" title="2.2 为什么需要预处理"></a>2.2 为什么需要预处理</h3><p>预处理解决的核心问题是<strong>代码复用</strong>。</p>
 <p>你写的程序需要用 <code>printf</code>，但你的 <code>.c</code> 文件里并没有 <code>printf</code> 的代码——它只是在 <code>stdio.h</code> 里声明了一下。预处理阶段，预处理器会把 <code>stdio.h</code>（以及里面层层包含的所有头文件）全部在你当前文件里展开。展开后，你的源文件从几十行变成了几千行——里面有了 <code>printf</code> 的声明，编译器于是知道”有这么一个函数，参数是这样的，返回值是这样的”。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph 预处理前</span><br><span class="line">        A[&quot;main.c&lt;br/&gt;#include &amp;lt;stdio.h&amp;gt;&lt;br/&gt;int main() &#123;&lt;br/&gt;  printf(&amp;quot;hello&amp;quot;);&lt;br/&gt;&#125;&quot;]</span><br><span class="line">    end</span><br><span class="line">    subgraph 预处理后</span><br><span class="line">        B[&quot;main.i（几千行）&lt;br/&gt;...stdio.h全部内容展开...&lt;br/&gt;...里面又include的各种头文件...&lt;br/&gt;int main() &#123;&lt;br/&gt;  printf(&amp;quot;hello&amp;quot;);&lt;br/&gt;&#125;&quot;]</span><br><span class="line">    end</span><br><span class="line">    A --&gt;|&quot;gcc -E&quot;| B</span><br><span class="line">    style A fill:#e8f4fd,stroke:#333</span><br><span class="line">    style B fill:#f5e6d3,stroke:#333</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart TB
+    subgraph 预处理前
+        A["main.c<br/>#include &lt;stdio.h&gt;<br/>int main() {<br/>  printf(&quot;hello&quot;);<br/>}"]
+    end
+    subgraph 预处理后
+        B["main.i（几千行）<br/>...stdio.h全部内容展开...<br/>...里面又include的各种头文件...<br/>int main() {<br/>  printf(&quot;hello&quot;);<br/>}"]
+    end
+    A -->|"gcc -E"| B
+    style A fill:#e8f4fd,stroke:#333
+    style B fill:#f5e6d3,stroke:#333</pre>
 
 <h3 id="2-3-亲手试试"><a href="#2-3-亲手试试" class="headerlink" title="2.3 亲手试试"></a>2.3 亲手试试</h3><p>你可以用 GCC 命令手动看到预处理的结果：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 对 C 文件做预处理，输出到 .i 文件</span></span><br><span class="line">gcc -E main.c -o main.i</span><br><span class="line"></span><br><span class="line"><span class="comment"># 对 C++ 文件做预处理</span></span><br><span class="line">g++ -E main.cpp -o main.ii</span><br></pre></td></tr></table></figure>
@@ -339,7 +352,13 @@
 <p><strong>把 C&#x2F;C++ 代码翻译成汇编语言</strong></p>
 </blockquote>
 <h3 id="3-1-编译器在做什么"><a href="#3-1-编译器在做什么" class="headerlink" title="3.1 编译器在做什么"></a>3.1 编译器在做什么</h3><p>编译是这四步中<strong>最复杂的一步</strong>。编译器拿到预处理后的源代码后，要做以下几件事：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    A[&quot;源代码&lt;br/&gt;（C/C++ 文本）&quot;] --&gt; B[&quot;词法分析&lt;br/&gt;把代码切成 Token&quot;]</span><br><span class="line">    B --&gt; C[&quot;语法分析&lt;br/&gt;检查语法，生成语法树&quot;]</span><br><span class="line">    C --&gt; D[&quot;语义分析&lt;br/&gt;检查类型、作用域等&quot;]</span><br><span class="line">    D --&gt; E[&quot;中间代码生成&lt;br/&gt;与机器无关的中间表示&quot;]</span><br><span class="line">    E --&gt; F[&quot;代码优化&lt;br/&gt;去掉冗余、循环展开等&quot;]</span><br><span class="line">    F --&gt; G[&quot;目标代码生成&lt;br/&gt;输出汇编语言&quot;]</span><br></pre></td></tr></table></figure>
+<pre class="mermaid">flowchart TB
+    A["源代码<br/>（C/C++ 文本）"] --> B["词法分析<br/>把代码切成 Token"]
+    B --> C["语法分析<br/>检查语法，生成语法树"]
+    C --> D["语义分析<br/>检查类型、作用域等"]
+    D --> E["中间代码生成<br/>与机器无关的中间表示"]
+    E --> F["代码优化<br/>去掉冗余、循环展开等"]
+    F --> G["目标代码生成<br/>输出汇编语言"]</pre>
 
 <p>每一层的解释：</p>
 <p><strong>词法分析</strong>：把代码文本切分成一个个”单词”（Token）。比如 <code>int a = 5;</code> 被切分为：<code>int</code>（关键字）、<code>a</code>（标识符）、<code>=</code>（操作符）、<code>5</code>（字面量）、<code>;</code>（分号）。</p>
@@ -380,7 +399,24 @@
 <p><strong>把所有目标文件拼在一起，填上缺失的地址</strong></p>
 </blockquote>
 <p>链接是新手最容易困惑的一步，也是”undefined reference”这道常客的温床。</p>
-<h3 id="5-1-链接器做了什么"><a href="#5-1-链接器做了什么" class="headerlink" title="5.1 链接器做了什么"></a>5.1 链接器做了什么</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph 输入</span><br><span class="line">        A[&quot;main.o&lt;br/&gt;代码 + 符号表&lt;br/&gt;(引用了 printf, add)&quot;]</span><br><span class="line">        B[&quot;add.o&lt;br/&gt;代码 + 符号表&lt;br/&gt;(提供了 add)&quot;]</span><br><span class="line">        C[&quot;libc.a&lt;br/&gt;系统库&lt;br/&gt;(提供了 printf)&quot;]</span><br><span class="line">    end</span><br><span class="line">    subgraph 链接器</span><br><span class="line">        D[&quot;1. 符号解析&lt;br/&gt;把每个.o里的「未定义」和别的.o里的「已定义」对上&quot;]</span><br><span class="line">        E[&quot;2. 重定位&lt;br/&gt;把代码里的符号引用替换成实际地址&quot;]</span><br><span class="line">        F[&quot;3. 段合并&lt;br/&gt;把所有 .text 段拼一起, 所有 .data 段拼一起&quot;]</span><br><span class="line">    end</span><br><span class="line">    subgraph 输出</span><br><span class="line">        G[&quot;🚀 可执行文件&lt;br/&gt;main.exe&quot;]</span><br><span class="line">    end</span><br><span class="line">    A --&gt; D</span><br><span class="line">    B --&gt; D</span><br><span class="line">    C --&gt; D</span><br><span class="line">    D --&gt; E --&gt; F --&gt; G</span><br></pre></td></tr></table></figure>
+<h3 id="5-1-链接器做了什么"><a href="#5-1-链接器做了什么" class="headerlink" title="5.1 链接器做了什么"></a>5.1 链接器做了什么</h3><pre class="mermaid">flowchart TB
+    subgraph 输入
+        A["main.o<br/>代码 + 符号表<br/>(引用了 printf, add)"]
+        B["add.o<br/>代码 + 符号表<br/>(提供了 add)"]
+        C["libc.a<br/>系统库<br/>(提供了 printf)"]
+    end
+    subgraph 链接器
+        D["1. 符号解析<br/>把每个.o里的「未定义」和别的.o里的「已定义」对上"]
+        E["2. 重定位<br/>把代码里的符号引用替换成实际地址"]
+        F["3. 段合并<br/>把所有 .text 段拼一起, 所有 .data 段拼一起"]
+    end
+    subgraph 输出
+        G["🚀 可执行文件<br/>main.exe"]
+    end
+    A --> D
+    B --> D
+    C --> D
+    D --> E --> F --> G</pre>
 
 <h3 id="5-2-一个多文件项目的完整链接流程"><a href="#5-2-一个多文件项目的完整链接流程" class="headerlink" title="5.2 一个多文件项目的完整链接流程"></a>5.2 一个多文件项目的完整链接流程</h3><p>用你课程里的例子来说明。下面是一个最简单的情况——<code>main.cpp</code> 和 <code>add.cpp</code> 两个源文件，通过头文件 <code>add.h</code> 连接：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">multi_file_project/</span><br><span class="line">├── main.cpp        ← 主程序，调用了 add()</span><br><span class="line">├── add.cpp         ← 实现了 add() 函数</span><br><span class="line">└── add.h           ← 声明了 add() 函数</span><br></pre></td></tr></table></figure>
@@ -701,7 +737,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">48</span>
+          <span class="site-state-item-count">49</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -750,12 +786,12 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">429k</span>
+    <span title="站点总字数">444k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">6:30</span>
+    <span title="站点阅读时长">6:44</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>
@@ -829,6 +865,19 @@
 
 
 
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
 
 
   
