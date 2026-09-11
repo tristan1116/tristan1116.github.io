@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="操作系统线程模型总览">
+<meta property="og:type" content="article">
+<meta property="og:title" content="操作系统：线程模型">
+<meta property="og:url" content="http://tristan1116.github.io/2026/09/11/OS_Thread_Model/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="操作系统线程模型总览">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-09-11T21:40:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T21:40:00.000Z">
+<meta property="article:tag" content="操作系统">
+<meta property="article:tag" content="线程">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/09/11/OS_Thread_Model/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>操作系统：线程模型 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/09/11/OS_Thread_Model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          操作系统：线程模型
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-09-11 21:40:00" itemprop="dateCreated datePublished" datetime="2026-09-11T21:40:00+00:00">2026-09-11</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" itemprop="url" rel="index"><span itemprop="name">操作系统</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>13k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+            <div class="post-description">操作系统线程模型总览</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>进程是资源的容器，也是操作系统调度的基本单位。但现代操作系统里，真正被 CPU 调度的东西其实是线程。</p>
+<hr>
+<h2 id="线程的使用"><a href="#线程的使用" class="headerlink" title="线程的使用"></a>线程的使用</h2><p>在传统的操作系统设计中，进程是资源分配的基本单位，每个进程都拥有独立的地址空间和至少一个控制线程。</p>
+<p>随着并发编程需求的增加，人们发现单一进程内运行多个控制流，能带来诸多优势。这些线程虽然彼此独立执行，但它们共享同一进程的地址空间及其中的所有数据，这种模式为多线程编程提供了基础。</p>
+<h3 id="资源共享"><a href="#资源共享" class="headerlink" title="资源共享"></a>资源共享</h3><p>线程之间的主要优势在于它们能够共享同一块地址空间。线程可以直接访问进程中的全局变量、静态变量，以及通过指针或引用访问的内存区域，不需要进行进程间通信（IPC）那套复杂操作。</p>
+<p>比如在一个文本编辑器里，多个线程可以同时访问并修改文档的同一部分，因为它们共享着文档的内存表示。</p>
+<h3 id="轻量级与高效性"><a href="#轻量级与高效性" class="headerlink" title="轻量级与高效性"></a>轻量级与高效性</h3><p>相比进程，线程是更加轻量级的执行单元。线程的创建和销毁通常比进程快得多，因为线程不需要为每个实例分配独立的地址空间和其他系统资源。</p>
+<p>在许多现代操作系统中，创建一个新线程的速度可以比创建一个新进程快 <strong>10 到 100 倍</strong>。这种高效性让线程成为处理高并发任务时的理想选择。</p>
+<h3 id="性能提升"><a href="#性能提升" class="headerlink" title="性能提升"></a>性能提升</h3><p>在涉及大量计算和 I&#x2F;O 处理的场景中，多线程编程能显著提升应用程序的性能。当 CPU 密集型任务与 I&#x2F;O 密集型任务交替执行时，多线程允许这些任务重叠进行，从而减少 CPU 的空闲时间。</p>
+<p>拿 Web 服务器举例：一个线程可以处理客户端的连接请求，另一个线程负责从磁盘读取数据并准备响应。这种并行处理方式提高了服务器的吞吐量和响应速度。</p>
+<p>线程作为进程内的一种轻量级执行单元，通过共享地址空间和高效性，为并发编程提供了强大的支持。在现代软件开发中，多线程编程已经成为一种普遍采用的技术手段，用于提高应用程序的并发性和性能。</p>
+<hr>
+<h3 id="Web服务器：三种解决方案"><a href="#Web服务器：三种解决方案" class="headerlink" title="Web服务器：三种解决方案"></a>Web服务器：三种解决方案</h3><p>在探讨线程应用的实例时，我们可以聚焦于web服务器的工作机制：</p>
+<h3 id="问题本身"><a href="#问题本身" class="headerlink" title="问题本身"></a>问题本身</h3><p>客户端向服务器发送页面请求，服务器把页面返回去。值得注意的是，站点上各个页面的访问频率差得很远，公司主页这类页面被请求的次数远超产品详情页。</p>
+<p>为了优化性能和响应速度，服务器采用了一种高效策略：把访问量高的那批页面预先加载进内存。这个用来存放高访问率页面的存储空间，就叫<strong>高速缓存</strong>（cache）。缓存命中就直接返回，不用访问磁盘。</p>
+<blockquote>
+<p>注：CPU 里也是同样的思路，L1、L2、L3 缓存存的是近期可能被频繁访问的数据和指令，为的是减少对主存的直接访问。</p>
+</blockquote>
+<h3 id="多线程解决方案"><a href="#多线程解决方案" class="headerlink" title="多线程解决方案"></a>多线程解决方案</h3><p>Web 服务器的一种组织方式，核心是一个叫<strong>调度线程</strong>（dispatcher thread）的组件。</p>
+<p>调度线程从网络接收工作请求，充当中央调度器。收到请求并完成初步检查后，它选择一个当前处于空闲（阻塞状态）的工作线程，把指向请求消息的指针写入该工作线程关联的数据结构（如队列或特殊字）中，然后唤醒这个处于休眠状态的工作线程，把它的状态从阻塞态转变为就绪态。</p>
+<p>被唤醒的工作线程启动后，先检查请求所需的页面是否已存在于共享高速缓存中。存在就迅速检索并返回，不需要进行磁盘 I&#x2F;O。不存在则执行 <code>read</code> 从磁盘读取，由于磁盘 I&#x2F;O 通常耗时较长，工作线程会进入阻塞状态，等待磁盘操作完成。在此期间，调度线程会选择其他就绪的工作线程执行，确保服务器能够持续处理新的请求。</p>
+<pre class="mermaid">flowchart TB
+    D["调度线程<br/>（死循环收请求）"] -->|"① 分派请求<br/>写入指针并唤醒"| W1["工作线程 1"]
+    D --> W2["工作线程 2"]
+    D --> W3["工作线程 3"]
+    W1 -->|"② 先查"| C["共享高速缓存<br/>（所有工作线程可访问）"]
+    C -->|"命中，直接返回"| R["返回页面给客户端"]
+    C -->|"未命中"| K["③ read 磁盘<br/>（阻塞）"]
+    K --> R
+    W1 -.->|"④ 处理完再次阻塞<br/>等待下一个请求"| D</pre>
+
+<p>调度线程的大致逻辑就是一个死循环：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> TRUE 1</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main_dispatcher_thread</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">request</span> <span class="title">buf</span>;</span></span><br><span class="line">    <span class="keyword">while</span> (TRUE) &#123;</span><br><span class="line">        get_next_request(&amp;buf);   <span class="comment">/* 不断从请求源获取请求 */</span></span><br><span class="line">        handoff_work(&amp;buf);       <span class="comment">/* 将请求分派给工作线程处理 */</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;   <span class="comment">/* 理论上永远不会执行到这里 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>工作线程也是死循环，但循环体里多了查缓存、读磁盘、返回页面这几步：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main_worker_thread</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">request</span> <span class="title">buf</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">page</span> *<span class="title">page</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (TRUE) &#123;</span><br><span class="line">        wait_for_work(&amp;buf);                      <span class="comment">/* 等待工作分配 */</span></span><br><span class="line">        <span class="keyword">if</span> (!look_for_page_in_cache(&amp;buf, &amp;page)) <span class="comment">/* 缓存里没有 */</span></span><br><span class="line">            read_page_from_disk(&amp;buf, page);      <span class="comment">/* 从磁盘读 */</span></span><br><span class="line">        <span class="keyword">if</span> (page != <span class="literal">NULL</span>)</span><br><span class="line">            return_page(page);                    <span class="comment">/* 返回页面 */</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;   <span class="comment">/* 同样不会执行到这里 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>调度线程靠一个死循环不断取新请求并分派，工作线程处理完一次请求就再次进入阻塞，等下一个请求到来，形成循环。</p>
+<h3 id="单线程解决方案"><a href="#单线程解决方案" class="headerlink" title="单线程解决方案"></a>单线程解决方案</h3><p>没有多线程环境时，服务器的主循环连续不断地获取客户端请求并依次处理。问题出在处理每个请求的过程中：一旦涉及磁盘 I&#x2F;O 这类耗时操作，服务器必须等待这些操作完成，期间无法响应新的请求。</p>
+<p>PDF 把这种状态称为”空转”，它显著降低了服务器的处理效率，每秒能够处理的请求数量非常有限，由此凸显出多线程对于提升程序并行性和整体性能的重要性。</p>
+<h3 id="状态机解决方案"><a href="#状态机解决方案" class="headerlink" title="状态机解决方案"></a>状态机解决方案</h3><p>还有第三种方案，专门针对那些只提供<strong>非阻塞系统调用</strong>（比如非阻塞 <code>read</code>）的环境。</p>
+<p>非阻塞 I&#x2F;O 的行为是这样的：把文件描述符设置成非阻塞模式之后，如果 I&#x2F;O 操作不能立即完成（比如从网络读数据但当前没有数据到达），系统调用会立刻返回一个错误码（<code>EAGAIN</code> 或 <code>EWOULDBLOCK</code>），而不是让调用线程进入休眠状态等待。</p>
+<p>非阻塞系统调用在需要处理多个IO源，或希望提高程序响应速度的场景中非常有用。通过将文件描述符设置为非阻塞模式，并使用适当的错误处理逻辑，程序可以在IO操作无法立即完成时继续执行其他任务，而不是阻塞等待。这有助于提高程序的并发性和整体性能。</p>
+<p>状态机方案的工作流程：</p>
+<ol>
+<li>请求到达服务器，接收线程先看内存中的高速缓存能不能立刻满足该请求。能就立即响应，无需任何等待。</li>
+<li>如果缓存里没有所需数据，就发起一个非阻塞的磁盘读取，然后把请求的状态（请求标识符、预期的数据位置等）记进服务器的内部状态表。</li>
+<li>服务器进入一个事件循环，不断监听和响应两类事件：新请求到达、先前磁盘操作完成（通常通过信号中断通知）。每当有新请求到来时，服务器检查其状态，如果处于可立即处理的状态，则开始处理；若需要等待磁盘响应，则跳过处理，继续监听。</li>
+<li>一旦收到磁盘操作完成的通知，服务器就从状态表里取出对应的请求状态，用拿到的数据完成响应准备的工作，最后发给客户端。</li>
+</ol>
+<p>这套设计体现的是<strong>有限状态机</strong>（Finite-State Machine，FSM）的核心思想。每个请求被看成一个有着有限数量状态的系统，系统根据外部事件（新请求到达、磁盘操作完成）从一个状态转移到另一个状态，每次转移都伴随着状态的保存和恢复。</p>
+<p>FSM 的应用不限于 Web 服务器，凡是需要处理并发和异步事件的场合都能用上。但是编程难度相对较高，状态转移和状态信息的保存恢复都要开发者显式管理。</p>
+<p>三种方案放一起比：</p>
+<table>
+<thead>
+<tr>
+<th align="left">模型</th>
+<th align="left">特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">单线程</td>
+<td align="left">无并行性，性能较差，阻塞系统调用</td>
+</tr>
+<tr>
+<td align="left">多线程</td>
+<td align="left">有并行性，阻塞系统调用</td>
+</tr>
+<tr>
+<td align="left">有限状态机</td>
+<td align="left">并行性，非阻塞系统调用、中断</td>
+</tr>
+</tbody></table>
+<p>多线程靠并行处理提升性能，但是增加了复杂度和线程安全问题；单线程简单但性能受限；状态机用非阻塞调用和中断机制换来高性能，但是编程难度高。</p>
+<hr>
+<h2 id="经典的线程模型"><a href="#经典的线程模型" class="headerlink" title="经典的线程模型"></a>经典的线程模型</h2><p>换个角度看进程：它是一种高效整合并管理相关<strong>资源</strong>的方式。进程承载着程序正文和数据，还装着已打开的文件句柄、派生的子进程、待触发的定时器、信号处理机制、用户账号信息这些形形色色的资源。把它们统一封装在进程内部，资源的组织和访问都简化了。</p>
+<p>而进程内部真正的执行单元是<strong>线程</strong>（thread）。每个线程配着三样关键的执行状态组件：</p>
+<ul>
+<li><strong>程序计数器</strong>，精确追踪即将执行的指令位置</li>
+<li><strong>寄存器集合</strong>，暂存线程当前操作所依赖的变量值</li>
+<li><strong>堆栈</strong>，记录方法调用与返回的路径</li>
+</ul>
+<p>线程的运行依托于进程，但进程和线程在概念上是截然分开的实体，各承载不同的职责，可以独立处理。一句话概括：<strong>进程是资源的容器，线程是 CPU 直接调度的执行单位</strong>。</p>
+<p>线程概念的引入给进程模型加了一个新维度。同一进程内部，多个线程能以较高程度的独立性并行运行，彼此互不干扰。这种架构看起来类似一台计算机上同时跑多个独立进程，区别在于线程间的资源共享紧密得多，它们共同访问同一地址空间及其他进程资源。不同进程之间虽然也共享物理内存、磁盘、外设，但访问和隔离机制要复杂得多。</p>
+<p>线程继承进程的资源，同时保持较轻量的执行上下文，所以常被叫做<strong>轻量级进程</strong>（lightweight processes）。<strong>多线程</strong>（multithreading）这个词，指的就是单个进程内部多个线程并行执行、共享资源、协同工作的模式。</p>
+<h3 id="单线程进程-vs-多线程进程"><a href="#单线程进程-vs-多线程进程" class="headerlink" title="单线程进程 vs 多线程进程"></a>单线程进程 vs 多线程进程</h3><p>三个传统的进程，每个进程有自己的地址空间和单个控制线程，各自在独立的地址空间里运行：</p>
+<pre class="mermaid">flowchart TB
+    subgraph PA["进程 A"]
+        TA["线程"] --> DA["地址空间 A"]
+    end
+    subgraph PB["进程 B"]
+        TB["线程"] --> DB["地址空间 B"]
+    end
+    subgraph PC["进程 C"]
+        TC["线程"] --> DC["地址空间 C"]
+    end</pre>
+
+<p>一个进程三个线程的情况，三个线程跑在同一个地址空间里：</p>
+<pre class="mermaid">flowchart TB
+    subgraph PD["进程 D"]
+        TD1["线程 1"] --> DD["地址空间 D"]
+        TD2["线程 2"] --> DD
+        TD3["线程 3"] --> DD
+    end</pre>
+
+<h3 id="线程之间共享什么、独有什么"><a href="#线程之间共享什么、独有什么" class="headerlink" title="线程之间共享什么、独有什么"></a>线程之间共享什么、独有什么</h3><p>线程与进程在独立性上差别很大。线程不具备进程那种强独立性。同一进程内所有线程共享一个共同的地址空间，它们能访问相同的程序代码和数据段，还共享包括全局变量在内的所有进程资源。</p>
+<pre class="mermaid">flowchart TB
+    S["每个线程独有<br/>────────<br/>程序计数器<br/>寄存器<br/>堆栈<br/>状态"]
+    G["进程内所有线程共享<br/>────────<br/>地址空间<br/>全局变量<br/>打开的文件<br/>子进程<br/>即将发生的定时器 <br/> 信号与信号处理程序 <br/> 账号信息"]</pre>
+
+<p>这张图对应 PDF 里的两张对照图，左边那列是每个线程中的内容，是线程的属性；右边那列是同一个进程中线程共享的内容，是进程的属性。</p>
+<p>共享带来便利，也带来风险。每个线程都有能力访问进程地址空间内的任意内存地址。一个线程不仅能读写自己的局部变量和堆栈，理论上它还能访问并修改同一进程中其他线程的堆栈或全局变量。比如某个线程错误地写进了一个被其他线程当作控制流程用的变量，或者覆盖了某个线程栈上的关键返回值，都可能引发难以预料的行为，甚至让程序崩溃。</p>
+<p>所以，线程间的资源共享虽然提高了执行效率和响应速度，但也要求开发者在设计多线程程序时采取额外的同步和协调机制，保证线程间的正确交互和数据一致性。手段包括互斥锁（mutexes）、信号量（semaphores）、条件变量（condition variables）这些同步原语，以及合理的线程调度策略，用来避免数据竞争（race conditions）和其他并发问题。</p>
+<h3 id="线程的状态"><a href="#线程的状态" class="headerlink" title="线程的状态"></a>线程的状态</h3><pre class="mermaid">stateDiagram-v2
+    [*] --> 就绪
+    就绪 --> 运行: 获得 CPU 时间片
+    运行 --> 就绪: 时间片用完
+    运行 --> 阻塞: 等待 I/O 或事件
+    阻塞 --> 就绪: 事件发生
+    运行 --> 终止: 任务完成 / 出错
+    终止 --> [*]</pre>
+
+
+
+<p>线程是操作系统调度的基本单位，它的生命周期同样可以划分成多个状态，跟进程的状态类似，但更侧重 CPU 的调度与执行。线程可以处于这几种状态：</p>
+<p><strong>运行中（Running）</strong>：线程获得 CPU 时间片，进入运行状态，执行任务。时间片结束后，线程可能需要把 CPU 让给其他线程。</p>
+<p><strong>阻塞（Blocked）</strong>：线程因为某些原因，比如等待外部事件或资源的就绪，而暂停执行。比如执行一个从键盘读取数据的系统调用，它会一直等到有数据可读。等待文件 I&#x2F;O 完成、等待网络响应也是常见的阻塞原因。线程通常保持阻塞状态，直到等待的事件发生或资源可用，或者被其他线程通过信号、条件变量之类的机制唤醒。</p>
+<p><strong>就绪（Ready）</strong>：线程已做好执行准备，但 CPU 被其他线程占着，暂时轮不到它。处于就绪态的线程已经完成所有必要的准备工作，只等 CPU 时间片分配下来。</p>
+<p><strong>终止（Terminated）</strong>：线程完成任务，或者因为错误、异常、程序逻辑被终止。进程状态图里没有画出这一状态，但它是线程生命周期的重要阶段，标志着线程执行的结束。</p>
+<p>线程之间的状态转换和进程之间的状态转换本质相似，遵循相同的规则和逻辑。一个正在运行的线程可能因为等待 I&#x2F;O 进入阻塞态，I&#x2F;O 完成后再次进入就绪态等 CPU 时间片；就绪态的线程拿到时间片就开始执行，进入运行态。每个线程都有自己的堆栈。</p>
+<hr>
+<h3 id="线程系统调用"><a href="#线程系统调用" class="headerlink" title="线程系统调用"></a>线程系统调用</h3><p>进程在其生命周期中通常从一个初始的单线程启动，这个线程是进程的主执行流。之后通过调用特定的库函数（比如 <code>thread_create</code>）创建新线程来执行并发任务。</p>
+<p><code>thread_create</code> 调用时需要指定新线程的某些属性，包括一个用于标识新线程的名称。调用成功后返回一个唯一的线程标识符，后续对线程的引用和管理都用它。</p>
+<p>线程完成任务后应调用退出函数（如 <code>thread_exit</code>）优雅地结束执行。线程一旦退出，状态转变为终止，此后不再参与系统调度，占用的资源被回收。</p>
+<p><code>thread_join</code> 是一种常用的同步机制，让一个线程（等待线程）暂停执行，直到另一个特定线程（被等待线程）退出。这套机制实现了线程间的依赖管理和资源回收。线程的创建和终止，在逻辑上和进程的创建与终止有诸多相似之处，都涉及资源的申请、使用和释放。</p>
+<blockquote>
+<p>线程同步是指在多线程环境下，通过一定的机制来协调各个线程的执行顺序，以保证它们能够按照一定的规则来访问共享资源或执行特定的任务。同步的目的是确保数据的一致性和程序的正确性。</p>
+</blockquote>
+<p><code>thread_yield</code> 允许当前运行的线程主动放弃 CPU，把执行机会让给同一进程内的其他线程或系统内的其他进程。这在需要公平调度或避免饥饿时特别重要，因为与进程不同，线程通常不会因时钟中断而自动放弃 CPU（具体取决于操作系统和调度策略）。通过 <code>thread_yield</code>，开发者可以更精细地控制线程的执行顺序和优先级。</p>
+<h3 id="POSIX-线程"><a href="#POSIX-线程" class="headerlink" title="POSIX 线程"></a>POSIX 线程</h3><p>为了让跨平台编写线程程序成为可能，IEEE 在标准 IEEE 1003.1c（通常叫 POSIX.1c，或简称 POSIX 线程标准）里详细定义了线程标准，引入了 <strong>Pthreads</strong>（POSIX 线程）库作为实现线程功能的一套标准接口。这一标准在多数 UNIX 系统及兼容系统中得到广泛支持。</p>
+<p>Pthreads 不依赖于特定编程语言，是一个执行和并行计算模型。它允许开发者在单个程序中创建并控制多个时间上重叠执行的线程，每个线程代表一个独立的工作流程。它的实现在 FreeBSD、NetBSD、OpenBSD、Linux、macOS、Android、Solaris 上都存在。</p>
+<p>Windows 本身不直接支持 POSIX 线程，但微软通过兼容层技术（如 Windows Services for UNIX，或后续版本的兼容性更新），在 Windows API 之上实现了对 pthread 功能的支持，使得 pthreads 程序也能在 Windows 平台上运行。</p>
+<p>常用的几个调用：</p>
+<table>
+<thead>
+<tr>
+<th align="left">线程调用</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>pthread_create</code></td>
+<td align="left">创建一个新线程</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_exit</code></td>
+<td align="left">结束调用的线程</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_join</code></td>
+<td align="left">等待一个特定的线程退出</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_yield</code></td>
+<td align="left">释放 CPU 来运行另外一个线程</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_attr_init</code></td>
+<td align="left">创建并初始化一个线程的属性结构</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_attr_destroy</code></td>
+<td align="left">删除一个线程的属性结构</td>
+</tr>
+</tbody></table>
+<p>所有 Pthreads 都有一套特定属性，定义每个线程的基本特征。每个线程包含一个唯一的标识符、一组寄存器（含程序计数器）以及存储在特定结构中的其他属性集，包括堆栈大小、调度优先级和策略等。</p>
+<ul>
+<li><code>pthread_create</code> 成功执行后把新线程的标识符返回给调用者。这个机制和 UNIX 的 <code>fork</code> 系统调用相似，线程标识符在这里起到类似进程 ID（PID）的作用。</li>
+<li><code>pthread_exit</code> 终止自身，同时释放线程堆栈等分配的资源。</li>
+<li><code>pthread_join</code> 等待另一个特定线程的终止，调用时需指定被等待线程的标识符，直到该线程退出，调用线程才继续执行。</li>
+<li><code>pthread_yield</code> 请求系统把当前线程置于可运行状态中的较低优先级，让其他线程有机会运行。</li>
+<li><code>pthread_attr_init</code> 初始化一个线程属性对象并设为默认值，之后可以修改它来定制线程行为（如设置优先级）。不再需要时用 <code>pthread_attr_destroy</code> 删除并释放内存。这个过程只影响属性对象本身，对调用它的线程或任何已存在的线程没有影响。</li>
+</ul>
+<h3 id="pthread-示例"><a href="#pthread-示例" class="headerlink" title="pthread 示例"></a>pthread 示例</h3><p>下面这个程序创建多个线程，每个线程输出自己的唯一标识符：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> NUMBER_OF_THREADS 10</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* 线程函数，接收一个指向 void 的指针作为参数 */</span></span><br><span class="line"><span class="type">void</span> *<span class="title function_">print_hello_world</span><span class="params">(<span class="type">void</span> *thread_id)</span> &#123;</span><br><span class="line">    <span class="type">int</span> tid = (<span class="type">int</span>)thread_id;          <span class="comment">/* 转换回整数标识符 */</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Hello World. Greetings from thread %d\n&quot;</span>, tid);</span><br><span class="line">    pthread_exit(<span class="literal">NULL</span>);                <span class="comment">/* 线程执行完毕，退出 */</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">    <span class="type">pthread_t</span> threads[NUMBER_OF_THREADS];</span><br><span class="line">    <span class="type">int</span> status;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; NUMBER_OF_THREADS; i++) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Main thread: Creating thread %d\n&quot;</span>, i);</span><br><span class="line">        status = pthread_create(&amp;threads[i], <span class="literal">NULL</span>, print_hello_world, (<span class="type">void</span> *)i);</span><br><span class="line">        <span class="keyword">if</span> (status != <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Error: pthread_create failed with error code %d\n&quot;</span>, status);</span><br><span class="line">            <span class="built_in">exit</span>(EXIT_FAILURE);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 简化示例：主线程直接退出，不等待其他线程完成 */</span></span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主线程声明一个存放线程标识符的数组 <code>threads</code>，然后进入循环创建指定数量的线程。每个线程被赋予一个唯一标识符（循环变量 <code>i</code> 的值），通过 <code>pthread_create</code> 的最后一个参数传给线程函数 <code>print_hello_world</code>。创建成功时 <code>pthread_create</code> 返回 0，否则返回错误码，程序打印错误信息并退出。</p>
+<p>这个示例里主线程创建完所有线程后立即退出，实际应用中通常要用 <code>pthread_join</code> 等待线程完成，确保所有线程都顺利执行完毕并释放资源。原文还特别提醒：<code>exit(NULL)</code> 是不恰当的，<code>exit</code> 的参数应该是 int 类型，通常用 <code>EXIT_SUCCESS</code> 或 <code>EXIT_FAILURE</code> 宏，这个例子用 <code>exit(0)</code> 表示程序正常退出。</p>
+<hr>
+<h2 id="线程的实现"><a href="#线程的实现" class="headerlink" title="线程的实现"></a>线程的实现</h2><p>主要有三种实现方式，划分依据是线程的创建、调度、管理这些工作交给谁做：</p>
+<ul>
+<li>在用户空间中实现线程</li>
+<li>在内核空间中实现线程</li>
+<li>在用户和内核空间中混合实现</li>
+</ul>
+<h3 id="在用户空间中实现线程"><a href="#在用户空间中实现线程" class="headerlink" title="在用户空间中实现线程"></a>在用户空间中实现线程</h3><p>用户空间实现的意思是，线程的创建、调度、管理以及同步等机制完全由用户级库负责，不需要内核介入。线程对内核是透明的，内核根本不知道线程的存在，它只能看到进程。所以所有线程共享同一个进程空间，包括地址空间、文件描述符等。</p>
+<pre class="mermaid">flowchart TB
+    subgraph US["用户空间"]
+        subgraph P1["进程"]
+            subgraph RT1["运行时系统"]
+                T1["线程"] --> TT1["线程表"]
+                T2["线程"] --> TT1
+                T3["线程"] --> TT1
+            end
+        end
+        subgraph P2["进程"]
+            subgraph RT2["运行时系统"]
+                T4["线程"] --> TT2["线程表"]
+                T5["线程"] --> TT2
+                T6["线程"] --> TT2
+            end
+        end
+    end
+    subgraph KS["内核空间"]
+        K["内核"] --> PT["进程表"]
+    end</pre>
+
+<p>上图中能直接看出用户空间实现的两个特征。<strong>线程表在用户空间的运行时系统内部</strong>，每个进程各有一张，记录本进程内各线程的程序计数器、堆栈指针、寄存器值以及当前状态。<strong>内核空间里只有进程表，没有线程表</strong>，内核能看到的只有进程，对线程一无所知。所以这张图里内核那一层不需要和线程层发生任何关系。</p>
+<p>这种实现遵循一个通用架构：线程在<strong>运行时系统</strong>（Runtime System，也叫运行时环境）的监管下运行。运行时系统是程序执行的基础框架，提供程序运行的物理环境，还负责内存布局管理、变量访问机制、过程间参数传递、与操作系统底层的接口协调这些复杂任务。编译器设计时会根据目标运行时系统的特性做假设，保证生成的代码能正确执行。</p>
+<p>运行时系统通常负责初始化和管理线程的堆栈，也可能包含垃圾收集、线程调度、语言内置的动态功能等高级特性。用户空间管理线程的场景下，每个进程都要维护一个专属的<strong>线程表</strong>（Thread Table）。这张表的作用类似内核中的进程表，但记录的是进程内部各线程的详细属性，包括程序计数器、堆栈指针、寄存器值以及当前状态。</p>
+<p>线程发生状态转换时（比如从运行态转为就绪态或阻塞态），所有必要的恢复信息（执行上下文）都会存进线程表的对应条目。线程再次被调度时，运行时系统依据这些信息准确恢复线程的上下文，让线程从之前的状态无缝继续。这个过程跟内核在进程表里管理进程上下文在逻辑上是相似的，只是作用域和细节有区别。</p>
+<p>举例来说，基于用户空间线程的 Java 应用程序里，JVM 的线程管理模块就扮演运行时系统的角色，负责创建、调度和管理 Java 线程，通过内部的线程表跟踪每个 Java 线程的状态和上下文信息。Java 线程因等待 I&#x2F;O 阻塞时，JVM 把该线程的信息存进线程表，等 I&#x2F;O 完成再在合适的时机恢复它。</p>
+<h4 id="优势"><a href="#优势" class="headerlink" title="优势"></a>优势</h4><p>用户空间线程的线程状态信息保存在运行时环境提供的线程表里，调度程序（用户空间中的一个本地过程）从线程表里挑另一个就绪线程执行。整个过程完全在用户空间完成，避免了内核调用的开销，省去上下文切换，也不需要刷新 CPU 缓存。这种切换机制让用户空间线程在调度和执行上<strong>更快更灵活</strong>。</p>
+<p>另外，调度算法可以<strong>定制</strong>。每个进程能根据自身需求定制调度算法，对需要精细控制线程执行顺序或优先级的应用尤其重要。比如带垃圾收集器的应用，用户线程可以确保垃圾收集线程在合适的时机运行，不会因内核调度的不确定性打断关键操作。</p>
+<p>此外，用户空间线程能展现出良好的<strong>可扩展性</strong>。内核线程要占用内核的表空间和堆栈空间等资源，系统中内核线程数量过多时可能引发资源紧张甚至系统崩溃。用户空间线程由进程自身管理，不直接占用内核资源，大量线程存在时也能保持较好的稳定性和可扩展性。</p>
+<h4 id="劣势"><a href="#劣势" class="headerlink" title="劣势"></a>劣势</h4><p><strong>阻塞系统调用</strong>：以键盘输入为例，一个线程发起系统调用等待键盘输入，在常规用户空间线程模型里，由于内核不直接知晓线程的存在，内核只能直接操控进程，所以会导致整个进程，包括进程内所有线程，被阻塞。这违背了线程设计的初衷之一，也就是<strong>允许线程进行阻塞调用而不影响同进程内的其他线程</strong>。用户空间线程库为了解决这个问题，通常要实现复杂机制，比如使用非阻塞 I&#x2F;O、轮询，或者用专门的线程处理阻塞操作。</p>
+<p><strong>缺页中断</strong>：由于计算机内存有限，操作系统用分页机制管理内存。当程序访问到尚未加载到内存的页面时，会触发缺页中断，操作系统需要从磁盘加载缺失的页面。传统用户空间线程模型里，因为内核对线程无知，一个线程的缺页中断可能导致整个进程被阻塞，即使进程内其他线程处于可运行状态也执行不了。</p>
+<p><strong>调度上也有限制</strong>：在一个单进程内部，如果没有外部触发（比如时钟中断或线程主动让出 CPU），就无法实现基于时间的轮转调度。这意味着一旦某个线程开始执行，它会独占 CPU 直到自愿放弃，除非因为系统调用、等待 I&#x2F;O 之类的原因为被阻塞，否则同进程内的其他线程拿不到执行机会。</p>
+<p>为了解决上述问题，现代操作系统和线程库通常采用混合模式（详见最后的混合实现），结合用户空间线程和内核空间线程的优点。比如Java虚拟机JVM中的线程模型就是这么做的，Java 线程在用户空间被管理，但通过与内核线程的映射来处理阻塞调用和缺页中断，既保持用户空间线程的高效性，又解决了阻塞和调度上的难题。</p>
+<h3 id="在内核中实现线程"><a href="#在内核中实现线程" class="headerlink" title="在内核中实现线程"></a>在内核中实现线程</h3><p>转向内核实现线程的方案后，系统架构发生显著变化：运行时环境不再是必需的，因为线程的管理和调度工作直接由操作系统内核承担。相应地，每个进程内部不再维护自己的线程表，所有线程的详细信息都被统一记录在内核维护的一个<strong>全局线程表</strong>里。</p>
+<pre class="mermaid">flowchart TB
+    subgraph US["用户空间"]
+        subgraph P1["进程"]
+            direction TB
+            T1["线程"]
+            T2["线程"]
+            T3["线程"]
+        end
+        subgraph P2["进程"]
+            direction TB
+            T4["线程"]
+            T5["线程"]
+            T6["线程"]
+        end
+    end
+    subgraph KS["内核空间"]
+        subgraph K["内核"]
+            direction TB
+            TT["线程表"]
+            PT["进程表"]
+        end
+    end
+    T1 -.-> TT
+    T2 -.-> TT
+    T3 -.-> TT
+    T4 -.-> TT
+    T5 -.-> TT
+    T6 -.-> TT</pre>
+
+<p>和用户空间实现的示意图对比，主要有两点区别：<strong>线程表只在内核空间里，全系统共用一张</strong>（全局线程表），各进程内部不再有自己的线程表和运行时系统。<strong>用户空间的线程要通过系统调用进入内核的线程表</strong>，这是图中那几条跨层连线的含义，也意味着每次线程操作都要陷入内核。</p>
+<p>全局线程表是内核数据结构的一部分，跟踪系统中所有活动线程的状态、属性以及相互关系。当进程中的线程要创建或销毁线程时，它会发起一个系统调用请求，请求传递给内核处理，内核根据请求的类型（创建&#x2F;销毁），在全局线程表里做相应更新。</p>
+<p>例如，当线程执行 <code>pthread_create</code> 创建新线程时，内核接收到调用，在全局线程表中分配一个新条目，存储新线程的标识符、状态、优先级、堆栈信息等关键数据，同时为新线程分配内存和处理器时间等必要资源。</p>
+<p>与之相对的，当线程通过 <code>pthread_exit</code> 或其他机制请求销毁自身时，内核更新全局线程表，把该线程状态标记为已终止并回收其占用的资源。如果这是进程中的最后一个线程，内核还可能回收进程占用的所有资源，结束进程。</p>
+<p>这种方式提供了高度的系统可见性和控制能力，所有线程的创建、销毁和管理都由内核直接负责。但是<strong>性能开销相对较大</strong>，系统调用和内核级别的线程管理操作通常比用户空间内的<strong>操作更复杂、更耗时</strong>。</p>
+<p>内核维护的线程表详尽记录每个线程的寄存器状态、执行状态及其他关键信息。内容和用户空间线程表一致，只是物理存储位置在内核空间，保证安全隔离和高效管理。此外内核还构建了一张进程表，全面跟踪整个系统的运行状态。</p>
+<p>关于线程的阻塞与调度，所有可能引发阻塞的操作都通过系统调用机制实现。某个线程因等待资源或事件进入阻塞态时，内核有决策权，决定是否切换到同一进程内另一个就绪线程，或者调度一个来自不同进程的线程以<strong>充分利用系统资源</strong>。而在用户空间的运行时系统实现里，通常会坚持运行当前线程直到它的 CPU 时间片耗尽，或者没有其他可运行的线程可选时，内核才介入调度。</p>
+<p>考虑到内核层面创建或销毁线程的开销较高，部分系统会采用<strong>线程复用</strong>策略优化性能。一个线程被销毁时，内核不立即释放其全部资源，而是把它标记为不可运行状态，保持内部结构的完整性。之后系统需要创建新线程时，优先复用这些已存在的线程资源，重新配置状态为可用，避免从零开始构建线程的开销。</p>
+<p>当进程中的某个线程遭遇缺页故障时，内核能迅速检测并评估系统内其他可运行线程的情况。必要的时候，也就是等待所需页面从磁盘加载进内存的过程中，内核会选一个可运行的线程继续执行，保持<strong>系统的响应性和效率</strong>。但是这种灵活调度也伴随着成本，即系统调用的相对高昂代价。在频繁进行线程操作（如创建、终止）的场景中，可能会因系统调用的累积效应而显著增加总体开销。</p>
+<hr>
+<h3 id="混合实现"><a href="#混合实现" class="headerlink" title="混合实现"></a>混合实现</h3><p>为了融合用户空间与内核空间的优点，设计者引入了一种名为<strong>内核级线程</strong>（也叫内核线程）的机制，并把用户级线程与这些内核线程中的部分或全部进行高效的多路复用。这一设计赋予开发者极大的灵活性，可以根据具体应用场景控制用户线程与内核线程的数量比例。</p>
+<p>在这个模型里，每个内核级线程都是操作系统直接管理的独立调度实体。操作系统内核只负责识别、创建、调度以及管理这些内核级线程。与此同时，多个用户级线程可以绑定到同一个内核级线程上，实现资源的共享与复用。<strong>多路复用机制</strong>提高了系统资源的利用率，在并发执行大量轻量级任务时，能显著减少线程创建与销毁带来的开销。</p>
+<pre class="mermaid">flowchart TB
+    subgraph US["用户空间"]
+        U1["用户线程"]
+        U2["用户线程"]
+        U3["用户线程"]
+        U4["用户线程"]
+    end
+    subgraph KS["内核空间"]
+        K1["内核线程"]
+        K2["内核线程"]
+    end
+    U1 -.-> K1
+    U2 -.-> K1
+    U3 -.-> K2
+    U4 -.-> K2</pre>
+
+<p>这张图是前两张图的折中。<strong>用户线程在用户空间，内核线程在内核空间</strong>，两者分处两层，靠绑定关系连接。用户空间里不再有运行时系统和线程表；内核空间里的内核线程是操作系统直接管理的独立调度实体，内核只负责识别、创建、调度以及管理这些内核线程。<strong>多个用户线程可以绑定到同一个内核线程上，多路复用由此实现</strong>。开发者可以根据具体场景控制用户线程与内核线程的数量比例，既保留了用户空间线程切换的高效，又让阻塞调用和缺页中断由内核接管。</p>
+<p>举例来说，假设一个应用程序需要处理大量I&#x2F;O密集型任务，它可能会创建多个用户级线程来并发执行这些任务。然而，由于IO操作通常会导致线程阻塞，如果直接位每个用户线程分配一个内核线程，将会造成大量内核线程的闲置等待。通过采用内核级线程与用户级线程的多路复用，这些用户线程可以共享少数几个内核线程，当某个用户线程因为IO操作而阻塞时，内核线程可以无缝切换到另一个就绪的用户线程执行，从而避免了资源浪费，提高了整体的并发处理能力。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag"># 操作系统</a>
+              <a href="/tags/%E7%BA%BF%E7%A8%8B/" rel="tag"># 线程</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/09/11/OS_Process_Model/" rel="prev" title="操作系统：进程模型">
+      <i class="fa fa-chevron-left"></i> 操作系统：进程模型
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E7%9A%84%E4%BD%BF%E7%94%A8"><span class="nav-number">1.</span> <span class="nav-text">线程的使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B5%84%E6%BA%90%E5%85%B1%E4%BA%AB"><span class="nav-number">1.1.</span> <span class="nav-text">资源共享</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%BB%E9%87%8F%E7%BA%A7%E4%B8%8E%E9%AB%98%E6%95%88%E6%80%A7"><span class="nav-number">1.2.</span> <span class="nav-text">轻量级与高效性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%A7%E8%83%BD%E6%8F%90%E5%8D%87"><span class="nav-number">1.3.</span> <span class="nav-text">性能提升</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Web%E6%9C%8D%E5%8A%A1%E5%99%A8%EF%BC%9A%E4%B8%89%E7%A7%8D%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">1.4.</span> <span class="nav-text">Web服务器：三种解决方案</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%98%E6%9C%AC%E8%BA%AB"><span class="nav-number">1.5.</span> <span class="nav-text">问题本身</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E7%BA%BF%E7%A8%8B%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">1.6.</span> <span class="nav-text">多线程解决方案</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E7%BA%BF%E7%A8%8B%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">1.7.</span> <span class="nav-text">单线程解决方案</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%8A%B6%E6%80%81%E6%9C%BA%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">1.8.</span> <span class="nav-text">状态机解决方案</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%8F%E5%85%B8%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">经典的线程模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E7%BA%BF%E7%A8%8B%E8%BF%9B%E7%A8%8B-vs-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E8%BF%9B%E7%A8%8B"><span class="nav-number">2.1.</span> <span class="nav-text">单线程进程 vs 多线程进程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E4%B9%8B%E9%97%B4%E5%85%B1%E4%BA%AB%E4%BB%80%E4%B9%88%E3%80%81%E7%8B%AC%E6%9C%89%E4%BB%80%E4%B9%88"><span class="nav-number">2.2.</span> <span class="nav-text">线程之间共享什么、独有什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E7%9A%84%E7%8A%B6%E6%80%81"><span class="nav-number">2.3.</span> <span class="nav-text">线程的状态</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8"><span class="nav-number">2.4.</span> <span class="nav-text">线程系统调用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#POSIX-%E7%BA%BF%E7%A8%8B"><span class="nav-number">2.5.</span> <span class="nav-text">POSIX 线程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#pthread-%E7%A4%BA%E4%BE%8B"><span class="nav-number">2.6.</span> <span class="nav-text">pthread 示例</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.</span> <span class="nav-text">线程的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8%E7%94%A8%E6%88%B7%E7%A9%BA%E9%97%B4%E4%B8%AD%E5%AE%9E%E7%8E%B0%E7%BA%BF%E7%A8%8B"><span class="nav-number">3.1.</span> <span class="nav-text">在用户空间中实现线程</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BC%98%E5%8A%BF"><span class="nav-number">3.1.1.</span> <span class="nav-text">优势</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8A%A3%E5%8A%BF"><span class="nav-number">3.1.2.</span> <span class="nav-text">劣势</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8%E5%86%85%E6%A0%B8%E4%B8%AD%E5%AE%9E%E7%8E%B0%E7%BA%BF%E7%A8%8B"><span class="nav-number">3.2.</span> <span class="nav-text">在内核中实现线程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B7%B7%E5%90%88%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.3.</span> <span class="nav-text">混合实现</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">77</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">457k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:55</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>
