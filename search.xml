@@ -1030,714 +1030,6 @@
       </tags>
   </entry>
   <entry>
-    <title>操作系统总览</title>
-    <url>/2026/09/03/OS_Overview/</url>
-    <content><![CDATA[<h2 id="为什么需要操作系统"><a href="#为什么需要操作系统" class="headerlink" title="为什么需要操作系统"></a>为什么需要操作系统</h2><p>一台计算机由硬件和软件组成，硬件包括处理器、内存、磁盘、键盘、鼠标、显示器、网卡等。可问题是：程序员不可能亲手去操作这些硬件，也不可能掌握所有硬件的细节。于是硬件之上盖了一层软件——操作系统，它替用户程序扛下所有脏活累活。</p>
-<p>操作系统扮演两种角色：</p>
-<ul>
-<li><strong>扩展机器（Extended Machine）</strong>：把丑陋的硬件抽象成一种”更清晰、更好用的计算机模型”，比如用”文件”来代表磁盘、用”进程”来代表 CPU 的占用。</li>
-<li><strong>资源管理器（Resource Manager）</strong>：管理 CPU、内存、I/O 这些稀缺资源，决定谁先用、用多少，并防止坏程序把系统搞垮。</li>
-</ul>
-<blockquote>
-<p>平时看到的操作系统还有一层”皮”：带图形界面的叫 <strong>GUI</strong>（Windows、macOS），基于文本命令行的叫 <strong>Shell</strong>。它们本质都是用户接口程序，往下才是真正干活的内核。</p>
-</blockquote>
-<hr>
-<h2 id="一、程序的一生：从源码到运行"><a href="#一、程序的一生：从源码到运行" class="headerlink" title="一、程序的一生：从源码到运行"></a>一、程序的一生：从源码到运行</h2><h3 id="1-1-信息是什么：context-byte"><a href="#1-1-信息是什么：context-byte" class="headerlink" title="1.1 信息是什么：context + byte"></a>1.1 信息是什么：context + byte</h3><p>从大家最熟的 <code>hello world</code> 入手，看一个程序的完整生命周期。</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">{</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"hello world\n"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-
-<p>在计算机里<strong>所有信息都是二进制</strong>——一句源码、一张图片、一段视频，底层都是 0 和 1 组成的位序列。8 个位合成一个<strong>字节</strong>，每个字节代表某个字符。</p>
-<p>问题来了：同样是一串字节，它到底是整数、字符、浮点数，还是机器指令？<strong>唯一的判别依据就是”环境”（context / 语境）</strong>。</p>
-<p>举个语文题的例子：一句”林冲大叫一声’啊也！’”，单独摘出来，你不懂它是什么情感；放到上下文里，才知道是惊吓还是愤怒。程序也一样——一个函数、一个变量、一个地址，必须放进它所在的环境（编译时或运行时的上下文）才能理解它的含义。</p>
-<p>子程序之于程序、进程之于操作系统、App 的一屏之于 App，都是一个道理：执行到某个子程序时，它要用到之前的一些结果（外部变量、对象等）；App 点进新界面，也要保存”你是从哪个屏幕跳来的”，返回时才能跳回去。这就是 context——**可以通俗理解成”环境”**。</p>
-<h3 id="1-2-编译系统四步"><a href="#1-2-编译系统四步" class="headerlink" title="1.2 编译系统四步"></a>1.2 编译系统四步</h3><p>操作系统其实<strong>看不懂你写的高级语言</strong>（C、Java、C++）。要让程序跑起来，每一条语句（以分号结束）都必须先被翻译成操作系统能识别、能执行的<strong>机器语言指令</strong>，再打包成<strong>可执行目标文件</strong>（二进制磁盘文件）。这个过程由编译器完成。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">gcc -o hello hello.c    <span class="comment"># -o 指定输出文件名；不加 -o 默认生成 a.out</span></span><br></pre></td></tr></table></figure>
-
-<p>这里用 <code>gcc</code> 演示，整个流程分四步：</p>
-<pre class="mermaid">flowchart LR
-    A["📄 源文件<br>hello.c"] --&gt;|"预处理 gcc -E"| B["📄 预处理后<br>hello.i"]
-    B --&gt;|"编译 gcc -S"| C["📄 汇编<br>hello.s"]
-    C --&gt;|"汇编 gcc -c"| D["📦 目标文件<br>hello.o"]
-    D --&gt;|"链接 ld"| E["🚀 可执行文件<br>hello"]</pre>
-
-<ol>
-<li><strong>预处理（<code>gcc -E</code>）</strong>：把以 <code>#</code> 开头的命令（如 <code>#include</code>）展开，把引用的头文件内容全部插入源文件对应位置，得到完整的 <code>hello.i</code>。</li>
-<li><strong>编译（<code>gcc -S</code>）</strong>：编译器把 <code>hello.i</code> 翻译成汇编程序 <code>hello.s</code>。这一步让”语言”和”机器”解耦——不同语言用不同编译器，最后都汇成同一套通用汇编语言。</li>
-<li><strong>汇编（<code>gcc -c</code>）</strong>：汇编器把 <code>.s</code> 翻译成机器语言指令，打包成<strong>可重定位目标文件</strong> <code>.o</code>。这是二进制文件，人直接打开只能看到乱码。</li>
-<li><strong>链接（<code>gcc hello.o -o hello</code>）</strong>：把多个目标文件合并。比如 <code>printf</code> 其实是预编译好的 <code>printf.o</code>（在标准库里），链接器把它和你的 <code>hello.o</code> 拼成一个可执行文件。</li>
-</ol>
-<blockquote>
-<p>详细展开（预处理、链接、静态库/动态库、为什么会出现 <code>undefined reference</code>）我在《从源代码到可执行文件——初步理解编译、链接与软件构造体系》那篇写过。这里只讲它在操作系统里的位置。</p>
-</blockquote>
-<p><strong>为什么还要懂编译系统？</strong> 三个原因：</p>
-<ul>
-<li><strong>优化性能</strong>：<code>switch</code> 一定比 <code>if-else</code> 快吗？<code>while</code> 和 <code>for</code> 谁更高效？指针和数组索引谁更快？这些选择的”代价”藏在编译器的实现里。</li>
-<li><strong>理解链接错误</strong>：最让人头疼的往往不是逻辑 bug，而是链接错误——比如”无法解析一个引用”。为什么会在运行时报错、有些编译时就报？这跟编译、链接机制有关。</li>
-<li><strong>安全问题</strong>：栈溢出、缓冲区溢出是大多数网络服务器漏洞的主因。理解数据和控制信息怎么在堆栈里存放，才能明白漏洞从哪来。</li>
-</ul>
-<h3 id="1-3-运行：shell-与可执行文件"><a href="#1-3-运行：shell-与可执行文件" class="headerlink" title="1.3 运行：shell 与可执行文件"></a>1.3 运行：shell 与可执行文件</h3><p>编译好的可执行文件躺在磁盘上，怎么让操作系统跑它？把文件名敲进 <strong>shell</strong>。</p>
-<p>先解释一下shell是什么：</p>
-<ul>
-<li><strong>它是用户和操作系统之间的接口（桥梁）</strong>：Linux/Unix 的关键组件，敲的命令第一步落在它身上，由它解析并调用相应的操作系统服务去执行；</li>
-<li><strong>本质是一个用 C 语言编写的应用程序</strong>，运行在<strong>用户态</strong>——和 GUI 一样，是内核外面裹着的一层”皮”，往下才是真正干活的内核；</li>
-<li><strong>既是一种命令语言，又是一种程序设计语言</strong>：逐条敲命令，它解释执行；把一串命令写成文本文件就是脚本，可以自动化。</li>
-</ul>
-<pre class="mermaid">flowchart LR
-    U["👤 用户"] --&gt;|"输入命令行"| S["🐚 shell 应用程序（用户态）"]
-    S --&gt;|"内置命令（cd / pwd 等）"| E["🔧 直接执行"]
-    S --&gt;|"外部命令（./hello）"| K["🧠 调用内核服务"]
-    K --&gt;|"指挥"| H["⚙️ 硬件真正干活"]</pre>
-
-<p><strong>shell 从哪来？</strong> 以UNIX系统为例，用户登录 UNIX 系统时，系统会启动一个 shell 进程，并把<strong>用户的终端</strong>设置为它的标准输入/输出设备——所以 shell 一启动就显示提示符（<code>$</code> 或 <code>#</code>），等着敲命令。UNIX 里的 shell 还有多种实现：<code>sh</code>（Bourne Shell，先驱）、<code>csh</code>、<code>ksh</code>、<code>bash</code> 等，现在最常见的是 bash；不同 shell 语法略有差异，但角色都一样——那道”接口”。</p>
-<p><strong>shell 不是 UNIX 独有的</strong>——“用户和操作系统之间的接口”这个角色，任何系统都得找人扮演：</p>
-<table>
-<thead>
-<tr>
-<th>系统</th>
-<th>代表 shell</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Windows</td>
-<td><code>cmd.exe</code>（命令提示符，承自 DOS 的 COMMAND.COM）＋ <strong>PowerShell</strong>（现代主推，还能跨平台跑在 Linux/macOS 上）</td>
-</tr>
-<tr>
-<td>macOS</td>
-<td><code>zsh</code>（早期版本曾默认 <code>bash</code>，2019 年后改为 <code>zsh</code>）</td>
-</tr>
-<tr>
-<td>Linux</td>
-<td><code>bash</code>（主流），常见的还有 <code>zsh</code>、<code>fish</code> 等</td>
-</tr>
-</tbody></table>
-<p>它们的命令语法各不相同（ Windows 里拷文件是 <code>copy</code>，Linux 里是 <code>cp</code>），但做的事完全相同：解析用户的输入，帮用户运行程序。</p>
-<p>注意一个容易混淆的点：<strong>shell 不一定是命令行</strong>。Windows 语境里说 “Windows shell”，通常指的是 <strong>explorer.exe</strong>（资源管理器）；macOS 的 Finder、Linux 的 GNOME/KDE 桌面环境同理。所以 shell 分两种：</p>
-<ul>
-<li><strong>文本型 shell（CLI）</strong>：cmd、PowerShell、bash……可以打字的那种；</li>
-<li><strong>图形型 shell（GUI）</strong>：Explorer、Finder、桌面环境——同样包在内核外面，只是长成一幅图。</li>
-</ul>
-<p>无论是哪种，它们都是 1.3 开头说的那层”皮”：站在内核和用户之间，把命令交给内核。</p>
-<p>shell 的工作流程：显示提示符（<code>$</code> 或 <code>#</code>），等用户输入命令行，然后分两类处理：</p>
-<ul>
-<li><strong>内置命令</strong>：shell 自带的命令（如 <code>cd</code>、<code>pwd</code>），直接执行；</li>
-<li><strong>外部命令</strong>：shell 把它<strong>当成一个可执行文件的名字</strong>去查找并运行——这就是为什么我们写 <code>./hello</code>（<code>./</code> 表示当前目录；直接敲 <code>hello</code> 的话，得靠 PATH 环境变量里配置的路径才能找到它）。</li>
-</ul>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ ./hello</span><br><span class="line">hello world</span><br></pre></td></tr></table></figure>
-
-<p>shell 的四大作用：</p>
-<ul>
-<li><strong>命令解释器</strong>：解析输入的命令，内置命令直接执行，否则查找并运行对应的可执行文件；</li>
-<li><strong>脚本语言</strong>：把一串 shell 命令写成文本文件，实现自动化；</li>
-<li><strong>环境配置</strong>：管理环境变量（默认编辑器、路径等）；</li>
-<li><strong>批处理</strong>：按顺序执行一系列命令。</li>
-</ul>
-<blockquote>
-<p>shell 执行外部命令时自己并不跑程序，而是靠 <code>fork + execve</code> 创建子进程去执行</p>
-</blockquote>
-<p>真正运行那段是硬件在工作，所以<strong>操作系统和硬件不能分开看</strong>。要搞懂程序运行时发生了什么，必须先了解硬件组织。</p>
-<hr>
-<h2 id="二、操作系统所处的位置"><a href="#二、操作系统所处的位置" class="headerlink" title="二、操作系统所处的位置"></a>二、操作系统所处的位置</h2><p>先看一张操作系统的分层示意图：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│  用户态  │  用户接口程序（shell / GUI）      │</span><br><span class="line">│         │  应用程序（浏览器、播放器、邮件…）  │</span><br><span class="line">├─────────┼─────────────────────────────────┤</span><br><span class="line">│  内核态  │  操作系统内核                      │</span><br><span class="line">│         │  （内存分配、进程调度、设备驱动…）    │</span><br><span class="line">├─────────┼─────────────────────────────────┤</span><br><span class="line">│  硬件    │  处理器 / 内存 / 磁盘 / 网卡 / I/O │</span><br><span class="line">└─────────┴─────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>最底下是<strong>硬件</strong>，所有计算和存储都在这里发生。</li>
-<li>硬件之上是软件。计算机有两种运行模式：<strong>内核态</strong>（又称管态、核心态）和<strong>用户态</strong>。操作系统内核运行在<strong>内核态</strong>，能直接管硬件。</li>
-<li><strong>用户接口程序（shell 或 GUI）处于用户态</strong>，且位于用户态最低层，允许用户运行其他程序（浏览器、播放器）。</li>
-<li><strong>越靠近用户态的应用程序越容易编写</strong>：你不喜欢某个邮件阅读器，可以自己重写一个；但你不能自己写一个操作系统或中断处理程序——这部分由硬件保护，防外部修改。</li>
-</ul>
-<blockquote>
-<p>操作系统位于硬件与用户之间，起管理和协调作用。用户态应用<strong>无法直接访问硬件</strong>，必须通过内核提供的服务间接访问。这样既提高了安全性（坏程序/恶意软件碰不到硬件），也让应用程序更容易编写维护（不用管底层硬件细节）。</p>
-</blockquote>
-<hr>
-<h2 id="三、硬件速览：OS-眼中的机器"><a href="#三、硬件速览：OS-眼中的机器" class="headerlink" title="三、硬件速览：OS 眼中的机器"></a>三、硬件速览：OS 眼中的机器</h2><p>操作系统和运行它的硬件关系极密切——它要扩展指令集、管理资源，就必须足够了解硬件。这里把一台个人电脑抽象成一个模型：<strong>CPU、内存、I/O 设备都挂在总线上，通过总线通信。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CPU           内存           I/O设备</span><br><span class="line"> │              │              │</span><br><span class="line"> └──────────────┼──────────────┘</span><br><span class="line">             中央总线</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-1-CPU"><a href="#3-1-CPU" class="headerlink" title="3.1 CPU"></a>3.1 CPU</h3><p>CPU 的作用就是处理和执行指令。它是”大脑”，但大脑下命令也要知道命令在哪——它通过<strong>程序计数器（PC）</strong>这个寄存器，始终指向主存中下一条要执行的指令地址。</p>
-<p>处理器执行一条指令的流程：从 <strong>PC</strong> 取出指令地址 → 取指令 → 用<strong>算术/逻辑单元（ALU）</strong>算出更新后的地址和值 → 更新 PC → 继续下一条。如此循环。</p>
-<p>CPU 还遵循一套<strong>指令集架构（ISA）</strong>。现代处理器又把 ISA 和<strong>微体系结构</strong>分开：</p>
-<ul>
-<li><strong>ISA</strong> 描述每条机器代码的效果（行为规范）；</li>
-<li><strong>微体系结构</strong> 描述处理器具体怎么实现。同一 ISA 可以有多种微体系结构，比如 Intel 和 AMD 都生产 x86 处理器，但内部实现差别很大。这样软件开发只管 ISA，硬件设计师可以自由优化实现。</li>
-</ul>
-<p>所以，<strong>不同架构的 CPU 之间不能直接执行彼此的程序</strong>：x86 能跑的，ARM 装不上，因为指令集和寄存器布局都不同。</p>
-<p>CPU 内有一些<strong>通用寄存器</strong>存放关键变量和临时结果（因为从内存取数比执行指令慢得多，寄存器提供了高速暂存）。指令通常有三类：</p>
-<ul>
-<li><strong>加载指令</strong>：内存 → 寄存器；</li>
-<li><strong>存储指令</strong>：寄存器 → 内存；</li>
-<li><strong>运算指令</strong>：对操作数做运算（如 <code>add</code> 把两个操作数相加）。</li>
-</ul>
-<p>特殊的、对程序员可见的寄存器：</p>
-<ul>
-<li><strong>程序计数器（PC）</strong>：下一条要取的指令地址，取完自动更新，保证顺序执行。</li>
-<li><strong>堆栈指针（SP）</strong>：指向当前栈顶，管理函数调用时的参数、局部变量、返回地址。</li>
-<li><strong>程序状态字（PSW）</strong>：记录当前系统状态（如零标志 ZF、进位标志 CF、溢出标志 OF）。用户程序能读整个 PSW，但通常只能改其中某些字段。</li>
-</ul>
-<p><strong>函数调用怎么用堆栈？</strong></p>
-<p>假设：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">add</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> {</span><br><span class="line">    <span class="keyword">return</span> a + b;</span><br><span class="line">}</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> {</span><br><span class="line">    <span class="type">int</span> result = add(<span class="number">5</span>, <span class="number">7</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"The sum is: %d\n"</span>, result);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-<p>调用过程：<code>main</code> 先把参数 5、7 压栈并保存返回地址 → 调 <code>add</code>；<code>add</code> 进入后保存当前栈指针（<code>push ebp / mov ebp, esp</code>），从栈弹出参数执行加法和；返回时通过 <code>ret</code> 回到 <code>main</code>，栈指针恢复到调用前的状态。</p>
-<blockquote>
-<p>操作系统必须”认识”所有这些寄存器。时间多路复用（多个程序在单个 CPU 上交替执行，让每个程序都像独占 CPU）时，OS 每次暂停一个程序，都要<strong>保存全部寄存器的值</strong>，之后才能正确恢复。</p>
-</blockquote>
-<h4 id="流水线与超标量"><a href="#流水线与超标量" class="headerlink" title="流水线与超标量"></a>流水线与超标量</h4><p>早期 CPU 一次只取一条指令、解码一条、执行一条。现代 CPU 能同时处理多条：执行第 N 条时，同时解码第 N+1 条、读取第 N+2 条——这叫<strong>流水线（pipeline）</strong>。</p>
-<p>更进一步的<strong>超标量（superscalar）</strong>有多个执行单元（整数、浮点、布尔各一个），多条指令可同时取、解码、放入缓冲区，只要哪个执行单元空闲就取走执行。这种设计下，指令经常是<strong>乱序执行</strong>的，但硬件会保证结果和顺序执行时一致。</p>
-<h4 id="内核态与用户态"><a href="#内核态与用户态" class="headerlink" title="内核态与用户态"></a>内核态与用户态</h4><p>除了嵌入式里特别简单的 CPU，<strong>大多数 CPU 有两种操作模式：内核态和用户态</strong>，通常靠 PSW 里一个二进制位来控制。</p>
-<ul>
-<li><strong>内核态</strong>：可执行指令集里任何指令，能访问硬件全部功能。</li>
-<li><strong>用户态</strong>：只能执行部分指令、访问部分硬件，无法执行 I/O 和内存保护相关指令，也无法改 PSW 的模式位进入内核态。</li>
-</ul>
-<p><strong>为什么嵌入式系统也要把一部分代码放内核态、一部分放用户态？</strong> 综合考量：</p>
-<ul>
-<li><strong>安全性</strong>：用户态应用受限，防止坏程序破坏系统、篡改数据；内核态代码才能碰硬件，隔离了系统资源。</li>
-<li><strong>资源管理</strong>：内核态负责分配资源（内存、文件、网络），用户态通过<strong>系统调用</strong>请求服务；用户态权限受限，防滥用。</li>
-<li><strong>灵活性</strong>：用户态程序可单独更新替换，不用重编整个系统；也更容易调试维护。</li>
-<li><strong>性能</strong>：实时控制等性能敏感任务放内核态保证低延迟，非实时任务放用户态减轻内核负担。</li>
-<li><strong>兼容性</strong>：借鉴桌面/服务器设计，保持一致性；用户态可用现成工具链和开源库，开发更简便。</li>
-</ul>
-<p><strong>用户程序怎么进入内核？</strong> 靠<strong>系统调用（system call）</strong>，它把执行模式从用户态切到内核态。执行 <strong>TRAP</strong> 指令触发切换；完成后，系统调用后面的指令把控制权交还给用户程序。系统调用过程中还可能遇到 <strong>trap（陷阱）</strong>——硬件检测到的异常（比如除以零、浮点下溢），由操作系统接管处理。</p>
-<h4 id="多线程、多核、GPU"><a href="#多线程、多核、GPU" class="headerlink" title="多线程、多核、GPU"></a>多线程、多核、GPU</h4><ul>
-<li><strong>多线程（超线程）</strong>：允许 CPU 几乎同时维持两个线程状态，能在纳秒级切换。当一个线程等内存取数（要几个时钟周期）时，切换去跑另一个线程。<strong>注意：多线程不是真并行，任一时刻仍只有一个线程在执行</strong>，只是靠快速切换提高利用率。对 OS 来说，每个线程就像一台独立 CPU——两个物理核各跑两线程，OS 会看成四个 CPU。</li>
-<li><strong>多核</strong>：一块芯片上集成多个完整处理器核，每个核有独立 CPU，能<strong>真正并行</strong>处理多任务。</li>
-<li><strong>GPU</strong>：由成千上万个微核组成的处理器，擅长大量并行的简单计算，核心数量远超普通 CPU。</li>
-</ul>
-<h4 id="并发与并行"><a href="#并发与并行" class="headerlink" title="并发与并行"></a>并发与并行</h4><p>上文一会儿说”多线程不是真并行”，一会儿说”多核真正并行”——这里涉及到一对经常出现的概念：</p>
-<ul>
-<li><strong>并发（concurrency）</strong>：多个任务在<strong>重叠的时间段</strong>里交替或同时进行，重点在”<strong>逻辑上同时</strong>“——任意时刻物理上可能只有一个任务在跑，但多个任务都处于”进行中”的状态，看起来像同时。单核 CPU 也能并发：时间片轮转，多个进程轮流上 CPU。</li>
-<li><strong>并行（parallelism）</strong>：多个任务在<strong>同一精确时刻</strong>真正同时执行，重点在”<strong>物理上同时</strong>“——多个核心各干各的活。只有多核/多处理器才谈得上并行。</li>
-</ul>
-<p>并发让系统<strong>能同时处理更多任务</strong>（提到吞吐量、响应性）——靠调度维持”多个活动同时存在”并有序推进；并行让系统<strong>跑得更快</strong>——利用多核硬件。第四章进程里的”时间片轮转”、第五章系统调用里”OS 暂停当前进程、调度其他就绪进程”，都是并发的日常；本节前面”多线程靠快速切换提高利用率”，说的也是并发。</p>
-<h3 id="3-2-内存层次结构"><a href="#3-2-内存层次结构" class="headerlink" title="3.2 内存层次结构"></a>3.2 内存层次结构</h3><p>内存是计算机第二大组件。理想的存储要快、大、便宜，但技术无法同时满足，于是做成<strong>层次结构</strong>：</p>
-<pre class="mermaid">flowchart TB
-    A["寄存器<br>最快 · 最小 · 最贵"] --&gt; B["高速缓存 L1/L2<br>硬件控制 · 快"]
-    B --&gt; C["主存 RAM<br>断电丢失 · 容量大"]
-    C --&gt; D["磁盘 / SSD<br>最慢 · 容量最大 · 最便宜"]</pre>
-
-<ul>
-<li><strong>寄存器</strong>：顶部，速度与 CPU 相同，程序须在软件里自行管理。</li>
-<li><strong>高速缓存</strong>：寄存器之下，主要由硬件控制。主存被分成<strong>高速缓存行</strong>（通常 64 字节）。CPU 要读数据时，缓存硬件先查对应行在不在——<strong>命中（cache hit）</strong>只需约 2 个时钟周期；不命中就必须去主存取，慢得多。缓存行数量受成本限制，有的机器有两三级缓存（每级更大但略慢）。</li>
-<li><strong>主存（RAM）</strong>：缓存不命中的访问最终都到主存。RAM 可读可写，<strong>断电丢失</strong>。</li>
-<li><strong>磁盘</strong>：比 RAM 每比特成本低两个数量级、容量高两个数量级，但随机访问慢约三个数量级。</li>
-</ul>
-<p><strong>为什么会有缓存？</strong> 硬件速度发展到瓶颈，处理器和内存的速度差距越来越大。与其砸钱提速内存，不如在处理器端引入高速缓存，利用程序的<strong>局部性原理</strong>，让大多数内存操作在缓存里就能完成，减少访问主存次数。</p>
-<p><strong>局部性原理</strong>：CPU 访问存储器（无论是取指令还是存取数据），所访问的存储单元总聚集在一个较小连续区域里。分为两种：</p>
-<ul>
-<li><strong>时间局部性</strong>：某个内存位置被重复引用。</li>
-<li><strong>空间局部性</strong>：某个位置被引用后，它附近的位置很快也被引用。</li>
-</ul>
-<blockquote>
-<p>局部性原理可以用程序验证：遍历一个 <code>[10000][10000]</code> 的二维数组，<code>dataArray[i][j]</code>（按行）和 <code>dataArray[j][i]</code>（按列）的耗时差异，就是空间局部性好坏的直观体现。</p>
-</blockquote>
-<p>缓存不只在 CPU，OS 也在用：比如把常用文件驻留在主存，避免反复读磁盘；把路径名到磁盘地址的转换结果缓存；把 URL 到 IP 的转换结果缓存。</p>
-<p><strong>任何缓存系统都要回答四个问题</strong>：何时把新内容放进来？放哪一行？没空位时移除谁？被移除的内容放到大存储器的哪里？——不同场景答案不同。</p>
-<p>现代 CPU 通常有两级缓存：<strong>L1 cache</strong> 在 CPU 内部（存放已解码指令和常用关键字，约 16KB，无延迟）；<strong>L2 cache</strong> 更大（兆字节级），访问有 1–2 个时钟周期延迟。</p>
-<blockquote>
-<p><strong>时钟周期</strong>：CPU 速度由振荡器两个脉冲之间的时间决定，每秒脉冲数越高越快，单位是 Hz（兆赫/千兆赫）。例如 4GHz 处理器每秒执行 40 亿个时钟周期。现代处理器每个周期可执行多条指令。</p>
-</blockquote>
-<p><strong>主存之外的非易失性存储</strong>：</p>
-<ul>
-<li><strong>ROM（只读存储器）</strong>：内容一旦写入就不变，速度快成本低。启动用的引导程序（bootstrap）通常存这里。</li>
-<li><strong>EEPROM / 闪存</strong>：可擦写重写，能修正程序错误；闪存常用于移动设备，介于 RAM 和磁盘之间，但有擦写寿命限制。</li>
-<li><strong>CMOS</strong>：断电会丢数据（易失性），但常用来保存当前时间和日期。</li>
-</ul>
-<p><strong>磁盘</strong>：机械装置，有一个或多个金属盘片以 5400/7200/10800rpm 旋转，机械臂悬在盘面上。信息写在同心圆上，一个臂位置的所有磁道合起来是<strong>柱面</strong>。每个磁道分成若干<strong>扇区</strong>（512 字节）。<strong>固态硬盘（SSD）不是磁盘</strong>——它没有可动部分，用闪存存储，只是同样断电不丢数据。现代计算机支持<strong>虚拟内存</strong>机制：把主存当成一部分缓存，最常用的程序放主存，其余放磁盘；地址映射由 CPU 里的<strong>存储器管理单元（MMU）</strong>完成。</p>
-<blockquote>
-<p>缓存和 MMU 对性能影响很大。在多道程序系统里，从一个程序切到另一个程序的机制叫<strong>上下文切换（context switch）</strong>，必要时还要把缓存里修改过的数据写回磁盘。</p>
-</blockquote>
-<h3 id="3-3-I-O-设备"><a href="#3-3-I-O-设备" class="headerlink" title="3.3 I/O 设备"></a>3.3 I/O 设备</h3><p>CPU 和存储器只是 OS 管理范围的冰山一角，I/O 设备同样重要。I/O 设备通常分两部分：</p>
-<ul>
-<li><strong>设备控制器</strong>：一块或一组芯片，直接控制物理设备，接受并执行 OS 的指令。它设计了一个<strong>简化接口</strong>给 OS 用，屏蔽底层物理细节（类似加一层代理简化复杂）。</li>
-<li><strong>设备本身</strong>：接口相对简单且已标准化。比如标准化的 SATA 磁盘控制器能适配任意 SATA 磁盘。</li>
-</ul>
-<blockquote>
-<p><code>ATA</code> 是 IBM 第二代 PC 的高级技术成果，<code>SATA</code> 是串行 ATA，现在是很多计算机的标准硬盘接口。OS 看到的是对”控制器”的接口，和”设备”接口差别很大。</p>
-</blockquote>
-<p>每种设备控制器不同，需要不同软件控制。专门和控制器通信、发命令、收响应的软件叫<strong>设备驱动程序（device driver）</strong>。</p>
-<p><strong>怎样把驱动程序装进操作系统（在内核态运行）？</strong> 三种途径：</p>
-<ol>
-<li>把内核和驱动程序重新连接，然后重启（UNIX 常用）；</li>
-<li>在一个 OS 文件里设置入口，重启时 OS 寻找并装载（Windows 常用）；</li>
-<li>OS 运行时动态装载，无需重启（热插拔设备如 USB、IEEE 1394 需要）。</li>
-</ol>
-<p>每个设备控制器都有些寄存器（比如指定磁盘地址、内存地址、扇区计数）。驱动程序从 OS 取一条指令，翻译成值写进设备寄存器，<strong>所有设备寄存器的集合就是 I/O 端口空间</strong>。设备寄存器有的被映射到可用地址空间（像内存一样读写）；有的放在专门 I/O 端口空间（用 <code>IN</code>/<code>OUT</code> 指令读写，需内核态）。</p>
-<p><strong>实现输入的三种方式</strong>：</p>
-<ol>
-<li><strong>忙等待（busy waiting）</strong>：用户程序发起系统调用 → 内核转成驱动程序调用 → 驱动启动 I/O 后<strong>循环检查</strong>设备是否完成。缺点是<strong>一直占着 CPU</strong>，一直轮询直到完成。</li>
-<li><strong>中断（interrupt）</strong>：驱动启动设备后立刻返回，OS 安排其他工作；设备完成时发一个<strong>中断</strong>通知。中断流程：驱动写寄存器告诉控制器做什么 → 控制器启动设备 → 完成后向中断控制器发信号 → 中断控制器在 CPU 引脚上声明，并把设备编号放到总线上 → CPU 响应，把 PC 和 PSW 压栈并切到内核态 → 用设备编号查<strong>中断向量</strong>找到处理程序 → 处理完成后恢复用户程序继续执行。注意：<strong>中断可以在不合宜的时间发生</strong>，CPU 可暂时禁中断，但多个中断同时到来时由中断控制器按优先级裁决。</li>
-<li><strong>DMA（直接存储器访问）</strong>：专门的 DMA 芯片控制内存和控制器之间的位流，<strong>无需 CPU 干预</strong>。CPU 只需设置要传送的字节数、设备/内存地址和方向，DMA 完成后发中断。</li>
-</ol>
-<h3 id="3-4-总线"><a href="#3-4-总线" class="headerlink" title="3.4 总线"></a>3.4 总线</h3><p>总线的英文 <code>bus</code> 直译”公共汽车”，比喻很贴切：总线是数据通道，沿线连接的设备像公交站，数据包像乘客，知道起点终点、沿途停靠。总线有容量限制，通常按固定长度”字”传输（当前多为 4 字节/32 位或 8 字节/64 位），还需要一个”控制器”协调各设备访问顺序，避免冲突。</p>
-<p>早期总线多是<strong>共享总线架构</strong>（多条线路并行传同一数据字，多设备共用一组线），需要仲裁机制。<strong>PCIe</strong> 则彻底改用<strong>端到端链路</strong>（点对点串行通道，每个设备与目标设备独立连接）。对比：</p>
-<table>
-<thead>
-<tr>
-<th>维度</th>
-<th>共享总线架构</th>
-<th>端到端链路（PCIe）</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>共享性</td>
-<td>多设备共享同一物理总线</td>
-<td>每个设备有独立连接</td>
-</tr>
-<tr>
-<td>带宽</td>
-<td>被所有设备共享，易成瓶颈</td>
-<td>每条链路独立带宽，互不影响</td>
-</tr>
-<tr>
-<td>传输方式</td>
-<td>并行</td>
-<td>串行（可用多条 Lane 并行）</td>
-</tr>
-<tr>
-<td>扩展性</td>
-<td>设备越多性能越差</td>
-<td>新设备加链路即可，扩展性好</td>
-</tr>
-<tr>
-<td>管理复杂度</td>
-<td>需复杂仲裁机制</td>
-<td>无共享资源问题，管理简单</td>
-</tr>
-</tbody></table>
-<p>现代 x86 系统里总线很多：高速缓存、内存（DDR3）、PCIe、PCI、USB、SATA、DMI，各司其职。比如 CPU 通过 DDR3 与内存交互、通过 PCIe 连 GPU、通过 DMI 连集成控制中心，再通过 SATA 接硬盘和 DVD、通过串行总线接 USB 设备。<strong>USB</strong> 从 1.0（12Mb/s）→ 2.0（480Mb/s）→ 3.0（≥5Gb/s），实现即插即用；<strong>SCSI</strong> 速度可达 640MB/s，多在服务器/工作站。</p>
-<hr>
-<h2 id="四、操作系统的三大核心抽象"><a href="#四、操作系统的三大核心抽象" class="headerlink" title="四、操作系统的三大核心抽象"></a>四、操作系统的三大核心抽象</h2><p><code>📄 文件</code> → 屏蔽 I/O 设备细节；<code>🧠 虚拟内存</code> → 屏蔽主存+磁盘；<code>⚙️ 进程</code> → 屏蔽处理器+主存+I/O。</p>
-<h3 id="4-1-进程"><a href="#4-1-进程" class="headerlink" title="4.1 进程"></a>4.1 进程</h3><p>每个进程都带一个独立的<strong>地址空间</strong>（从 0 到某个最大值的一段连续存储区域），里面放可执行代码、数据、以及函数调用和局部变量用的栈。除了地址空间，进程还关联一串<strong>资源</strong>：寄存器（PC、SP）、打开的文件列表、待处理信号、相关进程列表等。简而言之，进程是一个装了运行所需所有信息的容器。</p>
-<p><strong>多任务怎么”同时”跑？</strong> 靠上下文切换。假设你开了视频编辑器、Web 浏览器、后台邮件检查三个进程，其实同一时刻 CPU 只跑一个；OS 通过时间片轮转等调度策略，周期性地挂起一个启动另一个，让所有进程公平分到 CPU。当进程被挂起时，必须<strong>精确保存状态</strong>（地址空间内容 + 寄存器值 + 文件位置等上下文信息），存在<strong>进程表</strong>里，之后才能无缝恢复。</p>
-<p><strong>进程的父子关系</strong>：进程可以创建子进程，子进程再创建子进程，形成一棵<strong>进程树</strong>。比如 shell 收到一条编译命令，就创建一个子进程去编译，编译完自毁。理论上进程可以无限增长，但实际 OS 会限制最大进程数。</p>
-<p>进程之间协作要交换信息，机制叫<strong>进程间通信（IPC）</strong>。OS 还提供一批系统调用管理进程：申请/释放内存、等待子进程完成并收集结果、用新程序替换当前进程映像等。</p>
-<p>进程有时需要接收外部信息（比如网络发消息后，设一个定时器，超时没收到确认就重传）。定时器到期后 OS 会给进程发<strong>警告信号</strong>，中断当前执行、保存寄存器、触发信号处理例程。这些信号其实是<strong>软件模拟的硬件中断</strong>，发射原因很多：定时器到期、非法指令、访问无效内存等。</p>
-<p><strong>身份标识</strong>：每个进程分配唯一 <strong>UID</strong>（标识运行者），新进程继承父进程 UID。用户可以属于一个或多个组，每个组有唯一 <strong>GID</strong>。UNIX 类系统还有个特殊 <strong>超级用户</strong>（Windows 里叫管理员），权限更高，能执行违反常规保护规则的操作。</p>
-<h3 id="4-2-线程"><a href="#4-2-线程" class="headerlink" title="4.2 线程"></a>4.2 线程</h3><p>进程和线程都是对 CPU 工作时间段的抽象，<strong>只是颗粒度不同</strong>：进程描述更大的执行环境，线程是更细的执行单元。</p>
-<p>假设程序 A 要依次执行 a、b、c 三个模块。CPU 拿到程序 A 的控制权、加载它的上下文后，依次跑 a、b、c。注意：<strong>a、b、c 共享的是程序 A（进程）的上下文环境</strong>，所以在这些段之间切换，是<strong>线程级上下文切换</strong>，不是更重的进程级切换——开销小得多，CPU 利用率更高。</p>
-<blockquote>
-<p>注意：编程语言里说的”进程/线程”是语言层的具体实现，和 OS 层的概念是”具体化”的关系，别混为一谈。</p>
-</blockquote>
-<h3 id="4-3-地址空间与虚拟内存"><a href="#4-3-地址空间与虚拟内存" class="headerlink" title="4.3 地址空间与虚拟内存"></a>4.3 地址空间与虚拟内存</h3><p><strong>地址空间</strong>：早期简单 OS 一次只跑一个程序，要开第二个就得把第一个整个移出内存，多任务能力极差。后来允许多个程序同时加载到内存并行执行，靠硬件+OS 实现隔离保护。每个进程被分配一个<strong>专属地址集合</strong>，通常从 0 连续编号到某个最大值。</p>
-<blockquote>
-<p>理论上，32 位架构的虚拟地址空间可达 (2^{32}) 字节，64 位可达 (2^{64}) 字节，远超物理内存容量。正是<strong>虚拟内存</strong>技术解决了”地址空间比物理内存大”的问题。</p>
-</blockquote>
-<p><strong>虚拟内存</strong>：允许直接把物理内存暴露给程序是<strong>危险且低效</strong>的——安全风险增加（可破坏系统稳定性、数据泄露）、资源利用率低（碎片化）、内存管理复杂。虚拟内存作为物理内存和进程间的<strong>抽象层</strong>：给每个进程一个独立的、看似无限大的内存空间。每个进程都以为独占整个内存，实际只是在访问 OS 精心管理的虚拟地址空间。</p>
-<pre class="mermaid">flowchart TB
-    subgraph VS["进程的虚拟地址空间（高地址在上，低地址在下）"]
-        A["内核内存区<br>（OS 专用，用户不可见）"]
-        B["堆栈区 Stack<br>（参数、局部变量、返回地址）从高地址往低地址增长"]
-        C["共享库区<br>（printf 等库代码）"]
-        D["堆区 Heap<br>（malloc 动态分配）从低地址往高地址增长"]
-        E["进程代码与数据区<br>只读段 + 可读写段"]
-    end</pre>
-
-<p>这张图从<strong>低地址（下）</strong>到<strong>高地址（上）</strong>排列，内核区在最上方（高地址），用户进程看不见它。从下往上看：</p>
-<ul>
-<li><strong>进程代码与数据区</strong>：最顶部承载可执行文件核心内容，分<strong>只读段</strong>（机器指令、只读数据如字符串常量）和<strong>可读写段</strong>（全局变量、静态变量，运行时允许修改）。</li>
-<li><strong>堆数据区（heap）</strong>：C 程序动态内存分配区，<code>malloc/calloc/realloc</code> 申请、<code>free</code> 释放，从低地址向高地址扩展。</li>
-<li><strong>共享库区</strong>：存放系统/第三方库代码（如 <code>printf</code>），多个进程共享同一份库代码，节省内存。</li>
-<li><strong>堆栈区（stack）</strong>：管理函数调用和局部变量，每个函数调用建一个<strong>栈帧</strong>（存参数、局部变量、返回地址），从高地址向低地址扩展。</li>
-<li><strong>内核内存区</strong>：最高地址处，内核专用的代码、数据和系统资源，用户进程不可见、无法访问，保证 OS 安全。</li>
-</ul>
-<h3 id="4-4-文件"><a href="#4-4-文件" class="headerlink" title="4.4 文件"></a>4.4 文件</h3><p>几乎所有 OS 都支持文件系统。OS 的一个核心功能就是屏蔽磁盘和其他 I/O 设备细节，给程序员一个<strong>与设备无关的抽象文件模型</strong>。创建、删除、读写文件都要通过系统调用。读文件前先”打开”（定位并验证权限），读完”关闭”。</p>
-<p>现代 OS 引入了<strong>目录</strong>概念，作为文件系统基本构成单元，允许用户按逻辑分组文件，形成<strong>树状结构</strong>（目录本身也是特殊文件，可嵌套包含文件或其他目录）。系统调用包括创建/删除目录、移动文件等。</p>
-<p>进程树和文件系统树都像树，但差异明显：进程树层次浅（很少超三层）、生命周期短（几分钟）；文件系统树更深（可达四五层）、<strong>持久存在</strong>。权限管理也不同：进程有明确父子关系，父进程能控制子进程；文件访问权限更灵活，不只限所有者。</p>
-<p><strong>路径</strong>：每个文件用唯一路径名定位，从根目录向下，各层目录用斜杠分隔。如 <code>/Faculty/Prof.Brown/Courses/CS101</code>，首个斜杠表示根目录。Windows 用反斜杠 <code>\</code>，Linux/Unix 用正斜杠 <code>/</code>。每个进程还拥有一个<strong>工作目录</strong>，作为相对路径的基准。</p>
-<p><strong>打开文件</strong>后分配一个<strong>文件描述符</strong>（非负整数），用于后续读写；拒绝访问则返回错误代码。</p>
-<p><strong>特殊文件</strong>：为了让 I/O 设备像普通文件一样读写。有两种特殊文件类型：</p>
-<ul>
-<li><strong>块特殊文件</strong>：可随机访问的块设备（如磁盘），打开后可直接访问第 N 块。</li>
-<li><strong>字符特殊文件</strong>：处理字符流的设备（如打印机、调制解调器）。<br>按惯例放在 <code>/dev</code> 目录，如 <code>/dev/lp0</code> 表示打印机。</li>
-</ul>
-<blockquote>
-<p>特殊文件是 <strong>UNIX/Linux 家族（POSIX）特有</strong>的设计——背后的哲学是 UNIX 的”<strong>一切皆文件</strong>“：设备、磁盘、终端统统统一成文件接口，开发者只要会读写文件，就会操作一切外设。Windows 没有这个机制：设备是系统里的”对象”，走 Win32 API 访问，只保留了 <code>CON</code>、<code>NUL</code>、<code>PRN</code> 等几个从 DOS 继承的设备名。现代 Linux 还把这一思想推进了一大步：<code>/proc</code>、<code>/sys</code> 等<strong>虚拟文件系统</strong>把内核信息、硬件状态也映射成了文件——<code>cat /proc/cpuinfo</code> 就能”读”到 CPU 信息，如同读一个普通文件。</p>
-</blockquote>
-<p><strong>管道（pipe）</strong>：一种与进程、文件都相关的重要特性，本质是<strong>存在内存里的一段空间</strong>，专门用于两个进程之间传输数据。注意”虚拟文件”的含义：它不是存储在磁盘上的实体，却能用文件那套操作来使用。</p>
-<p>两个进程用管道通信的流程：先创建一个管道，然后——</p>
-<ul>
-<li>进程 A 把数据”写”进管道，就像写一个普通的<strong>输出文件</strong>；</li>
-<li>进程 B 从管道”读”数据，就像读一个普通的<strong>输入文件</strong>；</li>
-<li>数据并不落到磁盘上，而是<strong>实时地</strong>直接送到另一端：A 写进去的字节，B 马上就能读到。</li>
-</ul>
-<p>管道价值的本质：开发人员可以用<strong>熟悉的文件操作接口</strong>来实现进程间通信——两个进程无需直接接触、互不干扰，数据就传输完毕了。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ <span class="built_in">cat</span> file1 file2 file3 | <span class="built_in">sort</span> &gt; /dev/lp</span><br></pre></td></tr></table></figure>
-
-<p><code>|</code> 就是管道操作符：左边命令的标准输出（stdout），直接变成右边命令的标准输入（stdin）。上面这句把三个文件用 <code>cat</code> 合并 → 通过 <code>|</code> 传给 <code>sort</code> 排序 → 最后的 <code>&gt;</code> 是重定向（<code>&lt;</code> 反向，把文件内容喂给命令），把排序结果写进 <code>/dev/lp</code>—本小节前面讲的<strong>字符特殊文件</strong>（打印机）。shell 把这些符号串起来，一条命令就完成了”合并 → 排序 → 打印”三连。</p>
-<h3 id="4-5-保护：rwx-权限"><a href="#4-5-保护：rwx-权限" class="headerlink" title="4.5 保护：rwx 权限"></a>4.5 保护：rwx 权限</h3><p>以 UNIX 为例，每个文件分配一个<strong>9 位二进制保护代码</strong>，分成三段：第一段给<strong>所有者</strong>，第二段给<strong>同组用户</strong>，第三段给<strong>其他用户</strong>。每段三位，分别控制<strong>读（r）、写（w）、执行（x）</strong>，即经典的”rwx 位”。</p>
-<p>例如 <code>rwxr-x--x</code>：</p>
-<ul>
-<li>所有者（owner）：r、w、x 全有；</li>
-<li>同组用户（group）：只有 r（读）和 x（执行），不能改；</li>
-<li>其他用户（others）：只有 x（执行），不能读也不能写。</li>
-</ul>
-<hr>
-<h2 id="五、系统调用：用户态进入内核的大门"><a href="#五、系统调用：用户态进入内核的大门" class="headerlink" title="五、系统调用：用户态进入内核的大门"></a>五、系统调用：用户态进入内核的大门</h2><p>上一节里的文件、进程、权限，都是通过系统调用实现”抽象接口 + 资源管理”的——现代操作系统普遍采用系统调用，尽管各系统间细节各异，但<strong>基本原理相通</strong>。此处入门仅需了解即可。</p>
-<ul>
-<li><strong>任何单 CPU 计算机，在任意时刻都只能执行一条指令。</strong> 所以进程在用户态执行用户程序时（比如读文件数据），如果想把控制权转移给操作系统，就必须执行一条特定指令——<strong>异常指令</strong>或<strong>系统调用指令</strong>，光靠普通 C 代码是”够不着”内核的。</li>
-<li><strong>系统调用的触发依赖计算机底层的机制，通常需要通过汇编语言来精确表达。</strong> C 语言里没有”把控制权交给内核”这种语句——所以 C 程序要经由 <strong>库函数</strong> 中转：库函数内部用汇编把系统调用编号放进寄存器、执行 TRAP 指令。这也是为什么平时的代码只调 <code>read</code> 函数，而不是直接”调用内核”。</li>
-</ul>
-<p>控制权交到内核后，操作系统先执行<strong>参数检查</strong>（确认目标进程、其所需调用的服务），确认无误后执行系统调用，控制权暂时转交给内核态的相应指令序列。</p>
-<blockquote>
-<p>简而言之，<strong>系统调用类似于一种特殊的过程调用</strong>，但它和普通过程调用有本质区别：普通过程调用只能在同一运行模式下跳来跳去，而系统调用<strong>能够跨越用户态与内核态的界限</strong>——正是这一点，才让用户程序”合法地”碰得到硬件。</p>
-</blockquote>
-<p>这里以**<code>read</code> 系统调用举例**：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">count = read(fd, buffer, nbytes);</span><br></pre></td></tr></table></figure>
-
-<p>三个参数：文件描述符（指定文件）、缓冲区指针（数据放哪）、要读的字节数。成功返回实际读取字节数（可能小于请求值）；失败返回 -1，并在全局变量 <code>errno</code> 里记录错误代码。所以程序<strong>必须检查返回值</strong>。</p>
-<p>read 调用历经 <strong>11 个步骤</strong>（完整流程见下图，①~⑪ 与下面文字一一对应）：</p>
-<pre class="mermaid">flowchart TB
-    subgraph U["🎩 用户空间（用户进程）"]
-        direction TB
-        S1["① 压入 nbytes"] --&gt; S2["② 压入 &amp;buffer"]
-        S2 --&gt; S3["③ 压入 fd"]
-        S3 --&gt; S4["④ 调用 read 库函数"]
-        S4 --&gt; S5["⑤ 系统调用编号放入指定寄存器"]
-        S5 --&gt; S6["⑥ TRAP：陷入内核"]
-        S9["⑨ 返回用户态的函数调用库"] --&gt; S10["⑩ 返回给调用者<br>read 之后的下一条指令"]
-        S10 --&gt; S11["⑪ 增加 SP：清理压入的参数"]
-    end
-    subgraph K["🔒 内核空间（操作系统）"]
-        direction TB
-        S7["⑦ 解析编号，查 dispatch 表定位处理器"] --&gt; S8["⑧ 执行系统调用处理程序"]
-    end
-    S6 --&gt; S7
-    S8 --&gt; S9</pre>
-
-<p><strong><code>read</code> 的完整执行步骤</strong>（C/C++ 编译器对函数调用按<strong>逆序压参</strong>）：把参数压入堆栈 → 程序调用 <code>read</code> 库函数 → 底层需要更深的系统调用 → 把系统调用编号放进指定寄存器 → 执行 <strong>TRAP</strong> 指令（切到内核态，跳转到内核预定义地址）→ 内核解析编号，用 <strong>dispatch 表</strong>定位系统调用处理器 → 执行服务 → 控制权返回到用户态函数调用库 → 返回发起调用的应用。最后一步是系统调用返回后<strong>调整堆栈指针</strong>，把之前压入的参数清掉——让堆栈回到调用前的状态。若调用阻塞（如等键盘输入），OS 可能暂停当前进程、调度其他就绪进程；条件满足再唤醒。</p>
-<blockquote>
-<p>TRAP 和普通过程调用有两点不同：它改变了执行模式；跳转目标受限于硬件/OS 定义，而非任意地址。</p>
-</blockquote>
-<p>刚才的 <code>read</code> 只是系统调用世界的一个例子——一共 有100 多个系统调用。在列出之前，补充一个问题：<strong>为什么 <code>read</code>、<code>fork</code> 这些名字，在 Linux 上敲、在 macOS 上敲，全都一模一样？</strong> 答案就是 POSIX。</p>
-<p><strong>POSIX 是什么？</strong> 它是一门<strong>标准</strong>——IEEE 制定的”可移植操作系统接口”（Portable Operating System Interface），规定操作系统<strong>应该给应用程序提供哪些接口</strong>：系统调用名、参数、库函数、命令行约定，通通写进标准条文。它要解决的只有一个问题：<strong>可移植性</strong>。因为有了 POSIX，同样的 <code>open</code>/<code>read</code>/<code>fork</code>，在 Linux、macOS、FreeBSD、Solaris 上名字一模一样、参数一模一样——写一次代码，换平台重编译就能跑。</p>
-<p>注意：POSIX 是<strong>标准条文</strong>（规定”应该长什么样”），不是某个具体的操作系统。Linux 内核 + glibc 实现了它，macOS（BSD 血统）也实现了它。打个比方：POSIX 像”同一本单词书”，Linux 和 macOS 是”两家出版社印的实体书”——程序只认标准拼写，在哪一本里都查得到，自然就跨平台了。</p>
-<p><strong>常用 POSIX 系统调用</strong>：</p>
-<p><strong>进程管理</strong></p>
-<table>
-<thead>
-<tr>
-<th>调用</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>pid = fork()</code></td>
-<td>创建与父进程相同的子进程</td>
-</tr>
-<tr>
-<td><code>pid = waitpid(pid, &amp;statloc, options)</code></td>
-<td>等待一个子进程终止</td>
-</tr>
-<tr>
-<td><code>s = execve(name, argv, environp)</code></td>
-<td>替换一个进程的核心映像</td>
-</tr>
-<tr>
-<td><code>exit(status)</code></td>
-<td>终止进程并返回状态</td>
-</tr>
-</tbody></table>
-<p><strong>文件管理</strong></p>
-<table>
-<thead>
-<tr>
-<th>调用</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>fd = open(file, how, ...)</code></td>
-<td>打开文件用于读、写</td>
-</tr>
-<tr>
-<td><code>s = close(fd)</code></td>
-<td>关闭文件</td>
-</tr>
-<tr>
-<td><code>n = read(fd, buffer, nbytes)</code></td>
-<td>从文件读数据到缓冲区</td>
-</tr>
-<tr>
-<td><code>n = write(fd, buffer, nbytes)</code></td>
-<td>从缓冲区写数据到文件</td>
-</tr>
-<tr>
-<td><code>position = lseek(fd, offset, whence)</code></td>
-<td>移动文件指针</td>
-</tr>
-<tr>
-<td><code>s = stat(name, &amp;buf)</code></td>
-<td>取得文件状态信息</td>
-</tr>
-</tbody></table>
-<p><strong>目录和文件系统管理</strong></p>
-<table>
-<thead>
-<tr>
-<th>调用</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>s = mkdir(name, mode)</code></td>
-<td>创建新目录</td>
-</tr>
-<tr>
-<td><code>s = rmdir(name)</code></td>
-<td>删除空目录</td>
-</tr>
-<tr>
-<td><code>s = link(name1, name2)</code></td>
-<td>创建新目录项指向已有文件</td>
-</tr>
-<tr>
-<td><code>s = unlink(name)</code></td>
-<td>删除一个目录项</td>
-</tr>
-<tr>
-<td><code>s = mount(special, name, flag)</code></td>
-<td>安装一个文件系统</td>
-</tr>
-<tr>
-<td><code>s = umount(special)</code></td>
-<td>卸载一个文件系统</td>
-</tr>
-</tbody></table>
-<p><strong>其他</strong></p>
-<table>
-<thead>
-<tr>
-<th>调用</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>s = chdir(dirname)</code></td>
-<td>改变工作目录</td>
-</tr>
-<tr>
-<td><code>s = chmod(name, mode)</code></td>
-<td>修改文件保护位</td>
-</tr>
-<tr>
-<td><code>s = kill(pid, signal)</code></td>
-<td>发送信号给进程</td>
-</tr>
-<tr>
-<td><code>seconds = time(&amp;seconds)</code></td>
-<td>获取从 1970-01-01 至今的时间</td>
-</tr>
-</tbody></table>
-<p><strong>几个关键系统调用解读</strong>：</p>
-<ul>
-<li><p><strong><code>fork</code><strong>：POSIX 下创建进程的唯一机制。它复制当前进程（父进程）——包括文件描述符、寄存器值等；复制地址空间 = 先共享，</strong>需要写入时才真正复制（写时复制 COW）</strong>。<code>fork</code> 返回一个特殊值：<strong>子进程里返回 0，父进程里返回子进程 PID</strong>。通过检查返回值，程序就知道自己是在父还是子进程里。<code>fork</code> 后父子进程各自独立修改自己的变量。</p>
-</li>
-<li><p>**<code>waitpid</code>**：父进程等待一个或多个子进程结束。第一个参数为 -1 时等待任意子进程；第二个参数返回退出状态（正常/异常终止和退出码）；第三个参数指定选项（如没有已退出子进程时立即返回）。</p>
-</li>
-<li><p><strong><code>execve</code><strong>：加载并执行第一个参数指定的程序，</strong>替换当前进程映像</strong>。三个参数：文件名（字符串指针）、参数向量（以 null 结尾的字符串数组）、环境变量（<code>name=value</code> 形式数组）。注意程序入口是 <code>int main(int argc, char *argv[], char *envp[])</code>——<code>argc</code> 是参数个数（含程序名本身），<code>argv</code> 是参数字符串数组，<code>envp</code> 是环境变量数组。</p>
-<p><strong>shell 常用 <code>fork + execve</code> 组合</strong>，典型伪代码：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> (TRUE) {</span><br><span class="line">    type_prompt();                         <span class="comment">// 显示提示符</span></span><br><span class="line">    <span class="keyword">if</span> (read_command(command, parameters) == <span class="number">-1</span>) <span class="keyword">break</span>;</span><br><span class="line">    <span class="type">pid_t</span> pid = fork();</span><br><span class="line">    <span class="keyword">if</span> (pid &lt; <span class="number">0</span>)            { perror(<span class="string">"fork failed"</span>); <span class="built_in">exit</span>(<span class="number">1</span>); }</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (pid &gt; <span class="number">0</span>)       waitpid(pid, &amp;status, <span class="number">0</span>);   <span class="comment">// 父进程等待</span></span><br><span class="line">    <span class="keyword">else</span> {</span><br><span class="line">        execve(command, parameters, <span class="literal">NULL</span>); <span class="comment">// 子进程执行命令</span></span><br><span class="line">        perror(<span class="string">"execve failed"</span>); <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-<p>比如敲了 <code>cp file1 file2</code>，shell 先 <code>fork</code> 建子进程，子进程再 <code>execve</code> 执行 <code>cp</code>，传 <code>file1</code>、<code>file2</code> 作为参数。</p>
-</li>
-<li><p>**<code>exit</code>**：终止当前进程，返回 0–255 的状态码给父进程（通过 <code>waitpid</code> 的 <code>statloc</code> 返回）。</p>
-</li>
-<li><p><strong>UNIX 进程的内存划分</strong>：<code>text segment</code>（文本区，程序代码）、<code>data segment</code>（数据区，变量）、<code>stack segment</code>（栈区）。数据向上增长、堆栈向下增长，夹在中间的是空闲区。数据段扩展通过 <code>brk</code> 系统调用显式进行（但 <code>brk</code> 不是 POSIX 标准，标准鼓励用 <code>malloc</code>，<code>malloc</code> 内部实现不适合标准化）。</p>
-</li>
-</ul>
-<p><strong>文件和目录系统调用小结</strong>：<code>open</code> 需指定绝对/相对路径名和访问模式（<code>O_RDONLY</code>/<code>O_WRONLY</code>/<code>O_RDWR</code>，新建加 <code>O_CREATE</code>），成功返回文件描述符。<code>read/write</code> 最常用。<code>lseek</code> 改变文件读写位置指针，参数为文件描述符、偏移量、起始标志（<code>SEEK_SET</code> 文件开头 / <code>SEEK_CUR</code> 当前位置 / <code>SEEK_END</code> 文件末尾），成功返回新位置的绝对偏移。<code>stat</code> 查询文件元数据（类型、大小、修改时间），<code>fstat</code> 对已打开文件用。</p>
-<p>目录相关：<code>mkdir</code>/<code>rmdir</code> 创建/删空目录。**<code>link(name1, name2)</code>** 让同一文件以两个或多个名称出现（多用在不同目录），它利用已有文件的 <strong>i-number（i-节点编号）</strong> 创建新目录项。UNIX 每个文件有唯一的 i-编号，是 <strong>i-节点表</strong> 的索引（记录谁拥有文件、磁盘块在哪）。目录其实是一组 <code>(i编号, ASCII名)</code> 映射。<code>unlink</code> 删一个目录项；当指向文件的目录项全部移除时，文件才被真正删除。**<code>mount(special, name, flag)</code>** 把两个文件系统合并，如 <code>mount("/dev/sdb0", "/mnt", 0)</code> 把 USB 盘挂到根文件系统；<code>umount</code> 卸载。</p>
-<p><strong>其他系统调用</strong>：<code>chdir("/usr/ast/test")</code> 改变工作目录（省得每次输入长路径）；<code>chmod("file", 0644)</code> 改文件保护位（让文件对所有者之外可读）；<code>kill</code> 发送信号（进程有信号处理程序就跑它，没准备好信号会杀掉进程）；<code>time</code> 返回从 1970-01-01 到现在的秒数，32 位下最大 <code>(2^32)-1</code> 秒约 136 年，所以 2106 年 32 位 UNIX 会”发飙”。</p>
-<h3 id="Win32-API-对比"><a href="#Win32-API-对比" class="headerlink" title="Win32 API 对比"></a>Win32 API 对比</h3><p>UNIX 里 <code>read</code> 系统调用和 <code>read</code> 库函数几乎一对一；<strong>Windows 则完全不同</strong>：库函数调用和实际系统调用几乎不对应，微软定义了一大套过程叫 <strong>Win32 应用编程接口（API）</strong>，程序员通过这套标准接口实现系统调用，支持从 Win95 以来所有版本。Win32 API 数量极大（几千个），但<strong>不都在内核态运行</strong>，很多在用户态（管理视窗、几何图形、文本、字体、对话框、菜单等 GUI 功能）。</p>
-<table>
-<thead>
-<tr>
-<th>UNIX</th>
-<th>Win32</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>fork</code></td>
-<td><code>CreateProcess</code></td>
-<td>创建新进程</td>
-</tr>
-<tr>
-<td><code>waitpid</code></td>
-<td><code>WaitForSingleObject</code></td>
-<td>等待进程退出</td>
-</tr>
-<tr>
-<td><code>execve</code></td>
-<td>无</td>
-<td><code>CreateProcess</code> = fork + execve</td>
-</tr>
-<tr>
-<td><code>exit</code></td>
-<td><code>ExitProcess</code></td>
-<td>终止执行</td>
-</tr>
-<tr>
-<td><code>open</code></td>
-<td><code>CreateFile</code></td>
-<td>创建/打开文件</td>
-</tr>
-<tr>
-<td><code>close</code></td>
-<td><code>CloseHandle</code></td>
-<td>关闭文件</td>
-</tr>
-<tr>
-<td><code>read</code></td>
-<td><code>ReadFile</code></td>
-<td>从文件读数据</td>
-</tr>
-<tr>
-<td><code>write</code></td>
-<td><code>WriteFile</code></td>
-<td>向文件写数据</td>
-</tr>
-<tr>
-<td><code>lseek</code></td>
-<td><code>SetFilePointer</code></td>
-<td>移动文件指针</td>
-</tr>
-<tr>
-<td><code>stat</code></td>
-<td><code>GetFileAttributesEx</code></td>
-<td>获取文件属性</td>
-</tr>
-<tr>
-<td><code>mkdir</code></td>
-<td><code>CreateDirectory</code></td>
-<td>创建目录</td>
-</tr>
-<tr>
-<td><code>rmdir</code></td>
-<td><code>RemoveDirectory</code></td>
-<td>删除空目录</td>
-</tr>
-<tr>
-<td><code>link</code> / <code>mount</code> / <code>umount</code> / <code>chmod</code> / <code>kill</code></td>
-<td>无</td>
-<td>Win32 不支持</td>
-</tr>
-<tr>
-<td><code>unlink</code></td>
-<td><code>DeleteFile</code></td>
-<td>删除文件</td>
-</tr>
-<tr>
-<td><code>chdir</code></td>
-<td><code>SetCurrentDirectory</code></td>
-<td>切换工作目录</td>
-</tr>
-<tr>
-<td><code>time</code></td>
-<td><code>GetLocalTime</code></td>
-<td>获取当前时间</td>
-</tr>
-</tbody></table>
-<p><strong>关键差异</strong>：Windows 无 <code>fork</code>/<code>execve</code>，<code>CreateProcess</code> 把两者合成一个。<strong>Windows 没有父子进程层次</strong>——进程创建后，创建者和被创建者是平等的（UNIX 有清晰父子关系与进程树）。<code>CreateProcess</code> 有大量参数指定新进程性质。Win32 没有文件 link、mount、umount、chmod、kill；但也有大量 UNIX 没有的调用，尤其是 GUI 管理。</p>
-<hr>
-<h2 id="六、操作系统结构"><a href="#六、操作系统结构" class="headerlink" title="六、操作系统结构"></a>六、操作系统结构</h2><h3 id="6-1-单体内核（Monolithic-Kernel）"><a href="#6-1-单体内核（Monolithic-Kernel）" class="headerlink" title="6.1 单体内核（Monolithic Kernel）"></a>6.1 单体内核（Monolithic Kernel）</h3><p>传统很多系统用单体内核：<strong>整个操作系统作为一个大型、单一二进制程序在内核态运行</strong>，把进程管理、内存管理、文件系统、设备驱动等组件紧密集成为一个可执行文件。</p>
-<ul>
-<li><strong>优点</strong>：所有组件在同一地址空间，组件间交互高效，减少上下文切换开销。</li>
-<li><strong>缺点</strong>：系统庞大复杂，维护调试难；**”一荣俱荣，一损俱损”**——内核任何部分出问题，整个系统都可能崩溃。</li>
-</ul>
-<p>开发遵循：主程序（初始化并调度）+ 服务过程（处理系统调用）+ 辅助服务程序（数据处理、资源管理，形成层次化服务）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌────────────────────────────────────────────────────┐</span><br><span class="line">│                  主程序（init）                      │  ← 初始化内核并调度</span><br><span class="line">├────────────────────────────────────────────────────┤</span><br><span class="line">│   服务程序 A（进程管理）   服务程序 B（内存管理）       │</span><br><span class="line">│   服务程序 C（文件系统）   服务程序 D（设备驱动）       │  ← 处理系统调用</span><br><span class="line">├────────────────────────────────────────────────────┤</span><br><span class="line">│   辅助服务程序：数据处理、资源管理等（若干小模块）        │  ← 实用程序</span><br><span class="line">└────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<p>注意这张图：<strong>逻辑上分了三层，物理上还是一个大型二进制程序、全部运行在内核态</strong>——分层只是”为了管理复杂性而划分”（理解、维护方便），并没有真正把哪层独立出来。</p>
-<p>为了增强模块性和可扩展性，现代系统引入<strong>共享库</strong>（UNIX）和<strong>动态链接库 DLL</strong>（Windows）动态加载扩展功能。</p>
-<h3 id="6-2-分层系统（Layered-System）"><a href="#6-2-分层系统（Layered-System）" class="headerlink" title="6.2 分层系统（Layered System）"></a>6.2 分层系统（Layered System）</h3><p>分层系统通过<strong>层级</strong>隔离功能模块：每一层只和相邻层通信，用下层提供的服务实现自身功能，层间通信走预定义接口。</p>
-<p>著名实例是 Dijkstra 团队开发的 <strong>THE 系统</strong>，六层结构：</p>
-<table>
-<thead>
-<tr>
-<th>层号</th>
-<th>功能</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>5</td>
-<td>操作员</td>
-</tr>
-<tr>
-<td>4</td>
-<td>用户程序</td>
-</tr>
-<tr>
-<td>3</td>
-<td>输入/输出管理</td>
-</tr>
-<tr>
-<td>2</td>
-<td>操作员-进程通信</td>
-</tr>
-<tr>
-<td>1</td>
-<td>存储器和磁鼓管理</td>
-</tr>
-<tr>
-<td>0</td>
-<td>处理器分配和多道程序编程</td>
-</tr>
-</tbody></table>
-<ul>
-<li>第 0 层：处理器分配，中断/定时器超时时做进程切换；之上是相互协作的进程。</li>
-<li>第 1 层：内存管理，为主存进程分配空间、控制页面调入调出。</li>
-<li>第 2 层：进程与操作员控制台通信。</li>
-<li>第 3 层：管理 I/O 设备及缓冲区。</li>
-<li>第 4 层：用户程序所在层，无需关心进程/内存/控制台/I/O 细节。</li>
-<li>第 5 层：系统操作员与系统的交互界面。</li>
-</ul>
-<p>分层提高了模块化、可维护性和扩展性。</p>
-<h3 id="6-3-微内核（Microkernel）"><a href="#6-3-微内核（Microkernel）" class="headerlink" title="6.3 微内核（Microkernel）"></a>6.3 微内核（Microkernel）</h3><p>分层设计需要明确划分<strong>内核-用户边界</strong>。传统把所有层放内核，但实际上<strong>内核里的错误难以处理、一出错整个系统就崩</strong>。所以反过来想：<strong>尽量减少内核功能</strong>，让内核最小化。</p>
-<p>微内核把 OS 分成小型、功能明确的模块，<strong>只有一个微内核运行在特权模式（内核态）</strong>，其他模块（设备驱动、文件系统）作为<strong>普通用户进程</strong>运行——即使这些模块崩溃，也不会影响整个系统。<strong>MINIX 3</strong> 是微内核代表作，它的具体结构如下（对比上面的单体内核：这里只有最下面一条灰条在内核态）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">用户态 │ ┌──────────────────────────────────────────┐</span><br><span class="line">       │ │  用户程序：  shell       Make      Other  │  ← 用户进程</span><br><span class="line">       │ ├──────────────────────────────────────────┤</span><br><span class="line">       │ │  服务器：    FS        Proc     Reinc     │  ← 文件/进程/重生</span><br><span class="line">       │ │              Other                        │</span><br><span class="line">       │ ├──────────────────────────────────────────┤</span><br><span class="line">       │ │  设备驱动：  Disk  TTY  New  Print  Other │  ← 无权直接碰 I/O</span><br><span class="line">       │ │        （构造结构 + 系统调用，辗转进内核）   │</span><br><span class="line">       │ ═════════════════════════════════════════════</span><br><span class="line">内核态 │ │  微内核：中断处理 · 进程调度 · 进程通信      │  ← 唯一特权模块</span><br><span class="line">       │ │          （旁挂 Clock、Sys 等小服务）       │</span><br><span class="line">       │ └──────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<p>有意思的是：<strong>文件系统、进程管理器这些”操作系统核心业务”，在微内核里是作为用户进程跑的</strong>——它们和你的 shell 平级，谁也压不过谁；一旦某个服务器崩溃，只有它自己消失，系统照样运行。</p>
-<ul>
-<li>最底层：设备驱动程序（运行在用户态，无法直接访问 I/O 端口，需构造结构 + 系统调用间接交互）；</li>
-<li>之上一层：<strong>服务器</strong>，包括文件服务器（文件系统）、进程管理器（创建/销毁/管理进程），还有一个特殊的<strong>重生服务器</strong>——检测并修复服务器和驱动程序的故障，无需用户干预自动恢复。</li>
-<li>微内核体现<strong>机制与策略分离</strong>：内核只实现”选择最高优先级进程运行”这个<strong>机制</strong>，而”如何分配优先级”这个<strong>策略</strong>由用户态进程管理器决定。内核精简、易维护、易扩展。</li>
-</ul>
-<h3 id="6-4-客户-服务器模式（Client-Server）"><a href="#6-4-客户-服务器模式（Client-Server）" class="headerlink" title="6.4 客户-服务器模式（Client-Server）"></a>6.4 客户-服务器模式（Client-Server）</h3><p>微内核思想把进程分成两类：<strong>服务器</strong>（提供服务）和<strong>客户端</strong>（使用服务），这就是客户-服务器模式。它有两种载体：一是在一台计算机上既当客户端又当服务器（OS 会优化）；普遍情况是客户端和服务器在<strong>不同机器</strong>上，通过局域网/广域网连接。</p>
-<p><strong>客户端不知道消息在本地还是远程处理</strong>——两种情形对客户端一样：发请求、收回应。现代 Web 就是典型：PC 向某服务器请求网页，服务器返回。越来越多系统（包括家用 PC）成为客户端，某地运行的大型机器成为服务器。</p>
-<hr>
-<h2 id="七、计算机是如何启动的"><a href="#七、计算机是如何启动的" class="headerlink" title="七、计算机是如何启动的"></a>七、计算机是如何启动的</h2><p>主板（母板）上有 <strong>BIOS（基本输入输出系统）</strong>，内含底层 I/O 软件（读键盘、写屏幕、磁盘 I/O 等），如今存在闪存里（非易失但可更新）。</p>
-<p>启动流程：</p>
-<ol>
-<li><strong>BIOS 自检</strong>：检查装了多大 RAM、键盘等基础设备是否正常响应。</li>
-<li><strong>扫描总线</strong>：扫描 PCIe/PCI 总线，找出所有设备，记录即插即用设备；若设备和上次不同则重新配置。</li>
-<li><strong>从 CMOS 清单找启动设备</strong>：CMOS 是主板上可读写的 RAM 芯片，用来保存 BIOS 设置后硬件参数（有时把 BIOS 设置叫 CMOS 设置）。用户可进 BIOS 配置程序修改设备清单，也可判定能否从 CD-ROM/USB 启动。</li>
-<li><strong>从硬盘启动</strong>：启动失败则从硬盘启动，把启动设备<strong>第一个扇区</strong>读入内存执行。它通常检查分区表确定哪个分区是活动的，再从该分区读入<strong>引导加载程序</strong>，这个加载器从活动分区读取操作系统并启动它。</li>
-<li><strong>OS 加载设备驱动</strong>：OS 询问 BIOS 获取配置信息，逐个设备检查是否有驱动；没有则问用户装（CD-ROM 或下载）。有驱动就加载进内核，初始化表、创建后台进程、启动登录程序或 GUI。</li>
-</ol>
-<hr>
-<h2 id="八、操作系统博物馆"><a href="#八、操作系统博物馆" class="headerlink" title="八、操作系统博物馆"></a>八、操作系统博物馆</h2><p>操作系统存在大半个世纪，种类繁多。按应用场景分：</p>
-<ul>
-<li><strong>大型机操作系统</strong>：高端，在大型公司数据中心。I/O 容量与 PC 天差地别，一个大型机有 1000 个磁盘、数百万 G 容量很正常。也用于高端 Web 服务器、大型电商站点。</li>
-<li><strong>服务器操作系统</strong>：运行在服务器上（大型 PC、工作站或大型机），通过网络为多个用户服务、共享软硬件资源，可提供打印/文件/Web 服务。典型：Solaris、FreeBSD、Linux、Windows Server。</li>
-<li><strong>多处理器操作系统</strong>：把多个 CPU 连成一个系统（并行计算机/多计算机/多处理器），需要专门 OS（配通信、连接、一致性功能）。个人电脑多核芯片出现后，Windows/Linux 也能跑多核。</li>
-<li><strong>个人计算机操作系统</strong>：支持多道处理，启动时常有几十个程序在跑，为单个用户提供良好支持（字处理、表格、游戏、上网）。如 Linux、FreeBSD、Windows 7/8、macOS。</li>
-<li><strong>掌上计算机操作系统</strong>：平板、智能手机、PDA，市场被 Android 和 iOS 主导。</li>
-<li><strong>嵌入式操作系统</strong>：控制设备（微波炉、汽车、DVD 刻录机、手机、MP3）里的计算机，不允许用户装软件。所有软件跑在 ROM，应用间无保护，较简化。典型：Linux、QNX、VxWorks。</li>
-<li><strong>传感器节点操作系统</strong>：微小传感器节点网络（可互相通信、用无线基站），用于建筑周边保护、国境界保卫、森林火灾探测、气象预测。每个节点是带 CPU、RAM、ROM 和传感器的真计算机，跑小型事件驱动 OS。</li>
-<li><strong>实时操作系统</strong>：把时间当关键参数。<strong>硬实时</strong>应在规定时刻发生（工业控制、民航、军事）；<strong>软实时</strong>偶尔违反时限还能接受、无永久损害（数字音频/多媒体、智能手机）。</li>
-<li><strong>智能卡操作系统</strong>：最小的 OS，跑在智能卡上（带 CPU 芯片的信用卡），能耗和存储极受限。有的是单功能电子支付，有的是面向 Java（ROM 里有 JVM 解释器）。</li>
-</ul>
-]]></content>
-      <categories>
-        <category>操作系统</category>
-      </categories>
-      <tags>
-        <tag>操作系统</tag>
-        <tag>四大件</tag>
-        <tag>系统调用</tag>
-        <tag>进程</tag>
-        <tag>线程</tag>
-        <tag>虚拟内存</tag>
-        <tag>文件</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>数据结构 —— 链表</title>
     <url>/2026/08/19/LinkList_DataStructure/</url>
     <content><![CDATA[<h2 id="什么是链表"><a href="#什么是链表" class="headerlink" title="什么是链表"></a>什么是链表</h2><p><strong>链表</strong>是线性表的另一种存储方式。与顺序表（数组）不同，链表的每个元素都是<strong>独立申请的一块内存</strong>（称为<strong>节点</strong>），通过指针把它们”串”起来。</p>
@@ -17626,6 +16918,714 @@
       </tags>
   </entry>
   <entry>
+    <title>操作系统总览</title>
+    <url>/2026/09/03/OS_Overview/</url>
+    <content><![CDATA[<h2 id="为什么需要操作系统"><a href="#为什么需要操作系统" class="headerlink" title="为什么需要操作系统"></a>为什么需要操作系统</h2><p>一台计算机由硬件和软件组成，硬件包括处理器、内存、磁盘、键盘、鼠标、显示器、网卡等。可问题是：程序员不可能亲手去操作这些硬件，也不可能掌握所有硬件的细节。于是硬件之上盖了一层软件——操作系统，它替用户程序扛下所有脏活累活。</p>
+<p>操作系统扮演两种角色：</p>
+<ul>
+<li><strong>扩展机器（Extended Machine）</strong>：把丑陋的硬件抽象成一种”更清晰、更好用的计算机模型”，比如用”文件”来代表磁盘、用”进程”来代表 CPU 的占用。</li>
+<li><strong>资源管理器（Resource Manager）</strong>：管理 CPU、内存、I/O 这些稀缺资源，决定谁先用、用多少，并防止坏程序把系统搞垮。</li>
+</ul>
+<blockquote>
+<p>平时看到的操作系统还有一层”皮”：带图形界面的叫 <strong>GUI</strong>（Windows、macOS），基于文本命令行的叫 <strong>Shell</strong>。它们本质都是用户接口程序，往下才是真正干活的内核。</p>
+</blockquote>
+<hr>
+<h2 id="一、程序的一生：从源码到运行"><a href="#一、程序的一生：从源码到运行" class="headerlink" title="一、程序的一生：从源码到运行"></a>一、程序的一生：从源码到运行</h2><h3 id="1-1-信息是什么：context-byte"><a href="#1-1-信息是什么：context-byte" class="headerlink" title="1.1 信息是什么：context + byte"></a>1.1 信息是什么：context + byte</h3><p>从大家最熟的 <code>hello world</code> 入手，看一个程序的完整生命周期。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">{</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"hello world\n"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>在计算机里<strong>所有信息都是二进制</strong>——一句源码、一张图片、一段视频，底层都是 0 和 1 组成的位序列。8 个位合成一个<strong>字节</strong>，每个字节代表某个字符。</p>
+<p>问题来了：同样是一串字节，它到底是整数、字符、浮点数，还是机器指令？<strong>唯一的判别依据就是”环境”（context / 语境）</strong>。</p>
+<p>举个语文题的例子：一句”林冲大叫一声’啊也！’”，单独摘出来，你不懂它是什么情感；放到上下文里，才知道是惊吓还是愤怒。程序也一样——一个函数、一个变量、一个地址，必须放进它所在的环境（编译时或运行时的上下文）才能理解它的含义。</p>
+<p>子程序之于程序、进程之于操作系统、App 的一屏之于 App，都是一个道理：执行到某个子程序时，它要用到之前的一些结果（外部变量、对象等）；App 点进新界面，也要保存”你是从哪个屏幕跳来的”，返回时才能跳回去。这就是 context——**可以通俗理解成”环境”**。</p>
+<h3 id="1-2-编译系统四步"><a href="#1-2-编译系统四步" class="headerlink" title="1.2 编译系统四步"></a>1.2 编译系统四步</h3><p>操作系统其实<strong>看不懂你写的高级语言</strong>（C、Java、C++）。要让程序跑起来，每一条语句（以分号结束）都必须先被翻译成操作系统能识别、能执行的<strong>机器语言指令</strong>，再打包成<strong>可执行目标文件</strong>（二进制磁盘文件）。这个过程由编译器完成。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">gcc -o hello hello.c    <span class="comment"># -o 指定输出文件名；不加 -o 默认生成 a.out</span></span><br></pre></td></tr></table></figure>
+
+<p>这里用 <code>gcc</code> 演示，整个流程分四步：</p>
+<pre class="mermaid">flowchart LR
+    A["📄 源文件<br>hello.c"] --&gt;|"预处理 gcc -E"| B["📄 预处理后<br>hello.i"]
+    B --&gt;|"编译 gcc -S"| C["📄 汇编<br>hello.s"]
+    C --&gt;|"汇编 gcc -c"| D["📦 目标文件<br>hello.o"]
+    D --&gt;|"链接 ld"| E["🚀 可执行文件<br>hello"]</pre>
+
+<ol>
+<li><strong>预处理（<code>gcc -E</code>）</strong>：把以 <code>#</code> 开头的命令（如 <code>#include</code>）展开，把引用的头文件内容全部插入源文件对应位置，得到完整的 <code>hello.i</code>。</li>
+<li><strong>编译（<code>gcc -S</code>）</strong>：编译器把 <code>hello.i</code> 翻译成汇编程序 <code>hello.s</code>。这一步让”语言”和”机器”解耦——不同语言用不同编译器，最后都汇成同一套通用汇编语言。</li>
+<li><strong>汇编（<code>gcc -c</code>）</strong>：汇编器把 <code>.s</code> 翻译成机器语言指令，打包成<strong>可重定位目标文件</strong> <code>.o</code>。这是二进制文件，人直接打开只能看到乱码。</li>
+<li><strong>链接（<code>gcc hello.o -o hello</code>）</strong>：把多个目标文件合并。比如 <code>printf</code> 其实是预编译好的 <code>printf.o</code>（在标准库里），链接器把它和你的 <code>hello.o</code> 拼成一个可执行文件。</li>
+</ol>
+<blockquote>
+<p>详细展开（预处理、链接、静态库/动态库、为什么会出现 <code>undefined reference</code>）我在《从源代码到可执行文件——初步理解编译、链接与软件构造体系》那篇写过。这里只讲它在操作系统里的位置。</p>
+</blockquote>
+<p><strong>为什么还要懂编译系统？</strong> 三个原因：</p>
+<ul>
+<li><strong>优化性能</strong>：<code>switch</code> 一定比 <code>if-else</code> 快吗？<code>while</code> 和 <code>for</code> 谁更高效？指针和数组索引谁更快？这些选择的”代价”藏在编译器的实现里。</li>
+<li><strong>理解链接错误</strong>：最让人头疼的往往不是逻辑 bug，而是链接错误——比如”无法解析一个引用”。为什么会在运行时报错、有些编译时就报？这跟编译、链接机制有关。</li>
+<li><strong>安全问题</strong>：栈溢出、缓冲区溢出是大多数网络服务器漏洞的主因。理解数据和控制信息怎么在堆栈里存放，才能明白漏洞从哪来。</li>
+</ul>
+<h3 id="1-3-运行：shell-与可执行文件"><a href="#1-3-运行：shell-与可执行文件" class="headerlink" title="1.3 运行：shell 与可执行文件"></a>1.3 运行：shell 与可执行文件</h3><p>编译好的可执行文件躺在磁盘上，怎么让操作系统跑它？把文件名敲进 <strong>shell</strong>。</p>
+<p>先解释一下shell是什么：</p>
+<ul>
+<li><strong>它是用户和操作系统之间的接口（桥梁）</strong>：Linux/Unix 的关键组件，敲的命令第一步落在它身上，由它解析并调用相应的操作系统服务去执行；</li>
+<li><strong>本质是一个用 C 语言编写的应用程序</strong>，运行在<strong>用户态</strong>——和 GUI 一样，是内核外面裹着的一层”皮”，往下才是真正干活的内核；</li>
+<li><strong>既是一种命令语言，又是一种程序设计语言</strong>：逐条敲命令，它解释执行；把一串命令写成文本文件就是脚本，可以自动化。</li>
+</ul>
+<pre class="mermaid">flowchart LR
+    U["👤 用户"] --&gt;|"输入命令行"| S["🐚 shell 应用程序（用户态）"]
+    S --&gt;|"内置命令（cd / pwd 等）"| E["🔧 直接执行"]
+    S --&gt;|"外部命令（./hello）"| K["🧠 调用内核服务"]
+    K --&gt;|"指挥"| H["⚙️ 硬件真正干活"]</pre>
+
+<p><strong>shell 从哪来？</strong> 以UNIX系统为例，用户登录 UNIX 系统时，系统会启动一个 shell 进程，并把<strong>用户的终端</strong>设置为它的标准输入/输出设备——所以 shell 一启动就显示提示符（<code>$</code> 或 <code>#</code>），等着敲命令。UNIX 里的 shell 还有多种实现：<code>sh</code>（Bourne Shell，先驱）、<code>csh</code>、<code>ksh</code>、<code>bash</code> 等，现在最常见的是 bash；不同 shell 语法略有差异，但角色都一样——那道”接口”。</p>
+<p><strong>shell 不是 UNIX 独有的</strong>——“用户和操作系统之间的接口”这个角色，任何系统都得找人扮演：</p>
+<table>
+<thead>
+<tr>
+<th>系统</th>
+<th>代表 shell</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td><code>cmd.exe</code>（命令提示符，承自 DOS 的 COMMAND.COM）＋ <strong>PowerShell</strong>（现代主推，还能跨平台跑在 Linux/macOS 上）</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>zsh</code>（早期版本曾默认 <code>bash</code>，2019 年后改为 <code>zsh</code>）</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td><code>bash</code>（主流），常见的还有 <code>zsh</code>、<code>fish</code> 等</td>
+</tr>
+</tbody></table>
+<p>它们的命令语法各不相同（ Windows 里拷文件是 <code>copy</code>，Linux 里是 <code>cp</code>），但做的事完全相同：解析用户的输入，帮用户运行程序。</p>
+<p>注意一个容易混淆的点：<strong>shell 不一定是命令行</strong>。Windows 语境里说 “Windows shell”，通常指的是 <strong>explorer.exe</strong>（资源管理器）；macOS 的 Finder、Linux 的 GNOME/KDE 桌面环境同理。所以 shell 分两种：</p>
+<ul>
+<li><strong>文本型 shell（CLI）</strong>：cmd、PowerShell、bash……可以打字的那种；</li>
+<li><strong>图形型 shell（GUI）</strong>：Explorer、Finder、桌面环境——同样包在内核外面，只是长成一幅图。</li>
+</ul>
+<p>无论是哪种，它们都是 1.3 开头说的那层”皮”：站在内核和用户之间，把命令交给内核。</p>
+<p>shell 的工作流程：显示提示符（<code>$</code> 或 <code>#</code>），等用户输入命令行，然后分两类处理：</p>
+<ul>
+<li><strong>内置命令</strong>：shell 自带的命令（如 <code>cd</code>、<code>pwd</code>），直接执行；</li>
+<li><strong>外部命令</strong>：shell 把它<strong>当成一个可执行文件的名字</strong>去查找并运行——这就是为什么我们写 <code>./hello</code>（<code>./</code> 表示当前目录；直接敲 <code>hello</code> 的话，得靠 PATH 环境变量里配置的路径才能找到它）。</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ ./hello</span><br><span class="line">hello world</span><br></pre></td></tr></table></figure>
+
+<p>shell 的四大作用：</p>
+<ul>
+<li><strong>命令解释器</strong>：解析输入的命令，内置命令直接执行，否则查找并运行对应的可执行文件；</li>
+<li><strong>脚本语言</strong>：把一串 shell 命令写成文本文件，实现自动化；</li>
+<li><strong>环境配置</strong>：管理环境变量（默认编辑器、路径等）；</li>
+<li><strong>批处理</strong>：按顺序执行一系列命令。</li>
+</ul>
+<blockquote>
+<p>shell 执行外部命令时自己并不跑程序，而是靠 <code>fork + execve</code> 创建子进程去执行</p>
+</blockquote>
+<p>真正运行那段是硬件在工作，所以<strong>操作系统和硬件不能分开看</strong>。要搞懂程序运行时发生了什么，必须先了解硬件组织。</p>
+<hr>
+<h2 id="二、操作系统所处的位置"><a href="#二、操作系统所处的位置" class="headerlink" title="二、操作系统所处的位置"></a>二、操作系统所处的位置</h2><p>先看一张操作系统的分层示意图：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│  用户态  │  用户接口程序（shell / GUI）      │</span><br><span class="line">│         │  应用程序（浏览器、播放器、邮件…）  │</span><br><span class="line">├─────────┼─────────────────────────────────┤</span><br><span class="line">│  内核态  │  操作系统内核                      │</span><br><span class="line">│         │  （内存分配、进程调度、设备驱动…）    │</span><br><span class="line">├─────────┼─────────────────────────────────┤</span><br><span class="line">│  硬件    │  处理器 / 内存 / 磁盘 / 网卡 / I/O │</span><br><span class="line">└─────────┴─────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>最底下是<strong>硬件</strong>，所有计算和存储都在这里发生。</li>
+<li>硬件之上是软件。计算机有两种运行模式：<strong>内核态</strong>（又称管态、核心态）和<strong>用户态</strong>。操作系统内核运行在<strong>内核态</strong>，能直接管硬件。</li>
+<li><strong>用户接口程序（shell 或 GUI）处于用户态</strong>，且位于用户态最低层，允许用户运行其他程序（浏览器、播放器）。</li>
+<li><strong>越靠近用户态的应用程序越容易编写</strong>：你不喜欢某个邮件阅读器，可以自己重写一个；但你不能自己写一个操作系统或中断处理程序——这部分由硬件保护，防外部修改。</li>
+</ul>
+<blockquote>
+<p>操作系统位于硬件与用户之间，起管理和协调作用。用户态应用<strong>无法直接访问硬件</strong>，必须通过内核提供的服务间接访问。这样既提高了安全性（坏程序/恶意软件碰不到硬件），也让应用程序更容易编写维护（不用管底层硬件细节）。</p>
+</blockquote>
+<hr>
+<h2 id="三、硬件速览：OS-眼中的机器"><a href="#三、硬件速览：OS-眼中的机器" class="headerlink" title="三、硬件速览：OS 眼中的机器"></a>三、硬件速览：OS 眼中的机器</h2><p>操作系统和运行它的硬件关系极密切——它要扩展指令集、管理资源，就必须足够了解硬件。这里把一台个人电脑抽象成一个模型：<strong>CPU、内存、I/O 设备都挂在总线上，通过总线通信。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CPU           内存           I/O设备</span><br><span class="line"> │              │              │</span><br><span class="line"> └──────────────┼──────────────┘</span><br><span class="line">             中央总线</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-1-CPU"><a href="#3-1-CPU" class="headerlink" title="3.1 CPU"></a>3.1 CPU</h3><p>CPU 的作用就是处理和执行指令。它是”大脑”，但大脑下命令也要知道命令在哪——它通过<strong>程序计数器（PC）</strong>这个寄存器，始终指向主存中下一条要执行的指令地址。</p>
+<p>处理器执行一条指令的流程：从 <strong>PC</strong> 取出指令地址 → 取指令 → 用<strong>算术/逻辑单元（ALU）</strong>算出更新后的地址和值 → 更新 PC → 继续下一条。如此循环。</p>
+<p>CPU 还遵循一套<strong>指令集架构（ISA）</strong>。现代处理器又把 ISA 和<strong>微体系结构</strong>分开：</p>
+<ul>
+<li><strong>ISA</strong> 描述每条机器代码的效果（行为规范）；</li>
+<li><strong>微体系结构</strong> 描述处理器具体怎么实现。同一 ISA 可以有多种微体系结构，比如 Intel 和 AMD 都生产 x86 处理器，但内部实现差别很大。这样软件开发只管 ISA，硬件设计师可以自由优化实现。</li>
+</ul>
+<p>所以，<strong>不同架构的 CPU 之间不能直接执行彼此的程序</strong>：x86 能跑的，ARM 装不上，因为指令集和寄存器布局都不同。</p>
+<p>CPU 内有一些<strong>通用寄存器</strong>存放关键变量和临时结果（因为从内存取数比执行指令慢得多，寄存器提供了高速暂存）。指令通常有三类：</p>
+<ul>
+<li><strong>加载指令</strong>：内存 → 寄存器；</li>
+<li><strong>存储指令</strong>：寄存器 → 内存；</li>
+<li><strong>运算指令</strong>：对操作数做运算（如 <code>add</code> 把两个操作数相加）。</li>
+</ul>
+<p>特殊的、对程序员可见的寄存器：</p>
+<ul>
+<li><strong>程序计数器（PC）</strong>：下一条要取的指令地址，取完自动更新，保证顺序执行。</li>
+<li><strong>堆栈指针（SP）</strong>：指向当前栈顶，管理函数调用时的参数、局部变量、返回地址。</li>
+<li><strong>程序状态字（PSW）</strong>：记录当前系统状态（如零标志 ZF、进位标志 CF、溢出标志 OF）。用户程序能读整个 PSW，但通常只能改其中某些字段。</li>
+</ul>
+<p><strong>函数调用怎么用堆栈？</strong></p>
+<p>假设：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">add</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> {</span><br><span class="line">    <span class="keyword">return</span> a + b;</span><br><span class="line">}</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> {</span><br><span class="line">    <span class="type">int</span> result = add(<span class="number">5</span>, <span class="number">7</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"The sum is: %d\n"</span>, result);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>调用过程：<code>main</code> 先把参数 5、7 压栈并保存返回地址 → 调 <code>add</code>；<code>add</code> 进入后保存当前栈指针（<code>push ebp / mov ebp, esp</code>），从栈弹出参数执行加法和；返回时通过 <code>ret</code> 回到 <code>main</code>，栈指针恢复到调用前的状态。</p>
+<blockquote>
+<p>操作系统必须”认识”所有这些寄存器。时间多路复用（多个程序在单个 CPU 上交替执行，让每个程序都像独占 CPU）时，OS 每次暂停一个程序，都要<strong>保存全部寄存器的值</strong>，之后才能正确恢复。</p>
+</blockquote>
+<h4 id="流水线与超标量"><a href="#流水线与超标量" class="headerlink" title="流水线与超标量"></a>流水线与超标量</h4><p>早期 CPU 一次只取一条指令、解码一条、执行一条。现代 CPU 能同时处理多条：执行第 N 条时，同时解码第 N+1 条、读取第 N+2 条——这叫<strong>流水线（pipeline）</strong>。</p>
+<p>更进一步的<strong>超标量（superscalar）</strong>有多个执行单元（整数、浮点、布尔各一个），多条指令可同时取、解码、放入缓冲区，只要哪个执行单元空闲就取走执行。这种设计下，指令经常是<strong>乱序执行</strong>的，但硬件会保证结果和顺序执行时一致。</p>
+<h4 id="内核态与用户态"><a href="#内核态与用户态" class="headerlink" title="内核态与用户态"></a>内核态与用户态</h4><p>除了嵌入式里特别简单的 CPU，<strong>大多数 CPU 有两种操作模式：内核态和用户态</strong>，通常靠 PSW 里一个二进制位来控制。</p>
+<ul>
+<li><strong>内核态</strong>：可执行指令集里任何指令，能访问硬件全部功能。</li>
+<li><strong>用户态</strong>：只能执行部分指令、访问部分硬件，无法执行 I/O 和内存保护相关指令，也无法改 PSW 的模式位进入内核态。</li>
+</ul>
+<p><strong>为什么嵌入式系统也要把一部分代码放内核态、一部分放用户态？</strong> 综合考量：</p>
+<ul>
+<li><strong>安全性</strong>：用户态应用受限，防止坏程序破坏系统、篡改数据；内核态代码才能碰硬件，隔离了系统资源。</li>
+<li><strong>资源管理</strong>：内核态负责分配资源（内存、文件、网络），用户态通过<strong>系统调用</strong>请求服务；用户态权限受限，防滥用。</li>
+<li><strong>灵活性</strong>：用户态程序可单独更新替换，不用重编整个系统；也更容易调试维护。</li>
+<li><strong>性能</strong>：实时控制等性能敏感任务放内核态保证低延迟，非实时任务放用户态减轻内核负担。</li>
+<li><strong>兼容性</strong>：借鉴桌面/服务器设计，保持一致性；用户态可用现成工具链和开源库，开发更简便。</li>
+</ul>
+<p><strong>用户程序怎么进入内核？</strong> 靠<strong>系统调用（system call）</strong>，它把执行模式从用户态切到内核态。执行 <strong>TRAP</strong> 指令触发切换；完成后，系统调用后面的指令把控制权交还给用户程序。系统调用过程中还可能遇到 <strong>trap（陷阱）</strong>——硬件检测到的异常（比如除以零、浮点下溢），由操作系统接管处理。</p>
+<h4 id="多线程、多核、GPU"><a href="#多线程、多核、GPU" class="headerlink" title="多线程、多核、GPU"></a>多线程、多核、GPU</h4><ul>
+<li><strong>多线程（超线程）</strong>：允许 CPU 几乎同时维持两个线程状态，能在纳秒级切换。当一个线程等内存取数（要几个时钟周期）时，切换去跑另一个线程。<strong>注意：多线程不是真并行，任一时刻仍只有一个线程在执行</strong>，只是靠快速切换提高利用率。对 OS 来说，每个线程就像一台独立 CPU——两个物理核各跑两线程，OS 会看成四个 CPU。</li>
+<li><strong>多核</strong>：一块芯片上集成多个完整处理器核，每个核有独立 CPU，能<strong>真正并行</strong>处理多任务。</li>
+<li><strong>GPU</strong>：由成千上万个微核组成的处理器，擅长大量并行的简单计算，核心数量远超普通 CPU。</li>
+</ul>
+<h4 id="并发与并行"><a href="#并发与并行" class="headerlink" title="并发与并行"></a>并发与并行</h4><p>上文一会儿说”多线程不是真并行”，一会儿说”多核真正并行”——这里涉及到一对经常出现的概念：</p>
+<ul>
+<li><strong>并发（concurrency）</strong>：多个任务在<strong>重叠的时间段</strong>里交替或同时进行，重点在”<strong>逻辑上同时</strong>“——任意时刻物理上可能只有一个任务在跑，但多个任务都处于”进行中”的状态，看起来像同时。单核 CPU 也能并发：时间片轮转，多个进程轮流上 CPU。</li>
+<li><strong>并行（parallelism）</strong>：多个任务在<strong>同一精确时刻</strong>真正同时执行，重点在”<strong>物理上同时</strong>“——多个核心各干各的活。只有多核/多处理器才谈得上并行。</li>
+</ul>
+<p>并发让系统<strong>能同时处理更多任务</strong>（提到吞吐量、响应性）——靠调度维持”多个活动同时存在”并有序推进；并行让系统<strong>跑得更快</strong>——利用多核硬件。第四章进程里的”时间片轮转”、第五章系统调用里”OS 暂停当前进程、调度其他就绪进程”，都是并发的日常；本节前面”多线程靠快速切换提高利用率”，说的也是并发。</p>
+<h3 id="3-2-内存层次结构"><a href="#3-2-内存层次结构" class="headerlink" title="3.2 内存层次结构"></a>3.2 内存层次结构</h3><p>内存是计算机第二大组件。理想的存储要快、大、便宜，但技术无法同时满足，于是做成<strong>层次结构</strong>：</p>
+<pre class="mermaid">flowchart TB
+    A["寄存器<br>最快 · 最小 · 最贵"] --&gt; B["高速缓存 L1/L2<br>硬件控制 · 快"]
+    B --&gt; C["主存 RAM<br>断电丢失 · 容量大"]
+    C --&gt; D["磁盘 / SSD<br>最慢 · 容量最大 · 最便宜"]</pre>
+
+<ul>
+<li><strong>寄存器</strong>：顶部，速度与 CPU 相同，程序须在软件里自行管理。</li>
+<li><strong>高速缓存</strong>：寄存器之下，主要由硬件控制。主存被分成<strong>高速缓存行</strong>（通常 64 字节）。CPU 要读数据时，缓存硬件先查对应行在不在——<strong>命中（cache hit）</strong>只需约 2 个时钟周期；不命中就必须去主存取，慢得多。缓存行数量受成本限制，有的机器有两三级缓存（每级更大但略慢）。</li>
+<li><strong>主存（RAM）</strong>：缓存不命中的访问最终都到主存。RAM 可读可写，<strong>断电丢失</strong>。</li>
+<li><strong>磁盘</strong>：比 RAM 每比特成本低两个数量级、容量高两个数量级，但随机访问慢约三个数量级。</li>
+</ul>
+<p><strong>为什么会有缓存？</strong> 硬件速度发展到瓶颈，处理器和内存的速度差距越来越大。与其砸钱提速内存，不如在处理器端引入高速缓存，利用程序的<strong>局部性原理</strong>，让大多数内存操作在缓存里就能完成，减少访问主存次数。</p>
+<p><strong>局部性原理</strong>：CPU 访问存储器（无论是取指令还是存取数据），所访问的存储单元总聚集在一个较小连续区域里。分为两种：</p>
+<ul>
+<li><strong>时间局部性</strong>：某个内存位置被重复引用。</li>
+<li><strong>空间局部性</strong>：某个位置被引用后，它附近的位置很快也被引用。</li>
+</ul>
+<blockquote>
+<p>局部性原理可以用程序验证：遍历一个 <code>[10000][10000]</code> 的二维数组，<code>dataArray[i][j]</code>（按行）和 <code>dataArray[j][i]</code>（按列）的耗时差异，就是空间局部性好坏的直观体现。</p>
+</blockquote>
+<p>缓存不只在 CPU，OS 也在用：比如把常用文件驻留在主存，避免反复读磁盘；把路径名到磁盘地址的转换结果缓存；把 URL 到 IP 的转换结果缓存。</p>
+<p><strong>任何缓存系统都要回答四个问题</strong>：何时把新内容放进来？放哪一行？没空位时移除谁？被移除的内容放到大存储器的哪里？——不同场景答案不同。</p>
+<p>现代 CPU 通常有两级缓存：<strong>L1 cache</strong> 在 CPU 内部（存放已解码指令和常用关键字，约 16KB，无延迟）；<strong>L2 cache</strong> 更大（兆字节级），访问有 1–2 个时钟周期延迟。</p>
+<blockquote>
+<p><strong>时钟周期</strong>：CPU 速度由振荡器两个脉冲之间的时间决定，每秒脉冲数越高越快，单位是 Hz（兆赫/千兆赫）。例如 4GHz 处理器每秒执行 40 亿个时钟周期。现代处理器每个周期可执行多条指令。</p>
+</blockquote>
+<p><strong>主存之外的非易失性存储</strong>：</p>
+<ul>
+<li><strong>ROM（只读存储器）</strong>：内容一旦写入就不变，速度快成本低。启动用的引导程序（bootstrap）通常存这里。</li>
+<li><strong>EEPROM / 闪存</strong>：可擦写重写，能修正程序错误；闪存常用于移动设备，介于 RAM 和磁盘之间，但有擦写寿命限制。</li>
+<li><strong>CMOS</strong>：断电会丢数据（易失性），但常用来保存当前时间和日期。</li>
+</ul>
+<p><strong>磁盘</strong>：机械装置，有一个或多个金属盘片以 5400/7200/10800rpm 旋转，机械臂悬在盘面上。信息写在同心圆上，一个臂位置的所有磁道合起来是<strong>柱面</strong>。每个磁道分成若干<strong>扇区</strong>（512 字节）。<strong>固态硬盘（SSD）不是磁盘</strong>——它没有可动部分，用闪存存储，只是同样断电不丢数据。现代计算机支持<strong>虚拟内存</strong>机制：把主存当成一部分缓存，最常用的程序放主存，其余放磁盘；地址映射由 CPU 里的<strong>存储器管理单元（MMU）</strong>完成。</p>
+<blockquote>
+<p>缓存和 MMU 对性能影响很大。在多道程序系统里，从一个程序切到另一个程序的机制叫<strong>上下文切换（context switch）</strong>，必要时还要把缓存里修改过的数据写回磁盘。</p>
+</blockquote>
+<h3 id="3-3-I-O-设备"><a href="#3-3-I-O-设备" class="headerlink" title="3.3 I/O 设备"></a>3.3 I/O 设备</h3><p>CPU 和存储器只是 OS 管理范围的冰山一角，I/O 设备同样重要。I/O 设备通常分两部分：</p>
+<ul>
+<li><strong>设备控制器</strong>：一块或一组芯片，直接控制物理设备，接受并执行 OS 的指令。它设计了一个<strong>简化接口</strong>给 OS 用，屏蔽底层物理细节（类似加一层代理简化复杂）。</li>
+<li><strong>设备本身</strong>：接口相对简单且已标准化。比如标准化的 SATA 磁盘控制器能适配任意 SATA 磁盘。</li>
+</ul>
+<blockquote>
+<p><code>ATA</code> 是 IBM 第二代 PC 的高级技术成果，<code>SATA</code> 是串行 ATA，现在是很多计算机的标准硬盘接口。OS 看到的是对”控制器”的接口，和”设备”接口差别很大。</p>
+</blockquote>
+<p>每种设备控制器不同，需要不同软件控制。专门和控制器通信、发命令、收响应的软件叫<strong>设备驱动程序（device driver）</strong>。</p>
+<p><strong>怎样把驱动程序装进操作系统（在内核态运行）？</strong> 三种途径：</p>
+<ol>
+<li>把内核和驱动程序重新连接，然后重启（UNIX 常用）；</li>
+<li>在一个 OS 文件里设置入口，重启时 OS 寻找并装载（Windows 常用）；</li>
+<li>OS 运行时动态装载，无需重启（热插拔设备如 USB、IEEE 1394 需要）。</li>
+</ol>
+<p>每个设备控制器都有些寄存器（比如指定磁盘地址、内存地址、扇区计数）。驱动程序从 OS 取一条指令，翻译成值写进设备寄存器，<strong>所有设备寄存器的集合就是 I/O 端口空间</strong>。设备寄存器有的被映射到可用地址空间（像内存一样读写）；有的放在专门 I/O 端口空间（用 <code>IN</code>/<code>OUT</code> 指令读写，需内核态）。</p>
+<p><strong>实现输入的三种方式</strong>：</p>
+<ol>
+<li><strong>忙等待（busy waiting）</strong>：用户程序发起系统调用 → 内核转成驱动程序调用 → 驱动启动 I/O 后<strong>循环检查</strong>设备是否完成。缺点是<strong>一直占着 CPU</strong>，一直轮询直到完成。</li>
+<li><strong>中断（interrupt）</strong>：驱动启动设备后立刻返回，OS 安排其他工作；设备完成时发一个<strong>中断</strong>通知。中断流程：驱动写寄存器告诉控制器做什么 → 控制器启动设备 → 完成后向中断控制器发信号 → 中断控制器在 CPU 引脚上声明，并把设备编号放到总线上 → CPU 响应，把 PC 和 PSW 压栈并切到内核态 → 用设备编号查<strong>中断向量</strong>找到处理程序 → 处理完成后恢复用户程序继续执行。注意：<strong>中断可以在不合宜的时间发生</strong>，CPU 可暂时禁中断，但多个中断同时到来时由中断控制器按优先级裁决。</li>
+<li><strong>DMA（直接存储器访问）</strong>：专门的 DMA 芯片控制内存和控制器之间的位流，<strong>无需 CPU 干预</strong>。CPU 只需设置要传送的字节数、设备/内存地址和方向，DMA 完成后发中断。</li>
+</ol>
+<h3 id="3-4-总线"><a href="#3-4-总线" class="headerlink" title="3.4 总线"></a>3.4 总线</h3><p>总线的英文 <code>bus</code> 直译”公共汽车”，比喻很贴切：总线是数据通道，沿线连接的设备像公交站，数据包像乘客，知道起点终点、沿途停靠。总线有容量限制，通常按固定长度”字”传输（当前多为 4 字节/32 位或 8 字节/64 位），还需要一个”控制器”协调各设备访问顺序，避免冲突。</p>
+<p>早期总线多是<strong>共享总线架构</strong>（多条线路并行传同一数据字，多设备共用一组线），需要仲裁机制。<strong>PCIe</strong> 则彻底改用<strong>端到端链路</strong>（点对点串行通道，每个设备与目标设备独立连接）。对比：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>共享总线架构</th>
+<th>端到端链路（PCIe）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>共享性</td>
+<td>多设备共享同一物理总线</td>
+<td>每个设备有独立连接</td>
+</tr>
+<tr>
+<td>带宽</td>
+<td>被所有设备共享，易成瓶颈</td>
+<td>每条链路独立带宽，互不影响</td>
+</tr>
+<tr>
+<td>传输方式</td>
+<td>并行</td>
+<td>串行（可用多条 Lane 并行）</td>
+</tr>
+<tr>
+<td>扩展性</td>
+<td>设备越多性能越差</td>
+<td>新设备加链路即可，扩展性好</td>
+</tr>
+<tr>
+<td>管理复杂度</td>
+<td>需复杂仲裁机制</td>
+<td>无共享资源问题，管理简单</td>
+</tr>
+</tbody></table>
+<p>现代 x86 系统里总线很多：高速缓存、内存（DDR3）、PCIe、PCI、USB、SATA、DMI，各司其职。比如 CPU 通过 DDR3 与内存交互、通过 PCIe 连 GPU、通过 DMI 连集成控制中心，再通过 SATA 接硬盘和 DVD、通过串行总线接 USB 设备。<strong>USB</strong> 从 1.0（12Mb/s）→ 2.0（480Mb/s）→ 3.0（≥5Gb/s），实现即插即用；<strong>SCSI</strong> 速度可达 640MB/s，多在服务器/工作站。</p>
+<hr>
+<h2 id="四、操作系统的三大核心抽象"><a href="#四、操作系统的三大核心抽象" class="headerlink" title="四、操作系统的三大核心抽象"></a>四、操作系统的三大核心抽象</h2><p><code>📄 文件</code> → 屏蔽 I/O 设备细节；<code>🧠 虚拟内存</code> → 屏蔽主存+磁盘；<code>⚙️ 进程</code> → 屏蔽处理器+主存+I/O。</p>
+<h3 id="4-1-进程"><a href="#4-1-进程" class="headerlink" title="4.1 进程"></a>4.1 进程</h3><p>每个进程都带一个独立的<strong>地址空间</strong>（从 0 到某个最大值的一段连续存储区域），里面放可执行代码、数据、以及函数调用和局部变量用的栈。除了地址空间，进程还关联一串<strong>资源</strong>：寄存器（PC、SP）、打开的文件列表、待处理信号、相关进程列表等。简而言之，进程是一个装了运行所需所有信息的容器。</p>
+<p><strong>多任务怎么”同时”跑？</strong> 靠上下文切换。假设你开了视频编辑器、Web 浏览器、后台邮件检查三个进程，其实同一时刻 CPU 只跑一个；OS 通过时间片轮转等调度策略，周期性地挂起一个启动另一个，让所有进程公平分到 CPU。当进程被挂起时，必须<strong>精确保存状态</strong>（地址空间内容 + 寄存器值 + 文件位置等上下文信息），存在<strong>进程表</strong>里，之后才能无缝恢复。</p>
+<p><strong>进程的父子关系</strong>：进程可以创建子进程，子进程再创建子进程，形成一棵<strong>进程树</strong>。比如 shell 收到一条编译命令，就创建一个子进程去编译，编译完自毁。理论上进程可以无限增长，但实际 OS 会限制最大进程数。</p>
+<p>进程之间协作要交换信息，机制叫<strong>进程间通信（IPC）</strong>。OS 还提供一批系统调用管理进程：申请/释放内存、等待子进程完成并收集结果、用新程序替换当前进程映像等。</p>
+<p>进程有时需要接收外部信息（比如网络发消息后，设一个定时器，超时没收到确认就重传）。定时器到期后 OS 会给进程发<strong>警告信号</strong>，中断当前执行、保存寄存器、触发信号处理例程。这些信号其实是<strong>软件模拟的硬件中断</strong>，发射原因很多：定时器到期、非法指令、访问无效内存等。</p>
+<p><strong>身份标识</strong>：每个进程分配唯一 <strong>UID</strong>（标识运行者），新进程继承父进程 UID。用户可以属于一个或多个组，每个组有唯一 <strong>GID</strong>。UNIX 类系统还有个特殊 <strong>超级用户</strong>（Windows 里叫管理员），权限更高，能执行违反常规保护规则的操作。</p>
+<h3 id="4-2-线程"><a href="#4-2-线程" class="headerlink" title="4.2 线程"></a>4.2 线程</h3><p>进程和线程都是对 CPU 工作时间段的抽象，<strong>只是颗粒度不同</strong>：进程描述更大的执行环境，线程是更细的执行单元。</p>
+<p>假设程序 A 要依次执行 a、b、c 三个模块。CPU 拿到程序 A 的控制权、加载它的上下文后，依次跑 a、b、c。注意：<strong>a、b、c 共享的是程序 A（进程）的上下文环境</strong>，所以在这些段之间切换，是<strong>线程级上下文切换</strong>，不是更重的进程级切换——开销小得多，CPU 利用率更高。</p>
+<blockquote>
+<p>注意：编程语言里说的”进程/线程”是语言层的具体实现，和 OS 层的概念是”具体化”的关系，别混为一谈。</p>
+</blockquote>
+<h3 id="4-3-地址空间与虚拟内存"><a href="#4-3-地址空间与虚拟内存" class="headerlink" title="4.3 地址空间与虚拟内存"></a>4.3 地址空间与虚拟内存</h3><p><strong>地址空间</strong>：早期简单 OS 一次只跑一个程序，要开第二个就得把第一个整个移出内存，多任务能力极差。后来允许多个程序同时加载到内存并行执行，靠硬件+OS 实现隔离保护。每个进程被分配一个<strong>专属地址集合</strong>，通常从 0 连续编号到某个最大值。</p>
+<blockquote>
+<p>理论上，32 位架构的虚拟地址空间可达 (2^{32}) 字节，64 位可达 (2^{64}) 字节，远超物理内存容量。正是<strong>虚拟内存</strong>技术解决了”地址空间比物理内存大”的问题。</p>
+</blockquote>
+<p><strong>虚拟内存</strong>：允许直接把物理内存暴露给程序是<strong>危险且低效</strong>的——安全风险增加（可破坏系统稳定性、数据泄露）、资源利用率低（碎片化）、内存管理复杂。虚拟内存作为物理内存和进程间的<strong>抽象层</strong>：给每个进程一个独立的、看似无限大的内存空间。每个进程都以为独占整个内存，实际只是在访问 OS 精心管理的虚拟地址空间。</p>
+<pre class="mermaid">flowchart TB
+    subgraph VS["进程的虚拟地址空间（高地址在上，低地址在下）"]
+        A["内核内存区<br>（OS 专用，用户不可见）"]
+        B["堆栈区 Stack<br>（参数、局部变量、返回地址）从高地址往低地址增长"]
+        C["共享库区<br>（printf 等库代码）"]
+        D["堆区 Heap<br>（malloc 动态分配）从低地址往高地址增长"]
+        E["进程代码与数据区<br>只读段 + 可读写段"]
+    end</pre>
+
+<p>这张图从<strong>低地址（下）</strong>到<strong>高地址（上）</strong>排列，内核区在最上方（高地址），用户进程看不见它。从下往上看：</p>
+<ul>
+<li><strong>进程代码与数据区</strong>：最顶部承载可执行文件核心内容，分<strong>只读段</strong>（机器指令、只读数据如字符串常量）和<strong>可读写段</strong>（全局变量、静态变量，运行时允许修改）。</li>
+<li><strong>堆数据区（heap）</strong>：C 程序动态内存分配区，<code>malloc/calloc/realloc</code> 申请、<code>free</code> 释放，从低地址向高地址扩展。</li>
+<li><strong>共享库区</strong>：存放系统/第三方库代码（如 <code>printf</code>），多个进程共享同一份库代码，节省内存。</li>
+<li><strong>堆栈区（stack）</strong>：管理函数调用和局部变量，每个函数调用建一个<strong>栈帧</strong>（存参数、局部变量、返回地址），从高地址向低地址扩展。</li>
+<li><strong>内核内存区</strong>：最高地址处，内核专用的代码、数据和系统资源，用户进程不可见、无法访问，保证 OS 安全。</li>
+</ul>
+<h3 id="4-4-文件"><a href="#4-4-文件" class="headerlink" title="4.4 文件"></a>4.4 文件</h3><p>几乎所有 OS 都支持文件系统。OS 的一个核心功能就是屏蔽磁盘和其他 I/O 设备细节，给程序员一个<strong>与设备无关的抽象文件模型</strong>。创建、删除、读写文件都要通过系统调用。读文件前先”打开”（定位并验证权限），读完”关闭”。</p>
+<p>现代 OS 引入了<strong>目录</strong>概念，作为文件系统基本构成单元，允许用户按逻辑分组文件，形成<strong>树状结构</strong>（目录本身也是特殊文件，可嵌套包含文件或其他目录）。系统调用包括创建/删除目录、移动文件等。</p>
+<p>进程树和文件系统树都像树，但差异明显：进程树层次浅（很少超三层）、生命周期短（几分钟）；文件系统树更深（可达四五层）、<strong>持久存在</strong>。权限管理也不同：进程有明确父子关系，父进程能控制子进程；文件访问权限更灵活，不只限所有者。</p>
+<p><strong>路径</strong>：每个文件用唯一路径名定位，从根目录向下，各层目录用斜杠分隔。如 <code>/Faculty/Prof.Brown/Courses/CS101</code>，首个斜杠表示根目录。Windows 用反斜杠 <code>\</code>，Linux/Unix 用正斜杠 <code>/</code>。每个进程还拥有一个<strong>工作目录</strong>，作为相对路径的基准。</p>
+<p><strong>打开文件</strong>后分配一个<strong>文件描述符</strong>（非负整数），用于后续读写；拒绝访问则返回错误代码。</p>
+<p><strong>特殊文件</strong>：为了让 I/O 设备像普通文件一样读写。有两种特殊文件类型：</p>
+<ul>
+<li><strong>块特殊文件</strong>：可随机访问的块设备（如磁盘），打开后可直接访问第 N 块。</li>
+<li><strong>字符特殊文件</strong>：处理字符流的设备（如打印机、调制解调器）。<br>按惯例放在 <code>/dev</code> 目录，如 <code>/dev/lp0</code> 表示打印机。</li>
+</ul>
+<blockquote>
+<p>特殊文件是 <strong>UNIX/Linux 家族（POSIX）特有</strong>的设计——背后的哲学是 UNIX 的”<strong>一切皆文件</strong>“：设备、磁盘、终端统统统一成文件接口，开发者只要会读写文件，就会操作一切外设。Windows 没有这个机制：设备是系统里的”对象”，走 Win32 API 访问，只保留了 <code>CON</code>、<code>NUL</code>、<code>PRN</code> 等几个从 DOS 继承的设备名。现代 Linux 还把这一思想推进了一大步：<code>/proc</code>、<code>/sys</code> 等<strong>虚拟文件系统</strong>把内核信息、硬件状态也映射成了文件——<code>cat /proc/cpuinfo</code> 就能”读”到 CPU 信息，如同读一个普通文件。</p>
+</blockquote>
+<p><strong>管道（pipe）</strong>：一种与进程、文件都相关的重要特性，本质是<strong>存在内存里的一段空间</strong>，专门用于两个进程之间传输数据。注意”虚拟文件”的含义：它不是存储在磁盘上的实体，却能用文件那套操作来使用。</p>
+<p>两个进程用管道通信的流程：先创建一个管道，然后——</p>
+<ul>
+<li>进程 A 把数据”写”进管道，就像写一个普通的<strong>输出文件</strong>；</li>
+<li>进程 B 从管道”读”数据，就像读一个普通的<strong>输入文件</strong>；</li>
+<li>数据并不落到磁盘上，而是<strong>实时地</strong>直接送到另一端：A 写进去的字节，B 马上就能读到。</li>
+</ul>
+<p>管道价值的本质：开发人员可以用<strong>熟悉的文件操作接口</strong>来实现进程间通信——两个进程无需直接接触、互不干扰，数据就传输完毕了。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ <span class="built_in">cat</span> file1 file2 file3 | <span class="built_in">sort</span> &gt; /dev/lp</span><br></pre></td></tr></table></figure>
+
+<p><code>|</code> 就是管道操作符：左边命令的标准输出（stdout），直接变成右边命令的标准输入（stdin）。上面这句把三个文件用 <code>cat</code> 合并 → 通过 <code>|</code> 传给 <code>sort</code> 排序 → 最后的 <code>&gt;</code> 是重定向（<code>&lt;</code> 反向，把文件内容喂给命令），把排序结果写进 <code>/dev/lp</code>—本小节前面讲的<strong>字符特殊文件</strong>（打印机）。shell 把这些符号串起来，一条命令就完成了”合并 → 排序 → 打印”三连。</p>
+<h3 id="4-5-保护：rwx-权限"><a href="#4-5-保护：rwx-权限" class="headerlink" title="4.5 保护：rwx 权限"></a>4.5 保护：rwx 权限</h3><p>以 UNIX 为例，每个文件分配一个<strong>9 位二进制保护代码</strong>，分成三段：第一段给<strong>所有者</strong>，第二段给<strong>同组用户</strong>，第三段给<strong>其他用户</strong>。每段三位，分别控制<strong>读（r）、写（w）、执行（x）</strong>，即经典的”rwx 位”。</p>
+<p>例如 <code>rwxr-x--x</code>：</p>
+<ul>
+<li>所有者（owner）：r、w、x 全有；</li>
+<li>同组用户（group）：只有 r（读）和 x（执行），不能改；</li>
+<li>其他用户（others）：只有 x（执行），不能读也不能写。</li>
+</ul>
+<hr>
+<h2 id="五、系统调用：用户态进入内核的大门"><a href="#五、系统调用：用户态进入内核的大门" class="headerlink" title="五、系统调用：用户态进入内核的大门"></a>五、系统调用：用户态进入内核的大门</h2><p>上一节里的文件、进程、权限，都是通过系统调用实现”抽象接口 + 资源管理”的——现代操作系统普遍采用系统调用，尽管各系统间细节各异，但<strong>基本原理相通</strong>。此处入门仅需了解即可。</p>
+<ul>
+<li><strong>任何单 CPU 计算机，在任意时刻都只能执行一条指令。</strong> 所以进程在用户态执行用户程序时（比如读文件数据），如果想把控制权转移给操作系统，就必须执行一条特定指令——<strong>异常指令</strong>或<strong>系统调用指令</strong>，光靠普通 C 代码是”够不着”内核的。</li>
+<li><strong>系统调用的触发依赖计算机底层的机制，通常需要通过汇编语言来精确表达。</strong> C 语言里没有”把控制权交给内核”这种语句——所以 C 程序要经由 <strong>库函数</strong> 中转：库函数内部用汇编把系统调用编号放进寄存器、执行 TRAP 指令。这也是为什么平时的代码只调 <code>read</code> 函数，而不是直接”调用内核”。</li>
+</ul>
+<p>控制权交到内核后，操作系统先执行<strong>参数检查</strong>（确认目标进程、其所需调用的服务），确认无误后执行系统调用，控制权暂时转交给内核态的相应指令序列。</p>
+<blockquote>
+<p>简而言之，<strong>系统调用类似于一种特殊的过程调用</strong>，但它和普通过程调用有本质区别：普通过程调用只能在同一运行模式下跳来跳去，而系统调用<strong>能够跨越用户态与内核态的界限</strong>——正是这一点，才让用户程序”合法地”碰得到硬件。</p>
+</blockquote>
+<p>这里以**<code>read</code> 系统调用举例**：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">count = read(fd, buffer, nbytes);</span><br></pre></td></tr></table></figure>
+
+<p>三个参数：文件描述符（指定文件）、缓冲区指针（数据放哪）、要读的字节数。成功返回实际读取字节数（可能小于请求值）；失败返回 -1，并在全局变量 <code>errno</code> 里记录错误代码。所以程序<strong>必须检查返回值</strong>。</p>
+<p>read 调用历经 <strong>11 个步骤</strong>（完整流程见下图，①~⑪ 与下面文字一一对应）：</p>
+<pre class="mermaid">flowchart TB
+    subgraph U["🎩 用户空间（用户进程）"]
+        direction TB
+        S1["① 压入 nbytes"] --&gt; S2["② 压入 &amp;buffer"]
+        S2 --&gt; S3["③ 压入 fd"]
+        S3 --&gt; S4["④ 调用 read 库函数"]
+        S4 --&gt; S5["⑤ 系统调用编号放入指定寄存器"]
+        S5 --&gt; S6["⑥ TRAP：陷入内核"]
+        S9["⑨ 返回用户态的函数调用库"] --&gt; S10["⑩ 返回给调用者<br>read 之后的下一条指令"]
+        S10 --&gt; S11["⑪ 增加 SP：清理压入的参数"]
+    end
+    subgraph K["🔒 内核空间（操作系统）"]
+        direction TB
+        S7["⑦ 解析编号，查 dispatch 表定位处理器"] --&gt; S8["⑧ 执行系统调用处理程序"]
+    end
+    S6 --&gt; S7
+    S8 --&gt; S9</pre>
+
+<p><strong><code>read</code> 的完整执行步骤</strong>（C/C++ 编译器对函数调用按<strong>逆序压参</strong>）：把参数压入堆栈 → 程序调用 <code>read</code> 库函数 → 底层需要更深的系统调用 → 把系统调用编号放进指定寄存器 → 执行 <strong>TRAP</strong> 指令（切到内核态，跳转到内核预定义地址）→ 内核解析编号，用 <strong>dispatch 表</strong>定位系统调用处理器 → 执行服务 → 控制权返回到用户态函数调用库 → 返回发起调用的应用。最后一步是系统调用返回后<strong>调整堆栈指针</strong>，把之前压入的参数清掉——让堆栈回到调用前的状态。若调用阻塞（如等键盘输入），OS 可能暂停当前进程、调度其他就绪进程；条件满足再唤醒。</p>
+<blockquote>
+<p>TRAP 和普通过程调用有两点不同：它改变了执行模式；跳转目标受限于硬件/OS 定义，而非任意地址。</p>
+</blockquote>
+<p>刚才的 <code>read</code> 只是系统调用世界的一个例子——一共 有100 多个系统调用。在列出之前，补充一个问题：<strong>为什么 <code>read</code>、<code>fork</code> 这些名字，在 Linux 上敲、在 macOS 上敲，全都一模一样？</strong> 答案就是 POSIX。</p>
+<p><strong>POSIX 是什么？</strong> 它是一门<strong>标准</strong>——IEEE 制定的”可移植操作系统接口”（Portable Operating System Interface），规定操作系统<strong>应该给应用程序提供哪些接口</strong>：系统调用名、参数、库函数、命令行约定，通通写进标准条文。它要解决的只有一个问题：<strong>可移植性</strong>。因为有了 POSIX，同样的 <code>open</code>/<code>read</code>/<code>fork</code>，在 Linux、macOS、FreeBSD、Solaris 上名字一模一样、参数一模一样——写一次代码，换平台重编译就能跑。</p>
+<p>注意：POSIX 是<strong>标准条文</strong>（规定”应该长什么样”），不是某个具体的操作系统。Linux 内核 + glibc 实现了它，macOS（BSD 血统）也实现了它。打个比方：POSIX 像”同一本单词书”，Linux 和 macOS 是”两家出版社印的实体书”——程序只认标准拼写，在哪一本里都查得到，自然就跨平台了。</p>
+<p><strong>常用 POSIX 系统调用</strong>：</p>
+<p><strong>进程管理</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pid = fork()</code></td>
+<td>创建与父进程相同的子进程</td>
+</tr>
+<tr>
+<td><code>pid = waitpid(pid, &amp;statloc, options)</code></td>
+<td>等待一个子进程终止</td>
+</tr>
+<tr>
+<td><code>s = execve(name, argv, environp)</code></td>
+<td>替换一个进程的核心映像</td>
+</tr>
+<tr>
+<td><code>exit(status)</code></td>
+<td>终止进程并返回状态</td>
+</tr>
+</tbody></table>
+<p><strong>文件管理</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fd = open(file, how, ...)</code></td>
+<td>打开文件用于读、写</td>
+</tr>
+<tr>
+<td><code>s = close(fd)</code></td>
+<td>关闭文件</td>
+</tr>
+<tr>
+<td><code>n = read(fd, buffer, nbytes)</code></td>
+<td>从文件读数据到缓冲区</td>
+</tr>
+<tr>
+<td><code>n = write(fd, buffer, nbytes)</code></td>
+<td>从缓冲区写数据到文件</td>
+</tr>
+<tr>
+<td><code>position = lseek(fd, offset, whence)</code></td>
+<td>移动文件指针</td>
+</tr>
+<tr>
+<td><code>s = stat(name, &amp;buf)</code></td>
+<td>取得文件状态信息</td>
+</tr>
+</tbody></table>
+<p><strong>目录和文件系统管理</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>s = mkdir(name, mode)</code></td>
+<td>创建新目录</td>
+</tr>
+<tr>
+<td><code>s = rmdir(name)</code></td>
+<td>删除空目录</td>
+</tr>
+<tr>
+<td><code>s = link(name1, name2)</code></td>
+<td>创建新目录项指向已有文件</td>
+</tr>
+<tr>
+<td><code>s = unlink(name)</code></td>
+<td>删除一个目录项</td>
+</tr>
+<tr>
+<td><code>s = mount(special, name, flag)</code></td>
+<td>安装一个文件系统</td>
+</tr>
+<tr>
+<td><code>s = umount(special)</code></td>
+<td>卸载一个文件系统</td>
+</tr>
+</tbody></table>
+<p><strong>其他</strong></p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>s = chdir(dirname)</code></td>
+<td>改变工作目录</td>
+</tr>
+<tr>
+<td><code>s = chmod(name, mode)</code></td>
+<td>修改文件保护位</td>
+</tr>
+<tr>
+<td><code>s = kill(pid, signal)</code></td>
+<td>发送信号给进程</td>
+</tr>
+<tr>
+<td><code>seconds = time(&amp;seconds)</code></td>
+<td>获取从 1970-01-01 至今的时间</td>
+</tr>
+</tbody></table>
+<p><strong>几个关键系统调用解读</strong>：</p>
+<ul>
+<li><p><strong><code>fork</code><strong>：POSIX 下创建进程的唯一机制。它复制当前进程（父进程）——包括文件描述符、寄存器值等；复制地址空间 = 先共享，</strong>需要写入时才真正复制（写时复制 COW）</strong>。<code>fork</code> 返回一个特殊值：<strong>子进程里返回 0，父进程里返回子进程 PID</strong>。通过检查返回值，程序就知道自己是在父还是子进程里。<code>fork</code> 后父子进程各自独立修改自己的变量。</p>
+</li>
+<li><p>**<code>waitpid</code>**：父进程等待一个或多个子进程结束。第一个参数为 -1 时等待任意子进程；第二个参数返回退出状态（正常/异常终止和退出码）；第三个参数指定选项（如没有已退出子进程时立即返回）。</p>
+</li>
+<li><p><strong><code>execve</code><strong>：加载并执行第一个参数指定的程序，</strong>替换当前进程映像</strong>。三个参数：文件名（字符串指针）、参数向量（以 null 结尾的字符串数组）、环境变量（<code>name=value</code> 形式数组）。注意程序入口是 <code>int main(int argc, char *argv[], char *envp[])</code>——<code>argc</code> 是参数个数（含程序名本身），<code>argv</code> 是参数字符串数组，<code>envp</code> 是环境变量数组。</p>
+<p><strong>shell 常用 <code>fork + execve</code> 组合</strong>，典型伪代码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> (TRUE) {</span><br><span class="line">    type_prompt();                         <span class="comment">// 显示提示符</span></span><br><span class="line">    <span class="keyword">if</span> (read_command(command, parameters) == <span class="number">-1</span>) <span class="keyword">break</span>;</span><br><span class="line">    <span class="type">pid_t</span> pid = fork();</span><br><span class="line">    <span class="keyword">if</span> (pid &lt; <span class="number">0</span>)            { perror(<span class="string">"fork failed"</span>); <span class="built_in">exit</span>(<span class="number">1</span>); }</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (pid &gt; <span class="number">0</span>)       waitpid(pid, &amp;status, <span class="number">0</span>);   <span class="comment">// 父进程等待</span></span><br><span class="line">    <span class="keyword">else</span> {</span><br><span class="line">        execve(command, parameters, <span class="literal">NULL</span>); <span class="comment">// 子进程执行命令</span></span><br><span class="line">        perror(<span class="string">"execve failed"</span>); <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>比如敲了 <code>cp file1 file2</code>，shell 先 <code>fork</code> 建子进程，子进程再 <code>execve</code> 执行 <code>cp</code>，传 <code>file1</code>、<code>file2</code> 作为参数。</p>
+</li>
+<li><p>**<code>exit</code>**：终止当前进程，返回 0–255 的状态码给父进程（通过 <code>waitpid</code> 的 <code>statloc</code> 返回）。</p>
+</li>
+<li><p><strong>UNIX 进程的内存划分</strong>：<code>text segment</code>（文本区，程序代码）、<code>data segment</code>（数据区，变量）、<code>stack segment</code>（栈区）。数据向上增长、堆栈向下增长，夹在中间的是空闲区。数据段扩展通过 <code>brk</code> 系统调用显式进行（但 <code>brk</code> 不是 POSIX 标准，标准鼓励用 <code>malloc</code>，<code>malloc</code> 内部实现不适合标准化）。</p>
+</li>
+</ul>
+<p><strong>文件和目录系统调用小结</strong>：<code>open</code> 需指定绝对/相对路径名和访问模式（<code>O_RDONLY</code>/<code>O_WRONLY</code>/<code>O_RDWR</code>，新建加 <code>O_CREATE</code>），成功返回文件描述符。<code>read/write</code> 最常用。<code>lseek</code> 改变文件读写位置指针，参数为文件描述符、偏移量、起始标志（<code>SEEK_SET</code> 文件开头 / <code>SEEK_CUR</code> 当前位置 / <code>SEEK_END</code> 文件末尾），成功返回新位置的绝对偏移。<code>stat</code> 查询文件元数据（类型、大小、修改时间），<code>fstat</code> 对已打开文件用。</p>
+<p>目录相关：<code>mkdir</code>/<code>rmdir</code> 创建/删空目录。**<code>link(name1, name2)</code>** 让同一文件以两个或多个名称出现（多用在不同目录），它利用已有文件的 <strong>i-number（i-节点编号）</strong> 创建新目录项。UNIX 每个文件有唯一的 i-编号，是 <strong>i-节点表</strong> 的索引（记录谁拥有文件、磁盘块在哪）。目录其实是一组 <code>(i编号, ASCII名)</code> 映射。<code>unlink</code> 删一个目录项；当指向文件的目录项全部移除时，文件才被真正删除。**<code>mount(special, name, flag)</code>** 把两个文件系统合并，如 <code>mount("/dev/sdb0", "/mnt", 0)</code> 把 USB 盘挂到根文件系统；<code>umount</code> 卸载。</p>
+<p><strong>其他系统调用</strong>：<code>chdir("/usr/ast/test")</code> 改变工作目录（省得每次输入长路径）；<code>chmod("file", 0644)</code> 改文件保护位（让文件对所有者之外可读）；<code>kill</code> 发送信号（进程有信号处理程序就跑它，没准备好信号会杀掉进程）；<code>time</code> 返回从 1970-01-01 到现在的秒数，32 位下最大 <code>(2^32)-1</code> 秒约 136 年，所以 2106 年 32 位 UNIX 会”发飙”。</p>
+<h3 id="Win32-API-对比"><a href="#Win32-API-对比" class="headerlink" title="Win32 API 对比"></a>Win32 API 对比</h3><p>UNIX 里 <code>read</code> 系统调用和 <code>read</code> 库函数几乎一对一；<strong>Windows 则完全不同</strong>：库函数调用和实际系统调用几乎不对应，微软定义了一大套过程叫 <strong>Win32 应用编程接口（API）</strong>，程序员通过这套标准接口实现系统调用，支持从 Win95 以来所有版本。Win32 API 数量极大（几千个），但<strong>不都在内核态运行</strong>，很多在用户态（管理视窗、几何图形、文本、字体、对话框、菜单等 GUI 功能）。</p>
+<table>
+<thead>
+<tr>
+<th>UNIX</th>
+<th>Win32</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fork</code></td>
+<td><code>CreateProcess</code></td>
+<td>创建新进程</td>
+</tr>
+<tr>
+<td><code>waitpid</code></td>
+<td><code>WaitForSingleObject</code></td>
+<td>等待进程退出</td>
+</tr>
+<tr>
+<td><code>execve</code></td>
+<td>无</td>
+<td><code>CreateProcess</code> = fork + execve</td>
+</tr>
+<tr>
+<td><code>exit</code></td>
+<td><code>ExitProcess</code></td>
+<td>终止执行</td>
+</tr>
+<tr>
+<td><code>open</code></td>
+<td><code>CreateFile</code></td>
+<td>创建/打开文件</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td><code>CloseHandle</code></td>
+<td>关闭文件</td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td><code>ReadFile</code></td>
+<td>从文件读数据</td>
+</tr>
+<tr>
+<td><code>write</code></td>
+<td><code>WriteFile</code></td>
+<td>向文件写数据</td>
+</tr>
+<tr>
+<td><code>lseek</code></td>
+<td><code>SetFilePointer</code></td>
+<td>移动文件指针</td>
+</tr>
+<tr>
+<td><code>stat</code></td>
+<td><code>GetFileAttributesEx</code></td>
+<td>获取文件属性</td>
+</tr>
+<tr>
+<td><code>mkdir</code></td>
+<td><code>CreateDirectory</code></td>
+<td>创建目录</td>
+</tr>
+<tr>
+<td><code>rmdir</code></td>
+<td><code>RemoveDirectory</code></td>
+<td>删除空目录</td>
+</tr>
+<tr>
+<td><code>link</code> / <code>mount</code> / <code>umount</code> / <code>chmod</code> / <code>kill</code></td>
+<td>无</td>
+<td>Win32 不支持</td>
+</tr>
+<tr>
+<td><code>unlink</code></td>
+<td><code>DeleteFile</code></td>
+<td>删除文件</td>
+</tr>
+<tr>
+<td><code>chdir</code></td>
+<td><code>SetCurrentDirectory</code></td>
+<td>切换工作目录</td>
+</tr>
+<tr>
+<td><code>time</code></td>
+<td><code>GetLocalTime</code></td>
+<td>获取当前时间</td>
+</tr>
+</tbody></table>
+<p><strong>关键差异</strong>：Windows 无 <code>fork</code>/<code>execve</code>，<code>CreateProcess</code> 把两者合成一个。<strong>Windows 没有父子进程层次</strong>——进程创建后，创建者和被创建者是平等的（UNIX 有清晰父子关系与进程树）。<code>CreateProcess</code> 有大量参数指定新进程性质。Win32 没有文件 link、mount、umount、chmod、kill；但也有大量 UNIX 没有的调用，尤其是 GUI 管理。</p>
+<hr>
+<h2 id="六、操作系统结构"><a href="#六、操作系统结构" class="headerlink" title="六、操作系统结构"></a>六、操作系统结构</h2><h3 id="6-1-单体内核（Monolithic-Kernel）"><a href="#6-1-单体内核（Monolithic-Kernel）" class="headerlink" title="6.1 单体内核（Monolithic Kernel）"></a>6.1 单体内核（Monolithic Kernel）</h3><p>传统很多系统用单体内核：<strong>整个操作系统作为一个大型、单一二进制程序在内核态运行</strong>，把进程管理、内存管理、文件系统、设备驱动等组件紧密集成为一个可执行文件。</p>
+<ul>
+<li><strong>优点</strong>：所有组件在同一地址空间，组件间交互高效，减少上下文切换开销。</li>
+<li><strong>缺点</strong>：系统庞大复杂，维护调试难；**”一荣俱荣，一损俱损”**——内核任何部分出问题，整个系统都可能崩溃。</li>
+</ul>
+<p>开发遵循：主程序（初始化并调度）+ 服务过程（处理系统调用）+ 辅助服务程序（数据处理、资源管理，形成层次化服务）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌────────────────────────────────────────────────────┐</span><br><span class="line">│                  主程序（init）                      │  ← 初始化内核并调度</span><br><span class="line">├────────────────────────────────────────────────────┤</span><br><span class="line">│   服务程序 A（进程管理）   服务程序 B（内存管理）       │</span><br><span class="line">│   服务程序 C（文件系统）   服务程序 D（设备驱动）       │  ← 处理系统调用</span><br><span class="line">├────────────────────────────────────────────────────┤</span><br><span class="line">│   辅助服务程序：数据处理、资源管理等（若干小模块）        │  ← 实用程序</span><br><span class="line">└────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>注意这张图：<strong>逻辑上分了三层，物理上还是一个大型二进制程序、全部运行在内核态</strong>——分层只是”为了管理复杂性而划分”（理解、维护方便），并没有真正把哪层独立出来。</p>
+<p>为了增强模块性和可扩展性，现代系统引入<strong>共享库</strong>（UNIX）和<strong>动态链接库 DLL</strong>（Windows）动态加载扩展功能。</p>
+<h3 id="6-2-分层系统（Layered-System）"><a href="#6-2-分层系统（Layered-System）" class="headerlink" title="6.2 分层系统（Layered System）"></a>6.2 分层系统（Layered System）</h3><p>分层系统通过<strong>层级</strong>隔离功能模块：每一层只和相邻层通信，用下层提供的服务实现自身功能，层间通信走预定义接口。</p>
+<p>著名实例是 Dijkstra 团队开发的 <strong>THE 系统</strong>，六层结构：</p>
+<table>
+<thead>
+<tr>
+<th>层号</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>5</td>
+<td>操作员</td>
+</tr>
+<tr>
+<td>4</td>
+<td>用户程序</td>
+</tr>
+<tr>
+<td>3</td>
+<td>输入/输出管理</td>
+</tr>
+<tr>
+<td>2</td>
+<td>操作员-进程通信</td>
+</tr>
+<tr>
+<td>1</td>
+<td>存储器和磁鼓管理</td>
+</tr>
+<tr>
+<td>0</td>
+<td>处理器分配和多道程序编程</td>
+</tr>
+</tbody></table>
+<ul>
+<li>第 0 层：处理器分配，中断/定时器超时时做进程切换；之上是相互协作的进程。</li>
+<li>第 1 层：内存管理，为主存进程分配空间、控制页面调入调出。</li>
+<li>第 2 层：进程与操作员控制台通信。</li>
+<li>第 3 层：管理 I/O 设备及缓冲区。</li>
+<li>第 4 层：用户程序所在层，无需关心进程/内存/控制台/I/O 细节。</li>
+<li>第 5 层：系统操作员与系统的交互界面。</li>
+</ul>
+<p>分层提高了模块化、可维护性和扩展性。</p>
+<h3 id="6-3-微内核（Microkernel）"><a href="#6-3-微内核（Microkernel）" class="headerlink" title="6.3 微内核（Microkernel）"></a>6.3 微内核（Microkernel）</h3><p>分层设计需要明确划分<strong>内核-用户边界</strong>。传统把所有层放内核，但实际上<strong>内核里的错误难以处理、一出错整个系统就崩</strong>。所以反过来想：<strong>尽量减少内核功能</strong>，让内核最小化。</p>
+<p>微内核把 OS 分成小型、功能明确的模块，<strong>只有一个微内核运行在特权模式（内核态）</strong>，其他模块（设备驱动、文件系统）作为<strong>普通用户进程</strong>运行——即使这些模块崩溃，也不会影响整个系统。<strong>MINIX 3</strong> 是微内核代表作，它的具体结构如下（对比上面的单体内核：这里只有最下面一条灰条在内核态）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">用户态 │ ┌──────────────────────────────────────────┐</span><br><span class="line">       │ │  用户程序：  shell       Make      Other  │  ← 用户进程</span><br><span class="line">       │ ├──────────────────────────────────────────┤</span><br><span class="line">       │ │  服务器：    FS        Proc     Reinc     │  ← 文件/进程/重生</span><br><span class="line">       │ │              Other                        │</span><br><span class="line">       │ ├──────────────────────────────────────────┤</span><br><span class="line">       │ │  设备驱动：  Disk  TTY  New  Print  Other │  ← 无权直接碰 I/O</span><br><span class="line">       │ │        （构造结构 + 系统调用，辗转进内核）   │</span><br><span class="line">       │ ═════════════════════════════════════════════</span><br><span class="line">内核态 │ │  微内核：中断处理 · 进程调度 · 进程通信      │  ← 唯一特权模块</span><br><span class="line">       │ │          （旁挂 Clock、Sys 等小服务）       │</span><br><span class="line">       │ └──────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>有意思的是：<strong>文件系统、进程管理器这些”操作系统核心业务”，在微内核里是作为用户进程跑的</strong>——它们和你的 shell 平级，谁也压不过谁；一旦某个服务器崩溃，只有它自己消失，系统照样运行。</p>
+<ul>
+<li>最底层：设备驱动程序（运行在用户态，无法直接访问 I/O 端口，需构造结构 + 系统调用间接交互）；</li>
+<li>之上一层：<strong>服务器</strong>，包括文件服务器（文件系统）、进程管理器（创建/销毁/管理进程），还有一个特殊的<strong>重生服务器</strong>——检测并修复服务器和驱动程序的故障，无需用户干预自动恢复。</li>
+<li>微内核体现<strong>机制与策略分离</strong>：内核只实现”选择最高优先级进程运行”这个<strong>机制</strong>，而”如何分配优先级”这个<strong>策略</strong>由用户态进程管理器决定。内核精简、易维护、易扩展。</li>
+</ul>
+<h3 id="6-4-客户-服务器模式（Client-Server）"><a href="#6-4-客户-服务器模式（Client-Server）" class="headerlink" title="6.4 客户-服务器模式（Client-Server）"></a>6.4 客户-服务器模式（Client-Server）</h3><p>微内核思想把进程分成两类：<strong>服务器</strong>（提供服务）和<strong>客户端</strong>（使用服务），这就是客户-服务器模式。它有两种载体：一是在一台计算机上既当客户端又当服务器（OS 会优化）；普遍情况是客户端和服务器在<strong>不同机器</strong>上，通过局域网/广域网连接。</p>
+<p><strong>客户端不知道消息在本地还是远程处理</strong>——两种情形对客户端一样：发请求、收回应。现代 Web 就是典型：PC 向某服务器请求网页，服务器返回。越来越多系统（包括家用 PC）成为客户端，某地运行的大型机器成为服务器。</p>
+<hr>
+<h2 id="七、计算机是如何启动的"><a href="#七、计算机是如何启动的" class="headerlink" title="七、计算机是如何启动的"></a>七、计算机是如何启动的</h2><p>主板（母板）上有 <strong>BIOS（基本输入输出系统）</strong>，内含底层 I/O 软件（读键盘、写屏幕、磁盘 I/O 等），如今存在闪存里（非易失但可更新）。</p>
+<p>启动流程：</p>
+<ol>
+<li><strong>BIOS 自检</strong>：检查装了多大 RAM、键盘等基础设备是否正常响应。</li>
+<li><strong>扫描总线</strong>：扫描 PCIe/PCI 总线，找出所有设备，记录即插即用设备；若设备和上次不同则重新配置。</li>
+<li><strong>从 CMOS 清单找启动设备</strong>：CMOS 是主板上可读写的 RAM 芯片，用来保存 BIOS 设置后硬件参数（有时把 BIOS 设置叫 CMOS 设置）。用户可进 BIOS 配置程序修改设备清单，也可判定能否从 CD-ROM/USB 启动。</li>
+<li><strong>从硬盘启动</strong>：启动失败则从硬盘启动，把启动设备<strong>第一个扇区</strong>读入内存执行。它通常检查分区表确定哪个分区是活动的，再从该分区读入<strong>引导加载程序</strong>，这个加载器从活动分区读取操作系统并启动它。</li>
+<li><strong>OS 加载设备驱动</strong>：OS 询问 BIOS 获取配置信息，逐个设备检查是否有驱动；没有则问用户装（CD-ROM 或下载）。有驱动就加载进内核，初始化表、创建后台进程、启动登录程序或 GUI。</li>
+</ol>
+<hr>
+<h2 id="八、操作系统博物馆"><a href="#八、操作系统博物馆" class="headerlink" title="八、操作系统博物馆"></a>八、操作系统博物馆</h2><p>操作系统存在大半个世纪，种类繁多。按应用场景分：</p>
+<ul>
+<li><strong>大型机操作系统</strong>：高端，在大型公司数据中心。I/O 容量与 PC 天差地别，一个大型机有 1000 个磁盘、数百万 G 容量很正常。也用于高端 Web 服务器、大型电商站点。</li>
+<li><strong>服务器操作系统</strong>：运行在服务器上（大型 PC、工作站或大型机），通过网络为多个用户服务、共享软硬件资源，可提供打印/文件/Web 服务。典型：Solaris、FreeBSD、Linux、Windows Server。</li>
+<li><strong>多处理器操作系统</strong>：把多个 CPU 连成一个系统（并行计算机/多计算机/多处理器），需要专门 OS（配通信、连接、一致性功能）。个人电脑多核芯片出现后，Windows/Linux 也能跑多核。</li>
+<li><strong>个人计算机操作系统</strong>：支持多道处理，启动时常有几十个程序在跑，为单个用户提供良好支持（字处理、表格、游戏、上网）。如 Linux、FreeBSD、Windows 7/8、macOS。</li>
+<li><strong>掌上计算机操作系统</strong>：平板、智能手机、PDA，市场被 Android 和 iOS 主导。</li>
+<li><strong>嵌入式操作系统</strong>：控制设备（微波炉、汽车、DVD 刻录机、手机、MP3）里的计算机，不允许用户装软件。所有软件跑在 ROM，应用间无保护，较简化。典型：Linux、QNX、VxWorks。</li>
+<li><strong>传感器节点操作系统</strong>：微小传感器节点网络（可互相通信、用无线基站），用于建筑周边保护、国境界保卫、森林火灾探测、气象预测。每个节点是带 CPU、RAM、ROM 和传感器的真计算机，跑小型事件驱动 OS。</li>
+<li><strong>实时操作系统</strong>：把时间当关键参数。<strong>硬实时</strong>应在规定时刻发生（工业控制、民航、军事）；<strong>软实时</strong>偶尔违反时限还能接受、无永久损害（数字音频/多媒体、智能手机）。</li>
+<li><strong>智能卡操作系统</strong>：最小的 OS，跑在智能卡上（带 CPU 芯片的信用卡），能耗和存储极受限。有的是单功能电子支付，有的是面向 Java（ROM 里有 JVM 解释器）。</li>
+</ul>
+]]></content>
+      <categories>
+        <category>操作系统</category>
+      </categories>
+      <tags>
+        <tag>操作系统</tag>
+        <tag>进程</tag>
+        <tag>线程</tag>
+        <tag>四大件</tag>
+        <tag>系统调用</tag>
+        <tag>虚拟内存</tag>
+        <tag>文件</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>从源代码到可执行文件——初步理解编译、链接与软件构造体系</title>
     <url>/2026/07/17/%E4%BB%8E%E6%BA%90%E4%BB%A3%E7%A0%81%E5%88%B0%E5%8F%AF%E6%89%A7%E8%A1%8C%E6%96%87%E4%BB%B6%E2%80%94%E2%80%94%E5%88%9D%E6%AD%A5%E7%90%86%E8%A7%A3%E7%BC%96%E8%AF%91%E3%80%81%E9%93%BE%E6%8E%A5%E4%B8%8E%E8%BD%AF%E4%BB%B6%E6%9E%84%E9%80%A0%E4%BD%93%E7%B3%BB/</url>
     <content><![CDATA[<h1 id="从源代码到可执行文件——初步理解编译、链接与软件构造体系"><a href="#从源代码到可执行文件——初步理解编译、链接与软件构造体系" class="headerlink" title="从源代码到可执行文件——初步理解编译、链接与软件构造体系"></a>从源代码到可执行文件——初步理解编译、链接与软件构造体系</h1><h2 id="从一个问题出发"><a href="#从一个问题出发" class="headerlink" title="从一个问题出发"></a>从一个问题出发</h2><p>我之前主要使用vs2022,codeblocks,clion等调试运行c&#x2F;c++程序。而昨天我第一次使用vscode 来调试c&#x2F;c++程序，遇到了一个问题：</p>
@@ -19704,80 +19704,233 @@
   <entry>
     <title>数据结构 —— 顺序表</title>
     <url>/2026/07/17/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%20%E2%80%94%E2%80%94%20%E9%A1%BA%E5%BA%8F%E8%A1%A8/</url>
-    <content><![CDATA[<h1 id="数据结构-——-顺序表"><a href="#数据结构-——-顺序表" class="headerlink" title="数据结构 —— 顺序表"></a>数据结构 —— 顺序表</h1><h2 id="什么是顺序表"><a href="#什么是顺序表" class="headerlink" title="什么是顺序表"></a>什么是顺序表</h2><p><strong>顺序表</strong>是线性表的一种存储方式。它的底层就是<strong>数组</strong>——在内存中申请一段连续的空间，依次存放数据元素。</p>
-<blockquote>
+    <content><![CDATA[<h2 id="什么是顺序表"><a href="#什么是顺序表" class="headerlink" title="什么是顺序表"></a>什么是顺序表</h2><p><strong>顺序表</strong>是线性表的一种存储方式。它的底层就是<strong>数组</strong>——在内存中申请一段连续的空间，依次存放数据元素。</p>
 <p>数组本身是静态的（长度固定），而顺序表是在数组外面包了一层，实现了<strong>动态管理</strong>：可以随时添加元素、删除元素、自动扩容。</p>
-</blockquote>
 <p>顺序表和链表的核心区别：</p>
 <ul>
 <li><strong>顺序表</strong>：内存连续，支持随机访问（<code>O(1)</code> 访问任意位置）</li>
 <li><strong>链表</strong>：内存离散，只能顺序访问，但插入删除更灵活</li>
 </ul>
 <hr>
-<h2 id="一、顺序表的结构定义"><a href="#一、顺序表的结构定义" class="headerlink" title="一、顺序表的结构定义"></a>一、顺序表的结构定义</h2><figure class="highlight c"><figcaption><span>SeqTable.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="type">int</span> ElemType;</span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    ElemType * data;    <span class="comment">// 指向堆区数据空间的指针（本质就是一个动态数组）</span></span><br><span class="line">    <span class="type">int</span> length;         <span class="comment">// 当前有效元素个数，同时也是下一个待插入位置的索引</span></span><br><span class="line">    <span class="type">int</span> capacity;       <span class="comment">// 当前数据空间的最大容量，也是边界</span></span><br><span class="line">} SeqList;</span><br></pre></td></tr></table></figure>
+<h2 id="数组"><a href="#数组" class="headerlink" title="数组"></a>数组</h2><h3 id="0-1-数组的特点"><a href="#0-1-数组的特点" class="headerlink" title="0.1 数组的特点"></a>0.1 数组的特点</h3><p><img src="/./../images/data-structure-seqtable/array-memory-model.png"></p>
+<p><strong>内存是连续的</strong>——这是数组最本质的特点，它的所有优点和缺点都从这一条推导出来。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> arr[<span class="number">10</span>];   <span class="comment">// 长度 10，下标 0~9</span></span><br></pre></td></tr></table></figure>
 
-<p>三个成员变量的关系可以用下图理解：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">data  →  [  |  |  |  |  |  |  |  ]   堆区的连续空间</span><br><span class="line">           ↑                  ↑</span><br><span class="line">         data[0]          data[capacity-1]</span><br><span class="line">           </span><br><span class="line">length = 3   ← 当前有3个有效元素</span><br><span class="line">capacity = 8 ← 最多能存8个元素</span><br></pre></td></tr></table></figure>
-
-<p><strong>重点理解 <code>length</code> 的含义</strong>：</p>
 <ul>
-<li><code>length</code> 既是元素个数，也是下一个元素插入位置的索引</li>
+<li>定义数组时，中括号里<strong>必须是常量或常量表达式</strong>，C/C++ 不允许用变量定义数组长度</li>
+<li>数组长度是 10，但<strong>下标是从 0 开始</strong>的，所以只能访问 <code>arr[0]</code> ~ <code>arr[9]</code></li>
+<li>访问 <code>arr[10]</code> 就是<strong>越界访问</strong></li>
+</ul>
+<blockquote>
+<p><strong>越界访问不一定会让程序崩溃。</strong> 有可能程序看起来还在正常运行，但访问到的数据是不是你想要的、算法结果对不对，就完全不确定了。所以绝不要对数组做越界访问。</p>
+</blockquote>
+<p>数组里”长度”和”有效元素个数”是两个不同的概念：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">int arr[10]  = [ 12 | 23 | 45 | 31 | 56 | 82 |   |   |   |   ]</span><br><span class="line">                 0    1    2    3    4    5    6   7   8   9</span><br><span class="line">                 └────────── 有效元素 6 个 ──────────┘</span><br><span class="line">                 └──────────────── 数组长度 10 ────────────────┘</span><br><span class="line">                                               ↑</span><br><span class="line">                                   cur = 6（有效元素个数）</span><br><span class="line">                                  同时也是"末尾元素后继位置"的下标</span><br></pre></td></tr></table></figure>
+
+<p>这个 <code>cur</code> 很关键：它既是<strong>有效元素的个数</strong>，又刚好是<strong>下一个可以插入元素的位置的下标</strong>。</p>
+<h3 id="0-2-下标访问-≠-查找"><a href="#0-2-下标访问-≠-查找" class="headerlink" title="0.2 下标访问 ≠ 查找"></a>0.2 下标访问 ≠ 查找</h3><p>这两个概念一定要分清楚，很多人描述数组的时候把它们混为一谈。</p>
+<p><strong>下标访问（随机访问）</strong>——直接用下标拿元素：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">arr[<span class="number">0</span>];       <span class="comment">// 访问 0 号位</span></span><br><span class="line">arr[<span class="number">9</span>];       <span class="comment">// 访问 9 号位</span></span><br><span class="line">arr[<span class="number">10000</span>];   <span class="comment">// 越界了！</span></span><br></pre></td></tr></table></figure>
+
+<p>因为数组每个元素的内存是连续的，给定下标就能<strong>直接算出地址</strong>，不需要从头找。所以访问 0 号位和访问 10000 号位，花费的时间<strong>一样多</strong>。</p>
+<blockquote>
+<p>**下标访问的时间复杂度是 O(1)**——这是常量时间，跟数组多长、访问哪个位置都无关。</p>
+</blockquote>
+<p><strong>查找（搜索）</strong>——找出某个值在不在数组里：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++)</span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span> (arr[i] == val)</span><br><span class="line">        <span class="keyword">return</span> i;   <span class="comment">// 找到了，返回下标</span></span><br><span class="line">}</span><br><span class="line"><span class="keyword">return</span> <span class="number">-1</span>;          <span class="comment">// 没找到</span></span><br></pre></td></tr></table></figure>
+
+<p>这个必须<strong>从 0 号位开始一个个比对</strong>，数据量越大、找得越慢。</p>
+<blockquote>
+<p>**无序数组的查找时间复杂度是 O(n)**——线性搜索。</p>
+</blockquote>
+<p>对比：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>代码</th>
+<th>时间复杂度</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>下标访问</strong>（随机访问）</td>
+<td><code>arr[i]</code></td>
+<td><strong>O(1)</strong></td>
+<td>直接算地址，与位置无关</td>
+</tr>
+<tr>
+<td><strong>查找</strong>（搜索）</td>
+<td>遍历比对</td>
+<td><strong>O(n)</strong></td>
+<td>必须从头找</td>
+</tr>
+</tbody></table>
+<p>数组的优势是<strong>下标访问快</strong>，不是<strong>查找快</strong>。</p>
+<blockquote>
+<p>另外，有序数组可以<strong>二分搜索</strong>，时间复杂度 O(log n)，不需要线性遍历。</p>
+</blockquote>
+<h3 id="0-3-数组的优点"><a href="#0-3-数组的优点" class="headerlink" title="0.3 数组的优点"></a>0.3 数组的优点</h3><table>
+<thead>
+<tr>
+<th>优点</th>
+<th>时间复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>下标访问（随机访问）效率很高</td>
+<td><strong>O(1)</strong></td>
+</tr>
+<tr>
+<td><strong>末尾</strong>位置增加/删除元素效率很高</td>
+<td><strong>O(1)</strong></td>
+</tr>
+<tr>
+<td>访问前后相邻位置的元素非常方便</td>
+<td>/</td>
+</tr>
+</tbody></table>
+<ul>
+<li>**下标访问 O(1)**：内存连续，直接按地址偏移取值</li>
+<li>**末尾增删 O(1)**：不涉及元素移动。末尾插入就是把值放到 <code>cur</code> 位置然后 <code>cur++</code>；末尾删除就是 <code>cur--</code></li>
+<li><strong>访问相邻元素方便</strong>：内存连续，指针 <code>++</code> 就是下一个元素，指针 <code>--</code> 就是上一个元素</li>
+</ul>
+<h3 id="0-4-数组的缺点"><a href="#0-4-数组的缺点" class="headerlink" title="0.4 数组的缺点"></a>0.4 数组的缺点</h3><table>
+<thead>
+<tr>
+<th>缺点</th>
+<th>时间复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>非末尾位置增加/删除元素效率低下</td>
+<td><strong>O(n)</strong></td>
+</tr>
+<tr>
+<td>搜索/查找（无序数组）的效率低下</td>
+<td><strong>O(n)</strong></td>
+</tr>
+<tr>
+<td>扩容消耗比较大</td>
+<td>/</td>
+</tr>
+</tbody></table>
+<p><strong>非末尾位置增删为什么是 O(n)？</strong></p>
+<p>因为内存必须连续，中间要插入一个元素，就得先把后面所有元素<strong>依次往后挪一位</strong>腾出位置：</p>
+<p><img src="/./../images/data-structure-seqtable/insert-move.png"></p>
+<p>删掉中间的元素也一样，后面的元素要<strong>依次往前挪一位</strong>把空位填上：</p>
+<p><img src="/./../images/data-structure-seqtable/delete-move.png"></p>
+<p>后面元素越多，移动花的时间越多，所以是 **O(n)**。</p>
+<p><strong>注意区分</strong>：末尾位置增删是 **O(1)**，非末尾位置增删是 **O(n)**。说”数组插入删除效率不高”太笼统了，把这两种情况分开说才是准确的回答。</p>
+<p><strong>扩容为什么消耗大？</strong></p>
+<p>数组一旦定义，容量就固定了。要扩容只能：</p>
+<ol>
+<li>在堆上<strong>开辟一块更大的新内存</strong></li>
+<li>把原内存上的数据<strong>全部拷贝过去</strong></li>
+<li><strong>释放原来的内存</strong></li>
+</ol>
+<p>数据量越大，拷贝花的时间越多，所以扩容本身是 **O(n)**。</p>
+<blockquote>
+<p>这也是为什么 <code>vector</code> 底层虽然是数组，但依然能”动态增长”——满了就扩容。</p>
+</blockquote>
+<hr>
+<h2 id="一、C和C-两种实现对比"><a href="#一、C和C-两种实现对比" class="headerlink" title="一、C和C++两种实现对比"></a>一、C和C++两种实现对比</h2><table>
+<thead>
+<tr>
+<th></th>
+<th><strong>C 版</strong></th>
+<th><strong>C++ 版</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数据和行为</td>
+<td>分开的（结构体 + 一堆函数）</td>
+<td>封装在一起（类）</td>
+</tr>
+<tr>
+<td>内存管理</td>
+<td><code>malloc</code> / <code>free</code></td>
+<td><code>new</code> / <code>delete</code></td>
+</tr>
+<tr>
+<td>传参</td>
+<td>显式传 <code>SeqList*</code></td>
+<td>隐含的 <code>this</code> 指针</td>
+</tr>
+<tr>
+<td>访问控制</td>
+<td>无（全靠约定）</td>
+<td><code>public</code> / <code>private</code></td>
+</tr>
+<tr>
+<td>内部细节</td>
+<td><code>static</code> 函数（文件内可见）</td>
+<td><code>private</code> 成员函数</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="二、C-版实现"><a href="#二、C-版实现" class="headerlink" title="二、C 版实现"></a>二、C 版实现</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">01_SeqTable/</span><br><span class="line">├── SeqTable.h    ← 结构体定义 + 函数声明</span><br><span class="line">├── SeqTable.c    ← 函数实现</span><br><span class="line">└── main.c        ← 测试代码</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-1-结构定义"><a href="#2-1-结构定义" class="headerlink" title="2.1 结构定义"></a>2.1 结构定义</h3><figure class="highlight c"><figcaption><span>SeqTable.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> SEQ_TABLE_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> SEQ_TABLE_H</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="type">int</span> ElemType;</span><br><span class="line"><span class="comment">//定义顺序表的表头</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span></span></span><br><span class="line"><span class="class">{</span></span><br><span class="line">    ElemType* data;</span><br><span class="line">    <span class="type">int</span> length;</span><br><span class="line">    <span class="type">int</span> capacity;</span><br><span class="line">}SeqList;</span><br></pre></td></tr></table></figure>
+
+<p>三个成员变量的关系：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">data  →  [  |  |  |  |  |  |  |  ]   堆区的连续空间</span><br><span class="line">           ↑                  ↑</span><br><span class="line">         data[0]          data[capacity-1]</span><br><span class="line"></span><br><span class="line">length   = 3   ← 当前有效元素个数，也是下一个待插入位置的索引</span><br><span class="line">capacity = 8   ← 当前数据空间的最大容量</span><br></pre></td></tr></table></figure>
+
+<p>**重点理解 <code>length</code>**：</p>
+<ul>
+<li>它既是元素个数，也是下一个元素插入位置的索引</li>
 <li>所以 <code>data[length]</code> 就是当前可以放新元素的那个位置</li>
 <li>有效元素的下标范围是 <code>[0, length-1]</code></li>
 </ul>
-<hr>
-<h2 id="二、创建与释放"><a href="#二、创建与释放" class="headerlink" title="二、创建与释放"></a>二、创建与释放</h2><h3 id="2-1-创建顺序表"><a href="#2-1-创建顺序表" class="headerlink" title="2.1 创建顺序表"></a>2.1 创建顺序表</h3><figure class="highlight c"><figcaption><span>SeqTable.c - createSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line">SeqList* <span class="title function_">createSeqList</span><span class="params">(<span class="type">int</span> n)</span> {</span><br><span class="line">    <span class="comment">// 1. 在堆区创建表头结构体</span></span><br><span class="line">    SeqList* seqList = (SeqList*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(SeqList));</span><br><span class="line">    <span class="keyword">if</span> (seqList == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqList failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 在堆区创建数据空间（n个ElemType大小的连续内存）</span></span><br><span class="line">    seqList-&gt;data = (ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType) * n);</span><br><span class="line">    <span class="keyword">if</span> (seqList-&gt;data == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqList-&gt;data failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 初始化成员</span></span><br><span class="line">    seqList-&gt;length = <span class="number">0</span>;</span><br><span class="line">    seqList-&gt;capacity = n;</span><br><span class="line">    <span class="keyword">return</span> seqList;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-函数声明"><a href="#2-2-函数声明" class="headerlink" title="2.2 函数声明"></a>2.2 函数声明</h3><figure class="highlight c"><figcaption><span>SeqTable.h</span></figcaption><table><tr><td class="code"><pre><span class="line">SeqList* <span class="title function_">createSeqList</span><span class="params">(<span class="type">int</span> n)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">releaseSeqList</span><span class="params">(SeqList* seq)</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">enlargerSeqList</span><span class="params">(SeqList* seq)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">pushSeqList</span><span class="params">(SeqList * seq,ElemType val)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">insertSeqList</span><span class="params">(SeqList* seq,ElemType val,<span class="type">int</span> pos)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">deleteSeqList</span><span class="params">(SeqList* seq,ElemType val)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">findSeqList</span><span class="params">(SeqList* seq,ElemType val)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">showSeqList</span><span class="params">(SeqList* seq)</span>;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
 
-<p><strong>为什么表头和数据空间要分两次 malloc？</strong></p>
+<p><strong>关于 <code>static</code><strong>：<code>enlargerSeqList</code> 前面加了 <code>static</code>，意思是</strong>只能在本文件内调用</strong>。扩容是对外隐藏的实现细节，不需要暴露给用户。这是 C 语言实现封装的一种手段。</p>
+<h3 id="2-3-创建与释放"><a href="#2-3-创建与释放" class="headerlink" title="2.3 创建与释放"></a>2.3 创建与释放</h3><figure class="highlight c"><figcaption><span>SeqTable.c - createSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line">SeqList* <span class="title function_">createSeqList</span><span class="params">(<span class="type">int</span> n)</span></span><br><span class="line">{</span><br><span class="line">    SeqList* seq=(SeqList*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(SeqList));</span><br><span class="line">    <span class="keyword">if</span>(seq==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqlist_head failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;data=(ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType)*n);</span><br><span class="line">    <span class="keyword">if</span>(seq-&gt;data==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqlist failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;capacity=n;</span><br><span class="line">    seq-&gt;length=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> seq;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么分两次 malloc？</strong></p>
 <p>因为它们是两块独立的内存：</p>
 <ul>
-<li>表头（<code>SeqList</code> 结构体）存的是”管理信息”——指向数据区的指针、长度、容量</li>
-<li>数据空间（<code>data</code>）才是真正存元素的地方</li>
+<li><strong>表头</strong>（<code>SeqList</code> 结构体）存管理信息——指向数据区的指针、长度、容量</li>
+<li><strong>数据区</strong>（<code>data</code>）才是真正存元素的地方</li>
 </ul>
 <p>如果合在一起，扩容的时候就没办法只扩大数据区了。</p>
-<h3 id="2-2-释放顺序表"><a href="#2-2-释放顺序表" class="headerlink" title="2.2 释放顺序表"></a>2.2 释放顺序表</h3><figure class="highlight c"><figcaption><span>SeqTable.c - releaseSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">releaseSeqList</span><span class="params">(SeqList* seq)</span> {</span><br><span class="line">    <span class="keyword">if</span> (seq) {</span><br><span class="line">        <span class="keyword">if</span> (seq-&gt;data) {</span><br><span class="line">            <span class="built_in">free</span>(seq-&gt;data);   <span class="comment">// 先释放数据空间</span></span><br><span class="line">            seq-&gt;data = <span class="literal">NULL</span>;  <span class="comment">// 置空，防止野指针</span></span><br><span class="line">        }</span><br><span class="line">        <span class="built_in">free</span>(seq);             <span class="comment">// 再释放表头</span></span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><figcaption><span>SeqTable.c - releaseSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">releaseSeqList</span><span class="params">(SeqList* seq)</span></span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span>(seq)</span><br><span class="line">    {</span><br><span class="line">        <span class="keyword">if</span>(seq-&gt;data)</span><br><span class="line">        {</span><br><span class="line">            <span class="built_in">free</span>(seq-&gt;data);</span><br><span class="line">            seq-&gt;data=<span class="literal">NULL</span>;</span><br><span class="line">        }</span><br><span class="line">        <span class="built_in">free</span>(seq);</span><br><span class="line">        seq=<span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
 
-<p>释放顺序和创建顺序相反：<strong>先释放数据区，再释放表头</strong>。每次 free 之后顺手置 NULL，是好习惯。</p>
-<hr>
-<h2 id="三、插入操作"><a href="#三、插入操作" class="headerlink" title="三、插入操作"></a>三、插入操作</h2><h3 id="3-1-尾插法（pushback）"><a href="#3-1-尾插法（pushback）" class="headerlink" title="3.1 尾插法（pushback）"></a>3.1 尾插法（pushback）</h3><figure class="highlight c"><figcaption><span>SeqTable.c - pushbackSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">pushbackSeqList</span><span class="params">(SeqList* seq, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 如果空间满了，先尝试扩容，如果扩容失败了，返回</span></span><br><span class="line">    <span class="keyword">if</span> ((seq-&gt;length &gt;= seq-&gt;capacity) &amp;&amp; (enlargerSeqList(seq))) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"扩容失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 在length位置放入新元素</span></span><br><span class="line">    seq-&gt;data[seq-&gt;length] = val;</span><br><span class="line">    seq-&gt;length++;   <span class="comment">// 有效元素个数+1</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>释放顺序和创建顺序<strong>相反</strong>：先释放数据区，再释放表头。每次 free 之后顺手置 NULL，防止野指针。</p>
+<h3 id="2-4-尾插法"><a href="#2-4-尾插法" class="headerlink" title="2.4 尾插法"></a>2.4 尾插法</h3><figure class="highlight c"><figcaption><span>SeqTable.c - pushSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">//尾插法</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">pushSeqList</span><span class="params">(SeqList * seq,ElemType val)</span></span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span>(seq==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"seqlist not exist\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//如果容量小于等于长度就扩容，扩容失败就返回</span></span><br><span class="line">    <span class="keyword">if</span>(seq-&gt;capacity&lt;=seq-&gt;length &amp;&amp; enlargerSeqList(seq))</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"fail to enlarger space\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;data[seq-&gt;length]=val;</span><br><span class="line">    seq-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
 
-<p>尾插法效率最高——**时间复杂度 O(1)**，因为不需要移动任何元素，直接在末尾追加即可。</p>
-<p><strong>关于条件判断的写法</strong>：这里用了 <code>A &amp;&amp; B</code> 的短路特性——只有 <code>length &gt;= capacity</code>（真需要扩容）时，才会去调用扩容函数。这是竞赛/面试中常见的简洁写法。</p>
-<h3 id="3-2-任意位置插入（insert）"><a href="#3-2-任意位置插入（insert）" class="headerlink" title="3.2 任意位置插入（insert）"></a>3.2 任意位置插入（insert）</h3><figure class="highlight c"><figcaption><span>SeqTable.c - insertSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertSeqList</span><span class="params">(SeqList* seq, <span class="type">int</span> pos, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 插入元素的范围校验：pos必须在 [0, length] 之间</span></span><br><span class="line">    <span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; seq-&gt;length) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"pos invalid\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 顺序表的容量校验：length必须小于容量，或者扩容必须成功</span></span><br><span class="line">    <span class="keyword">if</span> ((seq-&gt;length &gt;= seq-&gt;capacity) &amp;&amp; (enlargerSeqList(seq))) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"扩容失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 从后往前，把pos及之后的元素都往后移一位</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = seq-&gt;length - <span class="number">1</span>; i &gt;= pos; i--) {</span><br><span class="line">        seq-&gt;data[i + <span class="number">1</span>] = seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 4. 插入新元素，更新length</span></span><br><span class="line">    seq-&gt;data[pos] = val;</span><br><span class="line">    seq-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>尾插效率最高——**时间复杂度 O(1)**，不需要移动任何元素，直接放在 <code>data[length]</code> 位置即可。</p>
+<p><strong>关于 <code>A &amp;&amp; B</code> 的短路写法</strong>：只有 <code>capacity &lt;= length</code>（真需要扩容）时，才会去调用扩容函数。如果容量够用，短路特性会让 <code>enlargerSeqList</code> 根本不执行。这是竞赛和面试中常见的简洁写法。</p>
+<h3 id="2-5-任意位置插入"><a href="#2-5-任意位置插入" class="headerlink" title="2.5 任意位置插入"></a>2.5 任意位置插入</h3><figure class="highlight c"><figcaption><span>SeqTable.c - insertSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">//任意位置插入</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">insertSeqList</span><span class="params">(SeqList* seq,ElemType val,<span class="type">int</span> pos)</span></span><br><span class="line">{</span><br><span class="line">    <span class="comment">//先检查插入位置是否合理</span></span><br><span class="line">    <span class="keyword">if</span>(pos&lt;<span class="number">0</span>||pos&gt;seq-&gt;length)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"invalid pos\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//再检查是否有多余空间</span></span><br><span class="line">    <span class="comment">//如果容量小于等于长度就扩容，扩容失败就返回</span></span><br><span class="line">    <span class="keyword">if</span>(seq-&gt;capacity&lt;=seq-&gt;length &amp;&amp; enlargerSeqList(seq))</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"fail to enlarger space\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//在指定位置插入前，先从后往前，把每一项都往后移一位</span></span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=seq-&gt;length<span class="number">-1</span>;i&gt;=pos;i--)</span><br><span class="line">    {</span><br><span class="line">        seq-&gt;data[i+<span class="number">1</span>]=seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;data[pos]=val;</span><br><span class="line">    seq-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
 
-<p><strong>核心操作：从后往前移动元素</strong></p>
-<p>为什么必须从后往前？——因为 <code>data[i+1] = data[i]</code>，如果用从前往后移动，前面的元素会覆盖后面的元素，造成数据丢失。</p>
-<p>**时间复杂度 O(n)**：最坏情况是在头部插入，所有元素都要后移。</p>
-<h3 id="插入操作的图解"><a href="#插入操作的图解" class="headerlink" title="插入操作的图解"></a>插入操作的图解</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">初始状态：                   length=5</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 |   |   ]</span><br><span class="line"></span><br><span class="line">在 pos=0 处插入 200：</span><br><span class="line">                           length=5</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 |   |   ]</span><br><span class="line">         ↑</span><br><span class="line">        从后往前移动元素</span><br><span class="line"></span><br><span class="line">第1步：i=4</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 | 5 |   ]</span><br><span class="line">第2步：i=3</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 4 | 5 |   ]</span><br><span class="line">第3步：i=2</span><br><span class="line">data → [ 1 | 2 | 3 | 3 | 4 | 5 |   ]</span><br><span class="line">第4步：i=1</span><br><span class="line">data → [ 1 | 2 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line">第5步：i=0</span><br><span class="line">data → [ 1 | 1 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line"></span><br><span class="line">插入 200：            length=6</span><br><span class="line">data → [200| 1 | 2 | 3 | 4 | 5 |   ]</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="四、删除操作"><a href="#四、删除操作" class="headerlink" title="四、删除操作"></a>四、删除操作</h2><figure class="highlight c"><figcaption><span>SeqTable.c - deleteSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">deleteSeqList</span><span class="params">(SeqList* seq, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 先找到要删除的元素的位置</span></span><br><span class="line">    <span class="type">int</span> pos = findSeqList(seq, val);</span><br><span class="line">    <span class="keyword">if</span> (pos == <span class="number">-1</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"该元素不存在\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 从前往后，把后面的元素依次向前覆盖</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = pos; i &lt; seq-&gt;length - <span class="number">1</span>; i++) {</span><br><span class="line">        seq-&gt;data[i] = seq-&gt;data[i + <span class="number">1</span>];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 更新length</span></span><br><span class="line">    seq-&gt;length--;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-
-<p><strong>核心操作：从前往后移动元素</strong></p>
-<p>插入是从后往前，删除是从前往后——因为 <code>data[i] = data[i+1]</code>，用后面的元素覆盖前面的。</p>
-<p>**时间复杂度 O(n)**：最坏情况是删除头部元素，后面所有元素都要前移。</p>
-<blockquote>
-<p>注意这里用的是”按值删除”——先找到值对应的位置，再删除。也可以用”按位置删除”（直接传 pos），更常见的做法是把 find 和 delete 分开。</p>
-</blockquote>
-<hr>
-<h2 id="五、查找操作"><a href="#五、查找操作" class="headerlink" title="五、查找操作"></a>五、查找操作</h2><figure class="highlight c"><figcaption><span>SeqTable.c - findSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">findSeqList</span><span class="params">(SeqList* seq, ElemType val)</span> {</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; seq-&gt;length; i++) {</span><br><span class="line">        <span class="keyword">if</span> (seq-&gt;data[i] == val)</span><br><span class="line">            <span class="keyword">return</span> i;       <span class="comment">// 找到了，返回下标</span></span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;               <span class="comment">// 没找到，返回 -1</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-
-<p>非常直观的<strong>顺序查找</strong>，时间复杂度 O(n)。如果数据有序，可以用二分查找优化到 O(log n)。</p>
-<hr>
-<h2 id="六、扩容机制"><a href="#六、扩容机制" class="headerlink" title="六、扩容机制"></a>六、扩容机制</h2><figure class="highlight c"><figcaption><span>SeqTable.c - enlargerSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">enlargerSeqList</span><span class="params">(SeqList* seq)</span> {</span><br><span class="line">    <span class="comment">// 1. 申请更大的新空间（2倍扩容）</span></span><br><span class="line">    ElemType* temp = (ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType) * seq-&gt;capacity * <span class="number">2</span>);</span><br><span class="line">    <span class="keyword">if</span> (temp == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创造新的数据空间失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 把原数据拷贝到新空间</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; seq-&gt;length; i++) {</span><br><span class="line">        temp[i] = seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 释放原空间，更新指针和容量</span></span><br><span class="line">    <span class="built_in">free</span>(seq-&gt;data);</span><br><span class="line">    seq-&gt;data = temp;</span><br><span class="line">    seq-&gt;capacity *= <span class="number">2</span>;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"扩容成功\n"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-
-<p><strong>关于 <code>static</code> 关键字</strong>：这里把 <code>enlargerSeqList</code> 声明为 <code>static</code>，意思是<strong>只能在本文件内调用</strong>。对外部来说，扩容是内部实现细节，不需要暴露给用户。这是 C 语言实现封装的一种手段。</p>
-<p><strong>为什么是 2 倍扩容？</strong></p>
+<p><strong>位置校验的范围</strong>：<code>pos</code> 必须在 <code>[0, length]</code> 之间。</p>
 <ul>
-<li>如果一次只扩 1 个空间，每次插入都要扩容，效率极低</li>
-<li>2 倍扩容是一种常见的折中策略——既不会频繁扩容，又不会浪费太多内存</li>
-<li>STL 中 <code>vector</code> 也是类似的思路（不同编译器倍数不同，通常是 1.5~2 倍）</li>
+<li><code>pos &lt; 0</code> 不合法</li>
+<li><code>pos &gt; length</code> 不合法</li>
+<li><code>pos == length</code> <strong>是合法的</strong>——相当于在末尾插入</li>
 </ul>
-<hr>
-<h2 id="七、完整测试代码"><a href="#七、完整测试代码" class="headerlink" title="七、完整测试代码"></a>七、完整测试代码</h2><figure class="highlight c"><figcaption><span>main.c</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> {</span><br><span class="line">    <span class="type">int</span> n = <span class="number">5</span>;</span><br><span class="line">    SeqList* seq = createSeqList(n);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 尾插 5 个元素</span></span><br><span class="line">    pushbackSeqList(seq, <span class="number">1</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">2</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">3</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">4</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">5</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：1 2 3 4 5</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 尾插触发扩容（当前容量=5，已有5个元素，再插需要扩容）</span></span><br><span class="line">    pushbackSeqList(seq, <span class="number">300</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：1 2 3 4 5 300（扩容到10）</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 在头部插入200</span></span><br><span class="line">    insertSeqList(seq, <span class="number">0</span>, <span class="number">200</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：200 1 2 3 4 5 300</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 删除值为3的元素</span></span><br><span class="line">    deleteSeqList(seq, <span class="number">3</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：200 1 2 4 5 300</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 释放</span></span><br><span class="line">    releaseSeqList(seq);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p><strong>核心操作：从后往前移动元素</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">初始：                    length=5</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 |   |   ]</span><br><span class="line"></span><br><span class="line">在 pos=0 处插入 200：</span><br><span class="line"></span><br><span class="line">第1步 i=4：data → [ 1 | 2 | 3 | 4 | 5 | 5 |   ]</span><br><span class="line">第2步 i=3：data → [ 1 | 2 | 3 | 4 | 4 | 5 |   ]</span><br><span class="line">第3步 i=2：data → [ 1 | 2 | 3 | 3 | 4 | 5 |   ]</span><br><span class="line">第4步 i=1：data → [ 1 | 2 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line">第5步 i=0：data → [ 1 | 1 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line"></span><br><span class="line">插入 200：       → [200| 1 | 2 | 3 | 4 | 5 |   ]</span><br></pre></td></tr></table></figure>
 
-<hr>
-<h2 id="八、复习要点总结"><a href="#八、复习要点总结" class="headerlink" title="八、复习要点总结"></a>八、复习要点总结</h2><table>
+<p><strong>为什么必须从后往前？</strong> 因为写的是 <code>data[i+1] = data[i]</code>。如果从前往后移动，前面的元素会先把后面的覆盖掉，数据就丢了。</p>
+<p>**时间复杂度 O(n)**：最坏情况是在头部插入，所有元素都要后移。</p>
+<h3 id="2-6-查找"><a href="#2-6-查找" class="headerlink" title="2.6 查找"></a>2.6 查找</h3><figure class="highlight c"><figcaption><span>SeqTable.c - findSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">findSeqList</span><span class="params">(SeqList* seq,ElemType val)</span></span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span>(seq==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"seqlist not exist\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;seq-&gt;length;i++)</span><br><span class="line">    {</span><br><span class="line">        <span class="keyword">if</span>(seq-&gt;data[i]==val)</span><br><span class="line">        <span class="keyword">return</span> i;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>非常直观的<strong>顺序查找</strong>，时间复杂度 O(n)。找到了返回下标，没找到返回 -1。</p>
+<p><strong>注意 <code>return -1</code> 的位置</strong>：必须在<strong>整个循环结束之后</strong>再返回 -1。如果写在循环里，第一个元素没匹配上就直接返回 -1 了，后面的元素根本没机会比对。</p>
+<h3 id="2-7-删除"><a href="#2-7-删除" class="headerlink" title="2.7 删除"></a>2.7 删除</h3><figure class="highlight c"><figcaption><span>SeqTable.c - deleteSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">deleteSeqList</span><span class="params">(SeqList* seq,ElemType val)</span></span><br><span class="line">{</span><br><span class="line">    <span class="type">int</span> pos=findSeqList(seq,val);</span><br><span class="line">    <span class="keyword">if</span>(pos==<span class="number">-1</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"can't find %d\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=pos;i&lt;seq-&gt;length<span class="number">-1</span>;i++)</span><br><span class="line">    {</span><br><span class="line">        seq-&gt;data[i]=seq-&gt;data[i+<span class="number">1</span>];</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;length--;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>这里用的是<strong>按值删除</strong>——先调用 <code>findSeqList</code> 找到位置，再删除。<strong>查找和删除分开</strong>，是更常见的做法。</p>
+<p><strong>核心操作：从前往后移动元素</strong></p>
+<p>插入是从后往前，删除是从前往后——因为这里写的是 <code>data[i] = data[i+1]</code>，用后面的元素覆盖前面的。</p>
+<p>**时间复杂度 O(n)**：最坏情况是删除头部元素，后面所有元素都要前移。</p>
+<h3 id="2-8-扩容"><a href="#2-8-扩容" class="headerlink" title="2.8 扩容"></a>2.8 扩容</h3><figure class="highlight c"><figcaption><span>SeqTable.c - enlargerSeqList</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">enlargerSeqList</span><span class="params">(SeqList* seq)</span></span><br><span class="line">{</span><br><span class="line">    <span class="comment">//第一步，申请更大的空间--2倍</span></span><br><span class="line">    ElemType* temp=(ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType)*<span class="number">2</span>*seq-&gt;capacity);</span><br><span class="line">    <span class="keyword">if</span>(temp==<span class="literal">NULL</span>){</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc larger space failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//第二步，把原本的数据全部复制到新的空间里</span></span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;seq-&gt;length;i++)</span><br><span class="line">    {</span><br><span class="line">        temp[i]=seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//第三步，释放原来的数据空间</span></span><br><span class="line">    <span class="built_in">free</span>(seq-&gt;data);</span><br><span class="line">    <span class="comment">//第四步，更新数据指针和容量</span></span><br><span class="line">    seq-&gt;data=temp;</span><br><span class="line">    seq-&gt;capacity*=<span class="number">2</span>;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"enlarger space success\n"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>扩容四步：<strong>申请新空间 → 拷贝数据 → 释放旧空间 → 更新指针和容量</strong>。</p>
+<p><strong><code>sizeof</code> 里的类型要注意</strong>：这里必须写 <code>sizeof(ElemType)</code>，不能写成 <code>sizeof(ElemType*)</code>。写错了（比如 <code>ElemType</code> 是 <code>int</code> 时写成了指针大小）会多申请一倍内存——程序不一定崩，但内存就白白浪费了。</p>
+<h3 id="2-9-测试代码"><a href="#2-9-测试代码" class="headerlink" title="2.9 测试代码"></a>2.9 测试代码</h3><figure class="highlight c"><figcaption><span>main.c</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">"SeqTable.h"</span></span></span><br><span class="line"><span class="type">void</span> <span class="title function_">test01</span><span class="params">()</span></span><br><span class="line">{</span><br><span class="line">    SeqList* seq=createSeqList(<span class="number">5</span>);</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">5</span>;i++)</span><br><span class="line">    {</span><br><span class="line">        pushSeqList(seq,i+<span class="number">100</span>);</span><br><span class="line">    }</span><br><span class="line">    showSeqList(seq);</span><br><span class="line">    insertSeqList(seq,<span class="number">2026</span>,<span class="number">2</span>);</span><br><span class="line">    showSeqList(seq);</span><br><span class="line">    releaseSeqList(seq);</span><br><span class="line">}</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">{</span><br><span class="line">    test01();</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-10-C-版小结"><a href="#2-10-C-版小结" class="headerlink" title="2.10 C 版小结"></a>2.10 C 版小结</h3><table>
 <thead>
 <tr>
 <th>操作</th>
@@ -19793,7 +19946,7 @@
 <tr>
 <td>尾插</td>
 <td>O(1)</td>
-<td>直接放 data[length] 即可</td>
+<td>直接放 <code>data[length]</code></td>
 </tr>
 <tr>
 <td>任意位置插入</td>
@@ -19808,7 +19961,7 @@
 <tr>
 <td>查找</td>
 <td>O(n)</td>
-<td>顺序遍历</td>
+<td>顺序遍历，找不到返回 -1</td>
 </tr>
 <tr>
 <td>扩容</td>
@@ -19816,13 +19969,309 @@
 <td>2 倍扩容 + 拷贝数据</td>
 </tr>
 </tbody></table>
-<p><strong>面试常问的几个细节</strong>：</p>
+<hr>
+<h2 id="三、C-版实现"><a href="#三、C-版实现" class="headerlink" title="三、C++ 版实现"></a>三、C++ 版实现</h2><p>换成 C++ 之后，顺序表变成一个<strong>类</strong>：数据（成员变量）和行为（成员函数）封装在一起。</p>
+<p>文件划分（三个文件）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">01_Array/</span><br><span class="line">├── Array.h     ← 类的声明</span><br><span class="line">├── Array.cpp   ← 类的实现</span><br><span class="line">└── main.cpp    ← 测试代码</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-1-类的声明"><a href="#3-1-类的声明" class="headerlink" title="3.1 类的声明"></a>3.1 类的声明</h3><figure class="highlight cpp"><figcaption><span>Array.h</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">pragma</span> once</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 可扩容的数组实现（动态数组）</span></span><br><span class="line"><span class="comment">// 内存开辟在堆区，容量不足时自动 2 倍扩容</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Array</span></span><br><span class="line">{</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="built_in">Array</span>(<span class="type">int</span> size = <span class="number">10</span>);		<span class="comment">// 构造函数：指定初始容量，默认 10</span></span><br><span class="line">	~<span class="built_in">Array</span>();					<span class="comment">// 析构函数：释放堆内存</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="comment">//----------- 增删改查接口 -----------</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">push_back</span><span class="params">(<span class="type">int</span> val)</span></span>;	<span class="comment">// 末尾增加元素</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">pop_back</span><span class="params">()</span></span>;			<span class="comment">// 末尾删除元素</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">insert</span><span class="params">(<span class="type">int</span> pos, <span class="type">int</span> val)</span></span>;	<span class="comment">// 按位置增加元素</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">erase</span><span class="params">(<span class="type">int</span> pos)</span></span>;		<span class="comment">// 按位置删除元素</span></span><br><span class="line">	<span class="function"><span class="type">int</span>  <span class="title">find</span><span class="params">(<span class="type">int</span> val)</span></span>;			<span class="comment">// 元素查询，返回下标，找不到返回 -1</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">show</span><span class="params">()</span> <span class="type">const</span></span>;			<span class="comment">// 打印数组</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">expand</span><span class="params">(<span class="type">int</span> size)</span></span>;		<span class="comment">// 内部接口：把数组扩容到 size 大小</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	<span class="type">int</span>* mpArr;		<span class="comment">// 指针，指向堆区的数组内存</span></span><br><span class="line">	<span class="type">int</span>  mCap;		<span class="comment">// 数组容量（堆内存总大小）</span></span><br><span class="line">	<span class="type">int</span>  mCur;		<span class="comment">// 数组有效元素个数，也是末尾元素后继位置的下标</span></span><br><span class="line">};</span><br></pre></td></tr></table></figure>
+
+<p><strong>和 C 版对比</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>C 版</th>
+<th>C++ 版</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>typedef struct {...} SeqList;</code></td>
+<td><code>class Array {...};</code></td>
+</tr>
+<tr>
+<td><code>SeqList* seq</code> 显式传参</td>
+<td>隐含的 <code>this</code> 指针</td>
+</tr>
+<tr>
+<td><code>static int enlargerSeqList(...)</code></td>
+<td><code>private: void expand(...)</code></td>
+</tr>
+<tr>
+<td>函数散落在头文件里</td>
+<td>按 <code>public</code> / <code>private</code> 分区</td>
+</tr>
+</tbody></table>
+<p>**<code>#pragma once</code>**：告诉编译器这个头文件只被包含一次，作用相当于 C 版的 <code>#ifndef / #define / #endif</code>，但写起来更简洁。</p>
+<p><strong>三个成员变量和 C 版一一对应</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>C 版</th>
+<th>C++ 版</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>data</code></td>
+<td><code>mpArr</code></td>
+<td>指向堆区数组内存</td>
+</tr>
+<tr>
+<td><code>capacity</code></td>
+<td><code>mCap</code></td>
+<td>数组容量</td>
+</tr>
+<tr>
+<td><code>length</code></td>
+<td><code>mCur</code></td>
+<td>有效元素个数</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><code>m</code> 前缀是 member 的意思，表示这是成员变量——这是 C++ 里常见的命名习惯，方便和局部变量区分。</p>
+</blockquote>
+<h3 id="3-2-构造函数与析构函数"><a href="#3-2-构造函数与析构函数" class="headerlink" title="3.2 构造函数与析构函数"></a>3.2 构造函数与析构函数</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - 构造/析构</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 构造函数：开辟堆内存，初始化成员变量</span></span><br><span class="line">Array::<span class="built_in">Array</span>(<span class="type">int</span> size) : <span class="built_in">mCur</span>(<span class="number">0</span>), <span class="built_in">mCap</span>(size)</span><br><span class="line">{</span><br><span class="line">	mpArr = <span class="keyword">new</span> <span class="type">int</span>[mCap]();</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// 析构函数：释放指针指向的堆内存</span></span><br><span class="line">Array::~<span class="built_in">Array</span>()</span><br><span class="line">{</span><br><span class="line">	<span class="keyword">delete</span>[] mpArr;		<span class="comment">// 释放指针指向的堆内存</span></span><br><span class="line">	mpArr = <span class="literal">nullptr</span>;	<span class="comment">// 防止野指针出现</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>和 C 版的对应关系</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>C 版</th>
+<th>C++ 版</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>createSeqList(n)</code></td>
+<td><code>Array(int size = 10)</code> 构造函数</td>
+</tr>
+<tr>
+<td><code>releaseSeqList(seq)</code></td>
+<td><code>~Array()</code> 析构函数</td>
+</tr>
+<tr>
+<td><code>malloc(sizeof(SeqList))</code> + <code>malloc(...)</code></td>
+<td>对象本身由编译器管理，只需 <code>new int[mCap]</code></td>
+</tr>
+<tr>
+<td><code>free(seq-&gt;data)</code> + <code>free(seq)</code></td>
+<td>只需 <code>delete[] mpArr</code></td>
+</tr>
+</tbody></table>
+<p><strong>构造函数初始化列表</strong>：<code>Array::Array(int size) : mCur(0), mCap(size)</code>——冒号后面这一串就是初始化列表，在进入函数体之前就把成员变量初始化好。</p>
+<p><strong>为什么数组不用初始化？</strong> <code>new int[mCap]()</code> 后面加小括号会把每个元素初始化为 0。其实不加也行——因为访问数组是通过 <code>mCur</code> 控制的，<code>mCur</code> 是 0 就表示没有有效元素，根本不会去访问。</p>
+<p><strong>默认参数</strong>：<code>int size = 10</code> 表示用户不传参时默认容量是 10，这样 <code>Array arr;</code> 和 <code>Array arr(20);</code> 都能用。</p>
+<p><strong>析构函数里为什么置 <code>nullptr</code>？</strong> <code>delete[] mpArr</code> 只是把指针指向的堆内存释放了，指针本身还存着那个已经失效的地址——这就是<strong>野指针</strong>。置空可以防止后续误用。</p>
+<blockquote>
+<p>顺带说明：对空指针做 <code>delete</code> 是安全的（相当于空操作），所以没必要写 <code>if (mpArr != nullptr)</code> 再 delete。真正要由开发者保证的是：<strong>这个指针确实指向一块有效的堆内存</strong>。</p>
+</blockquote>
+<h3 id="3-3-末尾增删"><a href="#3-3-末尾增删" class="headerlink" title="3.3 末尾增删"></a>3.3 末尾增删</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - push_back</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 末尾增加元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(1)；若触发扩容则为 O(n)</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::push_back</span><span class="params">(<span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="comment">// 如果空间满了，先扩容</span></span><br><span class="line">	<span class="keyword">if</span> (mCur == mCap)</span><br><span class="line">	{</span><br><span class="line">		<span class="built_in">expand</span>(<span class="number">2</span> * mCap);</span><br><span class="line">	}</span><br><span class="line">	mpArr[mCur++] = val;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><figcaption><span>Array.cpp - pop_back</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 末尾删除元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(1)，不涉及元素移动</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::pop_back</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">if</span> (mCur == <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line">	mCur--;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>mpArr[mCur++] = val;</code></strong> 这一行做了两件事：先把 <code>val</code> 写到 <code>mCur</code> 位置，然后 <code>mCur</code> 自增 1。因为 <code>mCur</code> 既是元素个数、又是末尾元素的后继位置，所以直接写在它那个位置就对了。</p>
+<p><strong>末尾删除为什么这么简单？</strong> 因为只需要 <code>mCur--</code>。被”删除”的那个元素的值还在内存里，但 <code>mCur</code> 变小了，访问范围就缩小了，那个位置<strong>再也访问不到</strong>——相当于删掉了。不需要真的把值清零。</p>
+<p>**扩容判断用 <code>==</code> 而不是 <code>&lt;=</code>**：因为 <code>mCur</code> 每次最多加 1，不会跳过 <code>mCap</code>。</p>
+<h3 id="3-4-按位置插入"><a href="#3-4-按位置插入" class="headerlink" title="3.4 按位置插入"></a>3.4 按位置插入</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - insert</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 按位置增加元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(n)，非末尾位置需要移动元素</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::insert</span><span class="params">(<span class="type">int</span> pos, <span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="comment">// 判断插入位置是否合法，pos == mCur 相当于末尾插入</span></span><br><span class="line">	<span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; mCur)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 如果空间满了，先扩容</span></span><br><span class="line">	<span class="keyword">if</span> (mCur == mCap)</span><br><span class="line">	{</span><br><span class="line">		<span class="built_in">expand</span>(<span class="number">2</span> * mCap);</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 从后往前移动元素，给 pos 位置腾出空位</span></span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = mCur - <span class="number">1</span>; i &gt;= pos; i--)</span><br><span class="line">	{</span><br><span class="line">		mpArr[i + <span class="number">1</span>] = mpArr[i];</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 插入元素</span></span><br><span class="line">	mpArr[pos] = val;</span><br><span class="line">	mCur++;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>逻辑和 C 版完全一致：**校验位置 → 扩容检查 → 从后往前挪元素 → 写入 → <code>mCur++</code>**。</p>
+<p>移动方向和原因也和 C 版一样——必须<strong>从后往前</strong>，否则前面的元素会覆盖后面的。</p>
+<h3 id="3-5-按位置删除"><a href="#3-5-按位置删除" class="headerlink" title="3.5 按位置删除"></a>3.5 按位置删除</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - erase</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 按位置删除元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(n)，非末尾位置需要移动元素</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::erase</span><span class="params">(<span class="type">int</span> pos)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="comment">// 判断位置是否合法，末尾元素的后继位置没有元素，不能删</span></span><br><span class="line">	<span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt;= mCur)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 从前往后移动元素，覆盖掉被删除的位置</span></span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = pos + <span class="number">1</span>; i &lt; mCur; i++)</span><br><span class="line">	{</span><br><span class="line">		mpArr[i - <span class="number">1</span>] = mpArr[i];</span><br><span class="line">	}</span><br><span class="line">	mCur--;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>删除和插入的校验范围不一样</strong>，这点容易记错：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>合法范围</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>insert(pos, val)</code></td>
+<td><code>0 &lt;= pos &lt;= mCur</code></td>
+<td><code>pos == mCur</code> 相当于末尾插入，合法</td>
+</tr>
+<tr>
+<td><code>erase(pos)</code></td>
+<td><code>0 &lt;= pos &lt; mCur</code></td>
+<td><code>pos == mCur</code> 是末尾元素的后继位置，那里没有元素，不能删</td>
+</tr>
+</tbody></table>
+<p><strong>为什么用按位置删除，而不是按值删除？</strong></p>
+<p><strong>先 <code>find</code> 拿到下标，再按位置删</strong>——两个接口配合起来更灵活，也更通用。</p>
+<p>这和 C 版的 <code>deleteSeqList</code>（内部调 <code>findSeqList</code> 再删）是同一个思路，只是 C++ 版把这一步<strong>拆开交给了调用者</strong>。</p>
+<h3 id="3-6-查找"><a href="#3-6-查找" class="headerlink" title="3.6 查找"></a>3.6 查找</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - find</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 元素查询（线性搜索）</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(n)；若数组有序可改用二分搜索 O(logn)</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">Array::find</span><span class="params">(<span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; mCur; i++)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">if</span> (mpArr[i] == val)</span><br><span class="line">			<span class="keyword">return</span> i;</span><br><span class="line">	}</span><br><span class="line">	<span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>和 C 版的 <code>findSeqList</code> 逻辑完全一样：遍历比对，找到了返回下标，循环结束还没找到返回 -1。</p>
+<h3 id="3-7-打印"><a href="#3-7-打印" class="headerlink" title="3.7 打印"></a>3.7 打印</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - show</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 打印数组</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::show</span><span class="params">()</span> <span class="type">const</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; mCur; i++)</span><br><span class="line">	{</span><br><span class="line">		cout &lt;&lt; mpArr[i] &lt;&lt; <span class="string">" "</span>;</span><br><span class="line">	}</span><br><span class="line">	cout &lt;&lt; endl;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>const</code> 修饰</strong>：写在函数后面表示这是一个<strong>常成员函数</strong>，它不会修改对象的任何成员变量。这是 C++ 的约束——如果 <code>show</code> 里不小心写了修改成员变量的代码，编译器会直接报错。</p>
+<h3 id="3-8-扩容"><a href="#3-8-扩容" class="headerlink" title="3.8 扩容"></a>3.8 扩容</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - expand</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="comment">// 内部数组扩容接口</span></span><br><span class="line"><span class="comment">// 扩容消耗较大：开辟新内存 + 拷贝数据 + 释放旧内存</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::expand</span><span class="params">(<span class="type">int</span> size)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="type">int</span>* p = <span class="keyword">new</span> <span class="type">int</span>[size];					<span class="comment">// 开辟新的内存空间</span></span><br><span class="line">	<span class="built_in">memcpy</span>(p, mpArr, <span class="built_in">sizeof</span>(<span class="type">int</span>) * mCap);	<span class="comment">// 把原内存上的数据拷贝过来</span></span><br><span class="line">	<span class="keyword">delete</span>[] mpArr;							<span class="comment">// 释放原内存</span></span><br><span class="line"></span><br><span class="line">	mpArr = p;</span><br><span class="line">	mCap = size;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>和 C 版 <code>enlargerSeqList</code> 是<strong>同样的四步</strong>：开辟新内存 → 拷贝数据 → 释放旧内存 → 更新指针和容量。</p>
+<p>注意：</p>
+<ul>
+<li><strong><code>memcpy</code> 是按字节拷贝的</strong>，所以数组里存的必须是<strong>简单类型</strong>（比如 <code>int</code>）。如果存的是对象（有指针成员、需要深拷贝），就不能用 <code>memcpy</code>，必须逐个赋值</li>
+</ul>
+<p><strong>扩容倍数由调用者决定</strong>：<code>expand(2 * mCap)</code>。把倍数写在调用处而不是写死在 <code>expand</code> 里面，以后想改成 1.5 倍扩容只需要改调用处。</p>
+<h3 id="3-9-测试代码"><a href="#3-9-测试代码" class="headerlink" title="3.9 测试代码"></a>3.9 测试代码</h3><figure class="highlight cpp"><figcaption><span>main.cpp</span></figcaption><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;time.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">"Array.h"</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	Array arr;</span><br><span class="line">	<span class="built_in">srand</span>(<span class="built_in">time</span>(<span class="number">0</span>));</span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++)</span><br><span class="line">	{</span><br><span class="line">		arr.<span class="built_in">push_back</span>(<span class="built_in">rand</span>() % <span class="number">100</span>);</span><br><span class="line">	}</span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line">	arr.<span class="built_in">pop_back</span>();</span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line">	arr.<span class="built_in">insert</span>(<span class="number">0</span>, <span class="number">100</span>);			<span class="comment">// 头部插入 100</span></span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line"></span><br><span class="line">	<span class="type">int</span> pos = arr.<span class="built_in">find</span>(<span class="number">100</span>);	<span class="comment">// 查询 100 所在的下标</span></span><br><span class="line">	<span class="keyword">if</span> (pos != <span class="number">-1</span>)</span><br><span class="line">	{</span><br><span class="line">		arr.<span class="built_in">erase</span>(pos);			<span class="comment">// 按位置删除</span></span><br><span class="line">	}</span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>用随机数填 10 个元素（触发扩容，因为默认容量就是 10），然后依次测试 <code>pop_back</code> / <code>insert</code> / <code>find</code> / <code>erase</code>。</p>
+<h3 id="3-10-C-版小结"><a href="#3-10-C-版小结" class="headerlink" title="3.10 C++ 版小结"></a>3.10 C++ 版小结</h3><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>时间复杂度</th>
+<th>关键要点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>构造</td>
+<td>O(1)</td>
+<td>初始化列表 + <code>new int[mCap]()</code></td>
+</tr>
+<tr>
+<td>析构</td>
+<td>O(1)</td>
+<td><code>delete[]</code> + 置 <code>nullptr</code></td>
+</tr>
+<tr>
+<td><code>push_back</code></td>
+<td>O(1)</td>
+<td>满了先 <code>expand</code></td>
+</tr>
+<tr>
+<td><code>insert</code></td>
+<td>O(n)</td>
+<td>合法范围 <code>[0, mCur]</code>，<strong>从后往前</strong>移动</td>
+</tr>
+<tr>
+<td><code>erase</code></td>
+<td>O(n)</td>
+<td>合法范围 <code>[0, mCur)</code>，<strong>从前往后</strong>移动</td>
+</tr>
+<tr>
+<td><code>find</code></td>
+<td>O(n)</td>
+<td>顺序遍历</td>
+</tr>
+<tr>
+<td><code>expand</code></td>
+<td>O(n)</td>
+<td><code>memcpy</code> 拷贝 + <code>delete[]</code> 旧内存</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="四、C-与-C-对照总结"><a href="#四、C-与-C-对照总结" class="headerlink" title="四、C 与 C++ 对照总结"></a>四、C 与 C++ 对照总结</h2><table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>C 版</th>
+<th>C++ 版</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>数据组织</strong></td>
+<td><code>typedef struct</code></td>
+<td><code>class</code></td>
+</tr>
+<tr>
+<td><strong>数据与行为</strong></td>
+<td>分离：结构体 + 全局函数</td>
+<td>封装：成员变量 + 成员函数</td>
+</tr>
+<tr>
+<td><strong>内存申请</strong></td>
+<td><code>malloc</code></td>
+<td><code>new</code></td>
+</tr>
+<tr>
+<td><strong>内存释放</strong></td>
+<td><code>free</code></td>
+<td><code>delete[]</code> / <code>delete</code></td>
+</tr>
+<tr>
+<td><strong>生命周期</strong></td>
+<td>手动调 <code>create</code> / <code>release</code></td>
+<td>构造/析构函数自动调用</td>
+</tr>
+<tr>
+<td><strong>传参</strong></td>
+<td>显式传 <code>SeqList* seq</code></td>
+<td>隐含 <code>this</code> 指针</td>
+</tr>
+<tr>
+<td><strong>访问控制</strong></td>
+<td>无，靠 <code>static</code> 约定</td>
+<td><code>public</code> / <code>private</code></td>
+</tr>
+<tr>
+<td><strong>编译期检查</strong></td>
+<td>无</td>
+<td><code>const</code> 成员函数等</td>
+</tr>
+<tr>
+<td><strong>实现文件</strong></td>
+<td><code>SeqTable.h</code> + <code>SeqTable.c</code> + <code>main.c</code></td>
+<td><code>Array.h</code> + <code>Array.cpp</code> + <code>main.cpp</code></td>
+</tr>
+</tbody></table>
+<p><strong>核心操作完全一致</strong>：</p>
+<ul>
+<li>三个成员变量含义相同（指针 / 容量 / 元素个数）</li>
+<li>插入必须<strong>从后往前</strong>移动元素</li>
+<li>删除必须<strong>从前往后</strong>移动元素</li>
+<li>扩容都是<strong>四步</strong>：开辟 → 拷贝 → 释放 → 更新</li>
+</ul>
+<p><strong>C++ 多出来的东西</strong>：封装、访问控制、自动生命周期管理——这些让代码更安全，但底层的数据结构和算法<strong>一点没变</strong>。</p>
+<hr>
+<h2 id="五、复习要点总结"><a href="#五、复习要点总结" class="headerlink" title="五、复习要点总结"></a>五、复习要点总结</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>时间复杂度</th>
+<th>关键要点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>创建</td>
+<td>O(1)</td>
+<td>表头 + 数据区分两次申请</td>
+</tr>
+<tr>
+<td>尾插</td>
+<td>O(1)</td>
+<td>直接放 <code>data[length]</code></td>
+</tr>
+<tr>
+<td>任意位置插入</td>
+<td>O(n)</td>
+<td><strong>从后往前</strong>移动元素</td>
+</tr>
+<tr>
+<td>删除</td>
+<td>O(n)</td>
+<td><strong>从前往后</strong>移动元素</td>
+</tr>
+<tr>
+<td>查找</td>
+<td>O(n)</td>
+<td>顺序遍历，循环外返回 -1</td>
+</tr>
+<tr>
+<td>扩容</td>
+<td>O(n)</td>
+<td>2 倍扩容 + 拷贝数据</td>
+</tr>
+</tbody></table>
+<p><strong>几个细节</strong>：</p>
 <ol>
+<li><strong>下标访问和查找有什么区别？</strong> — 下标访问是 O(1)（直接算地址），查找是 O(n)（遍历比对），两个概念不能混为一谈</li>
 <li><strong>为什么长度和容量要分开记录？</strong> — 容量是总空间，长度是已用空间，扩容时靠容量判断</li>
 <li><strong>插入时为什么 pos 可以等于 length？</strong> — 等于 length 就相当于尾插</li>
 <li><strong>删除后需不需要缩容？</strong> — 一般不需要，这就是”以空间换时间”的思想</li>
+<li><strong>为什么插入从后往前、删除从前往后？</strong> — 都是为了不覆盖还没处理的数据</li>
 </ol>
-<hr>
 ]]></content>
       <categories>
         <category>数据结构</category>

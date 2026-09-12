@@ -22,19 +22,23 @@
     var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="从代码出发，整理顺序表的核心概念：结构定义、创建释放、插入删除、查找扩容。">
+  <meta name="description" content="从代码出发，整理顺序表的核心概念：结构定义、创建释放、插入删除、查找扩容。含 C 与 C++ 两种实现对照。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="数据结构 —— 顺序表">
 <meta property="og:url" content="http://tristan1116.github.io/2026/07/17/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%20%E2%80%94%E2%80%94%20%E9%A1%BA%E5%BA%8F%E8%A1%A8/index.html">
 <meta property="og:site_name" content="开发者LT的博客">
-<meta property="og:description" content="从代码出发，整理顺序表的核心概念：结构定义、创建释放、插入删除、查找扩容。">
+<meta property="og:description" content="从代码出发，整理顺序表的核心概念：结构定义、创建释放、插入删除、查找扩容。含 C 与 C++ 两种实现对照。">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/data-structure-seqtable/array-memory-model.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/data-structure-seqtable/insert-move.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/data-structure-seqtable/delete-move.png">
 <meta property="article:published_time" content="2026-07-17T10:04:00.000Z">
-<meta property="article:modified_time" content="2026-07-17T10:04:00.000Z">
+<meta property="article:modified_time" content="2026-09-12T18:30:00.000Z">
 <meta property="article:tag" content="C&#x2F;C++">
 <meta property="article:tag" content="数据结构">
 <meta property="article:tag" content="顺序表">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/data-structure-seqtable/array-memory-model.png">
 
 <link rel="canonical" href="http://tristan1116.github.io/2026/07/17/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%20%E2%80%94%E2%80%94%20%E9%A1%BA%E5%BA%8F%E8%A1%A8/">
 
@@ -339,6 +343,13 @@ mjx-container[display="true"] + br {
 
               <time title="创建时间：2026-07-17 10:04:00" itemprop="dateCreated datePublished" datetime="2026-07-17T10:04:00+00:00">2026-07-17</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-09-12 18:30:00" itemprop="dateModified" datetime="2026-09-12T18:30:00+00:00">2026-09-12</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -362,16 +373,16 @@ mjx-container[display="true"] + br {
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>5.1k</span>
+              <span>13k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>12 分钟</span>
             </span>
-            <div class="post-description">从代码出发，整理顺序表的核心概念：结构定义、创建释放、插入删除、查找扩容。</div>
+            <div class="post-description">从代码出发，整理顺序表的核心概念：结构定义、创建释放、插入删除、查找扩容。含 C 与 C++ 两种实现对照。</div>
 
         </div>
       </header>
@@ -382,80 +393,233 @@ mjx-container[display="true"] + br {
     <div class="post-body" itemprop="articleBody">
 
       
-        <h1 id="数据结构-——-顺序表"><a href="#数据结构-——-顺序表" class="headerlink" title="数据结构 —— 顺序表"></a>数据结构 —— 顺序表</h1><h2 id="什么是顺序表"><a href="#什么是顺序表" class="headerlink" title="什么是顺序表"></a>什么是顺序表</h2><p><strong>顺序表</strong>是线性表的一种存储方式。它的底层就是<strong>数组</strong>——在内存中申请一段连续的空间，依次存放数据元素。</p>
-<blockquote>
+        <h2 id="什么是顺序表"><a href="#什么是顺序表" class="headerlink" title="什么是顺序表"></a>什么是顺序表</h2><p><strong>顺序表</strong>是线性表的一种存储方式。它的底层就是<strong>数组</strong>——在内存中申请一段连续的空间，依次存放数据元素。</p>
 <p>数组本身是静态的（长度固定），而顺序表是在数组外面包了一层，实现了<strong>动态管理</strong>：可以随时添加元素、删除元素、自动扩容。</p>
-</blockquote>
 <p>顺序表和链表的核心区别：</p>
 <ul>
 <li><strong>顺序表</strong>：内存连续，支持随机访问（<code>O(1)</code> 访问任意位置）</li>
 <li><strong>链表</strong>：内存离散，只能顺序访问，但插入删除更灵活</li>
 </ul>
 <hr>
-<h2 id="一、顺序表的结构定义"><a href="#一、顺序表的结构定义" class="headerlink" title="一、顺序表的结构定义"></a>一、顺序表的结构定义</h2><figure class="highlight c"><figcaption><span>SeqTable.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="type">int</span> ElemType;</span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> {</span></span><br><span class="line">    ElemType * data;    <span class="comment">// 指向堆区数据空间的指针（本质就是一个动态数组）</span></span><br><span class="line">    <span class="type">int</span> length;         <span class="comment">// 当前有效元素个数，同时也是下一个待插入位置的索引</span></span><br><span class="line">    <span class="type">int</span> capacity;       <span class="comment">// 当前数据空间的最大容量，也是边界</span></span><br><span class="line">} SeqList;</span><br></pre></td></tr></table></figure>
+<h2 id="数组"><a href="#数组" class="headerlink" title="数组"></a>数组</h2><h3 id="0-1-数组的特点"><a href="#0-1-数组的特点" class="headerlink" title="0.1 数组的特点"></a>0.1 数组的特点</h3><p><img src="/./../images/data-structure-seqtable/array-memory-model.png"></p>
+<p><strong>内存是连续的</strong>——这是数组最本质的特点，它的所有优点和缺点都从这一条推导出来。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> arr[<span class="number">10</span>];   <span class="comment">// 长度 10，下标 0~9</span></span><br></pre></td></tr></table></figure>
 
-<p>三个成员变量的关系可以用下图理解：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">data  →  [  |  |  |  |  |  |  |  ]   堆区的连续空间</span><br><span class="line">           ↑                  ↑</span><br><span class="line">         data[0]          data[capacity-1]</span><br><span class="line">           </span><br><span class="line">length = 3   ← 当前有3个有效元素</span><br><span class="line">capacity = 8 ← 最多能存8个元素</span><br></pre></td></tr></table></figure>
-
-<p><strong>重点理解 <code>length</code> 的含义</strong>：</p>
 <ul>
-<li><code>length</code> 既是元素个数，也是下一个元素插入位置的索引</li>
+<li>定义数组时，中括号里<strong>必须是常量或常量表达式</strong>，C/C++ 不允许用变量定义数组长度</li>
+<li>数组长度是 10，但<strong>下标是从 0 开始</strong>的，所以只能访问 <code>arr[0]</code> ~ <code>arr[9]</code></li>
+<li>访问 <code>arr[10]</code> 就是<strong>越界访问</strong></li>
+</ul>
+<blockquote>
+<p><strong>越界访问不一定会让程序崩溃。</strong> 有可能程序看起来还在正常运行，但访问到的数据是不是你想要的、算法结果对不对，就完全不确定了。所以绝不要对数组做越界访问。</p>
+</blockquote>
+<p>数组里”长度”和”有效元素个数”是两个不同的概念：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">int arr[10]  = [ 12 | 23 | 45 | 31 | 56 | 82 |   |   |   |   ]</span><br><span class="line">                 0    1    2    3    4    5    6   7   8   9</span><br><span class="line">                 └────────── 有效元素 6 个 ──────────┘</span><br><span class="line">                 └──────────────── 数组长度 10 ────────────────┘</span><br><span class="line">                                               ↑</span><br><span class="line">                                   cur = 6（有效元素个数）</span><br><span class="line">                                  同时也是"末尾元素后继位置"的下标</span><br></pre></td></tr></table></figure>
+
+<p>这个 <code>cur</code> 很关键：它既是<strong>有效元素的个数</strong>，又刚好是<strong>下一个可以插入元素的位置的下标</strong>。</p>
+<h3 id="0-2-下标访问-≠-查找"><a href="#0-2-下标访问-≠-查找" class="headerlink" title="0.2 下标访问 ≠ 查找"></a>0.2 下标访问 ≠ 查找</h3><p>这两个概念一定要分清楚，很多人描述数组的时候把它们混为一谈。</p>
+<p><strong>下标访问（随机访问）</strong>——直接用下标拿元素：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">arr[<span class="number">0</span>];       <span class="comment">// 访问 0 号位</span></span><br><span class="line">arr[<span class="number">9</span>];       <span class="comment">// 访问 9 号位</span></span><br><span class="line">arr[<span class="number">10000</span>];   <span class="comment">// 越界了！</span></span><br></pre></td></tr></table></figure>
+
+<p>因为数组每个元素的内存是连续的，给定下标就能<strong>直接算出地址</strong>，不需要从头找。所以访问 0 号位和访问 10000 号位，花费的时间<strong>一样多</strong>。</p>
+<blockquote>
+<p>**下标访问的时间复杂度是 O(1)**——这是常量时间，跟数组多长、访问哪个位置都无关。</p>
+</blockquote>
+<p><strong>查找（搜索）</strong>——找出某个值在不在数组里：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++)</span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span> (arr[i] == val)</span><br><span class="line">        <span class="keyword">return</span> i;   <span class="comment">// 找到了，返回下标</span></span><br><span class="line">}</span><br><span class="line"><span class="keyword">return</span> <span class="number">-1</span>;          <span class="comment">// 没找到</span></span><br></pre></td></tr></table></figure>
+
+<p>这个必须<strong>从 0 号位开始一个个比对</strong>，数据量越大、找得越慢。</p>
+<blockquote>
+<p>**无序数组的查找时间复杂度是 O(n)**——线性搜索。</p>
+</blockquote>
+<p>对比：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>代码</th>
+<th>时间复杂度</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>下标访问</strong>（随机访问）</td>
+<td><code>arr[i]</code></td>
+<td><strong>O(1)</strong></td>
+<td>直接算地址，与位置无关</td>
+</tr>
+<tr>
+<td><strong>查找</strong>（搜索）</td>
+<td>遍历比对</td>
+<td><strong>O(n)</strong></td>
+<td>必须从头找</td>
+</tr>
+</tbody></table>
+<p>数组的优势是<strong>下标访问快</strong>，不是<strong>查找快</strong>。</p>
+<blockquote>
+<p>另外，有序数组可以<strong>二分搜索</strong>，时间复杂度 O(log n)，不需要线性遍历。</p>
+</blockquote>
+<h3 id="0-3-数组的优点"><a href="#0-3-数组的优点" class="headerlink" title="0.3 数组的优点"></a>0.3 数组的优点</h3><table>
+<thead>
+<tr>
+<th>优点</th>
+<th>时间复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>下标访问（随机访问）效率很高</td>
+<td><strong>O(1)</strong></td>
+</tr>
+<tr>
+<td><strong>末尾</strong>位置增加/删除元素效率很高</td>
+<td><strong>O(1)</strong></td>
+</tr>
+<tr>
+<td>访问前后相邻位置的元素非常方便</td>
+<td>/</td>
+</tr>
+</tbody></table>
+<ul>
+<li>**下标访问 O(1)**：内存连续，直接按地址偏移取值</li>
+<li>**末尾增删 O(1)**：不涉及元素移动。末尾插入就是把值放到 <code>cur</code> 位置然后 <code>cur++</code>；末尾删除就是 <code>cur--</code></li>
+<li><strong>访问相邻元素方便</strong>：内存连续，指针 <code>++</code> 就是下一个元素，指针 <code>--</code> 就是上一个元素</li>
+</ul>
+<h3 id="0-4-数组的缺点"><a href="#0-4-数组的缺点" class="headerlink" title="0.4 数组的缺点"></a>0.4 数组的缺点</h3><table>
+<thead>
+<tr>
+<th>缺点</th>
+<th>时间复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>非末尾位置增加/删除元素效率低下</td>
+<td><strong>O(n)</strong></td>
+</tr>
+<tr>
+<td>搜索/查找（无序数组）的效率低下</td>
+<td><strong>O(n)</strong></td>
+</tr>
+<tr>
+<td>扩容消耗比较大</td>
+<td>/</td>
+</tr>
+</tbody></table>
+<p><strong>非末尾位置增删为什么是 O(n)？</strong></p>
+<p>因为内存必须连续，中间要插入一个元素，就得先把后面所有元素<strong>依次往后挪一位</strong>腾出位置：</p>
+<p><img src="/./../images/data-structure-seqtable/insert-move.png"></p>
+<p>删掉中间的元素也一样，后面的元素要<strong>依次往前挪一位</strong>把空位填上：</p>
+<p><img src="/./../images/data-structure-seqtable/delete-move.png"></p>
+<p>后面元素越多，移动花的时间越多，所以是 **O(n)**。</p>
+<p><strong>注意区分</strong>：末尾位置增删是 **O(1)**，非末尾位置增删是 **O(n)**。说”数组插入删除效率不高”太笼统了，把这两种情况分开说才是准确的回答。</p>
+<p><strong>扩容为什么消耗大？</strong></p>
+<p>数组一旦定义，容量就固定了。要扩容只能：</p>
+<ol>
+<li>在堆上<strong>开辟一块更大的新内存</strong></li>
+<li>把原内存上的数据<strong>全部拷贝过去</strong></li>
+<li><strong>释放原来的内存</strong></li>
+</ol>
+<p>数据量越大，拷贝花的时间越多，所以扩容本身是 **O(n)**。</p>
+<blockquote>
+<p>这也是为什么 <code>vector</code> 底层虽然是数组，但依然能”动态增长”——满了就扩容。</p>
+</blockquote>
+<hr>
+<h2 id="一、C和C-两种实现对比"><a href="#一、C和C-两种实现对比" class="headerlink" title="一、C和C++两种实现对比"></a>一、C和C++两种实现对比</h2><table>
+<thead>
+<tr>
+<th></th>
+<th><strong>C 版</strong></th>
+<th><strong>C++ 版</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数据和行为</td>
+<td>分开的（结构体 + 一堆函数）</td>
+<td>封装在一起（类）</td>
+</tr>
+<tr>
+<td>内存管理</td>
+<td><code>malloc</code> / <code>free</code></td>
+<td><code>new</code> / <code>delete</code></td>
+</tr>
+<tr>
+<td>传参</td>
+<td>显式传 <code>SeqList*</code></td>
+<td>隐含的 <code>this</code> 指针</td>
+</tr>
+<tr>
+<td>访问控制</td>
+<td>无（全靠约定）</td>
+<td><code>public</code> / <code>private</code></td>
+</tr>
+<tr>
+<td>内部细节</td>
+<td><code>static</code> 函数（文件内可见）</td>
+<td><code>private</code> 成员函数</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="二、C-版实现"><a href="#二、C-版实现" class="headerlink" title="二、C 版实现"></a>二、C 版实现</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">01_SeqTable/</span><br><span class="line">├── SeqTable.h    ← 结构体定义 + 函数声明</span><br><span class="line">├── SeqTable.c    ← 函数实现</span><br><span class="line">└── main.c        ← 测试代码</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-1-结构定义"><a href="#2-1-结构定义" class="headerlink" title="2.1 结构定义"></a>2.1 结构定义</h3><figure class="highlight c"><figcaption><span>SeqTable.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> SEQ_TABLE_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> SEQ_TABLE_H</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="type">int</span> ElemType;</span><br><span class="line"><span class="comment">//定义顺序表的表头</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span></span></span><br><span class="line"><span class="class">{</span></span><br><span class="line">    ElemType* data;</span><br><span class="line">    <span class="type">int</span> length;</span><br><span class="line">    <span class="type">int</span> capacity;</span><br><span class="line">}SeqList;</span><br></pre></td></tr></table></figure>
+
+<p>三个成员变量的关系：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">data  →  [  |  |  |  |  |  |  |  ]   堆区的连续空间</span><br><span class="line">           ↑                  ↑</span><br><span class="line">         data[0]          data[capacity-1]</span><br><span class="line"></span><br><span class="line">length   = 3   ← 当前有效元素个数，也是下一个待插入位置的索引</span><br><span class="line">capacity = 8   ← 当前数据空间的最大容量</span><br></pre></td></tr></table></figure>
+
+<p>**重点理解 <code>length</code>**：</p>
+<ul>
+<li>它既是元素个数，也是下一个元素插入位置的索引</li>
 <li>所以 <code>data[length]</code> 就是当前可以放新元素的那个位置</li>
 <li>有效元素的下标范围是 <code>[0, length-1]</code></li>
 </ul>
-<hr>
-<h2 id="二、创建与释放"><a href="#二、创建与释放" class="headerlink" title="二、创建与释放"></a>二、创建与释放</h2><h3 id="2-1-创建顺序表"><a href="#2-1-创建顺序表" class="headerlink" title="2.1 创建顺序表"></a>2.1 创建顺序表</h3><figure class="highlight c"><figcaption><span>SeqTable.c - createSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">SeqList* <span class="title function_">createSeqList</span><span class="params">(<span class="type">int</span> n)</span> {</span><br><span class="line">    <span class="comment">// 1. 在堆区创建表头结构体</span></span><br><span class="line">    SeqList* seqList = (SeqList*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(SeqList));</span><br><span class="line">    <span class="keyword">if</span> (seqList == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqList failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 在堆区创建数据空间（n个ElemType大小的连续内存）</span></span><br><span class="line">    seqList-&gt;data = (ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType) * n);</span><br><span class="line">    <span class="keyword">if</span> (seqList-&gt;data == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqList-&gt;data failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 初始化成员</span></span><br><span class="line">    seqList-&gt;length = <span class="number">0</span>;</span><br><span class="line">    seqList-&gt;capacity = n;</span><br><span class="line">    <span class="keyword">return</span> seqList;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-函数声明"><a href="#2-2-函数声明" class="headerlink" title="2.2 函数声明"></a>2.2 函数声明</h3><figure class="highlight c"><figcaption><span>SeqTable.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">SeqList* <span class="title function_">createSeqList</span><span class="params">(<span class="type">int</span> n)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">releaseSeqList</span><span class="params">(SeqList* seq)</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">enlargerSeqList</span><span class="params">(SeqList* seq)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">pushSeqList</span><span class="params">(SeqList * seq,ElemType val)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">insertSeqList</span><span class="params">(SeqList* seq,ElemType val,<span class="type">int</span> pos)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">deleteSeqList</span><span class="params">(SeqList* seq,ElemType val)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">findSeqList</span><span class="params">(SeqList* seq,ElemType val)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">showSeqList</span><span class="params">(SeqList* seq)</span>;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
 
-<p><strong>为什么表头和数据空间要分两次 malloc？</strong></p>
+<p><strong>关于 <code>static</code><strong>：<code>enlargerSeqList</code> 前面加了 <code>static</code>，意思是</strong>只能在本文件内调用</strong>。扩容是对外隐藏的实现细节，不需要暴露给用户。这是 C 语言实现封装的一种手段。</p>
+<h3 id="2-3-创建与释放"><a href="#2-3-创建与释放" class="headerlink" title="2.3 创建与释放"></a>2.3 创建与释放</h3><figure class="highlight c"><figcaption><span>SeqTable.c - createSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">SeqList* <span class="title function_">createSeqList</span><span class="params">(<span class="type">int</span> n)</span></span><br><span class="line">{</span><br><span class="line">    SeqList* seq=(SeqList*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(SeqList));</span><br><span class="line">    <span class="keyword">if</span>(seq==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqlist_head failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;data=(ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType)*n);</span><br><span class="line">    <span class="keyword">if</span>(seq-&gt;data==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc seqlist failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;capacity=n;</span><br><span class="line">    seq-&gt;length=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> seq;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么分两次 malloc？</strong></p>
 <p>因为它们是两块独立的内存：</p>
 <ul>
-<li>表头（<code>SeqList</code> 结构体）存的是”管理信息”——指向数据区的指针、长度、容量</li>
-<li>数据空间（<code>data</code>）才是真正存元素的地方</li>
+<li><strong>表头</strong>（<code>SeqList</code> 结构体）存管理信息——指向数据区的指针、长度、容量</li>
+<li><strong>数据区</strong>（<code>data</code>）才是真正存元素的地方</li>
 </ul>
 <p>如果合在一起，扩容的时候就没办法只扩大数据区了。</p>
-<h3 id="2-2-释放顺序表"><a href="#2-2-释放顺序表" class="headerlink" title="2.2 释放顺序表"></a>2.2 释放顺序表</h3><figure class="highlight c"><figcaption><span>SeqTable.c - releaseSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">releaseSeqList</span><span class="params">(SeqList* seq)</span> {</span><br><span class="line">    <span class="keyword">if</span> (seq) {</span><br><span class="line">        <span class="keyword">if</span> (seq-&gt;data) {</span><br><span class="line">            <span class="built_in">free</span>(seq-&gt;data);   <span class="comment">// 先释放数据空间</span></span><br><span class="line">            seq-&gt;data = <span class="literal">NULL</span>;  <span class="comment">// 置空，防止野指针</span></span><br><span class="line">        }</span><br><span class="line">        <span class="built_in">free</span>(seq);             <span class="comment">// 再释放表头</span></span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><figcaption><span>SeqTable.c - releaseSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">releaseSeqList</span><span class="params">(SeqList* seq)</span></span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span>(seq)</span><br><span class="line">    {</span><br><span class="line">        <span class="keyword">if</span>(seq-&gt;data)</span><br><span class="line">        {</span><br><span class="line">            <span class="built_in">free</span>(seq-&gt;data);</span><br><span class="line">            seq-&gt;data=<span class="literal">NULL</span>;</span><br><span class="line">        }</span><br><span class="line">        <span class="built_in">free</span>(seq);</span><br><span class="line">        seq=<span class="literal">NULL</span>;</span><br><span class="line">    }</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
 
-<p>释放顺序和创建顺序相反：<strong>先释放数据区，再释放表头</strong>。每次 free 之后顺手置 NULL，是好习惯。</p>
-<hr>
-<h2 id="三、插入操作"><a href="#三、插入操作" class="headerlink" title="三、插入操作"></a>三、插入操作</h2><h3 id="3-1-尾插法（pushback）"><a href="#3-1-尾插法（pushback）" class="headerlink" title="3.1 尾插法（pushback）"></a>3.1 尾插法（pushback）</h3><figure class="highlight c"><figcaption><span>SeqTable.c - pushbackSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">pushbackSeqList</span><span class="params">(SeqList* seq, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 如果空间满了，先尝试扩容，如果扩容失败了，返回</span></span><br><span class="line">    <span class="keyword">if</span> ((seq-&gt;length &gt;= seq-&gt;capacity) &amp;&amp; (enlargerSeqList(seq))) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"扩容失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 在length位置放入新元素</span></span><br><span class="line">    seq-&gt;data[seq-&gt;length] = val;</span><br><span class="line">    seq-&gt;length++;   <span class="comment">// 有效元素个数+1</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>释放顺序和创建顺序<strong>相反</strong>：先释放数据区，再释放表头。每次 free 之后顺手置 NULL，防止野指针。</p>
+<h3 id="2-4-尾插法"><a href="#2-4-尾插法" class="headerlink" title="2.4 尾插法"></a>2.4 尾插法</h3><figure class="highlight c"><figcaption><span>SeqTable.c - pushSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//尾插法</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">pushSeqList</span><span class="params">(SeqList * seq,ElemType val)</span></span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span>(seq==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"seqlist not exist\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//如果容量小于等于长度就扩容，扩容失败就返回</span></span><br><span class="line">    <span class="keyword">if</span>(seq-&gt;capacity&lt;=seq-&gt;length &amp;&amp; enlargerSeqList(seq))</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"fail to enlarger space\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;data[seq-&gt;length]=val;</span><br><span class="line">    seq-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
 
-<p>尾插法效率最高——**时间复杂度 O(1)**，因为不需要移动任何元素，直接在末尾追加即可。</p>
-<p><strong>关于条件判断的写法</strong>：这里用了 <code>A &amp;&amp; B</code> 的短路特性——只有 <code>length &gt;= capacity</code>（真需要扩容）时，才会去调用扩容函数。这是竞赛/面试中常见的简洁写法。</p>
-<h3 id="3-2-任意位置插入（insert）"><a href="#3-2-任意位置插入（insert）" class="headerlink" title="3.2 任意位置插入（insert）"></a>3.2 任意位置插入（insert）</h3><figure class="highlight c"><figcaption><span>SeqTable.c - insertSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">insertSeqList</span><span class="params">(SeqList* seq, <span class="type">int</span> pos, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 插入元素的范围校验：pos必须在 [0, length] 之间</span></span><br><span class="line">    <span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; seq-&gt;length) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"pos invalid\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 顺序表的容量校验：length必须小于容量，或者扩容必须成功</span></span><br><span class="line">    <span class="keyword">if</span> ((seq-&gt;length &gt;= seq-&gt;capacity) &amp;&amp; (enlargerSeqList(seq))) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"扩容失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 从后往前，把pos及之后的元素都往后移一位</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = seq-&gt;length - <span class="number">1</span>; i &gt;= pos; i--) {</span><br><span class="line">        seq-&gt;data[i + <span class="number">1</span>] = seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 4. 插入新元素，更新length</span></span><br><span class="line">    seq-&gt;data[pos] = val;</span><br><span class="line">    seq-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p>尾插效率最高——**时间复杂度 O(1)**，不需要移动任何元素，直接放在 <code>data[length]</code> 位置即可。</p>
+<p><strong>关于 <code>A &amp;&amp; B</code> 的短路写法</strong>：只有 <code>capacity &lt;= length</code>（真需要扩容）时，才会去调用扩容函数。如果容量够用，短路特性会让 <code>enlargerSeqList</code> 根本不执行。这是竞赛和面试中常见的简洁写法。</p>
+<h3 id="2-5-任意位置插入"><a href="#2-5-任意位置插入" class="headerlink" title="2.5 任意位置插入"></a>2.5 任意位置插入</h3><figure class="highlight c"><figcaption><span>SeqTable.c - insertSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//任意位置插入</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">insertSeqList</span><span class="params">(SeqList* seq,ElemType val,<span class="type">int</span> pos)</span></span><br><span class="line">{</span><br><span class="line">    <span class="comment">//先检查插入位置是否合理</span></span><br><span class="line">    <span class="keyword">if</span>(pos&lt;<span class="number">0</span>||pos&gt;seq-&gt;length)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"invalid pos\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//再检查是否有多余空间</span></span><br><span class="line">    <span class="comment">//如果容量小于等于长度就扩容，扩容失败就返回</span></span><br><span class="line">    <span class="keyword">if</span>(seq-&gt;capacity&lt;=seq-&gt;length &amp;&amp; enlargerSeqList(seq))</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"fail to enlarger space\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//在指定位置插入前，先从后往前，把每一项都往后移一位</span></span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=seq-&gt;length<span class="number">-1</span>;i&gt;=pos;i--)</span><br><span class="line">    {</span><br><span class="line">        seq-&gt;data[i+<span class="number">1</span>]=seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;data[pos]=val;</span><br><span class="line">    seq-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
 
-<p><strong>核心操作：从后往前移动元素</strong></p>
-<p>为什么必须从后往前？——因为 <code>data[i+1] = data[i]</code>，如果用从前往后移动，前面的元素会覆盖后面的元素，造成数据丢失。</p>
-<p>**时间复杂度 O(n)**：最坏情况是在头部插入，所有元素都要后移。</p>
-<h3 id="插入操作的图解"><a href="#插入操作的图解" class="headerlink" title="插入操作的图解"></a>插入操作的图解</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">初始状态：                   length=5</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 |   |   ]</span><br><span class="line"></span><br><span class="line">在 pos=0 处插入 200：</span><br><span class="line">                           length=5</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 |   |   ]</span><br><span class="line">         ↑</span><br><span class="line">        从后往前移动元素</span><br><span class="line"></span><br><span class="line">第1步：i=4</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 | 5 |   ]</span><br><span class="line">第2步：i=3</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 4 | 5 |   ]</span><br><span class="line">第3步：i=2</span><br><span class="line">data → [ 1 | 2 | 3 | 3 | 4 | 5 |   ]</span><br><span class="line">第4步：i=1</span><br><span class="line">data → [ 1 | 2 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line">第5步：i=0</span><br><span class="line">data → [ 1 | 1 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line"></span><br><span class="line">插入 200：            length=6</span><br><span class="line">data → [200| 1 | 2 | 3 | 4 | 5 |   ]</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="四、删除操作"><a href="#四、删除操作" class="headerlink" title="四、删除操作"></a>四、删除操作</h2><figure class="highlight c"><figcaption><span>SeqTable.c - deleteSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">deleteSeqList</span><span class="params">(SeqList* seq, ElemType val)</span> {</span><br><span class="line">    <span class="comment">// 1. 先找到要删除的元素的位置</span></span><br><span class="line">    <span class="type">int</span> pos = findSeqList(seq, val);</span><br><span class="line">    <span class="keyword">if</span> (pos == <span class="number">-1</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"该元素不存在\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 从前往后，把后面的元素依次向前覆盖</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = pos; i &lt; seq-&gt;length - <span class="number">1</span>; i++) {</span><br><span class="line">        seq-&gt;data[i] = seq-&gt;data[i + <span class="number">1</span>];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 更新length</span></span><br><span class="line">    seq-&gt;length--;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-
-<p><strong>核心操作：从前往后移动元素</strong></p>
-<p>插入是从后往前，删除是从前往后——因为 <code>data[i] = data[i+1]</code>，用后面的元素覆盖前面的。</p>
-<p>**时间复杂度 O(n)**：最坏情况是删除头部元素，后面所有元素都要前移。</p>
-<blockquote>
-<p>注意这里用的是”按值删除”——先找到值对应的位置，再删除。也可以用”按位置删除”（直接传 pos），更常见的做法是把 find 和 delete 分开。</p>
-</blockquote>
-<hr>
-<h2 id="五、查找操作"><a href="#五、查找操作" class="headerlink" title="五、查找操作"></a>五、查找操作</h2><figure class="highlight c"><figcaption><span>SeqTable.c - findSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">findSeqList</span><span class="params">(SeqList* seq, ElemType val)</span> {</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; seq-&gt;length; i++) {</span><br><span class="line">        <span class="keyword">if</span> (seq-&gt;data[i] == val)</span><br><span class="line">            <span class="keyword">return</span> i;       <span class="comment">// 找到了，返回下标</span></span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;               <span class="comment">// 没找到，返回 -1</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-
-<p>非常直观的<strong>顺序查找</strong>，时间复杂度 O(n)。如果数据有序，可以用二分查找优化到 O(log n)。</p>
-<hr>
-<h2 id="六、扩容机制"><a href="#六、扩容机制" class="headerlink" title="六、扩容机制"></a>六、扩容机制</h2><figure class="highlight c"><figcaption><span>SeqTable.c - enlargerSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">enlargerSeqList</span><span class="params">(SeqList* seq)</span> {</span><br><span class="line">    <span class="comment">// 1. 申请更大的新空间（2倍扩容）</span></span><br><span class="line">    ElemType* temp = (ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType) * seq-&gt;capacity * <span class="number">2</span>);</span><br><span class="line">    <span class="keyword">if</span> (temp == <span class="literal">NULL</span>) {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"创造新的数据空间失败\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 2. 把原数据拷贝到新空间</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; seq-&gt;length; i++) {</span><br><span class="line">        temp[i] = seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">// 3. 释放原空间，更新指针和容量</span></span><br><span class="line">    <span class="built_in">free</span>(seq-&gt;data);</span><br><span class="line">    seq-&gt;data = temp;</span><br><span class="line">    seq-&gt;capacity *= <span class="number">2</span>;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"扩容成功\n"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
-
-<p><strong>关于 <code>static</code> 关键字</strong>：这里把 <code>enlargerSeqList</code> 声明为 <code>static</code>，意思是<strong>只能在本文件内调用</strong>。对外部来说，扩容是内部实现细节，不需要暴露给用户。这是 C 语言实现封装的一种手段。</p>
-<p><strong>为什么是 2 倍扩容？</strong></p>
+<p><strong>位置校验的范围</strong>：<code>pos</code> 必须在 <code>[0, length]</code> 之间。</p>
 <ul>
-<li>如果一次只扩 1 个空间，每次插入都要扩容，效率极低</li>
-<li>2 倍扩容是一种常见的折中策略——既不会频繁扩容，又不会浪费太多内存</li>
-<li>STL 中 <code>vector</code> 也是类似的思路（不同编译器倍数不同，通常是 1.5~2 倍）</li>
+<li><code>pos &lt; 0</code> 不合法</li>
+<li><code>pos &gt; length</code> 不合法</li>
+<li><code>pos == length</code> <strong>是合法的</strong>——相当于在末尾插入</li>
 </ul>
-<hr>
-<h2 id="七、完整测试代码"><a href="#七、完整测试代码" class="headerlink" title="七、完整测试代码"></a>七、完整测试代码</h2><figure class="highlight c"><figcaption><span>main.c</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> {</span><br><span class="line">    <span class="type">int</span> n = <span class="number">5</span>;</span><br><span class="line">    SeqList* seq = createSeqList(n);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 尾插 5 个元素</span></span><br><span class="line">    pushbackSeqList(seq, <span class="number">1</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">2</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">3</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">4</span>);</span><br><span class="line">    pushbackSeqList(seq, <span class="number">5</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：1 2 3 4 5</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 尾插触发扩容（当前容量=5，已有5个元素，再插需要扩容）</span></span><br><span class="line">    pushbackSeqList(seq, <span class="number">300</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：1 2 3 4 5 300（扩容到10）</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 在头部插入200</span></span><br><span class="line">    insertSeqList(seq, <span class="number">0</span>, <span class="number">200</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：200 1 2 3 4 5 300</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 删除值为3的元素</span></span><br><span class="line">    deleteSeqList(seq, <span class="number">3</span>);</span><br><span class="line">    showSeqList(seq);          <span class="comment">// 输出：200 1 2 4 5 300</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 释放</span></span><br><span class="line">    releaseSeqList(seq);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+<p><strong>核心操作：从后往前移动元素</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">初始：                    length=5</span><br><span class="line">data → [ 1 | 2 | 3 | 4 | 5 |   |   ]</span><br><span class="line"></span><br><span class="line">在 pos=0 处插入 200：</span><br><span class="line"></span><br><span class="line">第1步 i=4：data → [ 1 | 2 | 3 | 4 | 5 | 5 |   ]</span><br><span class="line">第2步 i=3：data → [ 1 | 2 | 3 | 4 | 4 | 5 |   ]</span><br><span class="line">第3步 i=2：data → [ 1 | 2 | 3 | 3 | 4 | 5 |   ]</span><br><span class="line">第4步 i=1：data → [ 1 | 2 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line">第5步 i=0：data → [ 1 | 1 | 2 | 3 | 4 | 5 |   ]</span><br><span class="line"></span><br><span class="line">插入 200：       → [200| 1 | 2 | 3 | 4 | 5 |   ]</span><br></pre></td></tr></table></figure>
 
-<hr>
-<h2 id="八、复习要点总结"><a href="#八、复习要点总结" class="headerlink" title="八、复习要点总结"></a>八、复习要点总结</h2><table>
+<p><strong>为什么必须从后往前？</strong> 因为写的是 <code>data[i+1] = data[i]</code>。如果从前往后移动，前面的元素会先把后面的覆盖掉，数据就丢了。</p>
+<p>**时间复杂度 O(n)**：最坏情况是在头部插入，所有元素都要后移。</p>
+<h3 id="2-6-查找"><a href="#2-6-查找" class="headerlink" title="2.6 查找"></a>2.6 查找</h3><figure class="highlight c"><figcaption><span>SeqTable.c - findSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">findSeqList</span><span class="params">(SeqList* seq,ElemType val)</span></span><br><span class="line">{</span><br><span class="line">    <span class="keyword">if</span>(seq==<span class="literal">NULL</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"seqlist not exist\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;seq-&gt;length;i++)</span><br><span class="line">    {</span><br><span class="line">        <span class="keyword">if</span>(seq-&gt;data[i]==val)</span><br><span class="line">        <span class="keyword">return</span> i;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>非常直观的<strong>顺序查找</strong>，时间复杂度 O(n)。找到了返回下标，没找到返回 -1。</p>
+<p><strong>注意 <code>return -1</code> 的位置</strong>：必须在<strong>整个循环结束之后</strong>再返回 -1。如果写在循环里，第一个元素没匹配上就直接返回 -1 了，后面的元素根本没机会比对。</p>
+<h3 id="2-7-删除"><a href="#2-7-删除" class="headerlink" title="2.7 删除"></a>2.7 删除</h3><figure class="highlight c"><figcaption><span>SeqTable.c - deleteSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">deleteSeqList</span><span class="params">(SeqList* seq,ElemType val)</span></span><br><span class="line">{</span><br><span class="line">    <span class="type">int</span> pos=findSeqList(seq,val);</span><br><span class="line">    <span class="keyword">if</span>(pos==<span class="number">-1</span>)</span><br><span class="line">    {</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"can't find %d\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=pos;i&lt;seq-&gt;length<span class="number">-1</span>;i++)</span><br><span class="line">    {</span><br><span class="line">        seq-&gt;data[i]=seq-&gt;data[i+<span class="number">1</span>];</span><br><span class="line">    }</span><br><span class="line">    seq-&gt;length--;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>这里用的是<strong>按值删除</strong>——先调用 <code>findSeqList</code> 找到位置，再删除。<strong>查找和删除分开</strong>，是更常见的做法。</p>
+<p><strong>核心操作：从前往后移动元素</strong></p>
+<p>插入是从后往前，删除是从前往后——因为这里写的是 <code>data[i] = data[i+1]</code>，用后面的元素覆盖前面的。</p>
+<p>**时间复杂度 O(n)**：最坏情况是删除头部元素，后面所有元素都要前移。</p>
+<h3 id="2-8-扩容"><a href="#2-8-扩容" class="headerlink" title="2.8 扩容"></a>2.8 扩容</h3><figure class="highlight c"><figcaption><span>SeqTable.c - enlargerSeqList</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">enlargerSeqList</span><span class="params">(SeqList* seq)</span></span><br><span class="line">{</span><br><span class="line">    <span class="comment">//第一步，申请更大的空间--2倍</span></span><br><span class="line">    ElemType* temp=(ElemType*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(ElemType)*<span class="number">2</span>*seq-&gt;capacity);</span><br><span class="line">    <span class="keyword">if</span>(temp==<span class="literal">NULL</span>){</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"malloc larger space failed\n"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//第二步，把原本的数据全部复制到新的空间里</span></span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;seq-&gt;length;i++)</span><br><span class="line">    {</span><br><span class="line">        temp[i]=seq-&gt;data[i];</span><br><span class="line">    }</span><br><span class="line">    <span class="comment">//第三步，释放原来的数据空间</span></span><br><span class="line">    <span class="built_in">free</span>(seq-&gt;data);</span><br><span class="line">    <span class="comment">//第四步，更新数据指针和容量</span></span><br><span class="line">    seq-&gt;data=temp;</span><br><span class="line">    seq-&gt;capacity*=<span class="number">2</span>;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"enlarger space success\n"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>扩容四步：<strong>申请新空间 → 拷贝数据 → 释放旧空间 → 更新指针和容量</strong>。</p>
+<p><strong><code>sizeof</code> 里的类型要注意</strong>：这里必须写 <code>sizeof(ElemType)</code>，不能写成 <code>sizeof(ElemType*)</code>。写错了（比如 <code>ElemType</code> 是 <code>int</code> 时写成了指针大小）会多申请一倍内存——程序不一定崩，但内存就白白浪费了。</p>
+<h3 id="2-9-测试代码"><a href="#2-9-测试代码" class="headerlink" title="2.9 测试代码"></a>2.9 测试代码</h3><figure class="highlight c"><figcaption><span>main.c</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">"SeqTable.h"</span></span></span><br><span class="line"><span class="type">void</span> <span class="title function_">test01</span><span class="params">()</span></span><br><span class="line">{</span><br><span class="line">    SeqList* seq=createSeqList(<span class="number">5</span>);</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">5</span>;i++)</span><br><span class="line">    {</span><br><span class="line">        pushSeqList(seq,i+<span class="number">100</span>);</span><br><span class="line">    }</span><br><span class="line">    showSeqList(seq);</span><br><span class="line">    insertSeqList(seq,<span class="number">2026</span>,<span class="number">2</span>);</span><br><span class="line">    showSeqList(seq);</span><br><span class="line">    releaseSeqList(seq);</span><br><span class="line">}</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">{</span><br><span class="line">    test01();</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-10-C-版小结"><a href="#2-10-C-版小结" class="headerlink" title="2.10 C 版小结"></a>2.10 C 版小结</h3><table>
 <thead>
 <tr>
 <th>操作</th>
@@ -471,7 +635,7 @@ mjx-container[display="true"] + br {
 <tr>
 <td>尾插</td>
 <td>O(1)</td>
-<td>直接放 data[length] 即可</td>
+<td>直接放 <code>data[length]</code></td>
 </tr>
 <tr>
 <td>任意位置插入</td>
@@ -486,7 +650,7 @@ mjx-container[display="true"] + br {
 <tr>
 <td>查找</td>
 <td>O(n)</td>
-<td>顺序遍历</td>
+<td>顺序遍历，找不到返回 -1</td>
 </tr>
 <tr>
 <td>扩容</td>
@@ -494,13 +658,309 @@ mjx-container[display="true"] + br {
 <td>2 倍扩容 + 拷贝数据</td>
 </tr>
 </tbody></table>
-<p><strong>面试常问的几个细节</strong>：</p>
+<hr>
+<h2 id="三、C-版实现"><a href="#三、C-版实现" class="headerlink" title="三、C++ 版实现"></a>三、C++ 版实现</h2><p>换成 C++ 之后，顺序表变成一个<strong>类</strong>：数据（成员变量）和行为（成员函数）封装在一起。</p>
+<p>文件划分（三个文件）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">01_Array/</span><br><span class="line">├── Array.h     ← 类的声明</span><br><span class="line">├── Array.cpp   ← 类的实现</span><br><span class="line">└── main.cpp    ← 测试代码</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-1-类的声明"><a href="#3-1-类的声明" class="headerlink" title="3.1 类的声明"></a>3.1 类的声明</h3><figure class="highlight cpp"><figcaption><span>Array.h</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">pragma</span> once</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 可扩容的数组实现（动态数组）</span></span><br><span class="line"><span class="comment">// 内存开辟在堆区，容量不足时自动 2 倍扩容</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Array</span></span><br><span class="line">{</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="built_in">Array</span>(<span class="type">int</span> size = <span class="number">10</span>);		<span class="comment">// 构造函数：指定初始容量，默认 10</span></span><br><span class="line">	~<span class="built_in">Array</span>();					<span class="comment">// 析构函数：释放堆内存</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="comment">//----------- 增删改查接口 -----------</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">push_back</span><span class="params">(<span class="type">int</span> val)</span></span>;	<span class="comment">// 末尾增加元素</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">pop_back</span><span class="params">()</span></span>;			<span class="comment">// 末尾删除元素</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">insert</span><span class="params">(<span class="type">int</span> pos, <span class="type">int</span> val)</span></span>;	<span class="comment">// 按位置增加元素</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">erase</span><span class="params">(<span class="type">int</span> pos)</span></span>;		<span class="comment">// 按位置删除元素</span></span><br><span class="line">	<span class="function"><span class="type">int</span>  <span class="title">find</span><span class="params">(<span class="type">int</span> val)</span></span>;			<span class="comment">// 元素查询，返回下标，找不到返回 -1</span></span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">show</span><span class="params">()</span> <span class="type">const</span></span>;			<span class="comment">// 打印数组</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">expand</span><span class="params">(<span class="type">int</span> size)</span></span>;		<span class="comment">// 内部接口：把数组扩容到 size 大小</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	<span class="type">int</span>* mpArr;		<span class="comment">// 指针，指向堆区的数组内存</span></span><br><span class="line">	<span class="type">int</span>  mCap;		<span class="comment">// 数组容量（堆内存总大小）</span></span><br><span class="line">	<span class="type">int</span>  mCur;		<span class="comment">// 数组有效元素个数，也是末尾元素后继位置的下标</span></span><br><span class="line">};</span><br></pre></td></tr></table></figure>
+
+<p><strong>和 C 版对比</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>C 版</th>
+<th>C++ 版</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>typedef struct {...} SeqList;</code></td>
+<td><code>class Array {...};</code></td>
+</tr>
+<tr>
+<td><code>SeqList* seq</code> 显式传参</td>
+<td>隐含的 <code>this</code> 指针</td>
+</tr>
+<tr>
+<td><code>static int enlargerSeqList(...)</code></td>
+<td><code>private: void expand(...)</code></td>
+</tr>
+<tr>
+<td>函数散落在头文件里</td>
+<td>按 <code>public</code> / <code>private</code> 分区</td>
+</tr>
+</tbody></table>
+<p>**<code>#pragma once</code>**：告诉编译器这个头文件只被包含一次，作用相当于 C 版的 <code>#ifndef / #define / #endif</code>，但写起来更简洁。</p>
+<p><strong>三个成员变量和 C 版一一对应</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>C 版</th>
+<th>C++ 版</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>data</code></td>
+<td><code>mpArr</code></td>
+<td>指向堆区数组内存</td>
+</tr>
+<tr>
+<td><code>capacity</code></td>
+<td><code>mCap</code></td>
+<td>数组容量</td>
+</tr>
+<tr>
+<td><code>length</code></td>
+<td><code>mCur</code></td>
+<td>有效元素个数</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><code>m</code> 前缀是 member 的意思，表示这是成员变量——这是 C++ 里常见的命名习惯，方便和局部变量区分。</p>
+</blockquote>
+<h3 id="3-2-构造函数与析构函数"><a href="#3-2-构造函数与析构函数" class="headerlink" title="3.2 构造函数与析构函数"></a>3.2 构造函数与析构函数</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - 构造/析构</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 构造函数：开辟堆内存，初始化成员变量</span></span><br><span class="line">Array::<span class="built_in">Array</span>(<span class="type">int</span> size) : <span class="built_in">mCur</span>(<span class="number">0</span>), <span class="built_in">mCap</span>(size)</span><br><span class="line">{</span><br><span class="line">	mpArr = <span class="keyword">new</span> <span class="type">int</span>[mCap]();</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// 析构函数：释放指针指向的堆内存</span></span><br><span class="line">Array::~<span class="built_in">Array</span>()</span><br><span class="line">{</span><br><span class="line">	<span class="keyword">delete</span>[] mpArr;		<span class="comment">// 释放指针指向的堆内存</span></span><br><span class="line">	mpArr = <span class="literal">nullptr</span>;	<span class="comment">// 防止野指针出现</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>和 C 版的对应关系</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>C 版</th>
+<th>C++ 版</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>createSeqList(n)</code></td>
+<td><code>Array(int size = 10)</code> 构造函数</td>
+</tr>
+<tr>
+<td><code>releaseSeqList(seq)</code></td>
+<td><code>~Array()</code> 析构函数</td>
+</tr>
+<tr>
+<td><code>malloc(sizeof(SeqList))</code> + <code>malloc(...)</code></td>
+<td>对象本身由编译器管理，只需 <code>new int[mCap]</code></td>
+</tr>
+<tr>
+<td><code>free(seq-&gt;data)</code> + <code>free(seq)</code></td>
+<td>只需 <code>delete[] mpArr</code></td>
+</tr>
+</tbody></table>
+<p><strong>构造函数初始化列表</strong>：<code>Array::Array(int size) : mCur(0), mCap(size)</code>——冒号后面这一串就是初始化列表，在进入函数体之前就把成员变量初始化好。</p>
+<p><strong>为什么数组不用初始化？</strong> <code>new int[mCap]()</code> 后面加小括号会把每个元素初始化为 0。其实不加也行——因为访问数组是通过 <code>mCur</code> 控制的，<code>mCur</code> 是 0 就表示没有有效元素，根本不会去访问。</p>
+<p><strong>默认参数</strong>：<code>int size = 10</code> 表示用户不传参时默认容量是 10，这样 <code>Array arr;</code> 和 <code>Array arr(20);</code> 都能用。</p>
+<p><strong>析构函数里为什么置 <code>nullptr</code>？</strong> <code>delete[] mpArr</code> 只是把指针指向的堆内存释放了，指针本身还存着那个已经失效的地址——这就是<strong>野指针</strong>。置空可以防止后续误用。</p>
+<blockquote>
+<p>顺带说明：对空指针做 <code>delete</code> 是安全的（相当于空操作），所以没必要写 <code>if (mpArr != nullptr)</code> 再 delete。真正要由开发者保证的是：<strong>这个指针确实指向一块有效的堆内存</strong>。</p>
+</blockquote>
+<h3 id="3-3-末尾增删"><a href="#3-3-末尾增删" class="headerlink" title="3.3 末尾增删"></a>3.3 末尾增删</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - push_back</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 末尾增加元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(1)；若触发扩容则为 O(n)</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::push_back</span><span class="params">(<span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="comment">// 如果空间满了，先扩容</span></span><br><span class="line">	<span class="keyword">if</span> (mCur == mCap)</span><br><span class="line">	{</span><br><span class="line">		<span class="built_in">expand</span>(<span class="number">2</span> * mCap);</span><br><span class="line">	}</span><br><span class="line">	mpArr[mCur++] = val;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><figcaption><span>Array.cpp - pop_back</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 末尾删除元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(1)，不涉及元素移动</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::pop_back</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">if</span> (mCur == <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line">	mCur--;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>mpArr[mCur++] = val;</code></strong> 这一行做了两件事：先把 <code>val</code> 写到 <code>mCur</code> 位置，然后 <code>mCur</code> 自增 1。因为 <code>mCur</code> 既是元素个数、又是末尾元素的后继位置，所以直接写在它那个位置就对了。</p>
+<p><strong>末尾删除为什么这么简单？</strong> 因为只需要 <code>mCur--</code>。被”删除”的那个元素的值还在内存里，但 <code>mCur</code> 变小了，访问范围就缩小了，那个位置<strong>再也访问不到</strong>——相当于删掉了。不需要真的把值清零。</p>
+<p>**扩容判断用 <code>==</code> 而不是 <code>&lt;=</code>**：因为 <code>mCur</code> 每次最多加 1，不会跳过 <code>mCap</code>。</p>
+<h3 id="3-4-按位置插入"><a href="#3-4-按位置插入" class="headerlink" title="3.4 按位置插入"></a>3.4 按位置插入</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - insert</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 按位置增加元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(n)，非末尾位置需要移动元素</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::insert</span><span class="params">(<span class="type">int</span> pos, <span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="comment">// 判断插入位置是否合法，pos == mCur 相当于末尾插入</span></span><br><span class="line">	<span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt; mCur)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 如果空间满了，先扩容</span></span><br><span class="line">	<span class="keyword">if</span> (mCur == mCap)</span><br><span class="line">	{</span><br><span class="line">		<span class="built_in">expand</span>(<span class="number">2</span> * mCap);</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 从后往前移动元素，给 pos 位置腾出空位</span></span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = mCur - <span class="number">1</span>; i &gt;= pos; i--)</span><br><span class="line">	{</span><br><span class="line">		mpArr[i + <span class="number">1</span>] = mpArr[i];</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 插入元素</span></span><br><span class="line">	mpArr[pos] = val;</span><br><span class="line">	mCur++;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>逻辑和 C 版完全一致：**校验位置 → 扩容检查 → 从后往前挪元素 → 写入 → <code>mCur++</code>**。</p>
+<p>移动方向和原因也和 C 版一样——必须<strong>从后往前</strong>，否则前面的元素会覆盖后面的。</p>
+<h3 id="3-5-按位置删除"><a href="#3-5-按位置删除" class="headerlink" title="3.5 按位置删除"></a>3.5 按位置删除</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - erase</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 按位置删除元素</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(n)，非末尾位置需要移动元素</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::erase</span><span class="params">(<span class="type">int</span> pos)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="comment">// 判断位置是否合法，末尾元素的后继位置没有元素，不能删</span></span><br><span class="line">	<span class="keyword">if</span> (pos &lt; <span class="number">0</span> || pos &gt;= mCur)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// 从前往后移动元素，覆盖掉被删除的位置</span></span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = pos + <span class="number">1</span>; i &lt; mCur; i++)</span><br><span class="line">	{</span><br><span class="line">		mpArr[i - <span class="number">1</span>] = mpArr[i];</span><br><span class="line">	}</span><br><span class="line">	mCur--;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>删除和插入的校验范围不一样</strong>，这点容易记错：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>合法范围</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>insert(pos, val)</code></td>
+<td><code>0 &lt;= pos &lt;= mCur</code></td>
+<td><code>pos == mCur</code> 相当于末尾插入，合法</td>
+</tr>
+<tr>
+<td><code>erase(pos)</code></td>
+<td><code>0 &lt;= pos &lt; mCur</code></td>
+<td><code>pos == mCur</code> 是末尾元素的后继位置，那里没有元素，不能删</td>
+</tr>
+</tbody></table>
+<p><strong>为什么用按位置删除，而不是按值删除？</strong></p>
+<p><strong>先 <code>find</code> 拿到下标，再按位置删</strong>——两个接口配合起来更灵活，也更通用。</p>
+<p>这和 C 版的 <code>deleteSeqList</code>（内部调 <code>findSeqList</code> 再删）是同一个思路，只是 C++ 版把这一步<strong>拆开交给了调用者</strong>。</p>
+<h3 id="3-6-查找"><a href="#3-6-查找" class="headerlink" title="3.6 查找"></a>3.6 查找</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - find</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 元素查询（线性搜索）</span></span><br><span class="line"><span class="comment">// 时间复杂度 O(n)；若数组有序可改用二分搜索 O(logn)</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">Array::find</span><span class="params">(<span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; mCur; i++)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">if</span> (mpArr[i] == val)</span><br><span class="line">			<span class="keyword">return</span> i;</span><br><span class="line">	}</span><br><span class="line">	<span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>和 C 版的 <code>findSeqList</code> 逻辑完全一样：遍历比对，找到了返回下标，循环结束还没找到返回 -1。</p>
+<h3 id="3-7-打印"><a href="#3-7-打印" class="headerlink" title="3.7 打印"></a>3.7 打印</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - show</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 打印数组</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::show</span><span class="params">()</span> <span class="type">const</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; mCur; i++)</span><br><span class="line">	{</span><br><span class="line">		cout &lt;&lt; mpArr[i] &lt;&lt; <span class="string">" "</span>;</span><br><span class="line">	}</span><br><span class="line">	cout &lt;&lt; endl;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>const</code> 修饰</strong>：写在函数后面表示这是一个<strong>常成员函数</strong>，它不会修改对象的任何成员变量。这是 C++ 的约束——如果 <code>show</code> 里不小心写了修改成员变量的代码，编译器会直接报错。</p>
+<h3 id="3-8-扩容"><a href="#3-8-扩容" class="headerlink" title="3.8 扩容"></a>3.8 扩容</h3><figure class="highlight cpp"><figcaption><span>Array.cpp - expand</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 内部数组扩容接口</span></span><br><span class="line"><span class="comment">// 扩容消耗较大：开辟新内存 + 拷贝数据 + 释放旧内存</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Array::expand</span><span class="params">(<span class="type">int</span> size)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="type">int</span>* p = <span class="keyword">new</span> <span class="type">int</span>[size];					<span class="comment">// 开辟新的内存空间</span></span><br><span class="line">	<span class="built_in">memcpy</span>(p, mpArr, <span class="built_in">sizeof</span>(<span class="type">int</span>) * mCap);	<span class="comment">// 把原内存上的数据拷贝过来</span></span><br><span class="line">	<span class="keyword">delete</span>[] mpArr;							<span class="comment">// 释放原内存</span></span><br><span class="line"></span><br><span class="line">	mpArr = p;</span><br><span class="line">	mCap = size;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>和 C 版 <code>enlargerSeqList</code> 是<strong>同样的四步</strong>：开辟新内存 → 拷贝数据 → 释放旧内存 → 更新指针和容量。</p>
+<p>注意：</p>
+<ul>
+<li><strong><code>memcpy</code> 是按字节拷贝的</strong>，所以数组里存的必须是<strong>简单类型</strong>（比如 <code>int</code>）。如果存的是对象（有指针成员、需要深拷贝），就不能用 <code>memcpy</code>，必须逐个赋值</li>
+</ul>
+<p><strong>扩容倍数由调用者决定</strong>：<code>expand(2 * mCap)</code>。把倍数写在调用处而不是写死在 <code>expand</code> 里面，以后想改成 1.5 倍扩容只需要改调用处。</p>
+<h3 id="3-9-测试代码"><a href="#3-9-测试代码" class="headerlink" title="3.9 测试代码"></a>3.9 测试代码</h3><figure class="highlight cpp"><figcaption><span>main.cpp</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;time.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">"Array.h"</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	Array arr;</span><br><span class="line">	<span class="built_in">srand</span>(<span class="built_in">time</span>(<span class="number">0</span>));</span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++)</span><br><span class="line">	{</span><br><span class="line">		arr.<span class="built_in">push_back</span>(<span class="built_in">rand</span>() % <span class="number">100</span>);</span><br><span class="line">	}</span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line">	arr.<span class="built_in">pop_back</span>();</span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line">	arr.<span class="built_in">insert</span>(<span class="number">0</span>, <span class="number">100</span>);			<span class="comment">// 头部插入 100</span></span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line"></span><br><span class="line">	<span class="type">int</span> pos = arr.<span class="built_in">find</span>(<span class="number">100</span>);	<span class="comment">// 查询 100 所在的下标</span></span><br><span class="line">	<span class="keyword">if</span> (pos != <span class="number">-1</span>)</span><br><span class="line">	{</span><br><span class="line">		arr.<span class="built_in">erase</span>(pos);			<span class="comment">// 按位置删除</span></span><br><span class="line">	}</span><br><span class="line">	arr.<span class="built_in">show</span>();</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p>用随机数填 10 个元素（触发扩容，因为默认容量就是 10），然后依次测试 <code>pop_back</code> / <code>insert</code> / <code>find</code> / <code>erase</code>。</p>
+<h3 id="3-10-C-版小结"><a href="#3-10-C-版小结" class="headerlink" title="3.10 C++ 版小结"></a>3.10 C++ 版小结</h3><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>时间复杂度</th>
+<th>关键要点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>构造</td>
+<td>O(1)</td>
+<td>初始化列表 + <code>new int[mCap]()</code></td>
+</tr>
+<tr>
+<td>析构</td>
+<td>O(1)</td>
+<td><code>delete[]</code> + 置 <code>nullptr</code></td>
+</tr>
+<tr>
+<td><code>push_back</code></td>
+<td>O(1)</td>
+<td>满了先 <code>expand</code></td>
+</tr>
+<tr>
+<td><code>insert</code></td>
+<td>O(n)</td>
+<td>合法范围 <code>[0, mCur]</code>，<strong>从后往前</strong>移动</td>
+</tr>
+<tr>
+<td><code>erase</code></td>
+<td>O(n)</td>
+<td>合法范围 <code>[0, mCur)</code>，<strong>从前往后</strong>移动</td>
+</tr>
+<tr>
+<td><code>find</code></td>
+<td>O(n)</td>
+<td>顺序遍历</td>
+</tr>
+<tr>
+<td><code>expand</code></td>
+<td>O(n)</td>
+<td><code>memcpy</code> 拷贝 + <code>delete[]</code> 旧内存</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="四、C-与-C-对照总结"><a href="#四、C-与-C-对照总结" class="headerlink" title="四、C 与 C++ 对照总结"></a>四、C 与 C++ 对照总结</h2><table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>C 版</th>
+<th>C++ 版</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>数据组织</strong></td>
+<td><code>typedef struct</code></td>
+<td><code>class</code></td>
+</tr>
+<tr>
+<td><strong>数据与行为</strong></td>
+<td>分离：结构体 + 全局函数</td>
+<td>封装：成员变量 + 成员函数</td>
+</tr>
+<tr>
+<td><strong>内存申请</strong></td>
+<td><code>malloc</code></td>
+<td><code>new</code></td>
+</tr>
+<tr>
+<td><strong>内存释放</strong></td>
+<td><code>free</code></td>
+<td><code>delete[]</code> / <code>delete</code></td>
+</tr>
+<tr>
+<td><strong>生命周期</strong></td>
+<td>手动调 <code>create</code> / <code>release</code></td>
+<td>构造/析构函数自动调用</td>
+</tr>
+<tr>
+<td><strong>传参</strong></td>
+<td>显式传 <code>SeqList* seq</code></td>
+<td>隐含 <code>this</code> 指针</td>
+</tr>
+<tr>
+<td><strong>访问控制</strong></td>
+<td>无，靠 <code>static</code> 约定</td>
+<td><code>public</code> / <code>private</code></td>
+</tr>
+<tr>
+<td><strong>编译期检查</strong></td>
+<td>无</td>
+<td><code>const</code> 成员函数等</td>
+</tr>
+<tr>
+<td><strong>实现文件</strong></td>
+<td><code>SeqTable.h</code> + <code>SeqTable.c</code> + <code>main.c</code></td>
+<td><code>Array.h</code> + <code>Array.cpp</code> + <code>main.cpp</code></td>
+</tr>
+</tbody></table>
+<p><strong>核心操作完全一致</strong>：</p>
+<ul>
+<li>三个成员变量含义相同（指针 / 容量 / 元素个数）</li>
+<li>插入必须<strong>从后往前</strong>移动元素</li>
+<li>删除必须<strong>从前往后</strong>移动元素</li>
+<li>扩容都是<strong>四步</strong>：开辟 → 拷贝 → 释放 → 更新</li>
+</ul>
+<p><strong>C++ 多出来的东西</strong>：封装、访问控制、自动生命周期管理——这些让代码更安全，但底层的数据结构和算法<strong>一点没变</strong>。</p>
+<hr>
+<h2 id="五、复习要点总结"><a href="#五、复习要点总结" class="headerlink" title="五、复习要点总结"></a>五、复习要点总结</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>时间复杂度</th>
+<th>关键要点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>创建</td>
+<td>O(1)</td>
+<td>表头 + 数据区分两次申请</td>
+</tr>
+<tr>
+<td>尾插</td>
+<td>O(1)</td>
+<td>直接放 <code>data[length]</code></td>
+</tr>
+<tr>
+<td>任意位置插入</td>
+<td>O(n)</td>
+<td><strong>从后往前</strong>移动元素</td>
+</tr>
+<tr>
+<td>删除</td>
+<td>O(n)</td>
+<td><strong>从前往后</strong>移动元素</td>
+</tr>
+<tr>
+<td>查找</td>
+<td>O(n)</td>
+<td>顺序遍历，循环外返回 -1</td>
+</tr>
+<tr>
+<td>扩容</td>
+<td>O(n)</td>
+<td>2 倍扩容 + 拷贝数据</td>
+</tr>
+</tbody></table>
+<p><strong>几个细节</strong>：</p>
 <ol>
+<li><strong>下标访问和查找有什么区别？</strong> — 下标访问是 O(1)（直接算地址），查找是 O(n)（遍历比对），两个概念不能混为一谈</li>
 <li><strong>为什么长度和容量要分开记录？</strong> — 容量是总空间，长度是已用空间，扩容时靠容量判断</li>
 <li><strong>插入时为什么 pos 可以等于 length？</strong> — 等于 length 就相当于尾插</li>
 <li><strong>删除后需不需要缩容？</strong> — 一般不需要，这就是”以空间换时间”的思想</li>
+<li><strong>为什么插入从后往前、删除从前往后？</strong> — 都是为了不覆盖还没处理的数据</li>
 </ol>
-<hr>
 
     </div>
 
@@ -586,7 +1046,7 @@ mjx-container[display="true"] + br {
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E2%80%94%E2%80%94-%E9%A1%BA%E5%BA%8F%E8%A1%A8"><span class="nav-number">1.</span> <span class="nav-text">数据结构 —— 顺序表</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E9%A1%BA%E5%BA%8F%E8%A1%A8"><span class="nav-number">1.1.</span> <span class="nav-text">什么是顺序表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E9%A1%BA%E5%BA%8F%E8%A1%A8%E7%9A%84%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89"><span class="nav-number">1.2.</span> <span class="nav-text">一、顺序表的结构定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E5%88%9B%E5%BB%BA%E4%B8%8E%E9%87%8A%E6%94%BE"><span class="nav-number">1.3.</span> <span class="nav-text">二、创建与释放</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E5%88%9B%E5%BB%BA%E9%A1%BA%E5%BA%8F%E8%A1%A8"><span class="nav-number">1.3.1.</span> <span class="nav-text">2.1 创建顺序表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E9%87%8A%E6%94%BE%E9%A1%BA%E5%BA%8F%E8%A1%A8"><span class="nav-number">1.3.2.</span> <span class="nav-text">2.2 释放顺序表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%8F%92%E5%85%A5%E6%93%8D%E4%BD%9C"><span class="nav-number">1.4.</span> <span class="nav-text">三、插入操作</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E5%B0%BE%E6%8F%92%E6%B3%95%EF%BC%88pushback%EF%BC%89"><span class="nav-number">1.4.1.</span> <span class="nav-text">3.1 尾插法（pushback）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E4%BB%BB%E6%84%8F%E4%BD%8D%E7%BD%AE%E6%8F%92%E5%85%A5%EF%BC%88insert%EF%BC%89"><span class="nav-number">1.4.2.</span> <span class="nav-text">3.2 任意位置插入（insert）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%93%8D%E4%BD%9C%E7%9A%84%E5%9B%BE%E8%A7%A3"><span class="nav-number">1.4.3.</span> <span class="nav-text">插入操作的图解</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C"><span class="nav-number">1.5.</span> <span class="nav-text">四、删除操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E6%9F%A5%E6%89%BE%E6%93%8D%E4%BD%9C"><span class="nav-number">1.6.</span> <span class="nav-text">五、查找操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E6%89%A9%E5%AE%B9%E6%9C%BA%E5%88%B6"><span class="nav-number">1.7.</span> <span class="nav-text">六、扩容机制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95%E4%BB%A3%E7%A0%81"><span class="nav-number">1.8.</span> <span class="nav-text">七、完整测试代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E5%A4%8D%E4%B9%A0%E8%A6%81%E7%82%B9%E6%80%BB%E7%BB%93"><span class="nav-number">1.9.</span> <span class="nav-text">八、复习要点总结</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E9%A1%BA%E5%BA%8F%E8%A1%A8"><span class="nav-number">1.</span> <span class="nav-text">什么是顺序表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E7%BB%84"><span class="nav-number">2.</span> <span class="nav-text">数组</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#0-1-%E6%95%B0%E7%BB%84%E7%9A%84%E7%89%B9%E7%82%B9"><span class="nav-number">2.1.</span> <span class="nav-text">0.1 数组的特点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-2-%E4%B8%8B%E6%A0%87%E8%AE%BF%E9%97%AE-%E2%89%A0-%E6%9F%A5%E6%89%BE"><span class="nav-number">2.2.</span> <span class="nav-text">0.2 下标访问 ≠ 查找</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-3-%E6%95%B0%E7%BB%84%E7%9A%84%E4%BC%98%E7%82%B9"><span class="nav-number">2.3.</span> <span class="nav-text">0.3 数组的优点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-4-%E6%95%B0%E7%BB%84%E7%9A%84%E7%BC%BA%E7%82%B9"><span class="nav-number">2.4.</span> <span class="nav-text">0.4 数组的缺点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81C%E5%92%8CC-%E4%B8%A4%E7%A7%8D%E5%AE%9E%E7%8E%B0%E5%AF%B9%E6%AF%94"><span class="nav-number">3.</span> <span class="nav-text">一、C和C++两种实现对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81C-%E7%89%88%E5%AE%9E%E7%8E%B0"><span class="nav-number">4.</span> <span class="nav-text">二、C 版实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89"><span class="nav-number">4.1.</span> <span class="nav-text">2.1 结构定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E5%87%BD%E6%95%B0%E5%A3%B0%E6%98%8E"><span class="nav-number">4.2.</span> <span class="nav-text">2.2 函数声明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E5%88%9B%E5%BB%BA%E4%B8%8E%E9%87%8A%E6%94%BE"><span class="nav-number">4.3.</span> <span class="nav-text">2.3 创建与释放</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E5%B0%BE%E6%8F%92%E6%B3%95"><span class="nav-number">4.4.</span> <span class="nav-text">2.4 尾插法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-%E4%BB%BB%E6%84%8F%E4%BD%8D%E7%BD%AE%E6%8F%92%E5%85%A5"><span class="nav-number">4.5.</span> <span class="nav-text">2.5 任意位置插入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-%E6%9F%A5%E6%89%BE"><span class="nav-number">4.6.</span> <span class="nav-text">2.6 查找</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-7-%E5%88%A0%E9%99%A4"><span class="nav-number">4.7.</span> <span class="nav-text">2.7 删除</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-8-%E6%89%A9%E5%AE%B9"><span class="nav-number">4.8.</span> <span class="nav-text">2.8 扩容</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-9-%E6%B5%8B%E8%AF%95%E4%BB%A3%E7%A0%81"><span class="nav-number">4.9.</span> <span class="nav-text">2.9 测试代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-10-C-%E7%89%88%E5%B0%8F%E7%BB%93"><span class="nav-number">4.10.</span> <span class="nav-text">2.10 C 版小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81C-%E7%89%88%E5%AE%9E%E7%8E%B0"><span class="nav-number">5.</span> <span class="nav-text">三、C++ 版实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E7%B1%BB%E7%9A%84%E5%A3%B0%E6%98%8E"><span class="nav-number">5.1.</span> <span class="nav-text">3.1 类的声明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0%E4%B8%8E%E6%9E%90%E6%9E%84%E5%87%BD%E6%95%B0"><span class="nav-number">5.2.</span> <span class="nav-text">3.2 构造函数与析构函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E6%9C%AB%E5%B0%BE%E5%A2%9E%E5%88%A0"><span class="nav-number">5.3.</span> <span class="nav-text">3.3 末尾增删</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E6%8C%89%E4%BD%8D%E7%BD%AE%E6%8F%92%E5%85%A5"><span class="nav-number">5.4.</span> <span class="nav-text">3.4 按位置插入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-5-%E6%8C%89%E4%BD%8D%E7%BD%AE%E5%88%A0%E9%99%A4"><span class="nav-number">5.5.</span> <span class="nav-text">3.5 按位置删除</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-6-%E6%9F%A5%E6%89%BE"><span class="nav-number">5.6.</span> <span class="nav-text">3.6 查找</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-7-%E6%89%93%E5%8D%B0"><span class="nav-number">5.7.</span> <span class="nav-text">3.7 打印</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-8-%E6%89%A9%E5%AE%B9"><span class="nav-number">5.8.</span> <span class="nav-text">3.8 扩容</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-9-%E6%B5%8B%E8%AF%95%E4%BB%A3%E7%A0%81"><span class="nav-number">5.9.</span> <span class="nav-text">3.9 测试代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-10-C-%E7%89%88%E5%B0%8F%E7%BB%93"><span class="nav-number">5.10.</span> <span class="nav-text">3.10 C++ 版小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81C-%E4%B8%8E-C-%E5%AF%B9%E7%85%A7%E6%80%BB%E7%BB%93"><span class="nav-number">6.</span> <span class="nav-text">四、C 与 C++ 对照总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%A4%8D%E4%B9%A0%E8%A6%81%E7%82%B9%E6%80%BB%E7%BB%93"><span class="nav-number">7.</span> <span class="nav-text">五、复习要点总结</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -651,12 +1111,12 @@ mjx-container[display="true"] + br {
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">457k</span>
+    <span title="站点总字数">464k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">6:55</span>
+    <span title="站点阅读时长">7:02</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
   </div>
