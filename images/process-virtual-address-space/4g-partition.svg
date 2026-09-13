@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600"
+     font-family="Microsoft YaHei, PingFang SC, Hiragino Sans GB, sans-serif">
+  <rect width="900" height="600" fill="#ffffff"/>
+
+  <text x="450" y="46" text-anchor="middle" font-size="24" font-weight="bold" fill="#1a1a1a">4G 空间的划分（32 位 Linux 默认）</text>
+
+  <!-- 4G 总框 -->
+  <rect x="220" y="90" width="300" height="400" fill="#ffffff" stroke="#2c5f8a" stroke-width="2.5"/>
+
+  <!-- 用户空间 3G：占 3/4 -->
+  <rect x="221" y="271" width="298" height="218" fill="#dbeafe"/>
+  <text x="370" y="380" text-anchor="middle" font-size="22" font-weight="bold" fill="#1e3a5f">用户空间</text>
+  <text x="370" y="414" text-anchor="middle" font-size="20" fill="#1e3a5f">3G</text>
+  <text x="370" y="444" text-anchor="middle" font-size="13" fill="#3b6ea5">0x00000000 ~ 0xC0000000</text>
+
+  <!-- 内核空间 1G：占 1/4 -->
+  <rect x="221" y="91" width="298" height="180" fill="#ffe4e6"/>
+  <text x="370" y="165" text-anchor="middle" font-size="22" font-weight="bold" fill="#9f1239">内核空间</text>
+  <text x="370" y="199" text-anchor="middle" font-size="20" fill="#9f1239">1G</text>
+  <text x="370" y="229" text-anchor="middle" font-size="13" fill="#b34a5c">0xC0000000 ~ 0xFFFFFFFF</text>
+
+  <!-- 3G 分界线 -->
+  <line x1="220" y1="271" x2="520" y2="271" stroke="#c0392b" stroke-width="3"/>
+
+  <!-- 右侧地址标注 -->
+  <g font-size="14" font-weight="bold" fill="#c0392b">
+    <text x="536" y="96">0xFFFFFFFF</text>
+    <text x="536" y="276">0xC0000000</text>
+    <text x="536" y="496">0x00000000</text>
+  </g>
+  <g font-size="11.5" fill="#888">
+    <text x="536" y="114">4G 顶部</text>
+    <text x="536" y="294">3G 分界线</text>
+    <text x="536" y="514">地址起点</text>
+  </g>
+
+  <!-- 左侧比例标注 -->
+  <g text-anchor="end">
+    <text x="204" y="185" font-size="16" font-weight="bold" fill="#9f1239">1/4</text>
+    <text x="204" y="388" font-size="16" font-weight="bold" fill="#1e3a5f">3/4</text>
+  </g>
+
+  <!-- 底部说明 -->
+  <g font-size="14" fill="#444">
+    <text x="220" y="572">· 每个进程都有这样一块 4G 的虚拟地址空间，互相独立</text>
+    <text x="220" y="596">· 1G / 3G 是系统默认比例，可通过内核配置调整</text>
+  </g>
+</svg>

@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 940" width="1180" height="940"
+     font-family="Microsoft YaHei, PingFang SC, Hiragino Sans GB, sans-serif">
+  <defs>
+    <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="9" stroke="#cfcfcf" stroke-width="1.6"/>
+    </pattern>
+    <marker id="arrowUp" markerWidth="9" markerHeight="9" refX="4.5" refY="2" orient="auto">
+      <path d="M0,8 L4.5,0 L9,8 z" fill="#f59e0b"/>
+    </marker>
+    <marker id="arrowDown" markerWidth="9" markerHeight="9" refX="4.5" refY="2" orient="auto">
+      <path d="M0,8 L4.5,0 L9,8 z" fill="#3b82f6"/>
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1180" height="940" fill="#ffffff"/>
+
+  <!-- 标题 -->
+  <text x="590" y="46" text-anchor="middle" font-size="25" font-weight="bold" fill="#1a1a1a">进程的虚拟地址空间（32 位 Linux）</text>
+
+  <!-- ===================== 大括号 ===================== -->
+  <!-- 用户空间 y:100~628 -->
+  <path d="M 36,100 C 23,100 23,100 23,130 L 23,334 C 23,364 23,364 13,364
+           C 23,364 23,364 23,394 L 23,598 C 23,628 23,628 36,628"
+        fill="none" stroke="#2c5f8a" stroke-width="2"/>
+  <text x="46" y="357" font-size="19" font-weight="bold" fill="#2c5f8a">用户空间</text>
+  <text x="46" y="381" font-size="17" fill="#2c5f8a">3G</text>
+
+  <!-- 内核空间 y:628~870 -->
+  <path d="M 36,628 C 23,628 23,628 23,658 L 23,719 C 23,749 23,749 13,749
+           C 23,749 23,749 23,779 L 23,840 C 23,870 23,870 36,870"
+        fill="none" stroke="#c0392b" stroke-width="2"/>
+  <text x="46" y="742" font-size="19" font-weight="bold" fill="#c0392b">内核空间</text>
+  <text x="46" y="766" font-size="17" fill="#c0392b">1G</text>
+
+  <!-- ===================== 左侧标注 ===================== -->
+  <g font-size="13.5" fill="#444" text-anchor="end">
+    <text x="425" y="172">局部变量 a、b、c</text>
+    <text x="425" y="191" fill="#888" font-size="12.5">生成指令，不产生符号</text>
+
+    <text x="425" y="230">常量字符串 &quot;hello world&quot;</text>
+
+    <text x="425" y="270" fill="#166534">gdata1　gdata4　e</text>
+
+    <text x="425" y="320" fill="#047857">gdata2　gdata3</text>
+    <text x="425" y="340" fill="#047857">gdata5　gdata6　f　g</text>
+
+    <text x="425" y="445">new / malloc 时分配</text>
+    <text x="425" y="547">函数运行时分配</text>
+    <text x="425" y="605">程序启动时由内核放入</text>
+  </g>
+
+  <!-- ===================== 地址空间主体 ===================== -->
+  <rect x="440" y="100" width="260" height="770" fill="#ffffff" stroke="#2c5f8a" stroke-width="2.5"/>
+
+  <!-- 1. 预留区 -->
+  <rect x="441" y="101" width="258" height="49" fill="url(#hatch)"/>
+  <text x="570" y="132" text-anchor="middle" font-size="14" fill="#555"
+        paint-order="stroke" stroke="#ffffff" stroke-width="5">未使用（不可访问）</text>
+
+  <!-- 2. .text -->
+  <rect x="441" y="150" width="258" height="50" fill="#dbeafe"/>
+  <text x="570" y="181" text-anchor="middle" font-size="16" fill="#1e3a5f" font-weight="bold">.text（代码段）</text>
+
+  <!-- 3. .rodata -->
+  <rect x="441" y="200" width="258" height="50" fill="#e0e7ff"/>
+  <text x="570" y="231" text-anchor="middle" font-size="16" fill="#312e81" font-weight="bold">.rodata（只读数据段）</text>
+
+  <!-- 4. .data -->
+  <rect x="441" y="250" width="258" height="50" fill="#dcfce7"/>
+  <text x="570" y="281" text-anchor="middle" font-size="16" fill="#166534" font-weight="bold">.data（已初始化且非0）</text>
+
+  <!-- 5. .bss -->
+  <rect x="441" y="300" width="258" height="50" fill="#d1fae5"/>
+  <text x="570" y="331" text-anchor="middle" font-size="16" fill="#065f46" font-weight="bold">.bss（未初始化／为0）</text>
+
+  <!-- 6. 空隙：堆生长方向 -->
+  <line x1="570" y1="408" x2="570" y2="352" stroke="#f59e0b" stroke-width="2.5" marker-end="url(#arrowUp)"/>
+  <text x="582" y="392" font-size="13" fill="#b45309">堆向上增长</text>
+
+  <!-- 7. .heap -->
+  <rect x="441" y="415" width="258" height="50" fill="#fef3c7"/>
+  <text x="570" y="446" text-anchor="middle" font-size="16" fill="#92400e" font-weight="bold">.heap（堆）</text>
+
+  <!-- 8. 共享库 -->
+  <rect x="441" y="465" width="258" height="50" fill="#ede9fe"/>
+  <text x="570" y="496" text-anchor="middle" font-size="15" fill="#5b21b6" font-weight="bold">加载共享库　*.dll　*.so</text>
+
+  <!-- 9. stack -->
+  <rect x="441" y="515" width="258" height="59" fill="#ffe4e6"/>
+  <text x="570" y="538" text-anchor="middle" font-size="16" fill="#9f1239" font-weight="bold">stack（栈）</text>
+  <line x1="570" y1="543" x2="570" y2="561" stroke="#3b82f6" stroke-width="2.5" marker-end="url(#arrowDown)"/>
+  <text x="605" y="560" font-size="13" fill="#1d4ed8">栈向下增长</text>
+
+  <!-- 10. 命令行参数 -->
+  <rect x="441" y="574" width="258" height="54" fill="#ffedd5"/>
+  <text x="570" y="606" text-anchor="middle" font-size="15" fill="#9a3412" font-weight="bold">命令行参数和环境变量</text>
+
+  <!-- 3G 分界线 -->
+  <line x1="440" y1="628" x2="700" y2="628" stroke="#c0392b" stroke-width="3.5"/>
+
+  <!-- 内核空间三区 -->
+  <rect x="490" y="663" width="160" height="47" rx="23" fill="#ffffff" stroke="#c0392b" stroke-width="2"/>
+  <text x="570" y="692" text-anchor="middle" font-size="15" fill="#c0392b" font-weight="bold">ZONE_DMA</text>
+
+  <rect x="470" y="724" width="200" height="47" rx="23" fill="#ffffff" stroke="#c0392b" stroke-width="2"/>
+  <text x="570" y="753" text-anchor="middle" font-size="15" fill="#c0392b" font-weight="bold">ZONE_NORMAL</text>
+
+  <rect x="470" y="785" width="200" height="47" rx="23" fill="#ffffff" stroke="#c0392b" stroke-width="2"/>
+  <text x="570" y="814" text-anchor="middle" font-size="15" fill="#c0392b" font-weight="bold">ZONE_HIGHMEM</text>
+
+  <!-- ===================== 右侧地址标注 ===================== -->
+  <g font-size="14" fill="#c0392b" font-weight="bold">
+    <text x="710" y="106">0x00000000</text>
+    <text x="710" y="156">0x08048000</text>
+    <text x="710" y="634">0xC0000000</text>
+    <text x="710" y="876">0xFFFFFFFF</text>
+  </g>
+
+  <!-- ===================== 右侧示例 ===================== -->
+  <g font-family="Consolas, Courier New, monospace" font-size="13.5">
+    <!-- 空指针 -->
+    <text x="800" y="122" fill="#111">char *p = NULL;</text>
+    <text x="800" y="144" fill="#111">strcpy(dest, src);</text>
+    <text x="1005" y="144" fill="#c0392b" font-family="Microsoft YaHei, sans-serif">← 程序崩溃</text>
+
+    <!-- rodata 常量字符串 -->
+    <text x="800" y="222" fill="#111">char *p = "hello world";</text>
+    <text x="800" y="244" fill="#111">*p = 'a';</text>
+    <text x="905" y="244" fill="#c0392b" font-family="Microsoft YaHei, sans-serif">← 运行崩溃</text>
+
+    <text x="800" y="284" fill="#166534">const char *p = "hello world";</text>
+    <text x="1090" y="284" fill="#166534" font-family="Microsoft YaHei, sans-serif">✓</text>
+
+    <!-- 命令行参数 -->
+    <text x="800" y="604" fill="#111">./a.out 192.168.1.100 9090</text>
+  </g>
+
+  <!-- 底部说明 -->
+  <text x="590" y="912" text-anchor="middle" font-size="15" fill="#333">
+    内核会给当前进程分配一块 2<tspan dy="-5" font-size="11">32</tspan><tspan dy="5"> </tspan> = 4G 大小的空间
+  </text>
+</svg>

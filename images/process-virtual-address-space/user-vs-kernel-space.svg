@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 620" width="1100" height="620"
+     font-family="Microsoft YaHei, PingFang SC, Hiragino Sans GB, sans-serif">
+  <rect width="1100" height="620" fill="#ffffff"/>
+
+  <text x="550" y="46" text-anchor="middle" font-size="24" font-weight="bold" fill="#1a1a1a">用户空间私有，内核空间共享</text>
+
+  <!-- 三个进程 -->
+  <g>
+    <!-- 进程1 -->
+    <rect x="70" y="90" width="200" height="150" fill="#dbeafe" stroke="#2c5f8a" stroke-width="2"/>
+    <text x="170" y="160" text-anchor="middle" font-size="17" fill="#1e3a5f" font-weight="bold">进程 1</text>
+    <text x="170" y="188" text-anchor="middle" font-size="14" fill="#1e3a5f">用户空间（私有）</text>
+
+    <!-- 进程2 -->
+    <rect x="320" y="90" width="200" height="150" fill="#dbeafe" stroke="#2c5f8a" stroke-width="2"/>
+    <text x="420" y="160" text-anchor="middle" font-size="17" fill="#1e3a5f" font-weight="bold">进程 2</text>
+    <text x="420" y="188" text-anchor="middle" font-size="14" fill="#1e3a5f">用户空间（私有）</text>
+
+    <!-- 进程3 -->
+    <rect x="570" y="90" width="200" height="150" fill="#dbeafe" stroke="#2c5f8a" stroke-width="2"/>
+    <text x="670" y="160" text-anchor="middle" font-size="17" fill="#1e3a5f" font-weight="bold">进程 3</text>
+    <text x="670" y="188" text-anchor="middle" font-size="14" fill="#1e5f8a">用户空间（私有）</text>
+  </g>
+
+  <!-- 隔离墙 -->
+  <g stroke="#c0392b" stroke-width="2.5" stroke-dasharray="7,5">
+    <line x1="295" y1="80" x2="295" y2="250"/>
+    <line x1="545" y1="80" x2="545" y2="250"/>
+  </g>
+  <text x="295" y="272" text-anchor="middle" font-size="12" fill="#c0392b">隔离</text>
+  <text x="545" y="272" text-anchor="middle" font-size="12" fill="#c0392b">隔离</text>
+
+  <!-- 共享内核空间 -->
+  <rect x="70" y="300" width="700" height="120" fill="#ffe4e6" stroke="#c0392b" stroke-width="2.5"/>
+  <text x="420" y="348" text-anchor="middle" font-size="19" fill="#9f1239" font-weight="bold">内核空间（共享）</text>
+  <text x="420" y="380" text-anchor="middle" font-size="14" fill="#9f1239">ZONE_DMA　ZONE_NORMAL　ZONE_HIGHMEM</text>
+  <text x="420" y="404" text-anchor="middle" font-size="12.5" fill="#9f1239">所有进程共用同一块</text>
+
+  <!-- 连接线 -->
+  <g stroke="#9f1239" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.65">
+    <line x1="170" y1="240" x2="170" y2="300"/>
+    <line x1="420" y1="240" x2="420" y2="300"/>
+    <line x1="670" y1="240" x2="670" y2="300"/>
+  </g>
+
+  <!-- 右侧说明 -->
+  <g font-size="14">
+    <text x="810" y="130" fill="#1e3a5f" font-weight="bold">用户空间</text>
+    <text x="810" y="156" fill="#444">每个进程各自独有</text>
+    <text x="810" y="180" fill="#666" font-size="12.5">→ 谁也访问不到谁</text>
+    <text x="810" y="204" fill="#666" font-size="12.5">→ 进程间通信难</text>
+
+    <text x="810" y="340" fill="#9f1239" font-weight="bold">内核空间</text>
+    <text x="810" y="366" fill="#444">操作系统只有一份</text>
+    <text x="810" y="390" fill="#666" font-size="12.5">→ 这块内存谁都能看见</text>
+    <text x="810" y="414" fill="#666" font-size="12.5">→ 匿名管道的基础</text>
+  </g>
+
+  <!-- 匿名管道示意 -->
+  <rect x="70" y="460" width="960" height="130" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="8"/>
+  <text x="100" y="492" font-size="15" font-weight="bold" fill="#334155">匿名管道通信原理</text>
+  <text x="100" y="522" font-size="13.5" fill="#475569">
+    在内核空间划出一块内存，进程 1 往里写数据，进程 2、进程 3 都能读到；反过来也一样。
+  </text>
+  <g font-size="13.5">
+    <text x="100" y="560" fill="#1d4ed8">进程 1 写入 →</text>
+    <rect x="240" y="543" width="240" height="26" fill="#ffe4e6" stroke="#c0392b" stroke-width="1.5"/>
+    <text x="360" y="561" text-anchor="middle" fill="#9f1239" font-size="12.5">内核空间的共享内存</text>
+    <text x="500" y="560" fill="#b45309">→ 进程 2 / 进程 3 读取</text>
+  </g>
+</svg>
