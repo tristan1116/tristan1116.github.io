@@ -2869,317 +2869,6 @@
       </tags>
   </entry>
   <entry>
-    <title>STM32——浅析时钟源与时钟树理论知识</title>
-    <url>/2026/08/06/STM32_Clock_Tree/</url>
-    <content><![CDATA[<h2 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h2><p><strong>STM32 为什么能”有条不紊”地工作？为什么芯片内部的电路不会乱套？</strong></p>
-<p>在每一篇博客的代码里，都有这么一行永远存在的代码，之前没有深究：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">SystemClock_Config();</span><br></pre></td></tr></table></figure>
-
-<p>这行代码在配置什么？为什么 GPIO、I2C、串口能正常工作的前提，都是先执行它？答案就是本期的主角——<strong>时钟源与时钟树</strong>，单片机的”心脏与动脉”。</p>
-<p>这一集是纯理论讲解，不写任何新代码。但它是理解后续所有外设（定时器、ADC、DMA……）的<strong>地基</strong>——因为每个外设的时钟频率，都是从这颗时钟树上”摘”下来的。</p>
-<h2 id="为什么单片机需要”心跳”"><a href="#为什么单片机需要”心跳”" class="headerlink" title="为什么单片机需要”心跳”"></a>为什么单片机需要”心跳”</h2><h3 id="微观视角：门电路的”运算延时”"><a href="#微观视角：门电路的”运算延时”" class="headerlink" title="微观视角：门电路的”运算延时”"></a>微观视角：门电路的”运算延时”</h3><p>芯片内部是庞杂的逻辑电路组成的，我们假设 STM32 内部有这样一套电路：一个<strong>与门</strong> + 一个<strong>异或门</strong>，异或门的输出连接到了某个寄存器的某一位：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">A ──┬─────┐</span><br><span class="line">    │ 与门  ├── 与门输出 ──┐</span><br><span class="line">B ──┴─────┘              ├─► 异或门 ──► 寄存器某一位 ──► 程序可读到</span><br><span class="line">B ───────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><strong>与门</strong>：A 和 B 都是高电平 1 时输出 1，其他情况输出 0</li>
-<li><strong>异或门</strong>：两个输入不一致时输出 1，一致时输出 0</li>
-</ul>
-<p>寄存器是”程序与电路之间的桥梁”——程序读寄存器获取电路状态，写寄存器控制电路运行。</p>
-<p>假设当前 A、B 都是高电平：与门输出 1，异或门两输入都是 1 → 输出 0，寄存器存储 0。</p>
-<p>现在 B 突然从高电平变为低电平（比如某个 GPIO 输入的电平变了），理想情况下：与门输出变 0，异或门两输入都变 0 → 输出还是 0，寄存器安然无恙。</p>
-<p>但<strong>实际情况有出入</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">B 电平变化瞬间到达异或门输入端</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">与门还在&quot;运算&quot;中！（MOS 管充放电需要时间，虽然对人类是瞬间，但相对光速是&quot;龟速&quot;）</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">异或门看到的是：A=1（与门还没算完，输出还是 1）、B=0</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">异或门两输入不一致 → 输出 1 → 寄存器短暂读到错误值 1！</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">与门运算完成，输出 0，异或门恢复输出 0，寄存器恢复正确值</span><br></pre></td></tr></table></figure>
-
-<p>寄存器中出现了一段<strong>由门电路运算延时产生的错误状态</strong>——这段错误虽然短暂，但可能导致依赖此寄存器的程序、其他逻辑电路出现更严重的连锁错误。芯片内部电路比这个例子复杂成千上万倍，每个信号经过的门电路数量不一、错综复杂，如果放任不管，<strong>芯片内部电信号将乱成一锅粥</strong>。</p>
-<h3 id="解决办法：边沿触发器-方波"><a href="#解决办法：边沿触发器-方波" class="headerlink" title="解决办法：边沿触发器 + 方波"></a>解决办法：边沿触发器 + 方波</h3><p>解决方法其实很简单——在寄存器前放一个<strong>边沿触发器</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">D端(数据输入)                    Q端(数据输出)</span><br><span class="line">      │                             │</span><br><span class="line">      └────► 边沿触发器 ◄──────┘</span><br><span class="line">                  │</span><br><span class="line">            控制端 ◄──── 一定频率的方波（时钟信号）</span><br></pre></td></tr></table></figure>
-
-<p>边沿触发器的特性：<strong>当控制端出现由低到高的上升沿时，输出端才采样 D 端的值</strong>，其他时候输出保持不变。</p>
-<p>于是，只要给控制端接入一个一定频率的方波信号：</p>
-<ol>
-<li>方波一个周期内，门电路运算产生的任何”毛刺”都无法进入寄存器</li>
-<li>等一切运算都稳定后，方波的上升沿到达，<strong>把最终稳定结果锁存进寄存器</strong></li>
-</ol>
-<p>这个好似脉搏的方波信号，就是<strong>时钟信号</strong>。它在单片机中由”心脏”——时钟源产生，通过”动脉”——时钟树传播到整个芯片。这也是”单片机离开了时钟源就无法存活”的原因。</p>
-<blockquote>
-<p>💡 这就是数字电路里的经典概念：<strong>同步时序逻辑</strong>。时钟就是全芯片的”节拍器”，让所有电路在同一个节拍下协同工作，避免异步混乱。还记得 STM32 – I2C 中断与 DMA 里讲的”同步&#x2F;异步”吗？硬件层面的同步，就是靠这根时钟线实现的。</p>
-</blockquote>
-<h3 id="宏观视角：外设也需要时钟"><a href="#宏观视角：外设也需要时钟" class="headerlink" title="宏观视角：外设也需要时钟"></a>宏观视角：外设也需要时钟</h3><p>除了微观层面，宏观的外设层面同样需要精确的时钟脉冲：</p>
-<ul>
-<li><strong>串口</strong>需要固定的波特率进行通信</li>
-<li><strong>定时器</strong>需要计时，得知道时间流逝了多少</li>
-<li><strong>ADC</strong> 需要采样时序</li>
-</ul>
-<p>这些都需要时钟脉冲告诉外设”时间在流逝”。</p>
-<h2 id="数据流全链路：时钟从晶振走到外设"><a href="#数据流全链路：时钟从晶振走到外设" class="headerlink" title="数据流全链路：时钟从晶振走到外设"></a>数据流全链路：时钟从晶振走到外设</h2><p>理解了”为什么需要时钟”，我们来看时钟是怎么从源头一步步传到每个外设的。这就是<strong>数据流全链路</strong>，也是本篇的核心：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                 ┌─────────┐</span><br><span class="line">HSE 晶振 8MHz ──►│ 预分频器  │──┐ 8MHz</span><br><span class="line">                 │  ÷1 / ÷2  │  │</span><br><span class="line">                 └─────────┘  │        ┌─────────┐   ×9 = 72MHz</span><br><span class="line">                 ┌─────────┐  └──────►│ PLL锁相环 │──────────┐</span><br><span class="line">HSI 内部 8MHz ──►│ 固定 ÷2  │────────►│ ×2~×16  │          │</span><br><span class="line">                 └─────────┘          └─────────┘          ▼</span><br><span class="line">                                 ┌─────────────── SYSCLK 系统时钟 72MHz</span><br><span class="line">                                 │  (三选一: HSI / HSE / PLLCLK)</span><br><span class="line">                                 ▼</span><br><span class="line">                       ┌──────────────────────┐</span><br><span class="line">                       │  AHB 预分频器 ÷1       │ ← AHB = 先进高性能总线</span><br><span class="line">                       └──────────────────────┘</span><br><span class="line">                                 ▼</span><br><span class="line">                     ┌────────────────────────┐</span><br><span class="line">                     │  HCLK = 72MHz           │</span><br><span class="line">                     │  连接: CPU / 内存 / DMA  │</span><br><span class="line">                     └───┬──────────┬──────┬───┘</span><br><span class="line">                         │          │      │</span><br><span class="line">              APB1 预分频 ÷2      APB2 预分频 ÷1</span><br><span class="line">                         │          │      │</span><br><span class="line">                         ▼          │      └──────► SysTick 系统滴答</span><br><span class="line">                PCLK1 = 36MHz       │          (自带分频器 ÷1 / ÷8)</span><br><span class="line">           (除定时器外APB1外设)        │      HAL_Delay 的时间基准!</span><br><span class="line">                         │          │</span><br><span class="line">               定时器倍频器 ×2       │</span><br><span class="line">                         │          │</span><br><span class="line">                         ▼          ▼</span><br><span class="line">          APB1 定时器 = 72MHz   PCLK2 = 72MHz</span><br><span class="line">          (TIM2~5等)          (GPIO/串口1/ADC等)</span><br><span class="line">                                 │</span><br><span class="line">                       定时器倍频器 ×1</span><br><span class="line">                                 │</span><br><span class="line">                                 ▼</span><br><span class="line">                     APB2 定时器 = 72MHz</span><br><span class="line">                     (高级定时器 TIM1/TIM8)</span><br></pre></td></tr></table></figure>
-
-<p>一句话概括这条链路：<strong>8MHz 晶振 ÷1 → PLL ×9 → SYSCLK 72MHz → AHB ÷1 → HCLK 72MHz → APB1 ÷2 &#x2F; APB2 ÷1 → PCLK1 36MHz &#x2F; PCLK2 72MHz</strong>。</p>
-<p>下面把每个节点拆开讲。</p>
-<h2 id="时钟树各节点详解"><a href="#时钟树各节点详解" class="headerlink" title="时钟树各节点详解"></a>时钟树各节点详解</h2><h3 id="主干道：AHB-总线与-HCLK"><a href="#主干道：AHB-总线与-HCLK" class="headerlink" title="主干道：AHB 总线与 HCLK"></a>主干道：AHB 总线与 HCLK</h3><p>STM32 芯片内部有一个 <strong>AHB 总线</strong>（Advanced High-performance Bus，先进高性能总线），它就像芯片的主干道。处理器、内存、DMA 以及各种外设都连接到这条总线上，通过它进行数据通信。</p>
-<p><strong>HCLK 就是这条 AHB 总线上的时钟线</strong>，直接连入处理器内核、内存和 DMA，为它们带来时钟信号。如果 HCLK 是 72MHz，那这些部件的时钟频率就都是 72MHz。</p>
-<blockquote>
-<p>72MHz 是什么概念？赫兹是频率单位，1Hz &#x3D; 每秒 1 次，72MHz &#x3D; 每秒 7200 万次运算。</p>
-<p><img src="/./../images/STM32_Clock_Tree/image-20260807164251762.png" alt="image-20260807164251762"></p>
-</blockquote>
-<h3 id="SysTick：系统滴答"><a href="#SysTick：系统滴答" class="headerlink" title="SysTick：系统滴答"></a>SysTick：系统滴答</h3><p>在处理器内核中有一个 <strong>SysTick（系统滴答）定时器</strong>，为程序提供时间基准——之前学外部中断时提过，<code>HAL_Delay()</code> 的延时功能就是靠它实现的。</p>
-<p>与 HCLK 的”直连”不同，SysTick 前多了一个<strong>分频器</strong>（÷1 或 ÷8）：HCLK&#x3D;72MHz 时设 ÷1 则 SysTick 也是 72MHz，设 ÷8 则降为 9MHz。</p>
-<h3 id="外设分支：APB1-APB2-总线"><a href="#外设分支：APB1-APB2-总线" class="headerlink" title="外设分支：APB1 &#x2F; APB2 总线"></a>外设分支：APB1 &#x2F; APB2 总线</h3><p>像 GPIO、串口、I2C 这些外设，并没有直接挂在 AHB 总线上，而是分门别类连接到两个 <strong>APB 总线</strong>（Advanced Peripheral Bus，先进外设总线）上，再通过桥接器与 AHB 上的处理器、DMA 通信：</p>
-<table>
-<thead>
-<tr>
-<th align="left">总线</th>
-<th align="left">挂载的外设</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>APB1</strong>（低速）</td>
-<td align="left">TIM2~TIM5、SPI3、I2C、USB、CAN、通用&#x2F;基本定时器等</td>
-</tr>
-<tr>
-<td align="left"><strong>APB2</strong>（高速）</td>
-<td align="left">ADC、串口1、SPI1、高级定时器 TIM1&#x2F;TIM8、所有 GPIO、中断等</td>
-</tr>
-</tbody></table>
-<p>（详细清单见 STM32 中文参考手册第 25 页的系统结构图。）</p>
-<p>两个 APB 总线的时钟都来自 HCLK，经过各自<strong>可设置的预分频器</strong>分频后，分频后的时钟叫 <strong>PCLK</strong>，下面是一个例子：</p>
-<ul>
-<li>APB1 预分频 ÷2 → <strong>PCLK1 &#x3D; 36MHz</strong>（APB1 上除定时器外的外设）</li>
-<li>APB2 预分频 ÷1 → <strong>PCLK2 &#x3D; 72MHz</strong></li>
-</ul>
-<p><img src="/./../images/STM32_Clock_Tree/image-20260807164447487.png" alt="image-20260807164447487"></p>
-<h3 id="定时器的”特权”：倍频器"><a href="#定时器的”特权”：倍频器" class="headerlink" title="定时器的”特权”：倍频器"></a>定时器的”特权”：倍频器</h3><p>定时器比较特殊——它前面多了一个<strong>倍频器</strong>，用来把频率”再提上去”。这个倍频器有 ×1 和 ×2 两个值，<strong>由预分频器自动决定，我们无法手动设置</strong>：</p>
-<table>
-<thead>
-<tr>
-<th align="center">APB 预分频值</th>
-<th align="center">定时器倍频</th>
-<th align="center">定时器时钟</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">÷1</td>
-<td align="center">×1</td>
-<td align="center">&#x3D; PCLK</td>
-</tr>
-<tr>
-<td align="center">÷2 &#x2F; ÷4 &#x2F; ÷8 &#x2F; ÷16</td>
-<td align="center">×2</td>
-<td align="center">&#x3D; 2 × PCLK</td>
-</tr>
-</tbody></table>
-<p>规则背后的意图：<strong>让定时器尽可能保持较高频率</strong>。比如 APB1 预分频 ÷2 时 PCLK1&#x3D;36MHz，但定时器倍频 ×2 后仍是 72MHz——这正是我们代码里看到的配置，也让马上要学的定时器能有最高的 72MHz 时基。</p>
-<h3 id="ADC-的专属预分频器"><a href="#ADC-的专属预分频器" class="headerlink" title="ADC 的专属预分频器"></a>ADC 的专属预分频器</h3><p>ADC 还有一套<strong>专属的预分频器</strong>：ADC 采样需要采集一段时间才能更准确地获取电压值，所以它的时钟频率需要慢下来。比如 ADC 预分频 ÷6 → ADC 时钟 &#x3D; 12MHz。</p>
-<h3 id="时钟源（树的根）：HSI-与-HSE"><a href="#时钟源（树的根）：HSI-与-HSE" class="headerlink" title="时钟源（树的根）：HSI 与 HSE"></a>时钟源（树的根）：HSI 与 HSE</h3><p>前面的部分让时钟树有了枝叶，而根茎从哪来？HCLK 上的频率源头有两个时钟源：</p>
-<table>
-<thead>
-<tr>
-<th align="left">时钟源</th>
-<th align="left">全称</th>
-<th align="center">频率</th>
-<th align="left">特点</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>HSI</strong></td>
-<td align="left">高速内部时钟</td>
-<td align="center">8MHz</td>
-<td align="left">内置在芯片内部，无需外接电路，默认使用，简单方便但精度稍差</td>
-</tr>
-<tr>
-<td align="left"><strong>HSE</strong></td>
-<td align="left">高速外部时钟</td>
-<td align="center">8MHz</td>
-<td align="left">需要从外部电路接入晶振，脉冲精度遥遥领先</td>
-</tr>
-</tbody></table>
-<p>HSE 依赖的<strong>晶振</strong>内部有石英晶体，可以发出一定频率的脉冲信号——大家常用的石英表就是相同原理（这就是为什么石英表走时准）。</p>
-<p>HSI 或 HSE 二选一接入时钟树后，这个接入的数值叫做 <strong>SYSCLK 系统时钟</strong>。<img src="/./../images/STM32_Clock_Tree/image-20260807164701768.png" alt="image-20260807164701768"></p>
-<blockquote>
-<p>⚠️ 注意：别把 <strong>SYSCLK（系统时钟）</strong> 和前面说的 <strong>SysTick（系统滴答）</strong> 搞混了！SysTick 是内核里的一个定时器，SYSCLK 是时钟树顶端的时钟源，只是名字像。</p>
-</blockquote>
-<p>8MHz 经过分频器只能变小，怎么也不可能是 72MHz——所以 SYSCLK 还有第三个选项：<strong>PLLCLK</strong>。</p>
-<h3 id="PLL：锁相环（倍频器）"><a href="#PLL：锁相环（倍频器）" class="headerlink" title="PLL：锁相环（倍频器）"></a>PLL：锁相环（倍频器）</h3><p>PLL 锁相环的具体原理很深，我们不去深究，只需要知道：<strong>它在此处起到倍频器的作用</strong>。<img src="/./../images/STM32_Clock_Tree/image-20260807164859963.png" alt="image-20260807164859963"></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PLL 输入前分频:  HSI → 固定 ÷2 (4MHz)</span><br><span class="line">                HSE → 可选择 ÷1 或 ÷2</span><br><span class="line">PLL 倍频:        ×2 ~ ×16 (可选)</span><br></pre></td></tr></table></figure>
-
-<p>于是：<strong>HSE 8MHz ÷1 ×9 &#x3D; 72MHz</strong>，只要 AHB 预分频 ÷1，HCLK 就是 72MHz——这就是我们代码中配置的完整路径。</p>
-<h3 id="剩余的分支"><a href="#剩余的分支" class="headerlink" title="剩余的分支"></a>剩余的分支</h3><p>时钟树讲到这里，对照 CubeMX 的时钟树页面还差几样东西：</p>
-<ul>
-<li><strong>FCLK（自由运行时钟）</strong>：当 STM32 进入低功耗的停止模式时，AHB 总线停止运行、HCLK 停止传输脉冲，所有挂载外设全部停摆。但休眠只是暂时的省电手段，还得靠<strong>外部中断</strong>唤醒——此时 FCLK 继续运行，为中断采样提供时钟。在 CubeMX 上看它来自 HCLK，只是表示两者同步、频率一致，真正的来源是 AHB 预分频器。</li>
-<li><strong>Flash 编程接口时钟</strong>：永远来自 HSI。</li>
-<li><strong>USB 时钟</strong>：来自 PLL（48MHz）。</li>
-<li><strong>CSS（时钟安全系统）</strong>：当系统时钟源选择 HSE（或经过 PLL 倍频的 HSE）时，可以开启 CSS。它在 HSE 发生故障时立刻把时钟源切换回 HSI，并产生中断，让我们可以进行紧急制动等处理——相当于时钟的”安全气囊”。</li>
-<li><strong>RTC 与看门狗</strong>：一个独立的小时钟树，时钟源是 LSI（低速内部时钟）&#x2F; LSE（低速外部时钟）&#x2F; HSE 的 128 分频。结构非常简单，等学到 RTC 和看门狗时再详细了解。</li>
-<li><strong>MCO（时钟输出）</strong>：在 CubeMX 勾选 Master Clock Output 后，PA8 引脚被设置为 MCO 功能，可以把某个时钟信号从引脚输出出来，方便外部测量&#x2F;调试。一般用不上。</li>
-</ul>
-<p>至此，时钟树全部讲解完成。</p>
-<h2 id="解读初始化代码：SystemClock-Config"><a href="#解读初始化代码：SystemClock-Config" class="headerlink" title="解读初始化代码：SystemClock_Config"></a>解读初始化代码：SystemClock_Config</h2><p>说了这么多，回到每篇博客都有的 <code>SystemClock_Config()</code>——它就是把上面的时钟树用代码配置一遍。以温湿度计项目为例，逐行解析：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">SystemClock_Config</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  RCC_OscInitTypeDef RCC_OscInitStruct = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 振荡器配置结构体</span></span><br><span class="line">  RCC_ClkInitTypeDef RCC_ClkInitStruct = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 总线时钟配置结构体</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">/* ① 配置振荡器：选哪个时钟源、开不开 PLL */</span></span><br><span class="line">  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;  <span class="comment">// 要配置的振荡器类型：HSE</span></span><br><span class="line">  RCC_OscInitStruct.HSEState = RCC_HSE_ON;                    <span class="comment">// 打开 HSE（外部晶振）</span></span><br><span class="line">  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;     <span class="comment">// HSE 预分频 ÷1 → 8MHz</span></span><br><span class="line">  RCC_OscInitStruct.HSIState = RCC_HSI_ON;                    <span class="comment">// HSI 保持开启（备用时钟源）</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                <span class="comment">// 打开 PLL</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;        <span class="comment">// PLL 的输入源 = HSE</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;                <span class="comment">// PLL 倍频 ×9 → 8×9=72MHz</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_RCC_OscConfig(&amp;RCC_OscInitStruct) != HAL_OK)        <span class="comment">// 写入 RCC 寄存器</span></span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* ② 配置总线时钟：SYSCLK 选谁、各总线分频多少 */</span></span><br><span class="line">  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK</span><br><span class="line">                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;  <span class="comment">// 要配置的时钟种类</span></span><br><span class="line">  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;   <span class="comment">// SYSCLK 来源 = PLLCLK</span></span><br><span class="line">  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;          <span class="comment">// AHB 预分频 ÷1 → HCLK = 72MHz</span></span><br><span class="line">  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;           <span class="comment">// APB1 ÷2 → PCLK1 = 36MHz</span></span><br><span class="line">  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;           <span class="comment">// APB2 ÷1 → PCLK2 = 72MHz</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (HAL_RCC_ClockConfig(&amp;RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)  <span class="comment">// 写入寄存器</span></span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="各配置项与时钟树的对应关系"><a href="#各配置项与时钟树的对应关系" class="headerlink" title="各配置项与时钟树的对应关系"></a>各配置项与时钟树的对应关系</h3><table>
-<thead>
-<tr>
-<th align="left">代码配置</th>
-<th align="left">对应时钟树节点</th>
-<th align="center">本项目的值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><code>HSEState = RCC_HSE_ON</code></td>
-<td align="left">打开 HSE 晶振（RCC_CR.HSEON）</td>
-<td align="center">开启</td>
-</tr>
-<tr>
-<td align="left"><code>HSEPredivValue = DIV1</code></td>
-<td align="left">HSE 预分频（RCC_CFGR.PLLXTPRE）</td>
-<td align="center">÷1 → 8MHz</td>
-</tr>
-<tr>
-<td align="left"><code>PLL.PLLSource = PLLSOURCE_HSE</code></td>
-<td align="left">PLL 输入源选择（RCC_CFGR.PLLSRC）</td>
-<td align="center">HSE</td>
-</tr>
-<tr>
-<td align="left"><code>PLL.PLLMUL = MUL9</code></td>
-<td align="left">PLL 倍频（RCC_CFGR.PLLMUL）</td>
-<td align="center">×9 → 72MHz</td>
-</tr>
-<tr>
-<td align="left"><code>SYSCLKSource = PLLCLK</code></td>
-<td align="left">SYSCLK 三选一（RCC_CFGR.SW）</td>
-<td align="center">PLLCLK</td>
-</tr>
-<tr>
-<td align="left"><code>AHBCLKDivider = DIV1</code></td>
-<td align="left">AHB 预分频（RCC_CFGR.HPRE）</td>
-<td align="center">÷1 → HCLK 72MHz</td>
-</tr>
-<tr>
-<td align="left"><code>APB1CLKDivider = DIV2</code></td>
-<td align="left">APB1 预分频（RCC_CFGR.PPRE1）</td>
-<td align="center">÷2 → PCLK1 36MHz</td>
-</tr>
-<tr>
-<td align="left"><code>APB2CLKDivider = DIV1</code></td>
-<td align="left">APB2 预分频（RCC_CFGR.PPRE2）</td>
-<td align="center">÷1 → PCLK2 72MHz</td>
-</tr>
-<tr>
-<td align="left"><code>FLASH_LATENCY_2</code></td>
-<td align="left">Flash 等待周期（FLASH_ACR.LATENCY）</td>
-<td align="center">2 个等待周期</td>
-</tr>
-</tbody></table>
-<p>两个值得注意的点：</p>
-<ol>
-<li><p><strong>HSI 为什么要保持开启（<code>RCC_HSI_ON</code>）？</strong> 即使不用它做系统时钟，HSI 也是 Flash 编程接口时钟的唯一来源，并且是 CSS 时钟安全系统切换的备用时钟——所以不能关。</p>
-</li>
-<li><p><strong><code>FLASH_LATENCY_2</code> 是什么？</strong> Flash 读数据比 CPU 运算慢。CPU 频率越高，等待周期就越多：72MHz 需要 2 个等待周期（每读一次 Flash 等 2 个周期）。这也是 HAL_RCC_ClockConfig 的第二个参数，CubeMX 会根据 HCLK 自动算好。</p>
-</li>
-</ol>
-<h3 id="HAL-层与寄存器的关系"><a href="#HAL-层与寄存器的关系" class="headerlink" title="HAL 层与寄存器的关系"></a>HAL 层与寄存器的关系</h3><p>整个 <code>SystemClock_Config</code> 是 HAL 封装层，最终写入的是 RCC 外设的寄存器：</p>
-<ul>
-<li><code>HAL_RCC_OscConfig()</code> → 写 <strong>RCC_CR</strong>（HSEON&#x2F;HSERDY、PLLON&#x2F;PLLRDY）和 <strong>RCC_CFGR</strong>（PLLSRC、PLLMUL）</li>
-<li><code>HAL_RCC_ClockConfig()</code> → 写 <strong>RCC_CFGR</strong>（SW&#x2F;SWS、HPRE、PPRE1、PPRE2）和 <strong>FLASH_ACR</strong>（LATENCY）</li>
-</ul>
-<p>这也再次印证博客开头的观点：每个外设运行前，都得先让这颗时钟树”枝繁叶茂”。</p>
-<h2 id="实操步骤：CubeMX-配置-72MHz"><a href="#实操步骤：CubeMX-配置-72MHz" class="headerlink" title="实操步骤：CubeMX 配置 72MHz"></a>实操步骤：CubeMX 配置 72MHz</h2><p>说了这么多理论，实操其实非常简单——CubeMX 图形化界面就是替我们操作上面的时钟树。正确流程：</p>
-<p><strong>① 在 RCC 配置页打开 HSE</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">System Core → RCC → High Speed Clock (HSE) → Crystal/Ceramic Resonator</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p><img src="/./../images/STM32_Clock_Tree/image-20260806105659838.png" alt="image-20260806105659838"></p>
-</blockquote>
-<p><strong>② 在 Clock Configuration 页把 HCLK 改为 72MHz</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Clock Configuration 页面 → HCLK 输入 72 → 回车</span><br><span class="line">CubeMX 自动帮我们算好所有预分频和倍频参数（弹出对话框直接点 OK）</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p><img src="/./../images/STM32_Clock_Tree/image-20260806105812668.png" alt="image-20260806105812668"></p>
-</blockquote>
-<p>配置完成后，对照 Clock Configuration 页面应该能看到与我们代码一致的参数：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">HSE 8MHz ──÷1──► PLL ×9 ──► SYSCLK 72MHz ──÷1──► HCLK 72MHz</span><br><span class="line">                         │                     ├──÷2──► PCLK1 36MHz（定时器自动 ×2 → 72MHz）</span><br><span class="line">                         │                     └──÷1──► PCLK2 72MHz（定时器 ×1）</span><br><span class="line">                         └──► APB2 定时器 72MHz</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>💡 顺序提醒：<strong>务必先开 HSE，再改 HCLK</strong>。如果没开 HSE 就改 72MHz，CubeMX 会弹窗提示只能配到 64MHz（原因见下节踩坑记录）。</p>
-</blockquote>
-<p><strong>③ 生成代码</strong>，<code>SystemClock_Config()</code> 会自动出现在 <code>main.c</code> 里——就是上面解读的那段代码。</p>
-<h2 id="踩坑记录：72MHz-弹窗-“no-solution-found”-的真相"><a href="#踩坑记录：72MHz-弹窗-“no-solution-found”-的真相" class="headerlink" title="踩坑记录：72MHz 弹窗 “no solution found” 的真相"></a>踩坑记录：72MHz 弹窗 “no solution found” 的真相</h2><p>刚接触这块时很容易遇到这个弹窗：</p>
-<blockquote>
-<p>改 HCLK&#x3D;72MHz 时弹出 “no solution found using 72MHz, do you want to use 64MHz?”</p>
-</blockquote>
-<p><strong>原因</strong>：没开 HSE 时，系统只能用 HSI（8MHz）作为 PLL 输入。HSI 经过固定的 ÷2 变成 4MHz，PLL 最大 ×16 → 4 × 16 &#x3D; <strong>64MHz，这就是 HSI 路线的极限</strong>，再怎么配也到不了 72MHz。</p>
-<p><strong>解决</strong>：回到 RCC 配置页打开 HSE（Crystal&#x2F;Ceramic Resonator），HSE 8MHz ÷1 ×9 &#x3D; 72MHz，完美。这也是上一节”先开 HSE，再改 HCLK”的原因。</p>
-<p>这个坑的通用价值在于：<strong>理解时钟树各节点的频率上下限，就能看懂 CubeMX 的报错</strong>。HSI 只能跑到 64MHz、PCLK1 最大 36MHz、APB2 定时器是 72MHz……这些限制全部写在这棵树上。</p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
-<thead>
-<tr>
-<th align="left">概念</th>
-<th align="left">一句话</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>时钟信号</strong></td>
-<td align="left">一定频率的方波，让门电路稳定后才锁存进寄存器，全芯片的”节拍器”</td>
-</tr>
-<tr>
-<td align="left"><strong>时钟源</strong></td>
-<td align="left">心脏：HSI（内部 8MHz）&#x2F; HSE（外部晶振 8MHz，精度高）</td>
-</tr>
-<tr>
-<td align="left"><strong>PLL</strong></td>
-<td align="left">倍频器：×2~×16，HSE ÷1 ×9 &#x3D; 72MHz</td>
-</tr>
-<tr>
-<td align="left"><strong>SYSCLK</strong></td>
-<td align="left">系统时钟：HSI &#x2F; HSE &#x2F; PLLCLK 三选一</td>
-</tr>
-<tr>
-<td align="left"><strong>AHB &#x2F; HCLK</strong></td>
-<td align="left">主干道：CPU、内存、DMA 的时钟线</td>
-</tr>
-<tr>
-<td align="left"><strong>APB1 &#x2F; PCLK1</strong></td>
-<td align="left">外设低速总线：÷2 &#x3D; 36MHz（定时器自动倍频回 72MHz）</td>
-</tr>
-<tr>
-<td align="left"><strong>APB2 &#x2F; PCLK2</strong></td>
-<td align="left">外设高速总线：÷1 &#x3D; 72MHz（GPIO、串口1、ADC、TIM1&#x2F;TIM8）</td>
-</tr>
-<tr>
-<td align="left"><strong>SysTick</strong></td>
-<td align="left">内核定时器：HCLK 分频（÷1&#x2F;÷8），<code>HAL_Delay</code> 的基准</td>
-</tr>
-<tr>
-<td align="left"><strong>CSS</strong></td>
-<td align="left">时钟安全系统：HSE 故障自动切回 HSI + 中断</td>
-</tr>
-<tr>
-<td align="left"><strong>FCLK</strong></td>
-<td align="left">自由运行时钟：停止模式时继续跑，供中断唤醒</td>
-</tr>
-</tbody></table>
-<p>这一集涉及的概念很多，有不少是后面才学到的（定时器、RTC、看门狗……）。但就像 keysking 说的”常看常新”——现在把时钟树这张地图装进脑子里，后面每学一个外设，都能在树上找到它的位置。</p>
-<p>下一集就要进入定时器的学习了，有了时钟树的知识打底，定时器的分频&#x2F;计数原理会好理解很多——因为定时器的 72MHz 时基，正是从 APB1&#x2F;APB2 这条分支上摘下来的。</p>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li>视频：【STM32】超清晰STM32时钟树动画讲解（keysking）</li>
-<li>STM32 中文参考手册：第 25 页”系统结构图”（APB1&#x2F;APB2 外设挂载清单）</li>
-<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
-<li><a href="/2026/08/05/STM32_OLED_Temperature_Humidity_Meter/">上一篇：STM32番外篇——oled温湿度计</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>嵌入式</tag>
-        <tag>STM32</tag>
-        <tag>CubeMX</tag>
-        <tag>RCC</tag>
-        <tag>时钟树</tag>
-        <tag>PLL</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>Python 入门</title>
     <url>/2026/08/27/Python_Basic_Syntax/</url>
     <content><![CDATA[<hr>
@@ -5977,6 +5666,317 @@
         <tag>蓝牙</tag>
         <tag>BLE</tag>
         <tag>DMA</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>STM32——浅析时钟源与时钟树理论知识</title>
+    <url>/2026/08/06/STM32_Clock_Tree/</url>
+    <content><![CDATA[<h2 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h2><p><strong>STM32 为什么能”有条不紊”地工作？为什么芯片内部的电路不会乱套？</strong></p>
+<p>在每一篇博客的代码里，都有这么一行永远存在的代码，之前没有深究：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">SystemClock_Config();</span><br></pre></td></tr></table></figure>
+
+<p>这行代码在配置什么？为什么 GPIO、I2C、串口能正常工作的前提，都是先执行它？答案就是本期的主角——<strong>时钟源与时钟树</strong>，单片机的”心脏与动脉”。</p>
+<p>这一集是纯理论讲解，不写任何新代码。但它是理解后续所有外设（定时器、ADC、DMA……）的<strong>地基</strong>——因为每个外设的时钟频率，都是从这颗时钟树上”摘”下来的。</p>
+<h2 id="为什么单片机需要”心跳”"><a href="#为什么单片机需要”心跳”" class="headerlink" title="为什么单片机需要”心跳”"></a>为什么单片机需要”心跳”</h2><h3 id="微观视角：门电路的”运算延时”"><a href="#微观视角：门电路的”运算延时”" class="headerlink" title="微观视角：门电路的”运算延时”"></a>微观视角：门电路的”运算延时”</h3><p>芯片内部是庞杂的逻辑电路组成的，我们假设 STM32 内部有这样一套电路：一个<strong>与门</strong> + 一个<strong>异或门</strong>，异或门的输出连接到了某个寄存器的某一位：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">A ──┬─────┐</span><br><span class="line">    │ 与门  ├── 与门输出 ──┐</span><br><span class="line">B ──┴─────┘              ├─► 异或门 ──► 寄存器某一位 ──► 程序可读到</span><br><span class="line">B ───────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>与门</strong>：A 和 B 都是高电平 1 时输出 1，其他情况输出 0</li>
+<li><strong>异或门</strong>：两个输入不一致时输出 1，一致时输出 0</li>
+</ul>
+<p>寄存器是”程序与电路之间的桥梁”——程序读寄存器获取电路状态，写寄存器控制电路运行。</p>
+<p>假设当前 A、B 都是高电平：与门输出 1，异或门两输入都是 1 → 输出 0，寄存器存储 0。</p>
+<p>现在 B 突然从高电平变为低电平（比如某个 GPIO 输入的电平变了），理想情况下：与门输出变 0，异或门两输入都变 0 → 输出还是 0，寄存器安然无恙。</p>
+<p>但<strong>实际情况有出入</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">B 电平变化瞬间到达异或门输入端</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">与门还在&quot;运算&quot;中！（MOS 管充放电需要时间，虽然对人类是瞬间，但相对光速是&quot;龟速&quot;）</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">异或门看到的是：A=1（与门还没算完，输出还是 1）、B=0</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">异或门两输入不一致 → 输出 1 → 寄存器短暂读到错误值 1！</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">与门运算完成，输出 0，异或门恢复输出 0，寄存器恢复正确值</span><br></pre></td></tr></table></figure>
+
+<p>寄存器中出现了一段<strong>由门电路运算延时产生的错误状态</strong>——这段错误虽然短暂，但可能导致依赖此寄存器的程序、其他逻辑电路出现更严重的连锁错误。芯片内部电路比这个例子复杂成千上万倍，每个信号经过的门电路数量不一、错综复杂，如果放任不管，<strong>芯片内部电信号将乱成一锅粥</strong>。</p>
+<h3 id="解决办法：边沿触发器-方波"><a href="#解决办法：边沿触发器-方波" class="headerlink" title="解决办法：边沿触发器 + 方波"></a>解决办法：边沿触发器 + 方波</h3><p>解决方法其实很简单——在寄存器前放一个<strong>边沿触发器</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">D端(数据输入)                    Q端(数据输出)</span><br><span class="line">      │                             │</span><br><span class="line">      └────► 边沿触发器 ◄──────┘</span><br><span class="line">                  │</span><br><span class="line">            控制端 ◄──── 一定频率的方波（时钟信号）</span><br></pre></td></tr></table></figure>
+
+<p>边沿触发器的特性：<strong>当控制端出现由低到高的上升沿时，输出端才采样 D 端的值</strong>，其他时候输出保持不变。</p>
+<p>于是，只要给控制端接入一个一定频率的方波信号：</p>
+<ol>
+<li>方波一个周期内，门电路运算产生的任何”毛刺”都无法进入寄存器</li>
+<li>等一切运算都稳定后，方波的上升沿到达，<strong>把最终稳定结果锁存进寄存器</strong></li>
+</ol>
+<p>这个好似脉搏的方波信号，就是<strong>时钟信号</strong>。它在单片机中由”心脏”——时钟源产生，通过”动脉”——时钟树传播到整个芯片。这也是”单片机离开了时钟源就无法存活”的原因。</p>
+<blockquote>
+<p>💡 这就是数字电路里的经典概念：<strong>同步时序逻辑</strong>。时钟就是全芯片的”节拍器”，让所有电路在同一个节拍下协同工作，避免异步混乱。还记得 STM32 – I2C 中断与 DMA 里讲的”同步&#x2F;异步”吗？硬件层面的同步，就是靠这根时钟线实现的。</p>
+</blockquote>
+<h3 id="宏观视角：外设也需要时钟"><a href="#宏观视角：外设也需要时钟" class="headerlink" title="宏观视角：外设也需要时钟"></a>宏观视角：外设也需要时钟</h3><p>除了微观层面，宏观的外设层面同样需要精确的时钟脉冲：</p>
+<ul>
+<li><strong>串口</strong>需要固定的波特率进行通信</li>
+<li><strong>定时器</strong>需要计时，得知道时间流逝了多少</li>
+<li><strong>ADC</strong> 需要采样时序</li>
+</ul>
+<p>这些都需要时钟脉冲告诉外设”时间在流逝”。</p>
+<h2 id="数据流全链路：时钟从晶振走到外设"><a href="#数据流全链路：时钟从晶振走到外设" class="headerlink" title="数据流全链路：时钟从晶振走到外设"></a>数据流全链路：时钟从晶振走到外设</h2><p>理解了”为什么需要时钟”，我们来看时钟是怎么从源头一步步传到每个外设的。这就是<strong>数据流全链路</strong>，也是本篇的核心：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                 ┌─────────┐</span><br><span class="line">HSE 晶振 8MHz ──►│ 预分频器  │──┐ 8MHz</span><br><span class="line">                 │  ÷1 / ÷2  │  │</span><br><span class="line">                 └─────────┘  │        ┌─────────┐   ×9 = 72MHz</span><br><span class="line">                 ┌─────────┐  └──────►│ PLL锁相环 │──────────┐</span><br><span class="line">HSI 内部 8MHz ──►│ 固定 ÷2  │────────►│ ×2~×16  │          │</span><br><span class="line">                 └─────────┘          └─────────┘          ▼</span><br><span class="line">                                 ┌─────────────── SYSCLK 系统时钟 72MHz</span><br><span class="line">                                 │  (三选一: HSI / HSE / PLLCLK)</span><br><span class="line">                                 ▼</span><br><span class="line">                       ┌──────────────────────┐</span><br><span class="line">                       │  AHB 预分频器 ÷1       │ ← AHB = 先进高性能总线</span><br><span class="line">                       └──────────────────────┘</span><br><span class="line">                                 ▼</span><br><span class="line">                     ┌────────────────────────┐</span><br><span class="line">                     │  HCLK = 72MHz           │</span><br><span class="line">                     │  连接: CPU / 内存 / DMA  │</span><br><span class="line">                     └───┬──────────┬──────┬───┘</span><br><span class="line">                         │          │      │</span><br><span class="line">              APB1 预分频 ÷2      APB2 预分频 ÷1</span><br><span class="line">                         │          │      │</span><br><span class="line">                         ▼          │      └──────► SysTick 系统滴答</span><br><span class="line">                PCLK1 = 36MHz       │          (自带分频器 ÷1 / ÷8)</span><br><span class="line">           (除定时器外APB1外设)        │      HAL_Delay 的时间基准!</span><br><span class="line">                         │          │</span><br><span class="line">               定时器倍频器 ×2       │</span><br><span class="line">                         │          │</span><br><span class="line">                         ▼          ▼</span><br><span class="line">          APB1 定时器 = 72MHz   PCLK2 = 72MHz</span><br><span class="line">          (TIM2~5等)          (GPIO/串口1/ADC等)</span><br><span class="line">                                 │</span><br><span class="line">                       定时器倍频器 ×1</span><br><span class="line">                                 │</span><br><span class="line">                                 ▼</span><br><span class="line">                     APB2 定时器 = 72MHz</span><br><span class="line">                     (高级定时器 TIM1/TIM8)</span><br></pre></td></tr></table></figure>
+
+<p>一句话概括这条链路：<strong>8MHz 晶振 ÷1 → PLL ×9 → SYSCLK 72MHz → AHB ÷1 → HCLK 72MHz → APB1 ÷2 &#x2F; APB2 ÷1 → PCLK1 36MHz &#x2F; PCLK2 72MHz</strong>。</p>
+<p>下面把每个节点拆开讲。</p>
+<h2 id="时钟树各节点详解"><a href="#时钟树各节点详解" class="headerlink" title="时钟树各节点详解"></a>时钟树各节点详解</h2><h3 id="主干道：AHB-总线与-HCLK"><a href="#主干道：AHB-总线与-HCLK" class="headerlink" title="主干道：AHB 总线与 HCLK"></a>主干道：AHB 总线与 HCLK</h3><p>STM32 芯片内部有一个 <strong>AHB 总线</strong>（Advanced High-performance Bus，先进高性能总线），它就像芯片的主干道。处理器、内存、DMA 以及各种外设都连接到这条总线上，通过它进行数据通信。</p>
+<p><strong>HCLK 就是这条 AHB 总线上的时钟线</strong>，直接连入处理器内核、内存和 DMA，为它们带来时钟信号。如果 HCLK 是 72MHz，那这些部件的时钟频率就都是 72MHz。</p>
+<blockquote>
+<p>72MHz 是什么概念？赫兹是频率单位，1Hz &#x3D; 每秒 1 次，72MHz &#x3D; 每秒 7200 万次运算。</p>
+<p><img src="/./../images/STM32_Clock_Tree/image-20260807164251762.png" alt="image-20260807164251762"></p>
+</blockquote>
+<h3 id="SysTick：系统滴答"><a href="#SysTick：系统滴答" class="headerlink" title="SysTick：系统滴答"></a>SysTick：系统滴答</h3><p>在处理器内核中有一个 <strong>SysTick（系统滴答）定时器</strong>，为程序提供时间基准——之前学外部中断时提过，<code>HAL_Delay()</code> 的延时功能就是靠它实现的。</p>
+<p>与 HCLK 的”直连”不同，SysTick 前多了一个<strong>分频器</strong>（÷1 或 ÷8）：HCLK&#x3D;72MHz 时设 ÷1 则 SysTick 也是 72MHz，设 ÷8 则降为 9MHz。</p>
+<h3 id="外设分支：APB1-APB2-总线"><a href="#外设分支：APB1-APB2-总线" class="headerlink" title="外设分支：APB1 &#x2F; APB2 总线"></a>外设分支：APB1 &#x2F; APB2 总线</h3><p>像 GPIO、串口、I2C 这些外设，并没有直接挂在 AHB 总线上，而是分门别类连接到两个 <strong>APB 总线</strong>（Advanced Peripheral Bus，先进外设总线）上，再通过桥接器与 AHB 上的处理器、DMA 通信：</p>
+<table>
+<thead>
+<tr>
+<th align="left">总线</th>
+<th align="left">挂载的外设</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>APB1</strong>（低速）</td>
+<td align="left">TIM2~TIM5、SPI3、I2C、USB、CAN、通用&#x2F;基本定时器等</td>
+</tr>
+<tr>
+<td align="left"><strong>APB2</strong>（高速）</td>
+<td align="left">ADC、串口1、SPI1、高级定时器 TIM1&#x2F;TIM8、所有 GPIO、中断等</td>
+</tr>
+</tbody></table>
+<p>（详细清单见 STM32 中文参考手册第 25 页的系统结构图。）</p>
+<p>两个 APB 总线的时钟都来自 HCLK，经过各自<strong>可设置的预分频器</strong>分频后，分频后的时钟叫 <strong>PCLK</strong>，下面是一个例子：</p>
+<ul>
+<li>APB1 预分频 ÷2 → <strong>PCLK1 &#x3D; 36MHz</strong>（APB1 上除定时器外的外设）</li>
+<li>APB2 预分频 ÷1 → <strong>PCLK2 &#x3D; 72MHz</strong></li>
+</ul>
+<p><img src="/./../images/STM32_Clock_Tree/image-20260807164447487.png" alt="image-20260807164447487"></p>
+<h3 id="定时器的”特权”：倍频器"><a href="#定时器的”特权”：倍频器" class="headerlink" title="定时器的”特权”：倍频器"></a>定时器的”特权”：倍频器</h3><p>定时器比较特殊——它前面多了一个<strong>倍频器</strong>，用来把频率”再提上去”。这个倍频器有 ×1 和 ×2 两个值，<strong>由预分频器自动决定，我们无法手动设置</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="center">APB 预分频值</th>
+<th align="center">定时器倍频</th>
+<th align="center">定时器时钟</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">÷1</td>
+<td align="center">×1</td>
+<td align="center">&#x3D; PCLK</td>
+</tr>
+<tr>
+<td align="center">÷2 &#x2F; ÷4 &#x2F; ÷8 &#x2F; ÷16</td>
+<td align="center">×2</td>
+<td align="center">&#x3D; 2 × PCLK</td>
+</tr>
+</tbody></table>
+<p>规则背后的意图：<strong>让定时器尽可能保持较高频率</strong>。比如 APB1 预分频 ÷2 时 PCLK1&#x3D;36MHz，但定时器倍频 ×2 后仍是 72MHz——这正是我们代码里看到的配置，也让马上要学的定时器能有最高的 72MHz 时基。</p>
+<h3 id="ADC-的专属预分频器"><a href="#ADC-的专属预分频器" class="headerlink" title="ADC 的专属预分频器"></a>ADC 的专属预分频器</h3><p>ADC 还有一套<strong>专属的预分频器</strong>：ADC 采样需要采集一段时间才能更准确地获取电压值，所以它的时钟频率需要慢下来。比如 ADC 预分频 ÷6 → ADC 时钟 &#x3D; 12MHz。</p>
+<h3 id="时钟源（树的根）：HSI-与-HSE"><a href="#时钟源（树的根）：HSI-与-HSE" class="headerlink" title="时钟源（树的根）：HSI 与 HSE"></a>时钟源（树的根）：HSI 与 HSE</h3><p>前面的部分让时钟树有了枝叶，而根茎从哪来？HCLK 上的频率源头有两个时钟源：</p>
+<table>
+<thead>
+<tr>
+<th align="left">时钟源</th>
+<th align="left">全称</th>
+<th align="center">频率</th>
+<th align="left">特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>HSI</strong></td>
+<td align="left">高速内部时钟</td>
+<td align="center">8MHz</td>
+<td align="left">内置在芯片内部，无需外接电路，默认使用，简单方便但精度稍差</td>
+</tr>
+<tr>
+<td align="left"><strong>HSE</strong></td>
+<td align="left">高速外部时钟</td>
+<td align="center">8MHz</td>
+<td align="left">需要从外部电路接入晶振，脉冲精度遥遥领先</td>
+</tr>
+</tbody></table>
+<p>HSE 依赖的<strong>晶振</strong>内部有石英晶体，可以发出一定频率的脉冲信号——大家常用的石英表就是相同原理（这就是为什么石英表走时准）。</p>
+<p>HSI 或 HSE 二选一接入时钟树后，这个接入的数值叫做 <strong>SYSCLK 系统时钟</strong>。<img src="/./../images/STM32_Clock_Tree/image-20260807164701768.png" alt="image-20260807164701768"></p>
+<blockquote>
+<p>⚠️ 注意：别把 <strong>SYSCLK（系统时钟）</strong> 和前面说的 <strong>SysTick（系统滴答）</strong> 搞混了！SysTick 是内核里的一个定时器，SYSCLK 是时钟树顶端的时钟源，只是名字像。</p>
+</blockquote>
+<p>8MHz 经过分频器只能变小，怎么也不可能是 72MHz——所以 SYSCLK 还有第三个选项：<strong>PLLCLK</strong>。</p>
+<h3 id="PLL：锁相环（倍频器）"><a href="#PLL：锁相环（倍频器）" class="headerlink" title="PLL：锁相环（倍频器）"></a>PLL：锁相环（倍频器）</h3><p>PLL 锁相环的具体原理很深，我们不去深究，只需要知道：<strong>它在此处起到倍频器的作用</strong>。<img src="/./../images/STM32_Clock_Tree/image-20260807164859963.png" alt="image-20260807164859963"></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PLL 输入前分频:  HSI → 固定 ÷2 (4MHz)</span><br><span class="line">                HSE → 可选择 ÷1 或 ÷2</span><br><span class="line">PLL 倍频:        ×2 ~ ×16 (可选)</span><br></pre></td></tr></table></figure>
+
+<p>于是：<strong>HSE 8MHz ÷1 ×9 &#x3D; 72MHz</strong>，只要 AHB 预分频 ÷1，HCLK 就是 72MHz——这就是我们代码中配置的完整路径。</p>
+<h3 id="剩余的分支"><a href="#剩余的分支" class="headerlink" title="剩余的分支"></a>剩余的分支</h3><p>时钟树讲到这里，对照 CubeMX 的时钟树页面还差几样东西：</p>
+<ul>
+<li><strong>FCLK（自由运行时钟）</strong>：当 STM32 进入低功耗的停止模式时，AHB 总线停止运行、HCLK 停止传输脉冲，所有挂载外设全部停摆。但休眠只是暂时的省电手段，还得靠<strong>外部中断</strong>唤醒——此时 FCLK 继续运行，为中断采样提供时钟。在 CubeMX 上看它来自 HCLK，只是表示两者同步、频率一致，真正的来源是 AHB 预分频器。</li>
+<li><strong>Flash 编程接口时钟</strong>：永远来自 HSI。</li>
+<li><strong>USB 时钟</strong>：来自 PLL（48MHz）。</li>
+<li><strong>CSS（时钟安全系统）</strong>：当系统时钟源选择 HSE（或经过 PLL 倍频的 HSE）时，可以开启 CSS。它在 HSE 发生故障时立刻把时钟源切换回 HSI，并产生中断，让我们可以进行紧急制动等处理——相当于时钟的”安全气囊”。</li>
+<li><strong>RTC 与看门狗</strong>：一个独立的小时钟树，时钟源是 LSI（低速内部时钟）&#x2F; LSE（低速外部时钟）&#x2F; HSE 的 128 分频。结构非常简单，等学到 RTC 和看门狗时再详细了解。</li>
+<li><strong>MCO（时钟输出）</strong>：在 CubeMX 勾选 Master Clock Output 后，PA8 引脚被设置为 MCO 功能，可以把某个时钟信号从引脚输出出来，方便外部测量&#x2F;调试。一般用不上。</li>
+</ul>
+<p>至此，时钟树全部讲解完成。</p>
+<h2 id="解读初始化代码：SystemClock-Config"><a href="#解读初始化代码：SystemClock-Config" class="headerlink" title="解读初始化代码：SystemClock_Config"></a>解读初始化代码：SystemClock_Config</h2><p>说了这么多，回到每篇博客都有的 <code>SystemClock_Config()</code>——它就是把上面的时钟树用代码配置一遍。以温湿度计项目为例，逐行解析：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">SystemClock_Config</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  RCC_OscInitTypeDef RCC_OscInitStruct = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 振荡器配置结构体</span></span><br><span class="line">  RCC_ClkInitTypeDef RCC_ClkInitStruct = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 总线时钟配置结构体</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">/* ① 配置振荡器：选哪个时钟源、开不开 PLL */</span></span><br><span class="line">  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;  <span class="comment">// 要配置的振荡器类型：HSE</span></span><br><span class="line">  RCC_OscInitStruct.HSEState = RCC_HSE_ON;                    <span class="comment">// 打开 HSE（外部晶振）</span></span><br><span class="line">  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;     <span class="comment">// HSE 预分频 ÷1 → 8MHz</span></span><br><span class="line">  RCC_OscInitStruct.HSIState = RCC_HSI_ON;                    <span class="comment">// HSI 保持开启（备用时钟源）</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                <span class="comment">// 打开 PLL</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;        <span class="comment">// PLL 的输入源 = HSE</span></span><br><span class="line">  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;                <span class="comment">// PLL 倍频 ×9 → 8×9=72MHz</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_RCC_OscConfig(&amp;RCC_OscInitStruct) != HAL_OK)        <span class="comment">// 写入 RCC 寄存器</span></span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* ② 配置总线时钟：SYSCLK 选谁、各总线分频多少 */</span></span><br><span class="line">  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK</span><br><span class="line">                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;  <span class="comment">// 要配置的时钟种类</span></span><br><span class="line">  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;   <span class="comment">// SYSCLK 来源 = PLLCLK</span></span><br><span class="line">  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;          <span class="comment">// AHB 预分频 ÷1 → HCLK = 72MHz</span></span><br><span class="line">  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;           <span class="comment">// APB1 ÷2 → PCLK1 = 36MHz</span></span><br><span class="line">  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;           <span class="comment">// APB2 ÷1 → PCLK2 = 72MHz</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (HAL_RCC_ClockConfig(&amp;RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)  <span class="comment">// 写入寄存器</span></span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="各配置项与时钟树的对应关系"><a href="#各配置项与时钟树的对应关系" class="headerlink" title="各配置项与时钟树的对应关系"></a>各配置项与时钟树的对应关系</h3><table>
+<thead>
+<tr>
+<th align="left">代码配置</th>
+<th align="left">对应时钟树节点</th>
+<th align="center">本项目的值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HSEState = RCC_HSE_ON</code></td>
+<td align="left">打开 HSE 晶振（RCC_CR.HSEON）</td>
+<td align="center">开启</td>
+</tr>
+<tr>
+<td align="left"><code>HSEPredivValue = DIV1</code></td>
+<td align="left">HSE 预分频（RCC_CFGR.PLLXTPRE）</td>
+<td align="center">÷1 → 8MHz</td>
+</tr>
+<tr>
+<td align="left"><code>PLL.PLLSource = PLLSOURCE_HSE</code></td>
+<td align="left">PLL 输入源选择（RCC_CFGR.PLLSRC）</td>
+<td align="center">HSE</td>
+</tr>
+<tr>
+<td align="left"><code>PLL.PLLMUL = MUL9</code></td>
+<td align="left">PLL 倍频（RCC_CFGR.PLLMUL）</td>
+<td align="center">×9 → 72MHz</td>
+</tr>
+<tr>
+<td align="left"><code>SYSCLKSource = PLLCLK</code></td>
+<td align="left">SYSCLK 三选一（RCC_CFGR.SW）</td>
+<td align="center">PLLCLK</td>
+</tr>
+<tr>
+<td align="left"><code>AHBCLKDivider = DIV1</code></td>
+<td align="left">AHB 预分频（RCC_CFGR.HPRE）</td>
+<td align="center">÷1 → HCLK 72MHz</td>
+</tr>
+<tr>
+<td align="left"><code>APB1CLKDivider = DIV2</code></td>
+<td align="left">APB1 预分频（RCC_CFGR.PPRE1）</td>
+<td align="center">÷2 → PCLK1 36MHz</td>
+</tr>
+<tr>
+<td align="left"><code>APB2CLKDivider = DIV1</code></td>
+<td align="left">APB2 预分频（RCC_CFGR.PPRE2）</td>
+<td align="center">÷1 → PCLK2 72MHz</td>
+</tr>
+<tr>
+<td align="left"><code>FLASH_LATENCY_2</code></td>
+<td align="left">Flash 等待周期（FLASH_ACR.LATENCY）</td>
+<td align="center">2 个等待周期</td>
+</tr>
+</tbody></table>
+<p>两个值得注意的点：</p>
+<ol>
+<li><p><strong>HSI 为什么要保持开启（<code>RCC_HSI_ON</code>）？</strong> 即使不用它做系统时钟，HSI 也是 Flash 编程接口时钟的唯一来源，并且是 CSS 时钟安全系统切换的备用时钟——所以不能关。</p>
+</li>
+<li><p><strong><code>FLASH_LATENCY_2</code> 是什么？</strong> Flash 读数据比 CPU 运算慢。CPU 频率越高，等待周期就越多：72MHz 需要 2 个等待周期（每读一次 Flash 等 2 个周期）。这也是 HAL_RCC_ClockConfig 的第二个参数，CubeMX 会根据 HCLK 自动算好。</p>
+</li>
+</ol>
+<h3 id="HAL-层与寄存器的关系"><a href="#HAL-层与寄存器的关系" class="headerlink" title="HAL 层与寄存器的关系"></a>HAL 层与寄存器的关系</h3><p>整个 <code>SystemClock_Config</code> 是 HAL 封装层，最终写入的是 RCC 外设的寄存器：</p>
+<ul>
+<li><code>HAL_RCC_OscConfig()</code> → 写 <strong>RCC_CR</strong>（HSEON&#x2F;HSERDY、PLLON&#x2F;PLLRDY）和 <strong>RCC_CFGR</strong>（PLLSRC、PLLMUL）</li>
+<li><code>HAL_RCC_ClockConfig()</code> → 写 <strong>RCC_CFGR</strong>（SW&#x2F;SWS、HPRE、PPRE1、PPRE2）和 <strong>FLASH_ACR</strong>（LATENCY）</li>
+</ul>
+<p>这也再次印证博客开头的观点：每个外设运行前，都得先让这颗时钟树”枝繁叶茂”。</p>
+<h2 id="实操步骤：CubeMX-配置-72MHz"><a href="#实操步骤：CubeMX-配置-72MHz" class="headerlink" title="实操步骤：CubeMX 配置 72MHz"></a>实操步骤：CubeMX 配置 72MHz</h2><p>说了这么多理论，实操其实非常简单——CubeMX 图形化界面就是替我们操作上面的时钟树。正确流程：</p>
+<p><strong>① 在 RCC 配置页打开 HSE</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">System Core → RCC → High Speed Clock (HSE) → Crystal/Ceramic Resonator</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><img src="/./../images/STM32_Clock_Tree/image-20260806105659838.png" alt="image-20260806105659838"></p>
+</blockquote>
+<p><strong>② 在 Clock Configuration 页把 HCLK 改为 72MHz</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Clock Configuration 页面 → HCLK 输入 72 → 回车</span><br><span class="line">CubeMX 自动帮我们算好所有预分频和倍频参数（弹出对话框直接点 OK）</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><img src="/./../images/STM32_Clock_Tree/image-20260806105812668.png" alt="image-20260806105812668"></p>
+</blockquote>
+<p>配置完成后，对照 Clock Configuration 页面应该能看到与我们代码一致的参数：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">HSE 8MHz ──÷1──► PLL ×9 ──► SYSCLK 72MHz ──÷1──► HCLK 72MHz</span><br><span class="line">                         │                     ├──÷2──► PCLK1 36MHz（定时器自动 ×2 → 72MHz）</span><br><span class="line">                         │                     └──÷1──► PCLK2 72MHz（定时器 ×1）</span><br><span class="line">                         └──► APB2 定时器 72MHz</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>💡 顺序提醒：<strong>务必先开 HSE，再改 HCLK</strong>。如果没开 HSE 就改 72MHz，CubeMX 会弹窗提示只能配到 64MHz（原因见下节踩坑记录）。</p>
+</blockquote>
+<p><strong>③ 生成代码</strong>，<code>SystemClock_Config()</code> 会自动出现在 <code>main.c</code> 里——就是上面解读的那段代码。</p>
+<h2 id="踩坑记录：72MHz-弹窗-“no-solution-found”-的真相"><a href="#踩坑记录：72MHz-弹窗-“no-solution-found”-的真相" class="headerlink" title="踩坑记录：72MHz 弹窗 “no solution found” 的真相"></a>踩坑记录：72MHz 弹窗 “no solution found” 的真相</h2><p>刚接触这块时很容易遇到这个弹窗：</p>
+<blockquote>
+<p>改 HCLK&#x3D;72MHz 时弹出 “no solution found using 72MHz, do you want to use 64MHz?”</p>
+</blockquote>
+<p><strong>原因</strong>：没开 HSE 时，系统只能用 HSI（8MHz）作为 PLL 输入。HSI 经过固定的 ÷2 变成 4MHz，PLL 最大 ×16 → 4 × 16 &#x3D; <strong>64MHz，这就是 HSI 路线的极限</strong>，再怎么配也到不了 72MHz。</p>
+<p><strong>解决</strong>：回到 RCC 配置页打开 HSE（Crystal&#x2F;Ceramic Resonator），HSE 8MHz ÷1 ×9 &#x3D; 72MHz，完美。这也是上一节”先开 HSE，再改 HCLK”的原因。</p>
+<p>这个坑的通用价值在于：<strong>理解时钟树各节点的频率上下限，就能看懂 CubeMX 的报错</strong>。HSI 只能跑到 64MHz、PCLK1 最大 36MHz、APB2 定时器是 72MHz……这些限制全部写在这棵树上。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">概念</th>
+<th align="left">一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>时钟信号</strong></td>
+<td align="left">一定频率的方波，让门电路稳定后才锁存进寄存器，全芯片的”节拍器”</td>
+</tr>
+<tr>
+<td align="left"><strong>时钟源</strong></td>
+<td align="left">心脏：HSI（内部 8MHz）&#x2F; HSE（外部晶振 8MHz，精度高）</td>
+</tr>
+<tr>
+<td align="left"><strong>PLL</strong></td>
+<td align="left">倍频器：×2~×16，HSE ÷1 ×9 &#x3D; 72MHz</td>
+</tr>
+<tr>
+<td align="left"><strong>SYSCLK</strong></td>
+<td align="left">系统时钟：HSI &#x2F; HSE &#x2F; PLLCLK 三选一</td>
+</tr>
+<tr>
+<td align="left"><strong>AHB &#x2F; HCLK</strong></td>
+<td align="left">主干道：CPU、内存、DMA 的时钟线</td>
+</tr>
+<tr>
+<td align="left"><strong>APB1 &#x2F; PCLK1</strong></td>
+<td align="left">外设低速总线：÷2 &#x3D; 36MHz（定时器自动倍频回 72MHz）</td>
+</tr>
+<tr>
+<td align="left"><strong>APB2 &#x2F; PCLK2</strong></td>
+<td align="left">外设高速总线：÷1 &#x3D; 72MHz（GPIO、串口1、ADC、TIM1&#x2F;TIM8）</td>
+</tr>
+<tr>
+<td align="left"><strong>SysTick</strong></td>
+<td align="left">内核定时器：HCLK 分频（÷1&#x2F;÷8），<code>HAL_Delay</code> 的基准</td>
+</tr>
+<tr>
+<td align="left"><strong>CSS</strong></td>
+<td align="left">时钟安全系统：HSE 故障自动切回 HSI + 中断</td>
+</tr>
+<tr>
+<td align="left"><strong>FCLK</strong></td>
+<td align="left">自由运行时钟：停止模式时继续跑，供中断唤醒</td>
+</tr>
+</tbody></table>
+<p>这一集涉及的概念很多，有不少是后面才学到的（定时器、RTC、看门狗……）。但就像 keysking 说的”常看常新”——现在把时钟树这张地图装进脑子里，后面每学一个外设，都能在树上找到它的位置。</p>
+<p>下一集就要进入定时器的学习了，有了时钟树的知识打底，定时器的分频&#x2F;计数原理会好理解很多——因为定时器的 72MHz 时基，正是从 APB1&#x2F;APB2 这条分支上摘下来的。</p>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li>视频：【STM32】超清晰STM32时钟树动画讲解（keysking）</li>
+<li>STM32 中文参考手册：第 25 页”系统结构图”（APB1&#x2F;APB2 外设挂载清单）</li>
+<li>波特律动文档站：<a href="https://docs.baud-dance.com/docs/stm32/intro">https://docs.baud-dance.com/docs/stm32/intro</a></li>
+<li><a href="/2026/08/05/STM32_OLED_Temperature_Humidity_Meter/">上一篇：STM32番外篇——oled温湿度计</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>嵌入式</tag>
+        <tag>STM32</tag>
+        <tag>CubeMX</tag>
+        <tag>RCC</tag>
+        <tag>时钟树</tag>
+        <tag>PLL</tag>
       </tags>
   </entry>
   <entry>
@@ -10400,6 +10400,304 @@
       </tags>
   </entry>
   <entry>
+    <title>STM32——定时器入门：定时器就是计数器</title>
+    <url>/2026/08/06/STM32_Timer_Basic/</url>
+    <content><![CDATA[<h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上一篇我们研究了单片机的”心脏与动脉”——时钟源与时钟树。当时埋了个伏笔：时钟树上 <strong>APB1 定时器分支</strong>经过预分频 + 倍频，给定时器送来了 72MHz 的时钟。</p>
+<p>为什么定时器值得单独一条分支、还专门配一个倍频器把频率”补”回 72MHz？从本篇开始，我们就来研究单片机中另一个非常重要的概念——<strong>定时器 TIM</strong>。</p>
+<p>如果你以为定时器的作用是”设定一个时间，时间到了执行程序”——恭喜你猜对了一半，但也正是被”定时器”这个名字误导了。请记住这句贯穿后续好几期的话：</p>
+<blockquote>
+<p><strong>定时器就是计数器。</strong></p>
+</blockquote>
+<p>身为计数器，通过不同的”计数姿势”的巧妙组合，定时器除了实现普通的定时功能，还可以捕获脉冲宽度、计算 PWM 占空比、输出 PWM 波形、编码器计数……功能非常丰富。</p>
+<h2 id="定时器家族：三类定时器"><a href="#定时器家族：三类定时器" class="headerlink" title="定时器家族：三类定时器"></a>定时器家族：三类定时器</h2><p>STM32F103 系列最多有 8 个定时器（TIM1~TIM8），按功能强弱分三类：</p>
+<table>
+<thead>
+<tr>
+<th align="left">类别</th>
+<th align="left">成员</th>
+<th align="left">功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>基本定时器</strong></td>
+<td align="left">TIM6、TIM7</td>
+<td align="left">功能最弱，只有简单的定时功能</td>
+</tr>
+<tr>
+<td align="left"><strong>通用定时器</strong></td>
+<td align="left">TIM2~TIM5</td>
+<td align="left">在基本定时器基础上扩展，功能丰富，是学习重点</td>
+</tr>
+<tr>
+<td align="left"><strong>高级定时器</strong></td>
+<td align="left">TIM1、TIM8</td>
+<td align="left">最强，多了刹车信号、输入捕获、互补输出等工业电机功能</td>
+</tr>
+</tbody></table>
+<p>高级定时器的那些电机功能需要提前学习许多电机知识，当前阶段我们把它当通用定时器用即可。</p>
+<blockquote>
+<p>⚠️ 注意：我们使用的 <strong>STM32F103C8T6 上只有 TIM1~TIM4</strong>（1 个高级 + 3 个通用），并没有基本定时器。不过没关系——通用&#x2F;高级定时器都是从基本定时器的结构上扩展出来的，<strong>包含基本定时器的全部功能</strong>，所以把任意一个通用定时器当基本定时器用就行。本集我们用 <strong>TIM4</strong>。</p>
+</blockquote>
+<h2 id="定时器就是计数器"><a href="#定时器就是计数器" class="headerlink" title="定时器就是计数器"></a>定时器就是计数器</h2><h3 id="计时原理：恒定频率方波-计数器"><a href="#计时原理：恒定频率方波-计数器" class="headerlink" title="计时原理：恒定频率方波 + 计数器"></a>计时原理：恒定频率方波 + 计数器</h3><p>如何计时？其实非常简单：<strong>一个恒定频率的方波信号 + 一个寄存器</strong>，每当方波的上升沿到达，寄存器存储的数就 +1，就能完成计时。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">        ┌──┐  ┌──┐  ┌──┐</span><br><span class="line">方波 ────┘  └──┘  └──┘  └── ...  100Hz = 每秒 100 个脉冲</span><br><span class="line">       ↑  ↑  ↑  ↑</span><br><span class="line">       │  │  │  └─ 计数到 100 → 我们知道过了一秒</span><br><span class="line">       │  │  └─ 3</span><br><span class="line">       │  └─ 2</span><br><span class="line">       └─ 1</span><br><span class="line">       计数器: 0 → 1 → 2 → 3 → ... → 100</span><br></pre></td></tr></table></figure>
+
+<p>恒定频率的方波从哪来？就是上篇时钟树讲过的：<strong>APB1 定时器分支，72MHz</strong>。也就是计数器每数到 7200 万，就是一秒。</p>
+<p>可惜计数器寄存器只有 <strong>16 位</strong>，最多数 65536 个数——72MHz 下 0.0009 秒就数满了，这太少了。所以定时器在计数器前加了一个<strong>预分频器</strong>。</p>
+<h3 id="预分频器：给方波”减速”"><a href="#预分频器：给方波”减速”" class="headerlink" title="预分频器：给方波”减速”"></a>预分频器：给方波”减速”</h3><p>预分频器本质也是个计数器（通过计数来分频）：</p>
+<table>
+<thead>
+<tr>
+<th align="center">预分频器设置值</th>
+<th align="left">行为</th>
+<th align="center">等效分频</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="left">不分频，脉冲原样输出</td>
+<td align="center">÷1</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="left">数 0、1，每 2 个脉冲输出 1 个</td>
+<td align="center">÷2</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">数 0、1、2，每 3 个脉冲输出 1 个</td>
+<td align="center">÷3</td>
+</tr>
+</tbody></table>
+<p>规律：<strong>想要 N 分频，就设置 N-1</strong>（因为从 0 开始计数）。</p>
+<p>预分频器也是 16 位，最多 65536 分频。72MHz ÷ 65536 ≈ 1098Hz，即最多可以定时 59 秒多——对于绝大多数需要高精度定时的任务足够用了。</p>
+<blockquote>
+<p>💡 想要更长时间的定时？定时器可以<strong>串联</strong>——一个定时器作为另一个的输入时钟。两个定时器组合可以实现 8124 年（当然，晶振存在误差，长时间定时会有累积误差，追求极致精确的话需要卫星授时校准等方案）。</p>
+</blockquote>
+<h3 id="自动重装载计数器：实现”定时”"><a href="#自动重装载计数器：实现”定时”" class="headerlink" title="自动重装载计数器：实现”定时”"></a>自动重装载计数器：实现”定时”</h3><p>有了预分频器和计数器，我们已经能”计时”（读计数器值知道过了多久），但怎么实现”<strong>每 1 秒提醒我发送一次数据</strong>“这种”定时”功能？</p>
+<p>靠第三个部件——<strong>自动重装载计数器（ARR）</strong>：</p>
+<ul>
+<li>它实时监控计数器的值是否与自己相同</li>
+<li>当计数器数到与它相同 → <strong>把计数器清零，重新开始计数</strong></li>
+<li>同时可根据设置<strong>触发一次更新中断</strong>，通知 STM32”时间到了”</li>
+</ul>
+<p>和预分频器一样，因为从 0 开始计数，想定时 M 个脉冲就设置 <strong>M-1</strong>。于是计数器从 0 数到 M-1，共 M 个数，然后重置并触发中断。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌────────────┐    ┌────────────┐    ┌────────────┐</span><br><span class="line">│ 预分频器 PSC │──►│ 计数器 CNT  │──►│重装载计数器ARR│──► 相等时:</span><br><span class="line">│   ÷7200     │    │ 0~9999     │    │  = 9999     │   ① 计数器清零重新计数</span><br><span class="line">└────────────┘    └────────────┘    └────────────┘   ② 触发更新中断</span><br></pre></td></tr></table></figure>
+
+<h2 id="数据流全链路：从-72MHz-到每秒一次的串口数据"><a href="#数据流全链路：从-72MHz-到每秒一次的串口数据" class="headerlink" title="数据流全链路：从 72MHz 到每秒一次的串口数据"></a>数据流全链路：从 72MHz 到每秒一次的串口数据</h2><p>理解了三个部件，把本集项目的完整数据流串起来——从时钟树到串口助手：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">APB1 定时器分支 72MHz (来自上篇的时钟树, HSE 8MHz ×PLL9)</span><br><span class="line">   │</span><br><span class="line">   ▼</span><br><span class="line">┌────────────────┐    ÷7200 (设置 7200-1)   ┌────────────────┐</span><br><span class="line">│ 预分频器 PSC    │ ──────────────────────► │ 10kHz 脉冲      │</span><br><span class="line">│ (幕后: 影子寄存器)│     每7200个脉冲输出1个   │ 每秒10000个脉冲  │</span><br><span class="line">└────────────────┘                         └───────┬────────┘</span><br><span class="line">                                                    │</span><br><span class="line">                                                    ▼</span><br><span class="line">                                    ┌────────────────┐</span><br><span class="line">                                    │ 计数器 CNT (16位)│</span><br><span class="line">                                    │ 0→1→2→…→9999   │</span><br><span class="line">                                    └───────┬────────┘</span><br><span class="line">                                            │ 实时比较</span><br><span class="line">                                            ▼</span><br><span class="line">                                    ┌────────────────┐</span><br><span class="line">                                    │ 重装载 ARR=9999 │──相等→ 清零 + 更新中断</span><br><span class="line">                                    │ (10000-1)      │</span><br><span class="line">                                    └────────────────┘</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                         HAL_TIM_PeriodElapsedCallback (中断回调)</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                            HAL_UART_Transmit_IT 中断发送</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                        串口助手: 每秒收到一次数据 ✅</span><br></pre></td></tr></table></figure>
+
+<p>关键计算：<strong>72MHz ÷ 7200 &#x3D; 10kHz</strong>（每秒 10000 个脉冲），<strong>计数 10000 次 &#x3D; 正好 1 秒</strong>。</p>
+<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="①-基础配置（老流程）"><a href="#①-基础配置（老流程）" class="headerlink" title="① 基础配置（老流程）"></a>① 基础配置（老流程）</h3><ul>
+<li>创建工程（STM32F103C8T6），打开<strong>串口2</strong>（USART2，115200），并打开串口中断（后面用中断发送）</li>
+<li>RCC 配置页打开 <strong>HSE（Crystal&#x2F;Ceramic Resonator）</strong></li>
+<li>Clock Configuration 页 HCLK 改为 <strong>72MHz</strong></li>
+<li>注意时钟树页面：<strong>APB1 定时器分支已经是 72MHz</strong>（APB1 ÷2 &#x3D; 36MHz，定时器自动倍频 ×2 &#x3D; 72MHz）——上一篇的知识在这里直接落地</li>
+</ul>
+<h3 id="②-TIM4-定时器配置"><a href="#②-TIM4-定时器配置" class="headerlink" title="② TIM4 定时器配置"></a>② TIM4 定时器配置</h3><p>打开 <strong>Timers → TIM4</strong>，把 Clock Source 选为 <strong>Internal Clock</strong>（内部时钟，即来自 APB1 的 72MHz），就算打开了定时器：</p>
+<blockquote>
+<p><img src="/./../images/STM32_Timer_Basic/image-20260806214008514.png" alt="image-20260806214008514"></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th align="left">配置项</th>
+<th align="center">填的值</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Prescaler</strong>（预分频器）</td>
+<td align="center"><code>7200-1</code></td>
+<td align="left">想 7200 分频就填 7199（N-1）</td>
+</tr>
+<tr>
+<td align="left"><strong>Counter Mode</strong></td>
+<td align="center">Up</td>
+<td align="left">向上计数（默认）</td>
+</tr>
+<tr>
+<td align="left"><strong>Counter Period</strong>（自动重装载）</td>
+<td align="center"><code>10000-1</code></td>
+<td align="left">想定时 1 秒就填 9999（M-1）</td>
+</tr>
+</tbody></table>
+<p>72MHz ÷ 7200 &#x3D; 10kHz，数 10000 次 &#x3D; 1 秒，每 1 秒触发一次更新中断。</p>
+<h3 id="③-打开更新中断"><a href="#③-打开更新中断" class="headerlink" title="③ 打开更新中断"></a>③ 打开更新中断</h3><p>在 TIM4 配置页切到 <strong>NVIC Settings</strong> 选项卡，勾选 <strong>TIM4 global interrupt</strong>：</p>
+<blockquote>
+<p><img src="/./../images/STM32_Timer_Basic/image-20260806214104527.png" alt="image-20260806214104527"></p>
+</blockquote>
+<p>保存并生成代码。打开 main.c，可以看到 main 函数调用了一个新的初始化函数 <code>MX_TIM4_Init()</code>。</p>
+<h2 id="核心代码"><a href="#核心代码" class="headerlink" title="核心代码"></a>核心代码</h2><h3 id="1-启动定时器（main-函数-USER-CODE-2）"><a href="#1-启动定时器（main-函数-USER-CODE-2）" class="headerlink" title="1. 启动定时器（main 函数 USER CODE 2）"></a>1. 启动定时器（main 函数 USER CODE 2）</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">HAL_TIM_Base_Start_IT(&amp;htim4);   <span class="comment">// 启动 TIM4，并使能更新中断</span></span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-更新中断回调（USER-CODE-0）"><a href="#2-更新中断回调（USER-CODE-0）" class="headerlink" title="2. 更新中断回调（USER CODE 0）"></a>2. 更新中断回调（USER CODE 0）</h3><p>定时器的”时间到”是通过<strong>更新中断</strong>通知的——每次计数器数到与重装载值相同、被清零重新计数时触发。中断发生后要执行什么，靠重写回调函数：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 0 */</span></span><br><span class="line"><span class="type">char</span> data[] = <span class="string">&quot;😊😂🤣😍😘🙌&quot;</span>;   <span class="comment">// 要发送的数据（随便示意一下）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_TIM_PeriodElapsedCallback</span><span class="params">(TIM_HandleTypeDef *htim)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span> (htim == &amp;htim4)                          <span class="comment">// 好习惯:先确认是本定时器的中断</span></span><br><span class="line">  &#123;</span><br><span class="line">    HAL_UART_Transmit_IT(&amp;huart2, data, <span class="built_in">strlen</span>(data));  <span class="comment">// 串口中断发送</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 0 */</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>💡 这个回调函数是 HAL 库定义的<strong>弱函数（weak）</strong>，默认空实现，我们在自己的代码里重写即可。它会被所有定时器（TIM1~TIM4）共用，所以<strong>第一个动作就是判断是哪个定时器</strong>——<code>htim == &amp;htim4</code>。</p>
+</blockquote>
+<h2 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h2><table>
+<thead>
+<tr>
+<th align="left">HAL 函数</th>
+<th align="left">作用</th>
+<th align="left">本项目中参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>HAL_TIM_Base_Start_IT</code></td>
+<td align="left">启动定时器（Base&#x3D;基本用法），并使能更新中断（IT&#x3D;Interrupt）</td>
+<td align="left"><code>&amp;htim4</code> 定时器句柄指针</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_TIM_PeriodElapsedCallback</code></td>
+<td align="left">更新中断回调（重写）</td>
+<td align="left">无参数，靠 <code>htim</code> 判断来源</td>
+</tr>
+<tr>
+<td align="left"><code>HAL_UART_Transmit_IT</code></td>
+<td align="left">串口<strong>中断</strong>发送（非阻塞）</td>
+<td align="left"><code>&amp;huart2</code>、<code>data</code>、<code>strlen(data)</code></td>
+</tr>
+</tbody></table>
+<p>另外，定时器还有一些<strong>名称全大写、以双下划线开头</strong>的函数——这类在 HAL 库中其实是<strong>宏定义</strong>，比较偏底层，倾向于直接操作寄存器。可以用它们随时读写定时器的核心部件，方便调试或动态改参数：</p>
+<ul>
+<li><code>__HAL_TIM_GET_COUNTER</code> &#x2F; <code>__HAL_TIM_SET_COUNTER</code>：获取&#x2F;设置计数器的值</li>
+<li><code>__HAL_TIM_GET_AUTORELOAD</code> &#x2F; <code>__HAL_TIM_SET_AUTORELOAD</code>：获取&#x2F;设置重装载寄存器的值</li>
+<li><code>__HAL_TIM_SET_PRESCALER</code>：设置预分频器的值</li>
+</ul>
+<p>可以自己设计实验试试这些函数。</p>
+<h2 id="解读初始化代码：MX-TIM4-Init"><a href="#解读初始化代码：MX-TIM4-Init" class="headerlink" title="解读初始化代码：MX_TIM4_Init"></a>解读初始化代码：MX_TIM4_Init</h2><p>CubeMX 生成的定时器初始化代码，逐行解析（这是本集必做的深度解读章节）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">MX_TIM4_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  TIM_ClockConfigTypeDef sClockSourceConfig = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 时钟源配置结构体</span></span><br><span class="line">  TIM_MasterConfigTypeDef sMasterConfig = &#123;<span class="number">0</span>&#125;;       <span class="comment">// 主模式配置结构体</span></span><br><span class="line"></span><br><span class="line">  htim4.Instance = TIM4;                             <span class="comment">// 指定外设: TIM4</span></span><br><span class="line">  htim4.Init.Prescaler = <span class="number">7200</span><span class="number">-1</span>;                     <span class="comment">// 预分频: ÷7200 (对应CubeMX Prescaler)</span></span><br><span class="line">  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;       <span class="comment">// 计数模式: 向上计数</span></span><br><span class="line">  htim4.Init.Period = <span class="number">10000</span><span class="number">-1</span>;                       <span class="comment">// 自动重装载: 数到9999清零 (对应Counter Period)</span></span><br><span class="line">  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1; <span class="comment">// 时钟分频: 用于输入滤波, 定时功能用不到</span></span><br><span class="line">  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;  <span class="comment">// 重装载影子寄存器: 关闭</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_Base_Init(&amp;htim4) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 时钟源: 内部时钟 (APB1定时器分支 72MHz) */</span></span><br><span class="line">  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_ConfigClockSource(&amp;htim4, &amp;sClockSourceConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 主模式配置: 本集用不到, 保持默认 */</span></span><br><span class="line">  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;</span><br><span class="line">  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIMEx_MasterConfigSynchronization(&amp;htim4, &amp;sMasterConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="各配置项与-CubeMX-寄存器的对应关系"><a href="#各配置项与-CubeMX-寄存器的对应关系" class="headerlink" title="各配置项与 CubeMX &#x2F; 寄存器的对应关系"></a>各配置项与 CubeMX &#x2F; 寄存器的对应关系</h3><table>
+<thead>
+<tr>
+<th align="left">代码配置</th>
+<th align="left">对应 CubeMX 设置</th>
+<th align="left">对应寄存器</th>
+<th align="center">本项目值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>Init.Prescaler</code></td>
+<td align="left">Prescaler</td>
+<td align="left">TIM_PSC</td>
+<td align="center">7200-1</td>
+</tr>
+<tr>
+<td align="left"><code>Init.CounterMode</code></td>
+<td align="left">Counter Mode</td>
+<td align="left">TIM_CR1.DIR</td>
+<td align="center">UP</td>
+</tr>
+<tr>
+<td align="left"><code>Init.Period</code></td>
+<td align="left">Counter Period</td>
+<td align="left">TIM_ARR</td>
+<td align="center">10000-1</td>
+</tr>
+<tr>
+<td align="left"><code>Init.ClockDivision</code></td>
+<td align="left">Clock Division</td>
+<td align="left">TIM_CR1.CKD</td>
+<td align="center">÷1</td>
+</tr>
+<tr>
+<td align="left"><code>AutoReloadPreload</code></td>
+<td align="left">auto-reload preload</td>
+<td align="left">TIM_CR1.ARPE</td>
+<td align="center">DISABLE</td>
+</tr>
+<tr>
+<td align="left"><code>ClockSource = INTERNAL</code></td>
+<td align="left">Clock Source</td>
+<td align="left">TIM_SMCR.SMS</td>
+<td align="center">内部时钟</td>
+</tr>
+</tbody></table>
+<h3 id="MSP-初始化：时钟使能与中断"><a href="#MSP-初始化：时钟使能与中断" class="headerlink" title="MSP 初始化：时钟使能与中断"></a>MSP 初始化：时钟使能与中断</h3><p>定时器初始化的另一半在 <code>HAL_TIM_Base_MspInit()</code> 里（MSP &#x3D; MCU Support Package，即”与 MCU 相关的部分”：时钟、引脚、中断）：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_TIM_Base_MspInit</span><span class="params">(TIM_HandleTypeDef* tim_baseHandle)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span> (tim_baseHandle-&gt;Instance == TIM4)</span><br><span class="line">  &#123;</span><br><span class="line">    __HAL_RCC_TIM4_CLK_ENABLE();          <span class="comment">// ① 打开 TIM4 的外设时钟(挂钟!)</span></span><br><span class="line">    HAL_NVIC_SetPriority(TIM4_IRQn, <span class="number">0</span>, <span class="number">0</span>);  <span class="comment">// ② 设置 TIM4 中断优先级: 抢占0 子0</span></span><br><span class="line">    HAL_NVIC_EnableIRQ(TIM4_IRQn);        <span class="comment">// ③ 使能 TIM4 中断</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>三步缺一不可：<strong>不打开外设时钟（挂钟），定时器根本不工作；不设置优先级、不使能中断，更新中断永远不会触发。</strong></p>
+<h3 id="中断链路"><a href="#中断链路" class="headerlink" title="中断链路"></a>中断链路</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">计数器数到 ARR → 硬件置位更新标志 → 触发 TIM4_IRQn</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">TIM4_IRQHandler (stm32f1xx_it.c, 中断服务函数)</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">HAL_TIM_IRQHandler(&amp;htim4)  (HAL库, 判断中断来源)</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">HAL_TIM_PeriodElapsedCallback(&amp;htim4)  (我们重写的回调)</span><br></pre></td></tr></table></figure>
+
+<p>和串口中断的套路一模一样：<strong>中断服务函数 → HAL 通用处理函数 → 我们重写的回调</strong>。</p>
+<h2 id="影子寄存器机制：幕后老板与一线员工"><a href="#影子寄存器机制：幕后老板与一线员工" class="headerlink" title="影子寄存器机制：幕后老板与一线员工"></a>影子寄存器机制：幕后老板与一线员工</h2><p>前面讲预分频器和重装载时，代码里有两个容易被忽略的设置，它们背后是定时器一个精巧的设计——<strong>影子寄存器</strong>。</p>
+<p><strong>预分频器</strong>：真正工作在分频一线的，其实是预分频寄存器的<strong>影子寄存器</strong>，而预分频寄存器本人更像”运筹帷幄的幕后老板”。我们通过 <code>__HAL_TIM_SET_PRESCALER</code> 设置的新预分频值，会<strong>等到当前计数周期结束（计数器数到重装载值、重新从零开始）时才传递给影子寄存器生效</strong>——简而言之，新值下个计数周期才生效。</p>
+<p><strong>自动重装载计数器</strong>：同样有影子寄存器，作用相同（新值下个周期生效）。不同之处在于——<strong>重装载的影子机制可以开关</strong>（<code>AutoReloadPreload</code>，默认关闭）：</p>
+<ul>
+<li>关闭（本项目）：改 ARR 立即写进寄存器，但注意——如果把重装载值<strong>调小</strong>到小于当前计数器的值，它们会”错过”，计数器一路数到最大值 65535 才会触发更新</li>
+<li>开启（CubeMX 里勾选 auto-reload preload）：新值在影子寄存器里等下个周期，绝对安全</li>
+</ul>
+<p>有了影子寄存器机制，就可以随时修改预分频器&#x2F;重装载寄存器，而不必担心影响当前的计数周期。</p>
+<h2 id="实操步骤"><a href="#实操步骤" class="headerlink" title="实操步骤"></a>实操步骤</h2><h3 id="1-CubeMX-配置"><a href="#1-CubeMX-配置" class="headerlink" title="1. CubeMX 配置"></a>1. CubeMX 配置</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">① 串口2: Mode → Asynchronous, 波特率 115200, NVIC 勾选 USART2 global interrupt</span><br><span class="line">② RCC → HSE → Crystal/Ceramic Resonator</span><br><span class="line">③ Clock Configuration → HCLK = 72MHz → 回车 → OK</span><br><span class="line">④ Timers → TIM4 → Clock Source = Internal Clock</span><br><span class="line">   Prescaler = 7200-1, Counter Period = 10000-1</span><br><span class="line">⑤ NVIC Settings → 勾选 TIM4 global interrupt</span><br><span class="line">⑥ 保存生成代码</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-写代码"><a href="#2-写代码" class="headerlink" title="2. 写代码"></a>2. 写代码</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">① USER CODE 2:  HAL_TIM_Base_Start_IT(&amp;htim4) 启动定时器</span><br><span class="line">② USER CODE 0:  重写 HAL_TIM_PeriodElapsedCallback, 判断 htim==&amp;htim4 后</span><br><span class="line">                 HAL_UART_Transmit_IT(&amp;huart2, data, strlen(data))</span><br><span class="line">③ 头文件:        #include &lt;string.h&gt; (strlen)</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-编译下载-查看效果"><a href="#3-编译下载-查看效果" class="headerlink" title="3. 编译下载 &amp; 查看效果"></a>3. 编译下载 &amp; 查看效果</h3><p>编译下载，连上串口线，打开波特律动串口助手连接串口。刚下载完程序会慢几拍，<strong>按下板上的复位键</strong>让程序重新开始运行。</p>
+<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><blockquote>
+<p><a href="https://www.bilibili.com/video/BV1Cnup68E8Z/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1Cnup68E8Z/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
+</blockquote>
+<p>串口助手每秒收到一次数据（emoji）</p>
+<h2 id="踩坑记录"><a href="#踩坑记录" class="headerlink" title="踩坑记录"></a>踩坑记录</h2><h3 id="1-中断发送和主循环发送会”打架”"><a href="#1-中断发送和主循环发送会”打架”" class="headerlink" title="1. 中断发送和主循环发送会”打架”"></a>1. 中断发送和主循环发送会”打架”</h3><p><code>HAL_UART_Transmit_IT</code> 是非阻塞发送。如果中断里的发送和主循环里的发送间隔太小，<strong>上次的数据还没发完，下次发送就把缓冲区覆盖掉了</strong>。所以发送逻辑尽量集中在一处——本项目把发送全部放在定时器中断回调里，主循环只留给自己的业务逻辑。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="复习结构图"><a href="#复习结构图" class="headerlink" title="复习结构图"></a>复习结构图</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line"> 时钟源 (内部时钟 72MHz)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">预分频器 PSC ──► 计数器 CNT ──► 重装载 ARR ──► 更新中断</span><br><span class="line">(÷7200)        (0~9999)        (=9999)</span><br></pre></td></tr></table></figure>
+
+<h3 id="本集要点"><a href="#本集要点" class="headerlink" title="本集要点"></a>本集要点</h3><table>
+<thead>
+<tr>
+<th align="left">要点</th>
+<th align="left">内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>定时器就是计数器</strong></td>
+<td align="left">一切功能的本质</td>
+</tr>
+<tr>
+<td align="left"><strong>N-1 原则</strong></td>
+<td align="left">预分频想 N 分频填 N-1；重装载想定时 M 个脉冲填 M-1</td>
+</tr>
+<tr>
+<td align="left"><strong>三个核心寄存器</strong></td>
+<td align="left">PSC（预分频）、CNT（计数器）、ARR（重装载）</td>
+</tr>
+<tr>
+<td align="left"><strong>更新中断</strong></td>
+<td align="left">计数器数到 ARR → 清零 → 触发中断 → 回调发数据</td>
+</tr>
+<tr>
+<td align="left"><strong>三步配置</strong></td>
+<td align="left">勾 Internal Clock + 设 PSC&#x2F;ARR + 开 NVIC 中断</td>
+</tr>
+<tr>
+<td align="left"><strong>两个函数</strong></td>
+<td align="left"><code>HAL_TIM_Base_Start_IT</code> 启动、<code>HAL_TIM_PeriodElapsedCallback</code> 回调</td>
+</tr>
+<tr>
+<td align="left"><strong>影子寄存器</strong></td>
+<td align="left">预分频&#x2F;重装载新值下个周期生效；重装载可开关</td>
+</tr>
+</tbody></table>
+<p>本期只用了基本定时器功能。接下来的几期会在这张结构图的基础上不断扩展——万变不离其宗，<strong>定时器就是计数器</strong>。</p>
+<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
+<li>视频：【STM32】第16集 动画告诉你, STM32的定时器到底怎么回事（keysking）</li>
+<li>STM32 中文参考手册：定时器章节（TIM1-8 寄存器详解）</li>
+<li><a href="/2026/08/06/STM32_Clock_Tree/">上一篇：STM32——浅析时钟源与时钟树理论知识</a></li>
+</ul>
+]]></content>
+      <categories>
+        <category>嵌入式</category>
+      </categories>
+      <tags>
+        <tag>嵌入式</tag>
+        <tag>STM32</tag>
+        <tag>CubeMX</tag>
+        <tag>中断</tag>
+        <tag>TIM</tag>
+        <tag>定时器</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>STM32——串口DMA模式收发，与不定长数据接收</title>
     <url>/2026/07/30/STM32_USART_DMA_Idle_Receive/</url>
     <content><![CDATA[<h2 id="从中断到-DMA——CPU-还是太忙了"><a href="#从中断到-DMA——CPU-还是太忙了" class="headerlink" title="从中断到 DMA——CPU 还是太忙了"></a>从中断到 DMA——CPU 还是太忙了</h2><p>上篇博客，我们用串口中断模式解决了 CPU “傻等”的问题。回顾一下当时的代码结构：</p>
@@ -11038,304 +11336,6 @@
         <tag>DMA</tag>
         <tag>中断</tag>
         <tag>NVIC</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>STM32——定时器入门：定时器就是计数器</title>
-    <url>/2026/08/06/STM32_Timer_Basic/</url>
-    <content><![CDATA[<h2 id="从上一篇到这篇"><a href="#从上一篇到这篇" class="headerlink" title="从上一篇到这篇"></a>从上一篇到这篇</h2><p>上一篇我们研究了单片机的”心脏与动脉”——时钟源与时钟树。当时埋了个伏笔：时钟树上 <strong>APB1 定时器分支</strong>经过预分频 + 倍频，给定时器送来了 72MHz 的时钟。</p>
-<p>为什么定时器值得单独一条分支、还专门配一个倍频器把频率”补”回 72MHz？从本篇开始，我们就来研究单片机中另一个非常重要的概念——<strong>定时器 TIM</strong>。</p>
-<p>如果你以为定时器的作用是”设定一个时间，时间到了执行程序”——恭喜你猜对了一半，但也正是被”定时器”这个名字误导了。请记住这句贯穿后续好几期的话：</p>
-<blockquote>
-<p><strong>定时器就是计数器。</strong></p>
-</blockquote>
-<p>身为计数器，通过不同的”计数姿势”的巧妙组合，定时器除了实现普通的定时功能，还可以捕获脉冲宽度、计算 PWM 占空比、输出 PWM 波形、编码器计数……功能非常丰富。</p>
-<h2 id="定时器家族：三类定时器"><a href="#定时器家族：三类定时器" class="headerlink" title="定时器家族：三类定时器"></a>定时器家族：三类定时器</h2><p>STM32F103 系列最多有 8 个定时器（TIM1~TIM8），按功能强弱分三类：</p>
-<table>
-<thead>
-<tr>
-<th align="left">类别</th>
-<th align="left">成员</th>
-<th align="left">功能</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>基本定时器</strong></td>
-<td align="left">TIM6、TIM7</td>
-<td align="left">功能最弱，只有简单的定时功能</td>
-</tr>
-<tr>
-<td align="left"><strong>通用定时器</strong></td>
-<td align="left">TIM2~TIM5</td>
-<td align="left">在基本定时器基础上扩展，功能丰富，是学习重点</td>
-</tr>
-<tr>
-<td align="left"><strong>高级定时器</strong></td>
-<td align="left">TIM1、TIM8</td>
-<td align="left">最强，多了刹车信号、输入捕获、互补输出等工业电机功能</td>
-</tr>
-</tbody></table>
-<p>高级定时器的那些电机功能需要提前学习许多电机知识，当前阶段我们把它当通用定时器用即可。</p>
-<blockquote>
-<p>⚠️ 注意：我们使用的 <strong>STM32F103C8T6 上只有 TIM1~TIM4</strong>（1 个高级 + 3 个通用），并没有基本定时器。不过没关系——通用&#x2F;高级定时器都是从基本定时器的结构上扩展出来的，<strong>包含基本定时器的全部功能</strong>，所以把任意一个通用定时器当基本定时器用就行。本集我们用 <strong>TIM4</strong>。</p>
-</blockquote>
-<h2 id="定时器就是计数器"><a href="#定时器就是计数器" class="headerlink" title="定时器就是计数器"></a>定时器就是计数器</h2><h3 id="计时原理：恒定频率方波-计数器"><a href="#计时原理：恒定频率方波-计数器" class="headerlink" title="计时原理：恒定频率方波 + 计数器"></a>计时原理：恒定频率方波 + 计数器</h3><p>如何计时？其实非常简单：<strong>一个恒定频率的方波信号 + 一个寄存器</strong>，每当方波的上升沿到达，寄存器存储的数就 +1，就能完成计时。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">        ┌──┐  ┌──┐  ┌──┐</span><br><span class="line">方波 ────┘  └──┘  └──┘  └── ...  100Hz = 每秒 100 个脉冲</span><br><span class="line">       ↑  ↑  ↑  ↑</span><br><span class="line">       │  │  │  └─ 计数到 100 → 我们知道过了一秒</span><br><span class="line">       │  │  └─ 3</span><br><span class="line">       │  └─ 2</span><br><span class="line">       └─ 1</span><br><span class="line">       计数器: 0 → 1 → 2 → 3 → ... → 100</span><br></pre></td></tr></table></figure>
-
-<p>恒定频率的方波从哪来？就是上篇时钟树讲过的：<strong>APB1 定时器分支，72MHz</strong>。也就是计数器每数到 7200 万，就是一秒。</p>
-<p>可惜计数器寄存器只有 <strong>16 位</strong>，最多数 65536 个数——72MHz 下 0.0009 秒就数满了，这太少了。所以定时器在计数器前加了一个<strong>预分频器</strong>。</p>
-<h3 id="预分频器：给方波”减速”"><a href="#预分频器：给方波”减速”" class="headerlink" title="预分频器：给方波”减速”"></a>预分频器：给方波”减速”</h3><p>预分频器本质也是个计数器（通过计数来分频）：</p>
-<table>
-<thead>
-<tr>
-<th align="center">预分频器设置值</th>
-<th align="left">行为</th>
-<th align="center">等效分频</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="center">0</td>
-<td align="left">不分频，脉冲原样输出</td>
-<td align="center">÷1</td>
-</tr>
-<tr>
-<td align="center">1</td>
-<td align="left">数 0、1，每 2 个脉冲输出 1 个</td>
-<td align="center">÷2</td>
-</tr>
-<tr>
-<td align="center">2</td>
-<td align="left">数 0、1、2，每 3 个脉冲输出 1 个</td>
-<td align="center">÷3</td>
-</tr>
-</tbody></table>
-<p>规律：<strong>想要 N 分频，就设置 N-1</strong>（因为从 0 开始计数）。</p>
-<p>预分频器也是 16 位，最多 65536 分频。72MHz ÷ 65536 ≈ 1098Hz，即最多可以定时 59 秒多——对于绝大多数需要高精度定时的任务足够用了。</p>
-<blockquote>
-<p>💡 想要更长时间的定时？定时器可以<strong>串联</strong>——一个定时器作为另一个的输入时钟。两个定时器组合可以实现 8124 年（当然，晶振存在误差，长时间定时会有累积误差，追求极致精确的话需要卫星授时校准等方案）。</p>
-</blockquote>
-<h3 id="自动重装载计数器：实现”定时”"><a href="#自动重装载计数器：实现”定时”" class="headerlink" title="自动重装载计数器：实现”定时”"></a>自动重装载计数器：实现”定时”</h3><p>有了预分频器和计数器，我们已经能”计时”（读计数器值知道过了多久），但怎么实现”<strong>每 1 秒提醒我发送一次数据</strong>“这种”定时”功能？</p>
-<p>靠第三个部件——<strong>自动重装载计数器（ARR）</strong>：</p>
-<ul>
-<li>它实时监控计数器的值是否与自己相同</li>
-<li>当计数器数到与它相同 → <strong>把计数器清零，重新开始计数</strong></li>
-<li>同时可根据设置<strong>触发一次更新中断</strong>，通知 STM32”时间到了”</li>
-</ul>
-<p>和预分频器一样，因为从 0 开始计数，想定时 M 个脉冲就设置 <strong>M-1</strong>。于是计数器从 0 数到 M-1，共 M 个数，然后重置并触发中断。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">┌────────────┐    ┌────────────┐    ┌────────────┐</span><br><span class="line">│ 预分频器 PSC │──►│ 计数器 CNT  │──►│重装载计数器ARR│──► 相等时:</span><br><span class="line">│   ÷7200     │    │ 0~9999     │    │  = 9999     │   ① 计数器清零重新计数</span><br><span class="line">└────────────┘    └────────────┘    └────────────┘   ② 触发更新中断</span><br></pre></td></tr></table></figure>
-
-<h2 id="数据流全链路：从-72MHz-到每秒一次的串口数据"><a href="#数据流全链路：从-72MHz-到每秒一次的串口数据" class="headerlink" title="数据流全链路：从 72MHz 到每秒一次的串口数据"></a>数据流全链路：从 72MHz 到每秒一次的串口数据</h2><p>理解了三个部件，把本集项目的完整数据流串起来——从时钟树到串口助手：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">APB1 定时器分支 72MHz (来自上篇的时钟树, HSE 8MHz ×PLL9)</span><br><span class="line">   │</span><br><span class="line">   ▼</span><br><span class="line">┌────────────────┐    ÷7200 (设置 7200-1)   ┌────────────────┐</span><br><span class="line">│ 预分频器 PSC    │ ──────────────────────► │ 10kHz 脉冲      │</span><br><span class="line">│ (幕后: 影子寄存器)│     每7200个脉冲输出1个   │ 每秒10000个脉冲  │</span><br><span class="line">└────────────────┘                         └───────┬────────┘</span><br><span class="line">                                                    │</span><br><span class="line">                                                    ▼</span><br><span class="line">                                    ┌────────────────┐</span><br><span class="line">                                    │ 计数器 CNT (16位)│</span><br><span class="line">                                    │ 0→1→2→…→9999   │</span><br><span class="line">                                    └───────┬────────┘</span><br><span class="line">                                            │ 实时比较</span><br><span class="line">                                            ▼</span><br><span class="line">                                    ┌────────────────┐</span><br><span class="line">                                    │ 重装载 ARR=9999 │──相等→ 清零 + 更新中断</span><br><span class="line">                                    │ (10000-1)      │</span><br><span class="line">                                    └────────────────┘</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                         HAL_TIM_PeriodElapsedCallback (中断回调)</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                            HAL_UART_Transmit_IT 中断发送</span><br><span class="line">                                            │</span><br><span class="line">                                            ▼</span><br><span class="line">                        串口助手: 每秒收到一次数据 ✅</span><br></pre></td></tr></table></figure>
-
-<p>关键计算：<strong>72MHz ÷ 7200 &#x3D; 10kHz</strong>（每秒 10000 个脉冲），<strong>计数 10000 次 &#x3D; 正好 1 秒</strong>。</p>
-<h2 id="CubeMX-配置"><a href="#CubeMX-配置" class="headerlink" title="CubeMX 配置"></a>CubeMX 配置</h2><h3 id="①-基础配置（老流程）"><a href="#①-基础配置（老流程）" class="headerlink" title="① 基础配置（老流程）"></a>① 基础配置（老流程）</h3><ul>
-<li>创建工程（STM32F103C8T6），打开<strong>串口2</strong>（USART2，115200），并打开串口中断（后面用中断发送）</li>
-<li>RCC 配置页打开 <strong>HSE（Crystal&#x2F;Ceramic Resonator）</strong></li>
-<li>Clock Configuration 页 HCLK 改为 <strong>72MHz</strong></li>
-<li>注意时钟树页面：<strong>APB1 定时器分支已经是 72MHz</strong>（APB1 ÷2 &#x3D; 36MHz，定时器自动倍频 ×2 &#x3D; 72MHz）——上一篇的知识在这里直接落地</li>
-</ul>
-<h3 id="②-TIM4-定时器配置"><a href="#②-TIM4-定时器配置" class="headerlink" title="② TIM4 定时器配置"></a>② TIM4 定时器配置</h3><p>打开 <strong>Timers → TIM4</strong>，把 Clock Source 选为 <strong>Internal Clock</strong>（内部时钟，即来自 APB1 的 72MHz），就算打开了定时器：</p>
-<blockquote>
-<p><img src="/./../images/STM32_Timer_Basic/image-20260806214008514.png" alt="image-20260806214008514"></p>
-</blockquote>
-<table>
-<thead>
-<tr>
-<th align="left">配置项</th>
-<th align="center">填的值</th>
-<th align="left">说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>Prescaler</strong>（预分频器）</td>
-<td align="center"><code>7200-1</code></td>
-<td align="left">想 7200 分频就填 7199（N-1）</td>
-</tr>
-<tr>
-<td align="left"><strong>Counter Mode</strong></td>
-<td align="center">Up</td>
-<td align="left">向上计数（默认）</td>
-</tr>
-<tr>
-<td align="left"><strong>Counter Period</strong>（自动重装载）</td>
-<td align="center"><code>10000-1</code></td>
-<td align="left">想定时 1 秒就填 9999（M-1）</td>
-</tr>
-</tbody></table>
-<p>72MHz ÷ 7200 &#x3D; 10kHz，数 10000 次 &#x3D; 1 秒，每 1 秒触发一次更新中断。</p>
-<h3 id="③-打开更新中断"><a href="#③-打开更新中断" class="headerlink" title="③ 打开更新中断"></a>③ 打开更新中断</h3><p>在 TIM4 配置页切到 <strong>NVIC Settings</strong> 选项卡，勾选 <strong>TIM4 global interrupt</strong>：</p>
-<blockquote>
-<p><img src="/./../images/STM32_Timer_Basic/image-20260806214104527.png" alt="image-20260806214104527"></p>
-</blockquote>
-<p>保存并生成代码。打开 main.c，可以看到 main 函数调用了一个新的初始化函数 <code>MX_TIM4_Init()</code>。</p>
-<h2 id="核心代码"><a href="#核心代码" class="headerlink" title="核心代码"></a>核心代码</h2><h3 id="1-启动定时器（main-函数-USER-CODE-2）"><a href="#1-启动定时器（main-函数-USER-CODE-2）" class="headerlink" title="1. 启动定时器（main 函数 USER CODE 2）"></a>1. 启动定时器（main 函数 USER CODE 2）</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 2 */</span></span><br><span class="line">HAL_TIM_Base_Start_IT(&amp;htim4);   <span class="comment">// 启动 TIM4，并使能更新中断</span></span><br><span class="line"><span class="comment">/* USER CODE END 2 */</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="2-更新中断回调（USER-CODE-0）"><a href="#2-更新中断回调（USER-CODE-0）" class="headerlink" title="2. 更新中断回调（USER CODE 0）"></a>2. 更新中断回调（USER CODE 0）</h3><p>定时器的”时间到”是通过<strong>更新中断</strong>通知的——每次计数器数到与重装载值相同、被清零重新计数时触发。中断发生后要执行什么，靠重写回调函数：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* USER CODE BEGIN 0 */</span></span><br><span class="line"><span class="type">char</span> data[] = <span class="string">&quot;😊😂🤣😍😘🙌&quot;</span>;   <span class="comment">// 要发送的数据（随便示意一下）</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">HAL_TIM_PeriodElapsedCallback</span><span class="params">(TIM_HandleTypeDef *htim)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span> (htim == &amp;htim4)                          <span class="comment">// 好习惯:先确认是本定时器的中断</span></span><br><span class="line">  &#123;</span><br><span class="line">    HAL_UART_Transmit_IT(&amp;huart2, data, <span class="built_in">strlen</span>(data));  <span class="comment">// 串口中断发送</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">/* USER CODE END 0 */</span></span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>💡 这个回调函数是 HAL 库定义的<strong>弱函数（weak）</strong>，默认空实现，我们在自己的代码里重写即可。它会被所有定时器（TIM1~TIM4）共用，所以<strong>第一个动作就是判断是哪个定时器</strong>——<code>htim == &amp;htim4</code>。</p>
-</blockquote>
-<h2 id="代码讲解"><a href="#代码讲解" class="headerlink" title="代码讲解"></a>代码讲解</h2><table>
-<thead>
-<tr>
-<th align="left">HAL 函数</th>
-<th align="left">作用</th>
-<th align="left">本项目中参数</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><code>HAL_TIM_Base_Start_IT</code></td>
-<td align="left">启动定时器（Base&#x3D;基本用法），并使能更新中断（IT&#x3D;Interrupt）</td>
-<td align="left"><code>&amp;htim4</code> 定时器句柄指针</td>
-</tr>
-<tr>
-<td align="left"><code>HAL_TIM_PeriodElapsedCallback</code></td>
-<td align="left">更新中断回调（重写）</td>
-<td align="left">无参数，靠 <code>htim</code> 判断来源</td>
-</tr>
-<tr>
-<td align="left"><code>HAL_UART_Transmit_IT</code></td>
-<td align="left">串口<strong>中断</strong>发送（非阻塞）</td>
-<td align="left"><code>&amp;huart2</code>、<code>data</code>、<code>strlen(data)</code></td>
-</tr>
-</tbody></table>
-<p>另外，定时器还有一些<strong>名称全大写、以双下划线开头</strong>的函数——这类在 HAL 库中其实是<strong>宏定义</strong>，比较偏底层，倾向于直接操作寄存器。可以用它们随时读写定时器的核心部件，方便调试或动态改参数：</p>
-<ul>
-<li><code>__HAL_TIM_GET_COUNTER</code> &#x2F; <code>__HAL_TIM_SET_COUNTER</code>：获取&#x2F;设置计数器的值</li>
-<li><code>__HAL_TIM_GET_AUTORELOAD</code> &#x2F; <code>__HAL_TIM_SET_AUTORELOAD</code>：获取&#x2F;设置重装载寄存器的值</li>
-<li><code>__HAL_TIM_SET_PRESCALER</code>：设置预分频器的值</li>
-</ul>
-<p>可以自己设计实验试试这些函数。</p>
-<h2 id="解读初始化代码：MX-TIM4-Init"><a href="#解读初始化代码：MX-TIM4-Init" class="headerlink" title="解读初始化代码：MX_TIM4_Init"></a>解读初始化代码：MX_TIM4_Init</h2><p>CubeMX 生成的定时器初始化代码，逐行解析（这是本集必做的深度解读章节）：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">MX_TIM4_Init</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  TIM_ClockConfigTypeDef sClockSourceConfig = &#123;<span class="number">0</span>&#125;;   <span class="comment">// 时钟源配置结构体</span></span><br><span class="line">  TIM_MasterConfigTypeDef sMasterConfig = &#123;<span class="number">0</span>&#125;;       <span class="comment">// 主模式配置结构体</span></span><br><span class="line"></span><br><span class="line">  htim4.Instance = TIM4;                             <span class="comment">// 指定外设: TIM4</span></span><br><span class="line">  htim4.Init.Prescaler = <span class="number">7200</span><span class="number">-1</span>;                     <span class="comment">// 预分频: ÷7200 (对应CubeMX Prescaler)</span></span><br><span class="line">  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;       <span class="comment">// 计数模式: 向上计数</span></span><br><span class="line">  htim4.Init.Period = <span class="number">10000</span><span class="number">-1</span>;                       <span class="comment">// 自动重装载: 数到9999清零 (对应Counter Period)</span></span><br><span class="line">  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1; <span class="comment">// 时钟分频: 用于输入滤波, 定时功能用不到</span></span><br><span class="line">  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;  <span class="comment">// 重装载影子寄存器: 关闭</span></span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_Base_Init(&amp;htim4) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 时钟源: 内部时钟 (APB1定时器分支 72MHz) */</span></span><br><span class="line">  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIM_ConfigClockSource(&amp;htim4, &amp;sClockSourceConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* 主模式配置: 本集用不到, 保持默认 */</span></span><br><span class="line">  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;</span><br><span class="line">  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;</span><br><span class="line">  <span class="keyword">if</span> (HAL_TIMEx_MasterConfigSynchronization(&amp;htim4, &amp;sMasterConfig) != HAL_OK)</span><br><span class="line">  &#123;</span><br><span class="line">    Error_Handler();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="各配置项与-CubeMX-寄存器的对应关系"><a href="#各配置项与-CubeMX-寄存器的对应关系" class="headerlink" title="各配置项与 CubeMX &#x2F; 寄存器的对应关系"></a>各配置项与 CubeMX &#x2F; 寄存器的对应关系</h3><table>
-<thead>
-<tr>
-<th align="left">代码配置</th>
-<th align="left">对应 CubeMX 设置</th>
-<th align="left">对应寄存器</th>
-<th align="center">本项目值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><code>Init.Prescaler</code></td>
-<td align="left">Prescaler</td>
-<td align="left">TIM_PSC</td>
-<td align="center">7200-1</td>
-</tr>
-<tr>
-<td align="left"><code>Init.CounterMode</code></td>
-<td align="left">Counter Mode</td>
-<td align="left">TIM_CR1.DIR</td>
-<td align="center">UP</td>
-</tr>
-<tr>
-<td align="left"><code>Init.Period</code></td>
-<td align="left">Counter Period</td>
-<td align="left">TIM_ARR</td>
-<td align="center">10000-1</td>
-</tr>
-<tr>
-<td align="left"><code>Init.ClockDivision</code></td>
-<td align="left">Clock Division</td>
-<td align="left">TIM_CR1.CKD</td>
-<td align="center">÷1</td>
-</tr>
-<tr>
-<td align="left"><code>AutoReloadPreload</code></td>
-<td align="left">auto-reload preload</td>
-<td align="left">TIM_CR1.ARPE</td>
-<td align="center">DISABLE</td>
-</tr>
-<tr>
-<td align="left"><code>ClockSource = INTERNAL</code></td>
-<td align="left">Clock Source</td>
-<td align="left">TIM_SMCR.SMS</td>
-<td align="center">内部时钟</td>
-</tr>
-</tbody></table>
-<h3 id="MSP-初始化：时钟使能与中断"><a href="#MSP-初始化：时钟使能与中断" class="headerlink" title="MSP 初始化：时钟使能与中断"></a>MSP 初始化：时钟使能与中断</h3><p>定时器初始化的另一半在 <code>HAL_TIM_Base_MspInit()</code> 里（MSP &#x3D; MCU Support Package，即”与 MCU 相关的部分”：时钟、引脚、中断）：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">HAL_TIM_Base_MspInit</span><span class="params">(TIM_HandleTypeDef* tim_baseHandle)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span> (tim_baseHandle-&gt;Instance == TIM4)</span><br><span class="line">  &#123;</span><br><span class="line">    __HAL_RCC_TIM4_CLK_ENABLE();          <span class="comment">// ① 打开 TIM4 的外设时钟(挂钟!)</span></span><br><span class="line">    HAL_NVIC_SetPriority(TIM4_IRQn, <span class="number">0</span>, <span class="number">0</span>);  <span class="comment">// ② 设置 TIM4 中断优先级: 抢占0 子0</span></span><br><span class="line">    HAL_NVIC_EnableIRQ(TIM4_IRQn);        <span class="comment">// ③ 使能 TIM4 中断</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>三步缺一不可：<strong>不打开外设时钟（挂钟），定时器根本不工作；不设置优先级、不使能中断，更新中断永远不会触发。</strong></p>
-<h3 id="中断链路"><a href="#中断链路" class="headerlink" title="中断链路"></a>中断链路</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">计数器数到 ARR → 硬件置位更新标志 → 触发 TIM4_IRQn</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">TIM4_IRQHandler (stm32f1xx_it.c, 中断服务函数)</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">HAL_TIM_IRQHandler(&amp;htim4)  (HAL库, 判断中断来源)</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">HAL_TIM_PeriodElapsedCallback(&amp;htim4)  (我们重写的回调)</span><br></pre></td></tr></table></figure>
-
-<p>和串口中断的套路一模一样：<strong>中断服务函数 → HAL 通用处理函数 → 我们重写的回调</strong>。</p>
-<h2 id="影子寄存器机制：幕后老板与一线员工"><a href="#影子寄存器机制：幕后老板与一线员工" class="headerlink" title="影子寄存器机制：幕后老板与一线员工"></a>影子寄存器机制：幕后老板与一线员工</h2><p>前面讲预分频器和重装载时，代码里有两个容易被忽略的设置，它们背后是定时器一个精巧的设计——<strong>影子寄存器</strong>。</p>
-<p><strong>预分频器</strong>：真正工作在分频一线的，其实是预分频寄存器的<strong>影子寄存器</strong>，而预分频寄存器本人更像”运筹帷幄的幕后老板”。我们通过 <code>__HAL_TIM_SET_PRESCALER</code> 设置的新预分频值，会<strong>等到当前计数周期结束（计数器数到重装载值、重新从零开始）时才传递给影子寄存器生效</strong>——简而言之，新值下个计数周期才生效。</p>
-<p><strong>自动重装载计数器</strong>：同样有影子寄存器，作用相同（新值下个周期生效）。不同之处在于——<strong>重装载的影子机制可以开关</strong>（<code>AutoReloadPreload</code>，默认关闭）：</p>
-<ul>
-<li>关闭（本项目）：改 ARR 立即写进寄存器，但注意——如果把重装载值<strong>调小</strong>到小于当前计数器的值，它们会”错过”，计数器一路数到最大值 65535 才会触发更新</li>
-<li>开启（CubeMX 里勾选 auto-reload preload）：新值在影子寄存器里等下个周期，绝对安全</li>
-</ul>
-<p>有了影子寄存器机制，就可以随时修改预分频器&#x2F;重装载寄存器，而不必担心影响当前的计数周期。</p>
-<h2 id="实操步骤"><a href="#实操步骤" class="headerlink" title="实操步骤"></a>实操步骤</h2><h3 id="1-CubeMX-配置"><a href="#1-CubeMX-配置" class="headerlink" title="1. CubeMX 配置"></a>1. CubeMX 配置</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">① 串口2: Mode → Asynchronous, 波特率 115200, NVIC 勾选 USART2 global interrupt</span><br><span class="line">② RCC → HSE → Crystal/Ceramic Resonator</span><br><span class="line">③ Clock Configuration → HCLK = 72MHz → 回车 → OK</span><br><span class="line">④ Timers → TIM4 → Clock Source = Internal Clock</span><br><span class="line">   Prescaler = 7200-1, Counter Period = 10000-1</span><br><span class="line">⑤ NVIC Settings → 勾选 TIM4 global interrupt</span><br><span class="line">⑥ 保存生成代码</span><br></pre></td></tr></table></figure>
-
-<h3 id="2-写代码"><a href="#2-写代码" class="headerlink" title="2. 写代码"></a>2. 写代码</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">① USER CODE 2:  HAL_TIM_Base_Start_IT(&amp;htim4) 启动定时器</span><br><span class="line">② USER CODE 0:  重写 HAL_TIM_PeriodElapsedCallback, 判断 htim==&amp;htim4 后</span><br><span class="line">                 HAL_UART_Transmit_IT(&amp;huart2, data, strlen(data))</span><br><span class="line">③ 头文件:        #include &lt;string.h&gt; (strlen)</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-编译下载-查看效果"><a href="#3-编译下载-查看效果" class="headerlink" title="3. 编译下载 &amp; 查看效果"></a>3. 编译下载 &amp; 查看效果</h3><p>编译下载，连上串口线，打开波特律动串口助手连接串口。刚下载完程序会慢几拍，<strong>按下板上的复位键</strong>让程序重新开始运行。</p>
-<h2 id="效果展示"><a href="#效果展示" class="headerlink" title="效果展示"></a>效果展示</h2><blockquote>
-<p><a href="https://www.bilibili.com/video/BV1Cnup68E8Z/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa">https://www.bilibili.com/video/BV1Cnup68E8Z/?vd_source=5a111e8d49f70e532d36ddb73be3d0aa</a></p>
-</blockquote>
-<p>串口助手每秒收到一次数据（emoji）</p>
-<h2 id="踩坑记录"><a href="#踩坑记录" class="headerlink" title="踩坑记录"></a>踩坑记录</h2><h3 id="1-中断发送和主循环发送会”打架”"><a href="#1-中断发送和主循环发送会”打架”" class="headerlink" title="1. 中断发送和主循环发送会”打架”"></a>1. 中断发送和主循环发送会”打架”</h3><p><code>HAL_UART_Transmit_IT</code> 是非阻塞发送。如果中断里的发送和主循环里的发送间隔太小，<strong>上次的数据还没发完，下次发送就把缓冲区覆盖掉了</strong>。所以发送逻辑尽量集中在一处——本项目把发送全部放在定时器中断回调里，主循环只留给自己的业务逻辑。</p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="复习结构图"><a href="#复习结构图" class="headerlink" title="复习结构图"></a>复习结构图</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line"> 时钟源 (内部时钟 72MHz)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">预分频器 PSC ──► 计数器 CNT ──► 重装载 ARR ──► 更新中断</span><br><span class="line">(÷7200)        (0~9999)        (=9999)</span><br></pre></td></tr></table></figure>
-
-<h3 id="本集要点"><a href="#本集要点" class="headerlink" title="本集要点"></a>本集要点</h3><table>
-<thead>
-<tr>
-<th align="left">要点</th>
-<th align="left">内容</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><strong>定时器就是计数器</strong></td>
-<td align="left">一切功能的本质</td>
-</tr>
-<tr>
-<td align="left"><strong>N-1 原则</strong></td>
-<td align="left">预分频想 N 分频填 N-1；重装载想定时 M 个脉冲填 M-1</td>
-</tr>
-<tr>
-<td align="left"><strong>三个核心寄存器</strong></td>
-<td align="left">PSC（预分频）、CNT（计数器）、ARR（重装载）</td>
-</tr>
-<tr>
-<td align="left"><strong>更新中断</strong></td>
-<td align="left">计数器数到 ARR → 清零 → 触发中断 → 回调发数据</td>
-</tr>
-<tr>
-<td align="left"><strong>三步配置</strong></td>
-<td align="left">勾 Internal Clock + 设 PSC&#x2F;ARR + 开 NVIC 中断</td>
-</tr>
-<tr>
-<td align="left"><strong>两个函数</strong></td>
-<td align="left"><code>HAL_TIM_Base_Start_IT</code> 启动、<code>HAL_TIM_PeriodElapsedCallback</code> 回调</td>
-</tr>
-<tr>
-<td align="left"><strong>影子寄存器</strong></td>
-<td align="left">预分频&#x2F;重装载新值下个周期生效；重装载可开关</td>
-</tr>
-</tbody></table>
-<p>本期只用了基本定时器功能。接下来的几期会在这张结构图的基础上不断扩展——万变不离其宗，<strong>定时器就是计数器</strong>。</p>
-<h2 id="参考资源"><a href="#参考资源" class="headerlink" title="参考资源"></a>参考资源</h2><ul>
-<li>视频：【STM32】第16集 动画告诉你, STM32的定时器到底怎么回事（keysking）</li>
-<li>STM32 中文参考手册：定时器章节（TIM1-8 寄存器详解）</li>
-<li><a href="/2026/08/06/STM32_Clock_Tree/">上一篇：STM32——浅析时钟源与时钟树理论知识</a></li>
-</ul>
-]]></content>
-      <categories>
-        <category>嵌入式</category>
-      </categories>
-      <tags>
-        <tag>嵌入式</tag>
-        <tag>STM32</tag>
-        <tag>CubeMX</tag>
-        <tag>中断</tag>
-        <tag>TIM</tag>
-        <tag>定时器</tag>
       </tags>
   </entry>
   <entry>
@@ -16181,6 +16181,120 @@
       </tags>
   </entry>
   <entry>
+    <title>Markdown 语法规则</title>
+    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
+    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
+<p>这是第二行</p>
+<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
+<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
+<p>效果：</p>
+<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>代码和快捷键：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
+<p>效果：</p>
+<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
+<p>效果：只有同一级别</p>
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：-&#x2F;*&#x2F;+ +空格</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
+<p>效果：</p>
+<ol>
+<li>一</li>
+<li>二</li>
+<li>子1</li>
+<li>子2<ol>
+<li>子1-子1</li>
+</ol>
+</li>
+</ol>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<p>数字+.+空格</p>
+<p>缩进用tab,回退shift+tab</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
+<p>效果：</p>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+练习markdown语法</p>
+</li>
+<li><p><input disabled="" type="checkbox"> 
+维护网站</p>
+</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
+<p>效果：</p>
+<blockquote>
+<p>这是最外层区块</p>
+<blockquote>
+<p>这是内层</p>
+<blockquote>
+<p>这是更内层</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
+<p>效果：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
+<p>效果：</p>
+<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
+<p>效果：</p>
+<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
+</blockquote>
+<blockquote>
+<p>代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Markdown</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>NBA 球员信息统计及可视化项目</title>
     <url>/2026/09/07/nba-data-analysis-visualization/</url>
     <content><![CDATA[<p>这篇博客是该项目的完整复盘，每个环节做了什么、为什么这么做、遇到了什么问题。</p>
@@ -16547,120 +16661,6 @@
         <tag>机器学习</tag>
         <tag>数据挖掘</tag>
         <tag>静态网站</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Markdown 语法规则</title>
-    <url>/2026/07/09/markdown%E8%AF%AD%E6%B3%95/</url>
-    <content><![CDATA[<h1 id="markdown-语法"><a href="#markdown-语法" class="headerlink" title="markdown 语法"></a>markdown 语法</h1><h2 id="段落"><a href="#段落" class="headerlink" title="段落"></a>段落</h2><h3 id="1、换行"><a href="#1、换行" class="headerlink" title="1、换行"></a>1、换行</h3><p>这是第一行</p>
-<p>这是第二行</p>
-<h3 id="2、分割线-—-或"><a href="#2、分割线-—-或" class="headerlink" title="2、分割线 — 或 ***"></a>2、分割线 — 或 ***</h3><hr>
-<h2 id="文字显示"><a href="#文字显示" class="headerlink" title="文字显示"></a>文字显示</h2><h3 id="1、字体"><a href="#1、字体" class="headerlink" title="1、字体"></a>1、字体</h3><blockquote>
-<p>效果：</p>
-<p><strong>粗体</strong>、<del>删除线</del>、 <u>下划线</u>、<em>斜体</em>、&#x3D;&#x3D;高亮&#x3D;&#x3D;</p>
-</blockquote>
-<blockquote>
-<p>代码和快捷键：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">**黑体**       ctrl+B</span><br><span class="line">~~删除线~~</span><br><span class="line">&lt;u&gt;下划线&lt;/u&gt;  ctrl+U</span><br><span class="line">*斜体*</span><br><span class="line">==高亮==</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、上下标"><a href="#2、上下标" class="headerlink" title="2、上下标"></a>2、上下标</h3><blockquote>
-<p>效果：</p>
-<p>x^2^,x^2^y,H<del>2</del>O,H<del>2</del>O<del>2</del></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">x^2^</span><br><span class="line">x^2^y</span><br><span class="line">H~2~O</span><br><span class="line">H~2~O~2~</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><h3 id="1、无序列表"><a href="#1、无序列表" class="headerlink" title="1、无序列表"></a>1、无序列表</h3><blockquote>
-<p>效果：只有同一级别</p>
-<ul>
-<li>1</li>
-<li>2</li>
-<li>3</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：-&#x2F;*&#x2F;+ +空格</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- 1</span><br><span class="line">&gt;- 2</span><br><span class="line">&gt;- 3</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="2、有序列表"><a href="#2、有序列表" class="headerlink" title="2、有序列表"></a>2、有序列表</h3><blockquote>
-<p>效果：</p>
-<ol>
-<li>一</li>
-<li>二</li>
-<li>子1</li>
-<li>子2<ol>
-<li>子1-子1</li>
-</ol>
-</li>
-</ol>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<p>数字+.+空格</p>
-<p>缩进用tab,回退shift+tab</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;1. 一</span><br><span class="line">&gt;2. 二</span><br><span class="line">1. 子1</span><br><span class="line">2. 子2</span><br><span class="line">	1. 子1-子1</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h3 id="3、任务列表"><a href="#3、任务列表" class="headerlink" title="3、任务列表"></a>3、任务列表</h3><blockquote>
-<p>效果：</p>
-<ul>
-<li><p><input checked="" disabled="" type="checkbox"> 
-练习markdown语法</p>
-</li>
-<li><p><input disabled="" type="checkbox"> 
-维护网站</p>
-</li>
-</ul>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;- [x] 练习markdown语法 (x不用先打)</span><br><span class="line"></span><br><span class="line">&gt;- [ ] 维护网站</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="区块显示"><a href="#区块显示" class="headerlink" title="区块显示"></a>区块显示</h2><blockquote>
-<p>效果：</p>
-<blockquote>
-<p>这是最外层区块</p>
-<blockquote>
-<p>这是内层</p>
-<blockquote>
-<p>这是更内层</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;&gt;+回车</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="代码显示"><a href="#代码显示" class="headerlink" title="代码显示"></a>代码显示</h2><h3 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h3><blockquote>
-<p>效果：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;如图</span><br></pre></td></tr></table></figure>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;```+内容</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><blockquote>
-<p>效果：</p>
-<p><a href="http://www.baidu.com/">www.baidu.com</a><br><a href="https://www.baidu.com/">百度一下</a><br><a href="https://www.baidu.com/">百度一下</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;www.baidu.com</span><br><span class="line">&gt;[百度一下](https://www.baidu.com)</span><br><span class="line">&gt;[百度一下](https://www.baidu.com &quot;https://www.baidu.com&quot;)</span><br></pre></td></tr></table></figure>
-</blockquote>
-<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><blockquote>
-<p>效果：</p>
-<p>脚注是一种技术<a href="%E8%BF%99%E6%98%AF%E4%B8%80%E7%A7%8D%E7%94%A8%E6%9D%A5%E8%A7%A3%E9%87%8A%E8%AF%B4%E6%98%8E%E6%96%87%E6%9C%AC%E5%86%85%E5%AE%B9%E7%9A%84%E6%8A%80%E6%9C%AF">^1</a></p>
-</blockquote>
-<blockquote>
-<p>代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&gt;脚注是一种技术[^1]</span><br><span class="line"></span><br><span class="line">&gt;[^1]: 这是一种用来解释说明文本内容的技术</span><br></pre></td></tr></table></figure></blockquote>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>Markdown</tag>
       </tags>
   </entry>
   <entry>
@@ -17995,6 +17995,246 @@
         <tag>C/C++</tag>
         <tag>编译原理</tag>
         <tag>开发工具</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>前缀和与差分 —— 从概念到公式</title>
+    <url>/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/</url>
+    <content><![CDATA[<h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
+<p>最直接的做法：每次从 3 加到 7。如果数组很大（比如 10 万个数），问你 10 万次，那总共要算 100 亿次加法——太慢了。<br>如果换一种思路，我能不能<strong>提前把「前 i 个数的和」全部算好存起来</strong>，这样每次询问直接用减法得到结果？</p>
+<p>这就是<strong>前缀和</strong>的核心思想——<strong>预处理，换时间</strong>。</p>
+<hr>
+<h2 id="二、一维前缀和"><a href="#二、一维前缀和" class="headerlink" title="二、一维前缀和"></a>二、一维前缀和</h2><h3 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="2.1 定义"></a>2.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，定义前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = a[1] + a[2] + ... + a[i]   （前 i 个数的总和）</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-核心公式"><a href="#2-2-核心公式" class="headerlink" title="2.2 核心公式"></a>2.2 核心公式</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = s[i-1] + a[i]</span><br></pre></td></tr></table></figure>
+
+<p>边界条件：<code>s[0] = 0</code>（前 0 个数的和为 0）。</p>
+<blockquote>
+<p>公式的意思是：前 i 个数的和 &#x3D; 前 i-1 个数的和 + 第 i 个数。</p>
+</blockquote>
+<h3 id="2-3-图示"><a href="#2-3-图示" class="headerlink" title="2.3 图示"></a>2.3 图示</h3><p>假设原数组 <code>a</code> 如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：  1    2    3    4    5</span><br><span class="line">a[]：  2    5    3    1    4</span><br></pre></td></tr></table></figure>
+
+<p>逐个计算前缀和：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + 2 = 2</span><br><span class="line">s[2] = 2 + 5 = 7</span><br><span class="line">s[3] = 7 + 3 = 10</span><br><span class="line">s[4] = 10 + 1 = 11</span><br><span class="line">s[5] = 11 + 4 = 15</span><br></pre></td></tr></table></figure>
+
+<p>得到前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：  2    7    10   11   15</span><br><span class="line">      ↑    ↑    ↑    ↑    ↑</span><br><span class="line">      前1  前2  前3  前4  前5</span><br></pre></td></tr></table></figure>
+
+<p>可以直观地看到：<code>s[i]</code> 就是从第一个数一直加到第 i 个数的「累计值」。</p>
+<h3 id="2-4-用途：快速求区间和"><a href="#2-4-用途：快速求区间和" class="headerlink" title="2.4 用途：快速求区间和"></a>2.4 用途：快速求区间和</h3><p>现在想求 <code>a[2] + a[3] + a[4]</code>（即区间 <code>[2, 4]</code> 的和）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间[2,4]的和 = s[4] - s[1] = 11 - 2 = 9</span><br><span class="line">验证：5 + 3 + 1 = 9  ✅</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心公式：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间 [l, r] 的和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>文字理解：<strong>前 r 个数的和 减去 前 l-1 个数的和</strong>，剩下的就是第 l 个到第 r 个。</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                   ┌─────────── 区间[l, r] ───────────┐</span><br><span class="line">                   │                                   │</span><br><span class="line">a[1] a[2] ... a[l-1]  a[l] a[l+1] ... a[r-1] a[r]  a[r+1] ...</span><br><span class="line">├──── 前 l-1 项 ────┤├────────── 前 r 项 ──────────┤</span><br><span class="line">                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</span><br><span class="line">                     s[r] = 前 r 项的总和</span><br><span class="line">     s[l-1] = 前 l-1 项的总和</span><br><span class="line">             </span><br><span class="line">     区间和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<p>预处理完 <code>s</code> 数组后，<strong>每次求区间和只需要 O(1) 的时间</strong>（一次减法），这就是前缀和的威力。</p>
+<hr>
+<h2 id="三、二维前缀和"><a href="#三、二维前缀和" class="headerlink" title="三、二维前缀和"></a>三、二维前缀和</h2><h3 id="3-1-问题升级"><a href="#3-1-问题升级" class="headerlink" title="3.1 问题升级"></a>3.1 问题升级</h3><p>如果你面对的<strong>不是一维数组，而是一个二维矩阵</strong>，想快速求出<strong>任意一个子矩形内所有数的和</strong>，怎么办？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">    列1  列2  列3  列4</span><br><span class="line">行1   1    2    3    4</span><br><span class="line">行2   5    6    7    8</span><br><span class="line">行3   9   10   11   12</span><br></pre></td></tr></table></figure>
+
+<p>比如：求从 <code>[2][2]</code> 到 <code>[3][4]</code> 这个 2×3 矩形里所有数的和。</p>
+<p>类比一维的思路：<strong>二维前缀和</strong>就是提前算好从 <code>[1][1]</code> 到 <code>[i][j]</code> 这个矩形内所有数的总和。</p>
+<h3 id="3-2-核心公式"><a href="#3-2-核心公式" class="headerlink" title="3.2 核心公式"></a>3.2 核心公式</h3><p>定义 <code>s[i][j]</code> &#x3D; 从左上角 <code>(1,1)</code> 到右下角 <code>(i,j)</code> 的矩形区域内所有元素的和。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-3-图解：容斥原理"><a href="#3-3-图解：容斥原理" class="headerlink" title="3.3 图解：容斥原理"></a>3.3 图解：容斥原理</h3><p>公式看着复杂，其实核心就是<strong>容斥原理</strong>——两个有重叠的区域合并时，<strong>加完两边，减掉重叠</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">             列1     列2    ...   列j-1    列j    列j+1</span><br><span class="line">     ┌──────────────────────────────────────────────────┐</span><br><span class="line">行1   │                                                  │</span><br><span class="line">     │                      A区域                        │</span><br><span class="line"> ...  │                  s[i-1][j]                       │</span><br><span class="line">     │              ┌──────────────┐                     │</span><br><span class="line">行i-1 │              │  重叠部分    │                     │</span><br><span class="line">     │              │ s[i-1][j-1]  │                     │</span><br><span class="line">     │              └──────────────┘                     │</span><br><span class="line">     ├─────────────────────────────┬────────────────────┤</span><br><span class="line">行i   │          B区域             │      a[i][j]       │</span><br><span class="line">     │       s[i][j-1]            │      (当前格子)     │</span><br><span class="line">     └─────────────────────────────┴────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>把 s[i][j] 拆成三块来看：</p>
+<ul>
+<li><strong>A 区域</strong> &#x3D; <code>s[i-1][j]</code>：第 1<del>i-1 行、第 1</del>j 列（不含第 i 行）</li>
+<li><strong>B 区域</strong> &#x3D; <code>s[i][j-1]</code>：第 1<del>i 行、第 1</del>j-1 列（不含第 j 列）</li>
+<li><strong>重叠部分</strong> &#x3D; <code>s[i-1][j-1]</code>：A 和 B 都覆盖的左上角</li>
+</ul>
+<p>根据容斥原理（两个集合的并集 &#x3D; 各自之和 − 交集）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = |A ∪ B| + a[i][j]</span><br><span class="line">        = |A| + |B| − |A ∩ B| + a[i][j]</span><br><span class="line">        = s[i-1][j] + s[i][j-1] − s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-4-用途：求子矩阵和"><a href="#3-4-用途：求子矩阵和" class="headerlink" title="3.4 用途：求子矩阵和"></a>3.4 用途：求子矩阵和</h3><p>现在想求矩形区域 <code>(x1, y1)</code> 到 <code>(x2, y2)</code> 的和：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">子矩阵和 = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</span><br></pre></td></tr></table></figure>
+
+<p>同样还是<strong>面积加减法</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">(x1,y1) ───────────── (x1,y2)</span><br><span class="line">   │                     │</span><br><span class="line">   │    ┌────────────┐   │</span><br><span class="line">   │    │  目标矩形    │   │</span><br><span class="line">   │    │ (红色区域)   │   │</span><br><span class="line">   │    └────────────┘   │</span><br><span class="line">(x2,y1) ───────────── (x2,y2)</span><br></pre></td></tr></table></figure>
+
+<p>怎么从 <code>s[x2][y2]</code>（整个大矩形）扣出目标红色区域？</p>
+<ol>
+<li><strong>减</strong>掉上边部分 <code>s[x1-1][y2]</code>  </li>
+<li><strong>减</strong>掉左边部分 <code>s[x2][y1-1]</code>  </li>
+<li>左上角区域 <code>s[x1-1][y1-1]</code> 被减了两次，<strong>加</strong>回来</li>
+</ol>
+<hr>
+<h2 id="四、差分"><a href="#四、差分" class="headerlink" title="四、差分"></a>四、差分</h2><h3 id="4-1-差分是前缀和的逆运算"><a href="#4-1-差分是前缀和的逆运算" class="headerlink" title="4.1 差分是前缀和的逆运算"></a>4.1 差分是前缀和的逆运算</h3><p>先回顾前缀和的定义：<code>s[i] = a[1] + ... + a[i]</code>。</p>
+<p>那反过来，已知 <code>s</code> 怎么求 <code>a</code>？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">a[i] = s[i] - s[i-1]</span><br></pre></td></tr></table></figure>
+
+<p><strong>这就是差分。</strong> 对前缀和数组求差分，就得到原数组；对差分数组求前缀和，也得到原数组——两者互逆。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原数组 a</span><br><span class="line">  │  求前缀和</span><br><span class="line">  ▼</span><br><span class="line">前缀和数组 s</span><br><span class="line">  │  求差分（相邻两项相减）</span><br><span class="line">  ▼</span><br><span class="line">原数组 a</span><br></pre></td></tr></table></figure>
+
+<p>那差分有什么用？看一个场景：</p>
+<blockquote>
+<p>如果要反复给数组的某个区间统一加上一个数，最后再看结果，能不能快速做？</p>
+</blockquote>
+<p>暴力做法是每次从 l 到 r 逐个加，太慢。差分能做到时间复杂度是<strong>O(1)， 一次标记，最后统一还原</strong>。</p>
+<hr>
+<h2 id="五、一维差分"><a href="#五、一维差分" class="headerlink" title="五、一维差分"></a>五、一维差分</h2><h3 id="5-1-定义"><a href="#5-1-定义" class="headerlink" title="5.1 定义"></a>5.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，差分数组 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i] = a[i] - a[i-1]</span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>b[1] = a[1]</code>（<code>a[0] = 0</code>）。</p>
+<h3 id="5-2-核心操作：区间加-c"><a href="#5-2-核心操作：区间加-c" class="headerlink" title="5.2 核心操作：区间加 c"></a>5.2 核心操作：区间加 c</h3><p>给 <code>a[l] ~ a[r]</code> 每个数都加 <code>c</code>，分成两步：</p>
+<blockquote>
+<p><strong>① 在差分数组上改两个位置 → ② 再对差分数组求一次前缀和，就得到修改后的原数组</strong></p>
+</blockquote>
+<p>改哪两个位置？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[l]   += c</span><br><span class="line">b[r+1] -= c</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，在差分数组上做完标记后，<strong>只要再求一遍前缀和就能得到修改后的数组</strong>。<br>不是说好了差分和前缀和是逆运算吗？为什么这样改两个位置就能让一整段加上 c？<br>拿一个具体的例子走一遍就明白了。</p>
+<hr>
+<h4 id="举个具体的例子"><a href="#举个具体的例子" class="headerlink" title="举个具体的例子"></a>举个具体的例子</h4><p>假设原数组 <code>a</code> 长度为 6：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">a[]：      2    5    3    1    4    6</span><br></pre></td></tr></table></figure>
+
+<p>先按定义造出差分数组 <code>b</code>（<code>b[i] = a[i] - a[i-1]</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[1] = a[1] - 0      = 2</span><br><span class="line">b[2] = a[2] - a[1]   = 5 - 2   = 3</span><br><span class="line">b[3] = a[3] - a[2]   = 3 - 5   = -2</span><br><span class="line">b[4] = a[4] - a[3]   = 1 - 3   = -2</span><br><span class="line">b[5] = a[5] - a[4]   = 4 - 1   = 3</span><br><span class="line">b[6] = a[6] - a[5]   = 6 - 4   = 2</span><br><span class="line"></span><br><span class="line">b[]：      2    3   -2   -2    3    2</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="现在，我想给-a-3-a-5-每个数都加上-5"><a href="#现在，我想给-a-3-a-5-每个数都加上-5" class="headerlink" title="现在，我想给 a[3] ~ a[5] 每个数都加上 5"></a>现在，我想给 a[3] ~ a[5] 每个数都加上 5</h4><p>按照公式，改 <code>b</code> 的两个位置：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[3] += 5      （原来是 -2，变成 3）</span><br><span class="line">b[6] -= 5      （原来是 2，变成 -3）</span><br></pre></td></tr></table></figure>
+
+<p>修改后的 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">b[]：      2    3    3   -2    3   -3</span><br><span class="line">                    ↑ b[3] 从 -2 变成 3</span><br><span class="line">                                   ↑ b[6] 从 2 变成 -3</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="关键一步：对修改后的-b-求前缀和，看看会发生什么"><a href="#关键一步：对修改后的-b-求前缀和，看看会发生什么" class="headerlink" title="关键一步：对修改后的 b 求前缀和，看看会发生什么"></a>关键一步：对修改后的 b 求前缀和，看看会发生什么</h4><p>还记得前缀和怎么算吗？**<code>s[i] = s[i-1] + b[i]</code>**。一步步来：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + b[1] = 0 + 2  = 2</span><br><span class="line">s[2] = 2 + b[2] = 2 + 3  = 5</span><br><span class="line">s[3] = 5 + b[3] = 5 + 3  = 8    ← 注意，这里用的是修改后的 b[3]（加了 5）</span><br><span class="line">s[4] = 8 + b[4] = 8 + (-2)= 6</span><br><span class="line">s[5] = 6 + b[5] = 6 + 3  = 9</span><br><span class="line">s[6] = 9 + b[6] = 9 + (-3)= 6    ← 这里用的是修改后的 b[6]（减了 5）</span><br></pre></td></tr></table></figure>
+
+<p>得到新的 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：      2    5    8    6    9    6</span><br></pre></td></tr></table></figure>
+
+<p>对比原来的 <code>a</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原来 a：   2    5    3    1    4    6</span><br><span class="line">新的 s：   2    5    8    6    9    6</span><br><span class="line">                          ↑    ↑    ↑</span><br><span class="line">                     a[3]+5  a[4]+5  a[5]+5</span><br></pre></td></tr></table></figure>
+
+<p><strong>正好</strong>只有 <code>a[3] ~ a[5]</code> 加了 5，前面和后面都没变！–很神奇对吧！</p>
+<hr>
+<h4 id="为什么？"><a href="#为什么？" class="headerlink" title="为什么？"></a>为什么？</h4><p>原因藏在<strong>前缀和的累加特性</strong>里。把 <code>b</code> 看成一系列”<strong>标记</strong>“：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[]：  2    3    3   -2    3   -3</span><br><span class="line">                 ↑</span><br><span class="line">           这里 b[3] 多了一个 +5</span><br><span class="line">                                ↑</span><br><span class="line">                          这里 b[6] 多了一个 -5</span><br></pre></td></tr></table></figure>
+
+<p>对 <code>b</code> 求前缀和时，每个位置的值会<strong>一直往后累加</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">位置1：       2                                 = 2</span><br><span class="line">位置2：       2 + 3                             = 5</span><br><span class="line">位置3：       2 + 3 + 3      ← +5 从这里开始     = 8 ← 比原来多了 5</span><br><span class="line">位置4：       2 + 3 + 3 + (-2)    ← +5 还在继续   = 6 ← 比原来多了 5</span><br><span class="line">位置5：       2 + 3 + 3 + (-2) + 3               = 9 ← 比原来多了 5</span><br><span class="line">位置6：       2 + 3 + 3 + (-2) + 3 + (-3)        = 6 ← +5 和 -5 抵消了！</span><br><span class="line">           ↑ 前 5 项还带着 +5     这里又减了 5 ──┘</span><br></pre></td></tr></table></figure>
+
+<p>把过程画出来看更清楚：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在 b[3] 放一个 +5 → 从位置 3 开始，所有数都多了 5</span><br><span class="line">                                              ┌───────────────────</span><br><span class="line">位置:    1      2      3      4      5      6 │</span><br><span class="line">累加:    2      5      8      6      9      6 │</span><br><span class="line">        ──────────────────────────────────────┘</span><br><span class="line">                            ← +5 一直跟着 →  </span><br><span class="line">                                              然后在 b[6] 放一个 -5 → +5 被抵消</span><br><span class="line"></span><br><span class="line">位置:    1      2      3      4      5      6</span><br><span class="line">累加:    2      5      8      6      9      6  </span><br><span class="line">                                     +5 被 -5 抵消 → 变回原样</span><br></pre></td></tr></table></figure>
+
+<p><strong>结论：</strong> <code>b[l] += c</code> 让 +c 从位置 l 开始一直往后传，<code>b[r+1] -= c</code> 让它在 r+1 处被抵消。一传一挡，<strong>c 就只落在了 [l, r] 这一段上</strong>。</p>
+<h3 id="5-3-完整流程"><a href="#5-3-完整流程" class="headerlink" title="5.3 完整流程"></a>5.3 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 由原数组 a 构造差分数组 b</span><br><span class="line">2. 在 b 上进行区间修改（b[l] += c, b[r+1] -= c）</span><br><span class="line">3. 所有修改完成后，对 b 求一遍前缀和 → 得到修改后的 a</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>前缀和和差分正好互补：</p>
+<ul>
+<li><strong>前缀和</strong>：一次预处理，多次<strong>查询</strong>区间和</li>
+<li><strong>差分</strong>：多次<strong>修改</strong>区间值，最后一次性看结果</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="六、二维差分"><a href="#六、二维差分" class="headerlink" title="六、二维差分"></a>六、二维差分</h2><h3 id="6-1-定义"><a href="#6-1-定义" class="headerlink" title="6.1 定义"></a>6.1 定义</h3><p>和一维完全对称：<strong>对 b 求二维前缀和 &#x3D; 原矩阵 a</strong>。</p>
+<p>构造公式（对二维前缀和公式做逆运算）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i][j] = a[i][j] - a[i-1][j] - a[i][j-1] + a[i-1][j-1]</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-核心操作：子矩阵加-c"><a href="#6-2-核心操作：子矩阵加-c" class="headerlink" title="6.2 核心操作：子矩阵加 c"></a>6.2 核心操作：子矩阵加 c</h3><p>给矩形 <code>(x1,y1)</code> 到 <code>(x2,y2)</code> 内每个数加 <code>c</code>，只需改<strong>四个点</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1]     += c</span><br><span class="line">b[x1][y2+1]   -= c</span><br><span class="line">b[x2+1][y1]   -= c</span><br><span class="line">b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-图解"><a href="#6-3-图解" class="headerlink" title="6.3 图解"></a>6.3 图解</h3><p>一维是在<strong>两端</strong>做标记，二维是在<strong>四个角</strong>做标记：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1] += c        b[x1][y2+1] -= c</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">     │                          │</span><br><span class="line">     │       目标区域            │</span><br><span class="line">     │      (+c 的区域)          │</span><br><span class="line">     │                          │</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">b[x2+1][y1] -= c      b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<p>和一维同理，四个标记经过二维前缀和后，只有矩形内部被加了 c。</p>
+<h3 id="6-4-完整流程"><a href="#6-4-完整流程" class="headerlink" title="6.4 完整流程"></a>6.4 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 构造二维差分数组 b</span><br><span class="line">2. 在 b 上进行子矩阵修改（改四个角）</span><br><span class="line">3. 所有修改完成后，对 b 求二维前缀和 → 得到修改后的矩阵 a</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、总结对照"><a href="#七、总结对照" class="headerlink" title="七、总结对照"></a>七、总结对照</h2><h3 id="公式速查表"><a href="#公式速查表" class="headerlink" title="公式速查表"></a>公式速查表</h3><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>公式</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一维前缀和</td>
+<td><code>s[i] = s[i-1] + a[i]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>一维区间和</td>
+<td><code>sum[l,r] = s[r] - s[l-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>二维前缀和</td>
+<td><code>s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>二维子矩阵和</td>
+<td><code>sum = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>一维差分</td>
+<td><code>b[l] += c, b[r+1] -= c</code></td>
+<td>区间加减</td>
+</tr>
+<tr>
+<td>二维差分</td>
+<td><code>b[x1][y1] += c, b[x1][y2+1] -= c, b[x2+1][y1] -= c, b[x2+1][y2+1] += c</code></td>
+<td>子矩阵加减</td>
+</tr>
+</tbody></table>
+<h3 id="一张图理解全部关系"><a href="#一张图理解全部关系" class="headerlink" title="一张图理解全部关系"></a>一张图理解全部关系</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">         求前缀和               求差分</span><br><span class="line">原数组 ────────→ 前缀和数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">         求差分                 求前缀和</span><br><span class="line">原数组 ────────→ 差分数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">前缀和与差分就像积分与求导，是互逆的运算</span><br></pre></td></tr></table></figure>
+
+<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>什么时候用</th>
+<th>耗时</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>前缀和</strong></td>
+<td>多次<strong>查询</strong>区间和&#x2F;子矩阵和</td>
+<td>预处理 O(n)，每次查询 O(1)</td>
+</tr>
+<tr>
+<td><strong>差分</strong></td>
+<td>多次<strong>修改</strong>区间&#x2F;子矩阵的值，最后一次性查看结果</td>
+<td>每次修改 O(1)，最后恢复 O(n)</td>
+</tr>
+<tr>
+<td><strong>前缀和 + 差分</strong></td>
+<td>多次修改 + 多次查询</td>
+<td>差分做修改，前缀和做查询，中间通过「求前缀和」衔接</td>
+</tr>
+</tbody></table>
+<h3 id="关键注意点"><a href="#关键注意点" class="headerlink" title="关键注意点"></a>关键注意点</h3><ol>
+<li><strong>数组下标从 1 开始</strong>，避免出现 <code>l-1 = 0</code> 时越界</li>
+<li>设 <code>s[0] = 0</code>（一维）或 <code>s[0][*] = s[*][0] = 0</code>（二维），统一边界条件</li>
+<li><strong>先修改，后查询</strong>——差分所有的修改操作做完后，最后求一遍前缀和才能得到最终结果</li>
+<li>二维的「面积加减法」理解了，前缀和和差分的四个公式<strong>其实是一个思路</strong>，不需要死记硬背</li>
+</ol>
+<hr>
+<blockquote>
+<p>前缀和是「累加」，差分是「标记」——这对互逆的算法体现了预处理和批量操作的核心思想，是算法竞赛和面试中最高频的基础技巧之一。</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>数据结构和算法</category>
+      </categories>
+      <tags>
+        <tag>前缀和&amp;差分</tag>
       </tags>
   </entry>
   <entry>
@@ -19385,246 +19625,6 @@
       </tags>
   </entry>
   <entry>
-    <title>前缀和与差分 —— 从概念到公式</title>
-    <url>/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/</url>
-    <content><![CDATA[<h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
-<p>最直接的做法：每次从 3 加到 7。如果数组很大（比如 10 万个数），问你 10 万次，那总共要算 100 亿次加法——太慢了。<br>如果换一种思路，我能不能<strong>提前把「前 i 个数的和」全部算好存起来</strong>，这样每次询问直接用减法得到结果？</p>
-<p>这就是<strong>前缀和</strong>的核心思想——<strong>预处理，换时间</strong>。</p>
-<hr>
-<h2 id="二、一维前缀和"><a href="#二、一维前缀和" class="headerlink" title="二、一维前缀和"></a>二、一维前缀和</h2><h3 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="2.1 定义"></a>2.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，定义前缀和数组 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = a[1] + a[2] + ... + a[i]   （前 i 个数的总和）</span><br></pre></td></tr></table></figure>
-
-<h3 id="2-2-核心公式"><a href="#2-2-核心公式" class="headerlink" title="2.2 核心公式"></a>2.2 核心公式</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = s[i-1] + a[i]</span><br></pre></td></tr></table></figure>
-
-<p>边界条件：<code>s[0] = 0</code>（前 0 个数的和为 0）。</p>
-<blockquote>
-<p>公式的意思是：前 i 个数的和 &#x3D; 前 i-1 个数的和 + 第 i 个数。</p>
-</blockquote>
-<h3 id="2-3-图示"><a href="#2-3-图示" class="headerlink" title="2.3 图示"></a>2.3 图示</h3><p>假设原数组 <code>a</code> 如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：  1    2    3    4    5</span><br><span class="line">a[]：  2    5    3    1    4</span><br></pre></td></tr></table></figure>
-
-<p>逐个计算前缀和：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + 2 = 2</span><br><span class="line">s[2] = 2 + 5 = 7</span><br><span class="line">s[3] = 7 + 3 = 10</span><br><span class="line">s[4] = 10 + 1 = 11</span><br><span class="line">s[5] = 11 + 4 = 15</span><br></pre></td></tr></table></figure>
-
-<p>得到前缀和数组 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：  2    7    10   11   15</span><br><span class="line">      ↑    ↑    ↑    ↑    ↑</span><br><span class="line">      前1  前2  前3  前4  前5</span><br></pre></td></tr></table></figure>
-
-<p>可以直观地看到：<code>s[i]</code> 就是从第一个数一直加到第 i 个数的「累计值」。</p>
-<h3 id="2-4-用途：快速求区间和"><a href="#2-4-用途：快速求区间和" class="headerlink" title="2.4 用途：快速求区间和"></a>2.4 用途：快速求区间和</h3><p>现在想求 <code>a[2] + a[3] + a[4]</code>（即区间 <code>[2, 4]</code> 的和）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间[2,4]的和 = s[4] - s[1] = 11 - 2 = 9</span><br><span class="line">验证：5 + 3 + 1 = 9  ✅</span><br></pre></td></tr></table></figure>
-
-<p><strong>核心公式：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间 [l, r] 的和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>文字理解：<strong>前 r 个数的和 减去 前 l-1 个数的和</strong>，剩下的就是第 l 个到第 r 个。</p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                   ┌─────────── 区间[l, r] ───────────┐</span><br><span class="line">                   │                                   │</span><br><span class="line">a[1] a[2] ... a[l-1]  a[l] a[l+1] ... a[r-1] a[r]  a[r+1] ...</span><br><span class="line">├──── 前 l-1 项 ────┤├────────── 前 r 项 ──────────┤</span><br><span class="line">                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</span><br><span class="line">                     s[r] = 前 r 项的总和</span><br><span class="line">     s[l-1] = 前 l-1 项的总和</span><br><span class="line">             </span><br><span class="line">     区间和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
-
-<p>预处理完 <code>s</code> 数组后，<strong>每次求区间和只需要 O(1) 的时间</strong>（一次减法），这就是前缀和的威力。</p>
-<hr>
-<h2 id="三、二维前缀和"><a href="#三、二维前缀和" class="headerlink" title="三、二维前缀和"></a>三、二维前缀和</h2><h3 id="3-1-问题升级"><a href="#3-1-问题升级" class="headerlink" title="3.1 问题升级"></a>3.1 问题升级</h3><p>如果你面对的<strong>不是一维数组，而是一个二维矩阵</strong>，想快速求出<strong>任意一个子矩形内所有数的和</strong>，怎么办？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">    列1  列2  列3  列4</span><br><span class="line">行1   1    2    3    4</span><br><span class="line">行2   5    6    7    8</span><br><span class="line">行3   9   10   11   12</span><br></pre></td></tr></table></figure>
-
-<p>比如：求从 <code>[2][2]</code> 到 <code>[3][4]</code> 这个 2×3 矩形里所有数的和。</p>
-<p>类比一维的思路：<strong>二维前缀和</strong>就是提前算好从 <code>[1][1]</code> 到 <code>[i][j]</code> 这个矩形内所有数的总和。</p>
-<h3 id="3-2-核心公式"><a href="#3-2-核心公式" class="headerlink" title="3.2 核心公式"></a>3.2 核心公式</h3><p>定义 <code>s[i][j]</code> &#x3D; 从左上角 <code>(1,1)</code> 到右下角 <code>(i,j)</code> 的矩形区域内所有元素的和。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-3-图解：容斥原理"><a href="#3-3-图解：容斥原理" class="headerlink" title="3.3 图解：容斥原理"></a>3.3 图解：容斥原理</h3><p>公式看着复杂，其实核心就是<strong>容斥原理</strong>——两个有重叠的区域合并时，<strong>加完两边，减掉重叠</strong>。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">             列1     列2    ...   列j-1    列j    列j+1</span><br><span class="line">     ┌──────────────────────────────────────────────────┐</span><br><span class="line">行1   │                                                  │</span><br><span class="line">     │                      A区域                        │</span><br><span class="line"> ...  │                  s[i-1][j]                       │</span><br><span class="line">     │              ┌──────────────┐                     │</span><br><span class="line">行i-1 │              │  重叠部分    │                     │</span><br><span class="line">     │              │ s[i-1][j-1]  │                     │</span><br><span class="line">     │              └──────────────┘                     │</span><br><span class="line">     ├─────────────────────────────┬────────────────────┤</span><br><span class="line">行i   │          B区域             │      a[i][j]       │</span><br><span class="line">     │       s[i][j-1]            │      (当前格子)     │</span><br><span class="line">     └─────────────────────────────┴────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<p>把 s[i][j] 拆成三块来看：</p>
-<ul>
-<li><strong>A 区域</strong> &#x3D; <code>s[i-1][j]</code>：第 1<del>i-1 行、第 1</del>j 列（不含第 i 行）</li>
-<li><strong>B 区域</strong> &#x3D; <code>s[i][j-1]</code>：第 1<del>i 行、第 1</del>j-1 列（不含第 j 列）</li>
-<li><strong>重叠部分</strong> &#x3D; <code>s[i-1][j-1]</code>：A 和 B 都覆盖的左上角</li>
-</ul>
-<p>根据容斥原理（两个集合的并集 &#x3D; 各自之和 − 交集）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = |A ∪ B| + a[i][j]</span><br><span class="line">        = |A| + |B| − |A ∩ B| + a[i][j]</span><br><span class="line">        = s[i-1][j] + s[i][j-1] − s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-4-用途：求子矩阵和"><a href="#3-4-用途：求子矩阵和" class="headerlink" title="3.4 用途：求子矩阵和"></a>3.4 用途：求子矩阵和</h3><p>现在想求矩形区域 <code>(x1, y1)</code> 到 <code>(x2, y2)</code> 的和：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">子矩阵和 = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</span><br></pre></td></tr></table></figure>
-
-<p>同样还是<strong>面积加减法</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">(x1,y1) ───────────── (x1,y2)</span><br><span class="line">   │                     │</span><br><span class="line">   │    ┌────────────┐   │</span><br><span class="line">   │    │  目标矩形    │   │</span><br><span class="line">   │    │ (红色区域)   │   │</span><br><span class="line">   │    └────────────┘   │</span><br><span class="line">(x2,y1) ───────────── (x2,y2)</span><br></pre></td></tr></table></figure>
-
-<p>怎么从 <code>s[x2][y2]</code>（整个大矩形）扣出目标红色区域？</p>
-<ol>
-<li><strong>减</strong>掉上边部分 <code>s[x1-1][y2]</code>  </li>
-<li><strong>减</strong>掉左边部分 <code>s[x2][y1-1]</code>  </li>
-<li>左上角区域 <code>s[x1-1][y1-1]</code> 被减了两次，<strong>加</strong>回来</li>
-</ol>
-<hr>
-<h2 id="四、差分"><a href="#四、差分" class="headerlink" title="四、差分"></a>四、差分</h2><h3 id="4-1-差分是前缀和的逆运算"><a href="#4-1-差分是前缀和的逆运算" class="headerlink" title="4.1 差分是前缀和的逆运算"></a>4.1 差分是前缀和的逆运算</h3><p>先回顾前缀和的定义：<code>s[i] = a[1] + ... + a[i]</code>。</p>
-<p>那反过来，已知 <code>s</code> 怎么求 <code>a</code>？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">a[i] = s[i] - s[i-1]</span><br></pre></td></tr></table></figure>
-
-<p><strong>这就是差分。</strong> 对前缀和数组求差分，就得到原数组；对差分数组求前缀和，也得到原数组——两者互逆。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原数组 a</span><br><span class="line">  │  求前缀和</span><br><span class="line">  ▼</span><br><span class="line">前缀和数组 s</span><br><span class="line">  │  求差分（相邻两项相减）</span><br><span class="line">  ▼</span><br><span class="line">原数组 a</span><br></pre></td></tr></table></figure>
-
-<p>那差分有什么用？看一个场景：</p>
-<blockquote>
-<p>如果要反复给数组的某个区间统一加上一个数，最后再看结果，能不能快速做？</p>
-</blockquote>
-<p>暴力做法是每次从 l 到 r 逐个加，太慢。差分能做到时间复杂度是<strong>O(1)， 一次标记，最后统一还原</strong>。</p>
-<hr>
-<h2 id="五、一维差分"><a href="#五、一维差分" class="headerlink" title="五、一维差分"></a>五、一维差分</h2><h3 id="5-1-定义"><a href="#5-1-定义" class="headerlink" title="5.1 定义"></a>5.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，差分数组 <code>b</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i] = a[i] - a[i-1]</span><br></pre></td></tr></table></figure>
-
-<p>其中 <code>b[1] = a[1]</code>（<code>a[0] = 0</code>）。</p>
-<h3 id="5-2-核心操作：区间加-c"><a href="#5-2-核心操作：区间加-c" class="headerlink" title="5.2 核心操作：区间加 c"></a>5.2 核心操作：区间加 c</h3><p>给 <code>a[l] ~ a[r]</code> 每个数都加 <code>c</code>，分成两步：</p>
-<blockquote>
-<p><strong>① 在差分数组上改两个位置 → ② 再对差分数组求一次前缀和，就得到修改后的原数组</strong></p>
-</blockquote>
-<p>改哪两个位置？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[l]   += c</span><br><span class="line">b[r+1] -= c</span><br></pre></td></tr></table></figure>
-
-<p>也就是说，在差分数组上做完标记后，<strong>只要再求一遍前缀和就能得到修改后的数组</strong>。<br>不是说好了差分和前缀和是逆运算吗？为什么这样改两个位置就能让一整段加上 c？<br>拿一个具体的例子走一遍就明白了。</p>
-<hr>
-<h4 id="举个具体的例子"><a href="#举个具体的例子" class="headerlink" title="举个具体的例子"></a>举个具体的例子</h4><p>假设原数组 <code>a</code> 长度为 6：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">a[]：      2    5    3    1    4    6</span><br></pre></td></tr></table></figure>
-
-<p>先按定义造出差分数组 <code>b</code>（<code>b[i] = a[i] - a[i-1]</code>）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[1] = a[1] - 0      = 2</span><br><span class="line">b[2] = a[2] - a[1]   = 5 - 2   = 3</span><br><span class="line">b[3] = a[3] - a[2]   = 3 - 5   = -2</span><br><span class="line">b[4] = a[4] - a[3]   = 1 - 3   = -2</span><br><span class="line">b[5] = a[5] - a[4]   = 4 - 1   = 3</span><br><span class="line">b[6] = a[6] - a[5]   = 6 - 4   = 2</span><br><span class="line"></span><br><span class="line">b[]：      2    3   -2   -2    3    2</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h4 id="现在，我想给-a-3-a-5-每个数都加上-5"><a href="#现在，我想给-a-3-a-5-每个数都加上-5" class="headerlink" title="现在，我想给 a[3] ~ a[5] 每个数都加上 5"></a>现在，我想给 a[3] ~ a[5] 每个数都加上 5</h4><p>按照公式，改 <code>b</code> 的两个位置：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[3] += 5      （原来是 -2，变成 3）</span><br><span class="line">b[6] -= 5      （原来是 2，变成 -3）</span><br></pre></td></tr></table></figure>
-
-<p>修改后的 <code>b</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">b[]：      2    3    3   -2    3   -3</span><br><span class="line">                    ↑ b[3] 从 -2 变成 3</span><br><span class="line">                                   ↑ b[6] 从 2 变成 -3</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h4 id="关键一步：对修改后的-b-求前缀和，看看会发生什么"><a href="#关键一步：对修改后的-b-求前缀和，看看会发生什么" class="headerlink" title="关键一步：对修改后的 b 求前缀和，看看会发生什么"></a>关键一步：对修改后的 b 求前缀和，看看会发生什么</h4><p>还记得前缀和怎么算吗？**<code>s[i] = s[i-1] + b[i]</code>**。一步步来：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + b[1] = 0 + 2  = 2</span><br><span class="line">s[2] = 2 + b[2] = 2 + 3  = 5</span><br><span class="line">s[3] = 5 + b[3] = 5 + 3  = 8    ← 注意，这里用的是修改后的 b[3]（加了 5）</span><br><span class="line">s[4] = 8 + b[4] = 8 + (-2)= 6</span><br><span class="line">s[5] = 6 + b[5] = 6 + 3  = 9</span><br><span class="line">s[6] = 9 + b[6] = 9 + (-3)= 6    ← 这里用的是修改后的 b[6]（减了 5）</span><br></pre></td></tr></table></figure>
-
-<p>得到新的 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：      2    5    8    6    9    6</span><br></pre></td></tr></table></figure>
-
-<p>对比原来的 <code>a</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原来 a：   2    5    3    1    4    6</span><br><span class="line">新的 s：   2    5    8    6    9    6</span><br><span class="line">                          ↑    ↑    ↑</span><br><span class="line">                     a[3]+5  a[4]+5  a[5]+5</span><br></pre></td></tr></table></figure>
-
-<p><strong>正好</strong>只有 <code>a[3] ~ a[5]</code> 加了 5，前面和后面都没变！–很神奇对吧！</p>
-<hr>
-<h4 id="为什么？"><a href="#为什么？" class="headerlink" title="为什么？"></a>为什么？</h4><p>原因藏在<strong>前缀和的累加特性</strong>里。把 <code>b</code> 看成一系列”<strong>标记</strong>“：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[]：  2    3    3   -2    3   -3</span><br><span class="line">                 ↑</span><br><span class="line">           这里 b[3] 多了一个 +5</span><br><span class="line">                                ↑</span><br><span class="line">                          这里 b[6] 多了一个 -5</span><br></pre></td></tr></table></figure>
-
-<p>对 <code>b</code> 求前缀和时，每个位置的值会<strong>一直往后累加</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">位置1：       2                                 = 2</span><br><span class="line">位置2：       2 + 3                             = 5</span><br><span class="line">位置3：       2 + 3 + 3      ← +5 从这里开始     = 8 ← 比原来多了 5</span><br><span class="line">位置4：       2 + 3 + 3 + (-2)    ← +5 还在继续   = 6 ← 比原来多了 5</span><br><span class="line">位置5：       2 + 3 + 3 + (-2) + 3               = 9 ← 比原来多了 5</span><br><span class="line">位置6：       2 + 3 + 3 + (-2) + 3 + (-3)        = 6 ← +5 和 -5 抵消了！</span><br><span class="line">           ↑ 前 5 项还带着 +5     这里又减了 5 ──┘</span><br></pre></td></tr></table></figure>
-
-<p>把过程画出来看更清楚：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在 b[3] 放一个 +5 → 从位置 3 开始，所有数都多了 5</span><br><span class="line">                                              ┌───────────────────</span><br><span class="line">位置:    1      2      3      4      5      6 │</span><br><span class="line">累加:    2      5      8      6      9      6 │</span><br><span class="line">        ──────────────────────────────────────┘</span><br><span class="line">                            ← +5 一直跟着 →  </span><br><span class="line">                                              然后在 b[6] 放一个 -5 → +5 被抵消</span><br><span class="line"></span><br><span class="line">位置:    1      2      3      4      5      6</span><br><span class="line">累加:    2      5      8      6      9      6  </span><br><span class="line">                                     +5 被 -5 抵消 → 变回原样</span><br></pre></td></tr></table></figure>
-
-<p><strong>结论：</strong> <code>b[l] += c</code> 让 +c 从位置 l 开始一直往后传，<code>b[r+1] -= c</code> 让它在 r+1 处被抵消。一传一挡，<strong>c 就只落在了 [l, r] 这一段上</strong>。</p>
-<h3 id="5-3-完整流程"><a href="#5-3-完整流程" class="headerlink" title="5.3 完整流程"></a>5.3 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 由原数组 a 构造差分数组 b</span><br><span class="line">2. 在 b 上进行区间修改（b[l] += c, b[r+1] -= c）</span><br><span class="line">3. 所有修改完成后，对 b 求一遍前缀和 → 得到修改后的 a</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>前缀和和差分正好互补：</p>
-<ul>
-<li><strong>前缀和</strong>：一次预处理，多次<strong>查询</strong>区间和</li>
-<li><strong>差分</strong>：多次<strong>修改</strong>区间值，最后一次性看结果</li>
-</ul>
-</blockquote>
-<hr>
-<h2 id="六、二维差分"><a href="#六、二维差分" class="headerlink" title="六、二维差分"></a>六、二维差分</h2><h3 id="6-1-定义"><a href="#6-1-定义" class="headerlink" title="6.1 定义"></a>6.1 定义</h3><p>和一维完全对称：<strong>对 b 求二维前缀和 &#x3D; 原矩阵 a</strong>。</p>
-<p>构造公式（对二维前缀和公式做逆运算）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i][j] = a[i][j] - a[i-1][j] - a[i][j-1] + a[i-1][j-1]</span><br></pre></td></tr></table></figure>
-
-<h3 id="6-2-核心操作：子矩阵加-c"><a href="#6-2-核心操作：子矩阵加-c" class="headerlink" title="6.2 核心操作：子矩阵加 c"></a>6.2 核心操作：子矩阵加 c</h3><p>给矩形 <code>(x1,y1)</code> 到 <code>(x2,y2)</code> 内每个数加 <code>c</code>，只需改<strong>四个点</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1]     += c</span><br><span class="line">b[x1][y2+1]   -= c</span><br><span class="line">b[x2+1][y1]   -= c</span><br><span class="line">b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
-
-<h3 id="6-3-图解"><a href="#6-3-图解" class="headerlink" title="6.3 图解"></a>6.3 图解</h3><p>一维是在<strong>两端</strong>做标记，二维是在<strong>四个角</strong>做标记：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1] += c        b[x1][y2+1] -= c</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">     │                          │</span><br><span class="line">     │       目标区域            │</span><br><span class="line">     │      (+c 的区域)          │</span><br><span class="line">     │                          │</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">b[x2+1][y1] -= c      b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
-
-<p>和一维同理，四个标记经过二维前缀和后，只有矩形内部被加了 c。</p>
-<h3 id="6-4-完整流程"><a href="#6-4-完整流程" class="headerlink" title="6.4 完整流程"></a>6.4 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 构造二维差分数组 b</span><br><span class="line">2. 在 b 上进行子矩阵修改（改四个角）</span><br><span class="line">3. 所有修改完成后，对 b 求二维前缀和 → 得到修改后的矩阵 a</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="七、总结对照"><a href="#七、总结对照" class="headerlink" title="七、总结对照"></a>七、总结对照</h2><h3 id="公式速查表"><a href="#公式速查表" class="headerlink" title="公式速查表"></a>公式速查表</h3><table>
-<thead>
-<tr>
-<th>场景</th>
-<th>公式</th>
-<th>用途</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>一维前缀和</td>
-<td><code>s[i] = s[i-1] + a[i]</code></td>
-<td>预处理</td>
-</tr>
-<tr>
-<td>一维区间和</td>
-<td><code>sum[l,r] = s[r] - s[l-1]</code></td>
-<td>快速查询</td>
-</tr>
-<tr>
-<td>二维前缀和</td>
-<td><code>s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</code></td>
-<td>预处理</td>
-</tr>
-<tr>
-<td>二维子矩阵和</td>
-<td><code>sum = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</code></td>
-<td>快速查询</td>
-</tr>
-<tr>
-<td>一维差分</td>
-<td><code>b[l] += c, b[r+1] -= c</code></td>
-<td>区间加减</td>
-</tr>
-<tr>
-<td>二维差分</td>
-<td><code>b[x1][y1] += c, b[x1][y2+1] -= c, b[x2+1][y1] -= c, b[x2+1][y2+1] += c</code></td>
-<td>子矩阵加减</td>
-</tr>
-</tbody></table>
-<h3 id="一张图理解全部关系"><a href="#一张图理解全部关系" class="headerlink" title="一张图理解全部关系"></a>一张图理解全部关系</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">         求前缀和               求差分</span><br><span class="line">原数组 ────────→ 前缀和数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">         求差分                 求前缀和</span><br><span class="line">原数组 ────────→ 差分数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">前缀和与差分就像积分与求导，是互逆的运算</span><br></pre></td></tr></table></figure>
-
-<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><table>
-<thead>
-<tr>
-<th>算法</th>
-<th>什么时候用</th>
-<th>耗时</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>前缀和</strong></td>
-<td>多次<strong>查询</strong>区间和&#x2F;子矩阵和</td>
-<td>预处理 O(n)，每次查询 O(1)</td>
-</tr>
-<tr>
-<td><strong>差分</strong></td>
-<td>多次<strong>修改</strong>区间&#x2F;子矩阵的值，最后一次性查看结果</td>
-<td>每次修改 O(1)，最后恢复 O(n)</td>
-</tr>
-<tr>
-<td><strong>前缀和 + 差分</strong></td>
-<td>多次修改 + 多次查询</td>
-<td>差分做修改，前缀和做查询，中间通过「求前缀和」衔接</td>
-</tr>
-</tbody></table>
-<h3 id="关键注意点"><a href="#关键注意点" class="headerlink" title="关键注意点"></a>关键注意点</h3><ol>
-<li><strong>数组下标从 1 开始</strong>，避免出现 <code>l-1 = 0</code> 时越界</li>
-<li>设 <code>s[0] = 0</code>（一维）或 <code>s[0][*] = s[*][0] = 0</code>（二维），统一边界条件</li>
-<li><strong>先修改，后查询</strong>——差分所有的修改操作做完后，最后求一遍前缀和才能得到最终结果</li>
-<li>二维的「面积加减法」理解了，前缀和和差分的四个公式<strong>其实是一个思路</strong>，不需要死记硬背</li>
-</ol>
-<hr>
-<blockquote>
-<p>前缀和是「累加」，差分是「标记」——这对互逆的算法体现了预处理和批量操作的核心思想，是算法竞赛和面试中最高频的基础技巧之一。</p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>数据结构和算法</category>
-      </categories>
-      <tags>
-        <tag>前缀和&amp;差分</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>一件关于Git分支的神奇小事 ：为什么我的 `master` 能推送到并且持续更新 `main`？</title>
     <url>/2026/07/13/%E5%AD%A6%E4%B9%A0git%E6%97%B6%E9%81%87%E5%88%B0%E7%9A%84%E4%B8%80%E4%BB%B6%E7%A5%9E%E5%A5%87%E7%9A%84%E4%BA%8B/</url>
     <content><![CDATA[<h1 id="一件关于Git分支的神奇小事-：为什么我的-master-能推送到并且持续更新-main？"><a href="#一件关于Git分支的神奇小事-：为什么我的-master-能推送到并且持续更新-main？" class="headerlink" title="一件关于Git分支的神奇小事 ：为什么我的 master 能推送到并且持续更新 main？"></a>一件关于Git分支的神奇小事 ：为什么我的 <code>master</code> 能推送到并且持续更新 <code>main</code>？</h1><hr>
@@ -19695,6 +19695,11 @@
       <tags>
         <tag>Git</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>我的第一篇hexo博客！</title>
+    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
+    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>数据结构 —— 顺序表</title>
@@ -20440,11 +20445,6 @@
       <tags>
         <tag>暴力&amp;枚举</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>我的第一篇hexo博客！</title>
-    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
-    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>洛谷P1328 - 生活大爆炸版石头剪刀布 - 题解</title>
