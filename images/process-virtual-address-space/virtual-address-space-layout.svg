@@ -60,7 +60,7 @@
 
   <!-- 2. .text -->
   <rect x="441" y="150" width="258" height="50" fill="#dbeafe"/>
-  <text x="570" y="181" text-anchor="middle" font-size="16" fill="#1e3a5f" font-weight="bold">.text（代码段）</text>
+  <text x="570" y="181" text-anchor="middle" font-size="16" fill="#1e3a5f" font-weight="bold">.text（指令段）</text>
 
   <!-- 3. .rodata -->
   <rect x="441" y="200" width="258" height="50" fill="#e0e7ff"/>
