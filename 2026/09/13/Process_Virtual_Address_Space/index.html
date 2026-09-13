@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="深入分析进程虚拟地址空间的划分——用户空间与内核空间、.text&#x2F;.rodata&#x2F;.data&#x2F;.bss&#x2F;堆&#x2F;共享库&#x2F;栈区">
+<meta property="og:type" content="article">
+<meta property="og:title" content="进程的虚拟地址空间内存划分和布局">
+<meta property="og:url" content="http://tristan1116.github.io/2026/09/13/Process_Virtual_Address_Space/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="深入分析进程虚拟地址空间的划分——用户空间与内核空间、.text&#x2F;.rodata&#x2F;.data&#x2F;.bss&#x2F;堆&#x2F;共享库&#x2F;栈区">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://tristan1116.github.io/images/Process_Virtual_Address_Space/image-20260913134607605.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/process-virtual-address-space/user-vs-kernel-space.png">
+<meta property="og:image" content="http://tristan1116.github.io/images/process-virtual-address-space/virtual-address-space-layout.png">
+<meta property="article:published_time" content="2026-09-13T15:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-13T15:00:00.000Z">
+<meta property="article:tag" content="操作系统">
+<meta property="article:tag" content="进程">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="虚拟地址空间">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://tristan1116.github.io/images/Process_Virtual_Address_Space/image-20260913134607605.png">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/09/13/Process_Virtual_Address_Space/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>进程的虚拟地址空间内存划分和布局 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/09/13/Process_Virtual_Address_Space/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          进程的虚拟地址空间内存划分和布局
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-09-13 15:00:00" itemprop="dateCreated datePublished" datetime="2026-09-13T15:00:00+00:00">2026-09-13</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/C-C/" itemprop="url" rel="index"><span itemprop="name">C/C++</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>7 分钟</span>
+            </span>
+            <div class="post-description">深入分析进程虚拟地址空间的划分——用户空间与内核空间、.text/.rodata/.data/.bss/堆/共享库/栈区</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="一段C-的代码"><a href="#一段C-的代码" class="headerlink" title="一段C++的代码"></a>一段C++的代码</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> gdata1 = <span class="number">10</span>;</span><br><span class="line"><span class="type">int</span> gdata2 = <span class="number">0</span>;</span><br><span class="line"><span class="type">int</span> gdata3;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> gdata4 = <span class="number">11</span>;</span><br><span class="line"><span class="type">static</span> <span class="type">int</span> gdata5 = <span class="number">0</span>;</span><br><span class="line"><span class="type">static</span> <span class="type">int</span> gdata6;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> a = <span class="number">12</span>;</span><br><span class="line">    <span class="type">int</span> b = <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> e = <span class="number">13</span>;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> f = <span class="number">0</span>;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> g;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>一个问题：<strong>这段代码经过编译链接产生可执行文件，运行时，这些变量分别放在内存的哪里？</strong></p>
+<h2 id="进程的虚拟地址空间"><a href="#进程的虚拟地址空间" class="headerlink" title="进程的虚拟地址空间"></a>进程的虚拟地址空间</h2><p>任何编程语言写出的代码，无非产生两样东西：<strong>指令</strong>和<strong>数据</strong>。</p>
+<p>程序编译链接完成后，在 Windows 上是一个 <code>.exe</code> 可执行文件，放在磁盘上。CPU 无法直接运行磁盘上的程序，需要先把它<strong>从磁盘加载到内存</strong>。这就产生了问题：加载到内存的哪里？内存有没有区域划分？划分后是什么样？</p>
+<p>这里以x86 体系、32 位 Linux 环境为例进行说明：</p>
+<p>程序运行时，Linux 内核会给当前进程分配一块大小为 2^32 的空间，也就是 <strong>4G</strong>。这块空间叫做<strong>进程的虚拟地址空间</strong>。</p>
+<p><strong>虚拟地址空间并不是物理内存上的一块真实空间</strong>。从底层原理上说，它只是内核创建的一系列<strong>数据结构</strong>而已。</p>
+<blockquote>
+<p>⚠️ <strong>虚拟内存 ≠ 虚拟地址空间</strong>，这是两个不同的词，不要混用。</p>
+</blockquote>
+<p>另外，4G 是跟系统位数绑定的：如果是 64 位 Linux，每个进程的虚拟地址空间是 2^64。但是原理是一样的。</p>
+<h2 id="空间的划分：用户空间-内核空间"><a href="#空间的划分：用户空间-内核空间" class="headerlink" title="空间的划分：用户空间 + 内核空间"></a>空间的划分：用户空间 + 内核空间</h2><p><img src="/./../images/Process_Virtual_Address_Space/image-20260913134607605.png" alt="image-20260913134607605"></p>
+<p>这 4G 空间默认被划分成两部分：</p>
+<table>
+<thead>
+<tr>
+<th align="left">区域</th>
+<th align="left">范围</th>
+<th align="left">大小</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>用户空间</strong> user space</td>
+<td align="left"><code>0x00000000</code> ~ <code>0xC0000000</code></td>
+<td align="left">3G</td>
+</tr>
+<tr>
+<td align="left"><strong>内核空间</strong> kernel space</td>
+<td align="left"><code>0xC0000000</code> ~ <code>0xFFFFFFFF</code></td>
+<td align="left">1G</td>
+</tr>
+</tbody></table>
+<p>32 位 Linux 下，<strong>系统默认</strong>内核空间占 1G、用户空间占 3G。这个比例可以通过修改操作系统配置来调整，但默认就是这样。</p>
+<p><strong>每一个进程都有这么一个虚拟地址空间，每一个进程。</strong></p>
+<h2 id="用户空间的布局，从低地址到高地址"><a href="#用户空间的布局，从低地址到高地址" class="headerlink" title="用户空间的布局，从低地址到高地址"></a>用户空间的布局，从低地址到高地址</h2><p>用户空间并不是从 0 地址就开始存放内容的，前面空了一段。</p>
+<h3 id="1-预留区，0x00000000-0x08048000"><a href="#1-预留区，0x00000000-0x08048000" class="headerlink" title="1. 预留区，0x00000000-0x08048000"></a>1. 预留区，0x00000000-0x08048000</h3><p>从 0 地址开始的一段空间是<strong>预留的，不能够访问</strong>。</p>
+<p>这一段在地址空间中的位置：</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000-0x08048000<br/>← 0 地址起，不可访问"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class A hot</pre>
+
+
+<p>如果把一个空的 <code>char*</code> 传给字符串函数，比如 <code>strcpy(dest, src)</code>，从 0 地址开始拷贝字符串，遇到 <code>&#39;\0&#39;</code> 结束。程序运行会直接崩掉——因为这块空间不能读也不能写，访问它系统就报异常。</p>
+<h3 id="2-text-段（指令段）"><a href="#2-text-段（指令段）" class="headerlink" title="2. .text 段（指令段）"></a>2. <code>.text</code> 段（指令段）</h3><p>从 <code>0x08048000</code> 开始存放的是 <strong><code>.text</code> 段（指令段）</strong>。</p>
+<p>先看它在整个地址空间中的位置（下面各段同理，蓝色为当前讨论的段）：</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 指令段<br/>← 0x08048000 起，存放指令"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class T hot</pre>
+
+<h3 id="3-rodata-段（只读数据段）"><a href="#3-rodata-段（只读数据段）" class="headerlink" title="3. .rodata 段（只读数据段）"></a>3. <code>.rodata</code> 段（只读数据段）</h3><p><code>.text</code> 之后是 <strong><code>.rodata</code> 段（read only，只读数据段）</strong>。</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段<br/>"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class R hot</pre>
+
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">const</span> <span class="type">char</span>* p = <span class="string">&quot;hello world&quot;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>函数里定义这样一个局部变量指针，指针 <code>p</code> 本身在<strong>栈</strong>上，但它指向的常量字符串 <code>&quot;hello world&quot;</code> 存储在 <strong><code>.rodata</code> 段</strong>。</p>
+<p>那能不能通过指针修改这个字符串的第一个字符？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*p = <span class="string">&#x27;a&#x27;</span>;   </span><br></pre></td></tr></table></figure>
+
+<p>编译能通过，但运行会崩溃——因为 <code>.rodata</code> 段跟 <code>.text</code> 段都<strong>只能读、不能写</strong>。</p>
+<blockquote>
+<p>较新的 C++ 编译器已经不允许用普通指针指向常量字符串，写的时候必须加 <code>const</code> 修饰。指向被 <code>const</code> 约束后，这类不可预期的错误也就不会发生了。</p>
+</blockquote>
+<h3 id="4-data-段-和-bss-段（数据段）"><a href="#4-data-段-和-bss-段（数据段）" class="headerlink" title="4. .data 段 和 .bss 段（数据段）"></a>4. <code>.data</code> 段 和 <code>.bss</code> 段（数据段）</h3><p>再往上就是存放数据的地方，分两个段：</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0<br/>← 未初始化或为 0 的数据，内核会清零"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class B hot</pre>
+
+<table>
+<thead>
+<tr>
+<th align="left">段</th>
+<th align="left">存放内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong><code>.data</code></strong></td>
+<td align="left">初始化了的，且<strong>初始值不为零</strong>的数据</td>
+</tr>
+<tr>
+<td align="left"><strong><code>.bss</code></strong></td>
+<td align="left"><strong>未初始化</strong>的，以及<strong>初始化为零</strong>的数据</td>
+</tr>
+</tbody></table>
+<p>对应到开头那段代码：</p>
+<ul>
+<li><code>gdata1 = 10</code>、<code>gdata4 = 11</code> → 初始化且不为零 → <strong><code>.data</code></strong></li>
+<li><code>gdata2 = 0</code>、<code>gdata3</code>、<code>gdata5 = 0</code>、<code>gdata6</code> → 为零或未初始化 → <strong><code>.bss</code></strong></li>
+<li><code>e = 13</code> → 静态局部变量，初始化且不为零 → <strong><code>.data</code></strong></li>
+<li><code>f = 0</code>、<code>g</code> → 静态局部变量，为零或未初始化 → <strong><code>.bss</code></strong></li>
+</ul>
+<p><strong>为什么未初始化的全局变量打印出来是 0？</strong></p>
+<p>因为它存放在 <code>.bss</code> 段。程序运行时，操作系统内核给当前进程分配地址空间，把未初始化的数据放在 <code>.bss</code>。然后<strong>内核会自己负责把 <code>.bss</code> 段的数据全部清零</strong>——所以我们看到未初始化的全局变量打印出来是 0，这是操作系统对 <code>.bss</code> 段默认做的零初始化。</p>
+<p>而局部变量 <code>c</code> 没初始化，打印出来<strong>肯定不为 0</strong>，因为它是栈上的无效值，跟 <code>.bss</code> 的零初始化不是一回事。</p>
+<h3 id="5-堆（heap）"><a href="#5-堆（heap）" class="headerlink" title="5. 堆（heap）"></a>5. 堆（heap）</h3><p><code>.bss</code> 再往上的一块空间叫做<strong>堆</strong>。</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆<br/>← new / malloc 时分配，向上增长"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class H hot</pre>
+
+<p>程序刚加载时这里还是空的，<strong>调用 <code>new</code> 或者 <code>malloc</code> 时才会在这里分配堆内存</strong>。堆的分配方向是<strong>从低地址到高地址</strong>增长。</p>
+<h3 id="6-共享库（动态链接库）"><a href="#6-共享库（动态链接库）" class="headerlink" title="6. 共享库（动态链接库）"></a>6. 共享库（动态链接库）</h3><p>再往上，程序运行过程中会加载一些共享库，也就是<strong>动态链接库</strong>。Windows 上是 <code>.dll</code>，Linux 下是 <code>.so</code> 库，都会映射到这一部分。</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so<br/>← 动态链接库映射到此"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class S hot</pre>
+
+<h3 id="7-栈（stack）"><a href="#7-栈（stack）" class="headerlink" title="7. 栈（stack）"></a>7. 栈（stack）</h3><p>再往上就是<strong>栈</strong>，函数运行时在栈上分配空间，每个线程都<strong>独有一份</strong>。</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈<br/>← 函数运行时分配，向下增长"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class ST hot</pre>
+
+<p>栈有两点特别重要：</p>
+<ol>
+<li><strong>每个线程在当前进程私有的也只有栈</strong></li>
+<li><strong>栈是从高地址往低地址增长</strong>（和堆的从低到高刚好相反）</li>
+</ol>
+<h3 id="8-命令行参数和环境变量"><a href="#8-命令行参数和环境变量" class="headerlink" title="8. 命令行参数和环境变量"></a>8. 命令行参数和环境变量</h3><p>栈再往上，靠近内核空间边界的地方，存放<strong>命令行参数</strong>和<strong>环境变量</strong>。</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）<br/>← 命令行参数与环境变量"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class C hot</pre>
+
+<p>比如 Linux 下运行 <code>./a.out 192.168.1.100 9090</code>，传的 IP 地址和端口号这些命令行参数都会放在这里。环境变量则包含程序搜索头文件、搜索库文件时的默认路径。</p>
+<h2 id="内核空间的划分"><a href="#内核空间的划分" class="headerlink" title="内核空间的划分"></a>内核空间的划分</h2><p>内核空间简单分为三块：</p>
+<pre class="mermaid">flowchart TB
+    K["内核空间 1G<br/>ZONE_DMA / NORMAL / HIGHMEM<br/>← 1G，所有进程共享"]
+    subgraph USER["用户空间 3G"]
+        direction TB
+        C["命令行参数和环境变量<br/>（高地址端）"]
+        ST["stack 栈"]
+        S["加载共享库 *.dll *.so"]
+        H["heap 堆"]
+        B[".bss 未初始化／为0"]
+        D[".data 已初始化且非0"]
+        R[".rodata 只读数据段"]
+        T[".text 代码段"]
+        A["未使用（不可访问）<br/>0x00000000 起"]
+        C --> ST --> S --> H --> B --> D --> R --> T --> A
+    end
+    K -->|"0xC0000000 分界"| C
+    classDef hot fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef norm fill:#f8fafc,stroke:#cbd5e1,color:#64748b
+    class K hot</pre>
+
+<table>
+<thead>
+<tr>
+<th align="left">区域</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>DMA 区</strong></td>
+<td align="left">大概 16M 大小</td>
+</tr>
+<tr>
+<td align="left"><strong>ZONE_NORMAL</strong></td>
+<td align="left">比较大，约 800 多兆。进程的 <strong>PCB 块（<code>task_struct</code>）</strong> 就存放在这里，内核空间的线程、内核函数运行所依赖的栈空间也在这部分</td>
+</tr>
+<tr>
+<td align="left"><strong>High Memory</strong></td>
+<td align="left">高端内存，用于映射高地址的物理内存做地址映射</td>
+</tr>
+</tbody></table>
+<h2 id="用户空间私有，内核空间共享"><a href="#用户空间私有，内核空间共享" class="headerlink" title="用户空间私有，内核空间共享"></a>用户空间私有，内核空间共享</h2><p>值得注意的是：</p>
+<blockquote>
+<p><strong>每一个进程的用户空间是私有的，但内核空间是共享的。</strong></p>
+</blockquote>
+<p>画三个进程来理解：</p>
+<p><img src="/./../images/process-virtual-address-space/user-vs-kernel-space.png"></p>
+<ul>
+<li>每个进程（比如QQ、酷狗音乐、VS Code）<strong>各自都有各自的用户空间</strong>，用户空间是<strong>私有</strong>的</li>
+<li>但<strong>内核空间是共享的</strong>，所有进程共用同一块</li>
+</ul>
+<p>这也解释了操作系统里的<strong>进程间通信</strong>问题。进程之间通信比较难的原因，就是<strong>用户空间是隔离的</strong>——谁也访问不到谁，就像你在一个房间、我在另一个房间，根本没法说话。</p>
+<p>而<strong>匿名管道通信</strong>的原理就清楚了：在内核空间划分一块内存，进程一往这块共享内存里写数据，进程二、进程三都能看得见；进程二或进程三往里写，其他进程也都能看得见。</p>
+<h2 id="回到代码"><a href="#回到代码" class="headerlink" title="回到代码"></a>回到代码</h2><p>把开头那段代码加上注释再看一遍，现在应该都能看懂了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 全局变量，不管是普通的还是静态的，都叫做数据，在符号表中会生成符号</span></span><br><span class="line"><span class="type">int</span> gdata1 = <span class="number">10</span>;        <span class="comment">// 初始值不为0，放在 .data 段</span></span><br><span class="line"><span class="type">int</span> gdata2 = <span class="number">0</span>;         <span class="comment">// .bss</span></span><br><span class="line"><span class="type">int</span> gdata3;             <span class="comment">// .bss</span></span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> gdata4 = <span class="number">11</span>; <span class="comment">// 初始值不为0，放在 .data 段</span></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> gdata5 = <span class="number">0</span>;  <span class="comment">// .bss</span></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> gdata6;      <span class="comment">// .bss</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="comment">// 局部变量，不产生符号，生成指令 --- 放在 .text 段</span></span><br><span class="line">    <span class="type">int</span> a = <span class="number">12</span>;         <span class="comment">// mov dword ptr[a], 0Ch</span></span><br><span class="line">    <span class="comment">// 语句本身生成的是指令，放在 .text 段</span></span><br><span class="line">    <span class="comment">// cpu在运行该指令时，会在栈上划出来一块四字节的空间，用来存放12</span></span><br><span class="line">    <span class="type">int</span> b = <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> c;              <span class="comment">// 栈上的无效值，打印出来肯定不为0</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 静态局部变量，属于数据，放在数据段</span></span><br><span class="line">    <span class="comment">// 程序启动的时候不初始化，第一次运行到它们时才初始化</span></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> e = <span class="number">13</span>;  <span class="comment">// .data</span></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> f = <span class="number">0</span>;   <span class="comment">// .bss</span></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> g;       <span class="comment">// .bss，打印出来是0，因为内核会把 .bss 段清零</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="符号表是什么"><a href="#符号表是什么" class="headerlink" title="符号表是什么"></a>符号表是什么</h3><p>编译一个源文件时，编译器会把<strong>当前文件里定义的、能被别的文件”看见”的名字</strong>记下来，列成一张表，这张表就叫<strong>符号表</strong>。每个条目大致记三件事：</p>
+<table>
+<thead>
+<tr>
+<th align="left">记录内容</th>
+<th align="left">例子</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">名字</td>
+<td align="left"><code>gdata1</code></td>
+</tr>
+<tr>
+<td align="left">类型和大小</td>
+<td align="left"><code>int</code>，4 字节</td>
+</tr>
+<tr>
+<td align="left">所在位置</td>
+<td align="left">哪个段、什么偏移</td>
+</tr>
+</tbody></table>
+<p><strong>它是干什么用的？</strong> 主要服务于<strong>链接</strong>。</p>
+<p>一个程序往往拆成多个 <code>.cpp</code>，每个单独编译成 <code>.o</code>（目标文件）。链接器要把它们拼成可执行文件，还得解决”你这个文件用的 <code>gdata1</code>，在别的文件里定义”这类问题——靠的就是每个目标文件里的符号表。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">a.cpp ──编译──&gt; a.o（含符号表）</span><br><span class="line">b.cpp ──编译──&gt; b.o（含符号表）</span><br><span class="line">                    ↓</span><br><span class="line">                链接器：按符号表把名字对上号</span><br><span class="line">                    ↓</span><br><span class="line">              可执行文件 .exe / a.out</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>链接时如果报 <code>undefined reference to &#39;xxx&#39;</code> 或 <code>LNK2019</code> 这类错误，本质就是<strong>某个符号在别人的符号表里找不到</strong>。</p>
+</blockquote>
+<p>所以，<strong>一个名字进不进符号表，取决于它需不需要被外部看见</strong>。而全局变量要被别的文件访问，自然得登记；出了函数就没人认得的局部变量，登记了也没用。</p>
+<h3 id="局部变量到底产生符号吗？"><a href="#局部变量到底产生符号吗？" class="headerlink" title="局部变量到底产生符号吗？"></a>局部变量到底产生符号吗？</h3><p><code>main</code> 里的三个局部变量 <code>a</code>、<code>b</code>、<code>c</code>，<strong>在符号表中不会产生符号</strong>。</p>
+<p>它们对应生成的是<strong>指令</strong>。在 x86 体系下，<code>int a = 12;</code> 生成的汇编是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mov dword ptr[a], 0Ch      ; 12 = 0Ch</span><br></pre></td></tr></table></figure>
+
+<p>它没有产生 <code>a</code> 的符号，而是生成一条 <code>mov</code> 指令。<strong>这三个局部变量的定义，最终产生的是三条 <code>mov</code> 指令，指令放在 <code>.text</code> 段。</strong></p>
+<h3 id="那”局部变量在栈上”这句话错了吗？"><a href="#那”局部变量在栈上”这句话错了吗？" class="headerlink" title="那”局部变量在栈上”这句话错了吗？"></a>那”局部变量在栈上”这句话错了吗？</h3><p>没错，但要分清两个层面，这是很多人的概念性错误：</p>
+<ol>
+<li><strong><code>a = 12</code> 这条语句编译后生成一条指令</strong>，这条指令放在 <code>.text</code> 段</li>
+<li><strong>当这条指令运行时</strong>，CPU 在当前进程的<strong>栈</strong>上开辟 4 字节空间，把 12 存进去</li>
+</ol>
+<p>所以准确的表述是：**<code>a</code> 不是”在栈上”，而是”<code>a = 12</code> 这条语句生成的指令，运行时会在栈上开辟空间存放 12”。**</p>
+<h3 id="静态局部变量和局部变量不一样"><a href="#静态局部变量和局部变量不一样" class="headerlink" title="静态局部变量和局部变量不一样"></a>静态局部变量和局部变量不一样</h3><p>静态局部变量也是放在数据段的，<strong>程序启动的时候不会初始化它们，而是第一次运行到它们的时候初始化</strong>。</p>
+<p>所以 <code>e = 13</code> 放在 <code>.data</code>，而 <code>f = 0</code>、<code>g</code> 放在 <code>.bss</code>。</p>
+<h2 id="完整布局图"><a href="#完整布局图" class="headerlink" title="完整布局图"></a>完整布局图</h2><p><img src="/./../images/process-virtual-address-space/virtual-address-space-layout.png"></p>
+<blockquote>
+<p>注：《深入理解计算机系统》里的图画法跟这里<strong>刚好上下颠倒</strong>——书上是低地址在下、高地址在上。</p>
+</blockquote>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">内容</th>
+<th align="left">准确说法</th>
+<th align="left">❌ 不要这么说</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">指令</td>
+<td align="left"><code>.text</code> 段 &#x2F; 代码段</td>
+<td align="left">全局变量区、静态区</td>
+</tr>
+<tr>
+<td align="left">常量字符串</td>
+<td align="left"><code>.rodata</code> 段</td>
+<td align="left">——</td>
+</tr>
+<tr>
+<td align="left">已初始化且非零的数据</td>
+<td align="left"><code>.data</code> 段</td>
+<td align="left">静态区</td>
+</tr>
+<tr>
+<td align="left">未初始化 &#x2F; 初始化为零</td>
+<td align="left"><code>.bss</code> 段</td>
+<td align="left">全局变量区</td>
+</tr>
+</tbody></table>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li>《深入理解计算机系统》（CSAPP）——<strong>第七章 链接</strong></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag"># 操作系统</a>
+              <a href="/tags/%E8%BF%9B%E7%A8%8B/" rel="tag"># 进程</a>
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/%E8%99%9A%E6%8B%9F%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4/" rel="tag"># 虚拟地址空间</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/09/13/%E6%95%B0%E7%BB%84%E5%8F%8C%E6%8C%87%E9%92%88%E7%AE%97%E6%B3%95%E9%A2%98/" rel="prev" title="数组--双指针">
+      <i class="fa fa-chevron-left"></i> 数组--双指针
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E6%AE%B5C-%E7%9A%84%E4%BB%A3%E7%A0%81"><span class="nav-number">1.</span> <span class="nav-text">一段C++的代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E8%99%9A%E6%8B%9F%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4"><span class="nav-number">2.</span> <span class="nav-text">进程的虚拟地址空间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A9%BA%E9%97%B4%E7%9A%84%E5%88%92%E5%88%86%EF%BC%9A%E7%94%A8%E6%88%B7%E7%A9%BA%E9%97%B4-%E5%86%85%E6%A0%B8%E7%A9%BA%E9%97%B4"><span class="nav-number">3.</span> <span class="nav-text">空间的划分：用户空间 + 内核空间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%A8%E6%88%B7%E7%A9%BA%E9%97%B4%E7%9A%84%E5%B8%83%E5%B1%80%EF%BC%8C%E4%BB%8E%E4%BD%8E%E5%9C%B0%E5%9D%80%E5%88%B0%E9%AB%98%E5%9C%B0%E5%9D%80"><span class="nav-number">4.</span> <span class="nav-text">用户空间的布局，从低地址到高地址</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E9%A2%84%E7%95%99%E5%8C%BA%EF%BC%8C0x00000000-0x08048000"><span class="nav-number">4.1.</span> <span class="nav-text">1. 预留区，0x00000000-0x08048000</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-text-%E6%AE%B5%EF%BC%88%E6%8C%87%E4%BB%A4%E6%AE%B5%EF%BC%89"><span class="nav-number">4.2.</span> <span class="nav-text">2. .text 段（指令段）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-rodata-%E6%AE%B5%EF%BC%88%E5%8F%AA%E8%AF%BB%E6%95%B0%E6%8D%AE%E6%AE%B5%EF%BC%89"><span class="nav-number">4.3.</span> <span class="nav-text">3. .rodata 段（只读数据段）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-data-%E6%AE%B5-%E5%92%8C-bss-%E6%AE%B5%EF%BC%88%E6%95%B0%E6%8D%AE%E6%AE%B5%EF%BC%89"><span class="nav-number">4.4.</span> <span class="nav-text">4. .data 段 和 .bss 段（数据段）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E5%A0%86%EF%BC%88heap%EF%BC%89"><span class="nav-number">4.5.</span> <span class="nav-text">5. 堆（heap）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-%E5%85%B1%E4%BA%AB%E5%BA%93%EF%BC%88%E5%8A%A8%E6%80%81%E9%93%BE%E6%8E%A5%E5%BA%93%EF%BC%89"><span class="nav-number">4.6.</span> <span class="nav-text">6. 共享库（动态链接库）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-%E6%A0%88%EF%BC%88stack%EF%BC%89"><span class="nav-number">4.7.</span> <span class="nav-text">7. 栈（stack）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-%E5%91%BD%E4%BB%A4%E8%A1%8C%E5%8F%82%E6%95%B0%E5%92%8C%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="nav-number">4.8.</span> <span class="nav-text">8. 命令行参数和环境变量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E6%A0%B8%E7%A9%BA%E9%97%B4%E7%9A%84%E5%88%92%E5%88%86"><span class="nav-number">5.</span> <span class="nav-text">内核空间的划分</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%A8%E6%88%B7%E7%A9%BA%E9%97%B4%E7%A7%81%E6%9C%89%EF%BC%8C%E5%86%85%E6%A0%B8%E7%A9%BA%E9%97%B4%E5%85%B1%E4%BA%AB"><span class="nav-number">6.</span> <span class="nav-text">用户空间私有，内核空间共享</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9E%E5%88%B0%E4%BB%A3%E7%A0%81"><span class="nav-number">7.</span> <span class="nav-text">回到代码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%A6%E5%8F%B7%E8%A1%A8%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">7.1.</span> <span class="nav-text">符号表是什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E5%88%B0%E5%BA%95%E4%BA%A7%E7%94%9F%E7%AC%A6%E5%8F%B7%E5%90%97%EF%BC%9F"><span class="nav-number">7.2.</span> <span class="nav-text">局部变量到底产生符号吗？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%82%A3%E2%80%9D%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E5%9C%A8%E6%A0%88%E4%B8%8A%E2%80%9D%E8%BF%99%E5%8F%A5%E8%AF%9D%E9%94%99%E4%BA%86%E5%90%97%EF%BC%9F"><span class="nav-number">7.3.</span> <span class="nav-text">那”局部变量在栈上”这句话错了吗？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9D%99%E6%80%81%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E4%B8%8D%E4%B8%80%E6%A0%B7"><span class="nav-number">7.4.</span> <span class="nav-text">静态局部变量和局部变量不一样</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E5%B8%83%E5%B1%80%E5%9B%BE"><span class="nav-number">8.</span> <span class="nav-text">完整布局图</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">9.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">10.</span> <span class="nav-text">参考</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">52</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">80</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">476k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">7:13</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>
