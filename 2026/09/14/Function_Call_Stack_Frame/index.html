@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="从汇编指令深入分析函数调用的完整过程——参数压栈、call 指令、栈帧建立、返回值传递、栈帧回退">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从汇编指令角度分析函数调用堆栈的详细过程">
+<meta property="og:url" content="http://tristan1116.github.io/2026/09/14/Function_Call_Stack_Frame/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="从汇编指令深入分析函数调用的完整过程——参数压栈、call 指令、栈帧建立、返回值传递、栈帧回退">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-09-14T18:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-14T18:00:00.000Z">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="汇编">
+<meta property="article:tag" content="函数调用">
+<meta property="article:tag" content="栈帧">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/09/14/Function_Call_Stack_Frame/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>从汇编指令角度分析函数调用堆栈的详细过程 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/09/14/Function_Call_Stack_Frame/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从汇编指令角度分析函数调用堆栈的详细过程
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-09-14 18:00:00" itemprop="dateCreated datePublished" datetime="2026-09-14T18:00:00+00:00">2026-09-14</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/C-C/" itemprop="url" rel="index"><span itemprop="name">C/C++</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>11k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>10 分钟</span>
+            </span>
+            <div class="post-description">从汇编指令深入分析函数调用的完整过程——参数压栈、call 指令、栈帧建立、返回值传递、栈帧回退</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="两个问题引入"><a href="#两个问题引入" class="headerlink" title="两个问题引入"></a>两个问题引入</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> temp = <span class="number">0</span>;</span><br><span class="line">    temp = a + b;</span><br><span class="line">    <span class="keyword">return</span> temp;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> a = <span class="number">10</span>;</span><br><span class="line">    <span class="type">int</span> b = <span class="number">20</span>;</span><br><span class="line">    <span class="type">int</span> ret = <span class="built_in">sum</span>(a, b);</span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;ret:&quot;</span> &lt;&lt; ret &lt;&lt; endl;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>两个问题：</p>
+<ol>
+<li><strong><code>main</code> 调用 <code>sum</code>，<code>sum</code> 执行完怎么知道回到哪个函数？</strong></li>
+<li><strong><code>sum</code> 执行完回到 <code>main</code>，怎么知道从哪一行指令继续运行？</strong></li>
+</ol>
+<p>如果 <code>sum</code> 返回后 <code>main</code> 又从头开始执行，那就成一个死循环了。但实际并没有，说明 **CPU 一定在哪里记下了”该从哪继续”**。</p>
+<h2 id="前置知识：栈、寄存器、压栈-出栈、汇编"><a href="#前置知识：栈、寄存器、压栈-出栈、汇编" class="headerlink" title="前置知识：栈、寄存器、压栈&#x2F;出栈、汇编"></a>前置知识：栈、寄存器、压栈&#x2F;出栈、汇编</h2><p>函数运行时依赖的内存区域叫做<strong>栈（stack）</strong>。它有几个特点：</p>
+<ul>
+<li><strong>从高地址向低地址生长</strong>（”向下生长”）</li>
+<li>由两个寄存器描述边界：</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th align="left">寄存器</th>
+<th align="left">含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>esp</strong>（Extended Stack Pointer）</td>
+<td align="left">栈顶指针，始终指向当前函数栈帧的<strong>栈顶</strong>（最低地址）。随 push&#x2F;pop 动态变化</td>
+</tr>
+<tr>
+<td align="left"><strong>ebp</strong>（Extended Base Pointer）</td>
+<td align="left">栈底指针，指向当前函数栈帧的<strong>栈底</strong>（最高地址）。函数入口处固定，之后作为访问变量的基准</td>
+</tr>
+</tbody></table>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["ebp →　当前函数栈底（锚点，访问变量的基准）"]
+    C["↓　栈向低地址方向生长"]
+    D["esp →　当前函数栈顶（随 push / pop 动态变化）"]
+    E["低地址"]
+    A --> B --> C --> D --> E
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    class B,D p</pre>
+
+<p><strong>栈底是高地址，栈顶是低地址</strong>。</p>
+<blockquote>
+<p>💡 为什么栈要向下生长？这跟进程的虚拟地址空间布局有关：栈区从高地址向低地址扩展，堆区从低地址向高地址扩展，两者相向生长，中间的空白区域可以灵活共用，避免过早耗尽。</p>
+</blockquote>
+<h3 id="x86-寄存器"><a href="#x86-寄存器" class="headerlink" title="x86 寄存器"></a>x86 寄存器</h3><p>前面反提到的 <code>esp</code>、<code>ebp</code> 都是<strong>寄存器</strong>——CPU 内部的存储单元，离运算器最近，读写速度比内存快一个数量级。</p>
+<p>32 位 x86 一共有 <strong>8 个通用寄存器</strong>，名字都以 <code>e</code> 开头：</p>
+<table>
+<thead>
+<tr>
+<th align="left">寄存器</th>
+<th align="left">传统用途</th>
+<th align="left">名字由来</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>eax</strong></td>
+<td align="left">累加器，<strong>函数返回值默认放这里</strong></td>
+<td align="left"><strong>A</strong>ccumulator</td>
+</tr>
+<tr>
+<td align="left"><strong>ebx</strong></td>
+<td align="left">基址寄存器，早期用于寻址</td>
+<td align="left"><strong>B</strong>ase</td>
+</tr>
+<tr>
+<td align="left"><strong>ecx</strong></td>
+<td align="left">计数寄存器，<code>rep</code> 前缀指令的重复次数就存在这里</td>
+<td align="left"><strong>C</strong>ounter</td>
+</tr>
+<tr>
+<td align="left"><strong>edx</strong></td>
+<td align="left">数据寄存器，与 <code>eax</code> 配对传递 8 字节返回值</td>
+<td align="left"><strong>D</strong>ata</td>
+</tr>
+<tr>
+<td align="left"><strong>esi</strong></td>
+<td align="left">源变址寄存器</td>
+<td align="left"><strong>S</strong>ource <strong>I</strong>ndex</td>
+</tr>
+<tr>
+<td align="left"><strong>edi</strong></td>
+<td align="left">目的变址寄存器</td>
+<td align="left"><strong>D</strong>estination <strong>I</strong>ndex</td>
+</tr>
+<tr>
+<td align="left"><strong>esp</strong></td>
+<td align="left">栈顶指针</td>
+<td align="left"><strong>S</strong>tack <strong>P</strong>ointer</td>
+</tr>
+<tr>
+<td align="left"><strong>ebp</strong></td>
+<td align="left">栈底指针</td>
+<td align="left"><strong>B</strong>ase <strong>P</strong>ointer</td>
+</tr>
+</tbody></table>
+<p>三点说明：</p>
+<p><strong>1. 名字只是”传统”，真正专用的只有 <code>esp</code> 和 <code>ebp</code></strong></p>
+<p><code>eax</code> 叫”累加器”，是 8086 时代留下的名字——那时候 <code>ax</code> 确实专用于累加运算，指令编码里给它留了最短的形式。到了现代，除了 <code>esp</code>、<code>ebp</code> 被硬件约定为栈顶&#x2F;栈底指针，其余 6 个基本可以随便用。只是编译器习惯把返回值放 <code>eax</code>，所以它在反汇编里出镜率最高。</p>
+<p><strong>2. 为什么返回值放寄存器，不放内存</strong></p>
+<p>寄存器在 CPU 内部，访问不必走总线；<code>eax</code> 是 32 位，也就是4 字节，刚好装下一个 <code>int</code>。”能塞进寄存器就别动内存”是编译器的一条基本原则。</p>
+<p><strong>3. <code>e</code> 是 Extended（扩展）的意思</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">位数</th>
+<th align="left">写法</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">16 位</td>
+<td align="left"><code>ax</code></td>
+<td align="left">8086 时代的原名</td>
+</tr>
+<tr>
+<td align="left">32 位</td>
+<td align="left"><code>eax</code></td>
+<td align="left">加 <code>e</code>，扩展到 32 位</td>
+</tr>
+<tr>
+<td align="left">64 位</td>
+<td align="left"><code>rax</code></td>
+<td align="left">换 <code>r</code> 前缀，扩展到 64 位</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>💡 现在写 64 位程序，反汇编里看到的是 <code>rax</code>、<code>rbp</code> 这一套。 <strong>32 位 x86</strong>，反汇编窗口里就是 <code>eax</code>、<code>ebp</code>。原理完全相同，只是位数不同。</p>
+</blockquote>
+<blockquote>
+<p>⚠️ 还有一个特殊成员：**<code>eip</code>（Instruction Pointer）<strong>，指令指针，也就是常说的 <strong>PC（Program Counter）</strong>。它存的不是数据，而是</strong>下一条要执行的指令的地址**。<code>call</code> 和 <code>ret</code> 之所以能跳转，本质就是往它里面写值——第六步会详细讲。</p>
+</blockquote>
+<h3 id="压栈-出栈：push-和-pop-到底做了什么"><a href="#压栈-出栈：push-和-pop-到底做了什么" class="headerlink" title="压栈 &#x2F; 出栈：push 和 pop 到底做了什么"></a>压栈 &#x2F; 出栈：push 和 pop 到底做了什么</h3><p>栈的两个基本操作是 <strong><code>push</code>（压栈）</strong> 和 <strong><code>pop</code>（出栈）</strong>，两者都只能操作<strong>栈顶</strong>那一格，不能从中间插队。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">push eax    ; 压栈：把 eax 的值放到栈顶</span><br><span class="line">pop ebx     ; 出栈：把栈顶的值取出来，放进 ebx</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>push</code> 拆开来是两步</strong>：</p>
+<ol>
+<li><strong>先把 <code>esp</code> 减 4</strong>（栈顶向低地址移动一格）</li>
+<li><strong>再把值写进新的栈顶位置</strong></li>
+</ol>
+<p><strong><code>pop</code> 是反过来的两步</strong>（所以顺序很关键）：</p>
+<ol>
+<li><strong>先把栈顶的值读出来</strong>，放进目标寄存器</li>
+<li><strong>再把 <code>esp</code> 加 4</strong>（栈顶退回高地址方向）</li>
+</ol>
+<p><strong><code>push</code> 之前</strong>，<code>esp</code> 停在 <code>0x0FFC</code>：</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["0x1000　　旧数据"]
+    C["0x0FFC　　esp →　栈顶"]
+    D["低地址"]
+    A --> B --> C --> D
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    class C p</pre>
+
+<p><strong><code>push eax</code> 之后</strong>（<code>eax = 30</code>），<code>esp</code> 减了 4，30 落在原来 <code>esp</code> 指的那一格：</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["0x1000　　旧数据"]
+    C["0x0FFC　　30　←　新压进来的值"]
+    D["0x0FF8　　esp →　栈顶（减了 4）"]
+    E["低地址"]
+    A --> B --> C --> D --> E
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef v fill:#dbeafe,stroke:#2c5f8a,color:#1e3a5f
+    class C v
+    class D p</pre>
+
+<p>对比两张图能看出两件事：</p>
+<ul>
+<li><strong><code>esp</code> 自己会动</strong> —— 这正是判断一个操作算不算”压栈”的依据。压栈只认 <code>push</code>。而<code>mov</code> 只写内存、不动 <code>esp</code>，所以不是压栈</li>
+<li><strong>“栈顶”在下、”栈底”在上</strong> —— 越后压进去的数据地址越低</li>
+</ul>
+<blockquote>
+<p>💡 为什么 <code>push</code> 要先减 <code>esp</code> 再写值？因为 <code>esp</code> 指向的才是<strong>当前可用的栈顶</strong>。先把指针让出来，再把数据放进去，顺序反了就会覆盖掉上一格的有效数据。</p>
+</blockquote>
+<h3 id="汇编语法基本概念"><a href="#汇编语法基本概念" class="headerlink" title="汇编语法基本概念"></a>汇编语法基本概念</h3><p>后面会反复出现 <code>mov dword ptr [ebp-4], 0Ah</code> 这样的指令，看着有点吓人，其实拆成三块就清楚了：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov      dword ptr      [ebp-4]      , 0Ah</span><br><span class="line"> ↑            ↑             ↑           ↑</span><br><span class="line">指令      操作数大小     内存地址      立即数</span><br></pre></td></tr></table></figure>
+
+<p><strong>① 操作数大小说明符：<code>dword ptr</code> &#x2F; <code>word ptr</code> &#x2F; <code>byte ptr</code></strong></p>
+<p>汇编里的内存<strong>没有类型</strong>（不像 C 语言有 <code>int</code>、<code>char</code>），所以你必须告诉 CPU：这次要操作几个字节？</p>
+<table>
+<thead>
+<tr>
+<th align="left">写法</th>
+<th align="left">大小</th>
+<th align="left">对应 C 类型</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>byte ptr</code></td>
+<td align="left">1 字节</td>
+<td align="left"><code>char</code></td>
+</tr>
+<tr>
+<td align="left"><code>word ptr</code></td>
+<td align="left">2 字节</td>
+<td align="left"><code>short</code></td>
+</tr>
+<tr>
+<td align="left"><code>dword ptr</code></td>
+<td align="left">4 字节</td>
+<td align="left"><code>int</code>、指针</td>
+</tr>
+</tbody></table>
+<p><code>dword</code> &#x3D; <strong>d</strong>ouble <strong>word</strong>，x86 里 <code>word</code> 是 2 字节，所以 <code>dword</code> 就是 4 字节。<code>ptr</code> 表示被描述的是一块内存（指针）。</p>
+<blockquote>
+<p>⚠️ 反过来，<code>mov eax, 10</code> 这种<strong>寄存器</strong>作为目标时不用写大小——<code>eax</code> 本身就是 4 字节，大小已经确定了。</p>
+</blockquote>
+<p><strong>② 方括号 <code>[ ]</code>：这是”取地址对应的内容”，不是数组</strong></p>
+<p><code>[ ]</code> 在这里跟数组没关系，它的含义是 <strong>取这个地址上的内存</strong>。可以直接对应到 C 语言的解引用：</p>
+<table>
+<thead>
+<tr>
+<th align="left">汇编</th>
+<th align="left">含义</th>
+<th align="left">对应 C 语言</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>ebp</code></td>
+<td align="left">寄存器的值（一个地址）</td>
+<td align="left"><code>ebp</code></td>
+</tr>
+<tr>
+<td align="left"><code>[ebp]</code></td>
+<td align="left">这个地址上存的东西</td>
+<td align="left"><code>*ebp</code>（解引用）</td>
+</tr>
+</tbody></table>
+<p><code>[ebp-4]</code> 就是”<code>ebp</code> 的值减 4，<strong>再取这个地址上的内容</strong>“——和 C 里的 <code>*(ebp - 4)</code> 是一个意思。</p>
+<p><strong>③ 完整的指令</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mov dword ptr [ebp-4], 0Ah</span><br></pre></td></tr></table></figure>
+
+<p>拆开来读：</p>
+<ul>
+<li><strong><code>dword ptr</code></strong> —— 这次操作 4 个字节（一个 <code>int</code>）</li>
+<li><strong><code>[ebp-4]</code></strong> —— 目的地是 <code>ebp - 4</code> 这个地址上的内存</li>
+<li><strong><code>0Ah</code></strong> —— 要写进去的值。末尾的 <code>h</code> 表示<strong>十六进制</strong>，<code>0Ah</code> &#x3D; <code>10</code>，前面的 <code>0</code> 是为了和标识符区分</li>
+<li><strong>合起来</strong> —— 把 10 这个 4 字节整数，写进 <code>ebp - 4</code> 这个地址</li>
+</ul>
+<p>前面代码中的<code>int a = 10</code>就是这么翻译过去的</p>
+<blockquote>
+<p>⚠️ 汇编有两大语法流派：<strong>Intel 语法</strong>（<code>mov 目标, 源</code>）和 <strong>AT&amp;T 语法</strong>（<code>mov 源, 目标</code>，寄存器要带 <code>%</code>）。这篇博客用的是 <strong>Intel 语法</strong>——VS 反汇编窗口也是这种。看别的资料时需要先确认是哪一派，不然操作数顺序会读反。</p>
+</blockquote>
+<h2 id="第一步：main-函数的栈帧布局"><a href="#第一步：main-函数的栈帧布局" class="headerlink" title="第一步：main 函数的栈帧布局"></a>第一步：main 函数的栈帧布局</h2><p>先看调用发生<strong>之前</strong> <code>main</code> 自己的地盘。</p>
+<p><code>main</code> 里定义了三个局部变量：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> a = <span class="number">10</span>;</span><br><span class="line"><span class="type">int</span> b = <span class="number">20</span>;</span><br><span class="line"><span class="type">int</span> ret = <span class="built_in">sum</span>(a, b);</span><br></pre></td></tr></table></figure>
+
+<p>它们生成的汇编指令是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">int a = 10;   →  mov dword ptr [ebp-4], 0Ah</span><br><span class="line">int b = 20;   →  mov dword ptr [ebp-8], 14h</span><br><span class="line">int ret;      →  mov dword ptr [ebp-0Ch], ?</span><br></pre></td></tr></table></figure>
+
+<p>注意三点：</p>
+<p><strong>1. 局部变量不产生符号，通过 <code>ebp</code> 偏移访问</strong></p>
+<p>指令里没有 <code>a</code>、<code>b</code> 这样的符号名，全是 <code>[ebp-4]</code>、<code>[ebp-8]</code> 这种写法。因为<strong>局部变量在符号表里不产生符号</strong>，有些编译器会在反汇编显示时标上变量名，方便阅读，比如前一篇博客里的写法，但是真正的指令是 <code>ebp</code> 减偏移。</p>
+<p>访问局部变量为什么用 <code>ebp</code> <strong>减</strong>？因为栈底是高地址，往上走是低地址，所以偏移量为负。</p>
+<p><strong>2. 声明顺序决定偏移大小</strong></p>
+<p>先声明的 <code>a</code> 离 <code>ebp</code> 最近（偏移 -4），后声明的 <code>b</code> 在更下面（-8），<code>ret</code> 再往下（-0Ch）。每个 <code>int</code> 占 4 字节，三个变量共 12 字节。</p>
+<p><strong>3. <code>ebp</code> 固定、<code>esp</code> 变化</strong></p>
+<p><code>ebp</code> 在函数入口处设好后就不再动，所有局部变量都以它为基准；<code>esp</code> 则随 push&#x2F;pop 上上下下。</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["ebp →　0x0018FF44　main 栈帧栈底"]
+    C["a = 10　　[ebp-4]"]
+    D["b = 20　　[ebp-8]"]
+    E["ret = ?　　[ebp-0Ch]"]
+    F["esp →　栈顶"]
+    G["低地址"]
+    A --> B --> C --> D --> E --> F --> G
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef v fill:#dbeafe,stroke:#2c5f8a,color:#1e3a5f
+    class B,F p
+    class C,D,E v</pre>
+
+<h2 id="第二步：参数压栈"><a href="#第二步：参数压栈" class="headerlink" title="第二步：参数压栈"></a>第二步：参数压栈</h2><p>现在执行到第三行 <code>int ret = sum(a, b);</code>——<strong>函数调用</strong>。</p>
+<p>函数调用首先要做的事情是<strong>压参数</strong>。两个细节：</p>
+<p><strong>从右向左压</strong>。先压 <code>b</code>，再压 <code>a</code>。</p>
+<p><strong>用 <code>push</code> 指令，不是 <code>mov</code><strong>。 <code>mov</code> 只是把值放到 <code>ebp</code> 偏移的某块内存里，</strong>不会移动栈顶指针</strong>；而 <code>push</code> 会自动调整 <code>esp</code>，这才是”压栈”。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mov eax, dword ptr [ebp-8]    ; 从 b 的内存取值 20，放到eax寄存器里</span><br><span class="line">push eax                       ; 压栈</span><br><span class="line">mov eax, dword ptr [ebp-4]    ; 从 a 的内存取值 10，放到eax</span><br><span class="line">push eax                       ; 压栈</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键点</strong>：随着 <code>push</code>，栈上新增的这两块 4 字节空间，<strong>就是 <code>sum</code> 函数形参变量 <code>a</code>、<code>b</code> 的内存</strong>。</p>
+<p>也就是说——<strong>形参变量的内存是在调用方函数里就开辟好的</strong>，不是 <code>sum</code> 自己分配的。这一点很重要，后面 <code>sum</code> 访问参数时直接往上找就行。</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["ebp →　main 栈底"]
+    C["a = 10　　[ebp-4]"]
+    D["b = 20　　[ebp-8]"]
+    E["ret = ?　　[ebp-0Ch]"]
+    F["参数 b = 20　　← push eax 压入"]
+    G["参数 a = 10　　← push eax 压入"]
+    H["esp →　栈顶（低地址）"]
+    A --> B --> C --> D --> E --> F --> G --> H
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef v fill:#dbeafe,stroke:#2c5f8a,color:#1e3a5f
+    classDef arg fill:#fef3c7,stroke:#b45309,color:#92400e
+    class B,H p
+    class C,D,E v
+    class F,G arg</pre>
+
+<h2 id="第三步：call-指令"><a href="#第三步：call-指令" class="headerlink" title="第三步：call 指令"></a>第三步：call 指令</h2><p>参数压完，执行 <code>call sum</code>。</p>
+<p><strong><code>call</code> 指令做两件事</strong>：</p>
+<ol>
+<li><strong>把下一条指令的地址入栈</strong>——也就是 <code>add esp, 8</code> 的地址</li>
+<li><strong>跳转到 <code>sum</code> 函数的入口</strong></li>
+</ol>
+<p>第一件事正是<strong>问题 2 的答案</strong>：<code>sum</code> 执行完怎么知道从哪继续？因为 <code>call</code> 指令在进去之前，已经把”回来的地址”压在栈上了。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">call sum    ; 1. 压入下一条指令的地址  2. 跳转到 sum</span><br><span class="line">add esp, 8              ; ← 这个指令的地址被压栈了</span><br><span class="line">mov dword ptr [ebp-0Ch], eax</span><br></pre></td></tr></table></figure>
+
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["ebp →　main 栈底"]
+    C["a = 10　　[ebp-4]"]
+    D["b = 20　　[ebp-8]"]
+    E["ret = ?　　[ebp-0Ch]"]
+    F["参数 b = 20"]
+    G["参数 a = 10"]
+    H["返回地址　← call 自动压入"]
+    I["esp →　栈顶（低地址）"]
+    A --> B --> C --> D --> E --> F --> G --> H --> I
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef v fill:#dbeafe,stroke:#2c5f8a,color:#1e3a5f
+    classDef arg fill:#fef3c7,stroke:#b45309,color:#92400e
+    classDef ret fill:#ffe4e6,stroke:#9f1239,color:#9f1239
+    class B,I p
+    class C,D,E v
+    class F,G arg
+    class H ret</pre>
+
+<h2 id="第四步：sum-函数栈帧的建立"><a href="#第四步：sum-函数栈帧的建立" class="headerlink" title="第四步：sum 函数栈帧的建立"></a>第四步：sum 函数栈帧的建立</h2><p>注意了——**从 <code>sum</code> 的左括号 <code>&#123;</code> 进来，并不是直接就执行 <code>int temp = 0;</code>**。</p>
+<p><strong>左括号和第一行代码之间，是有指令生成的</strong>。这些指令负责开辟和初始化 <code>sum</code> 自己的栈帧空间。任何函数的左括号进来，都是同样的操作序列：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">push ebp          ; 1. 把调用方函数（main）的栈底地址入栈</span><br><span class="line">mov ebp, esp      ; 2. 把 esp 赋给 ebp，确立当前函数的栈底</span><br><span class="line">sub esp, 4Ch      ; 3. esp 减去 4Ch，为 sum 开辟栈帧空间</span><br></pre></td></tr></table></figure>
+
+<p>逐条分析：</p>
+<p><strong><code>push ebp</code></strong> —— 此时 <code>ebp</code> 还指向 <code>main</code> 的栈底。把它压栈保存起来，相当于给”回家的路”做个标记。<strong>这正是问题 1 的答案</strong>：<code>sum</code> 执行完怎么知道回到哪个函数？在进来时它就把 <code>main</code> 的栈底地址存下来了。</p>
+<p><strong><code>mov ebp, esp</code></strong> —— 把esp赋给ebp，让ebp指向main函数的栈顶，也就是当前sum函数的栈底</p>
+<p><strong><code>sub esp, 4Ch</code></strong> —— <code>add</code> 是加、<code>sub</code> 是减。 <code>esp</code> 减 4Ch，<strong>向低地址移动</strong>，给 <code>sum</code> 划出 0x4C（76）字节的空间，也就是开辟栈帧空间。</p>
+<blockquote>
+<p><strong>栈初始化（VS Debug 版本特有）</strong> —— 在 VS 系列的编译器下，开辟完空间后还会有一条类似 <code>rep stosd</code> 的循环指令，把新栈帧**全部填充为 <code>0xCC</code>**。</p>
+<p><code>0xCC</code> 在编码里对应汉字「<strong>烫</strong>」——这就是为什么在 VS Debug 模式下，打印一个未初始化的局部变量会看到「烫烫烫」。它的用处是帮你快速发现”用了未初始化变量”的 bug。</p>
+<p>⚠ <strong>但这是特定编译器的行为，不是 C&#x2F;C++ 标准规定的</strong>。gcc 无论 Debug 还是 Release 都不做这个初始化，新栈空间里就是上一个函数留下的脏数据。</p>
+</blockquote>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["main 栈帧"]
+    C["参数 b　　[ebp+0Ch]"]
+    D["参数 a　　[ebp+8]"]
+    E["返回地址　[ebp+4]"]
+    F["保存的 main 的栈底地址（push ebp）　←　新 ebp 指向这里（mov ebp, esp）"]
+    G["...　sub esp,4Ch 开辟的空间"]
+    H["esp →　栈顶（低地址）"]
+    A --> B --> C --> D --> E --> F --> G --> H
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef arg fill:#fef3c7,stroke:#b45309,color:#92400e
+    classDef ret fill:#ffe4e6,stroke:#9f1239,color:#9f1239
+    classDef loc fill:#d1fae5,stroke:#047857,color:#065f46
+    class F,H p
+    class C,D arg
+    class E ret
+    class G loc</pre>
+
+<h2 id="第五步：函数体内如何访问参数和局部变量"><a href="#第五步：函数体内如何访问参数和局部变量" class="headerlink" title="第五步：函数体内如何访问参数和局部变量"></a>第五步：函数体内如何访问参数和局部变量</h2><p>栈帧建好，现在 <code>sum</code> 可以干活了。函数体三行：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> temp = <span class="number">0</span>;</span><br><span class="line">temp = a + b;</span><br><span class="line"><span class="keyword">return</span> temp;</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>int temp = 0;</code></strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mov dword ptr [ebp-4], 0</span><br></pre></td></tr></table></figure>
+
+<p>此时 <code>ebp</code> 已经指向 <code>sum</code> 的栈底，<code>[ebp-4]</code> 就是 <code>sum</code> 的第一个局部变量 <code>temp</code> 的空间。</p>
+<p><strong><code>temp = a + b;</code></strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov eax, dword ptr [ebp+0Ch]   ; 找到并取出b的值，放进 eax</span><br><span class="line">add eax, dword ptr [ebp+8]     ; 找到a，并给eax加上 a 的值</span><br><span class="line">mov dword ptr [ebp-4], eax     ; 把eax的值写回 temp</span><br></pre></td></tr></table></figure>
+
+<p>为什么 <code>a</code> 是 <code>[ebp+8]</code>、<code>b</code> 是 <code>[ebp+0Ch]</code>？从 <code>ebp</code> 往上数：</p>
+<table>
+<thead>
+<tr>
+<th align="left">偏移</th>
+<th align="left">内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>[ebp]</code></td>
+<td align="left">保存的 <code>main</code> 栈底地址</td>
+</tr>
+<tr>
+<td align="left"><code>[ebp+4]</code></td>
+<td align="left">返回时下一条指令的地址</td>
+</tr>
+<tr>
+<td align="left"><code>[ebp+8]</code></td>
+<td align="left">形参 a</td>
+</tr>
+<tr>
+<td align="left"><code>[ebp+0Ch]</code></td>
+<td align="left">形参 b</td>
+</tr>
+</tbody></table>
+<p>往上依次经过 <code>ebp</code> 的地址、返回地址、<code>a</code> 的地址，就取到了 <code>b</code>。可见ebp是一个“锚点”，向上加，能访问参数，向下减，访问局部变量</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["参数 b = 20　　[ebp+0Ch]"]
+    C["参数 a = 10　　[ebp+8]"]
+    D["返回地址　　[ebp+4]"]
+    E["保存的 main 的 ebp　[ebp]　←　锚点：正偏移往上取参数"]
+    F["temp = 30　　[ebp-4]　←　负偏移往下放局部变量"]
+    G["（sub esp,4Ch 预留的其余空间）"]
+    H["esp →　栈顶（低地址）"]
+    A --> B --> C --> D --> E --> F --> G --> H
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef arg fill:#fef3c7,stroke:#b45309,color:#92400e
+    classDef ret fill:#ffe4e6,stroke:#9f1239,color:#9f1239
+    classDef loc fill:#d1fae5,stroke:#047857,color:#065f46
+    class E,H p
+    class B,C arg
+    class D ret
+    class F,G loc</pre>
+
+<p><strong><code>return temp;</code></strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mov eax, dword ptr [ebp-4]</span><br></pre></td></tr></table></figure>
+
+<p><code>temp</code> 是函数的局部变量，出不去。返回值是<strong>按值返回</strong>——把 <code>temp</code> 的值放进 <strong><code>eax</code> 寄存器</strong>带走，而不是把 <code>temp</code> 这块内存带出去。</p>
+<h2 id="第六步：右括号——栈帧回退与返回"><a href="#第六步：右括号——栈帧回退与返回" class="headerlink" title="第六步：右括号——栈帧回退与返回"></a>第六步：右括号——栈帧回退与返回</h2><p><code>sum</code> 执行完，到了右括号 <code>&#125;</code>。<strong>右括号同样是由指令生成的</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov esp, ebp      ; 1. 回退栈帧空间</span><br><span class="line">pop ebp           ; 2. 恢复调用方的栈底</span><br><span class="line">ret               ; 3. 弹出返回地址并跳转</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>mov esp, ebp</code></strong> —— 把 <code>ebp</code> 的值赋给 <code>esp</code>，<code>esp</code> 瞬间从栈顶”跳”回栈底，<strong>一步就释放了整个 <code>sum</code> 的栈帧空间</strong>。</p>
+<p>注意：<strong>这只是把空间还给了系统，并没有清理栈上的数据</strong>。</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["参数 b = 20　　[ebp+0Ch]"]
+    C["参数 a = 10　　[ebp+8]"]
+    D["返回地址　　[ebp+4]"]
+    E["保存的 main 的 ebp　[ebp]　←　esp 跳到这里"]
+    F["temp 等局部变量区（已还给系统）　[ebp-4] 起往下"]
+    G["低地址"]
+    A --> B --> C --> D --> E --> F --> G
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef arg fill:#fef3c7,stroke:#b45309,color:#92400e
+    classDef ret fill:#ffe4e6,stroke:#9f1239,color:#9f1239
+    classDef rel fill:#e5e7eb,stroke:#6b7280,color:#6b7280
+    class E p
+    class B,C arg
+    class D ret
+    class F rel</pre>
+
+<p><strong><code>pop ebp</code></strong> —— 出栈，把进来时保存的 <code>main</code> 栈底地址，弹出来赋给 <code>ebp</code>。执行完，**<code>ebp</code> 回到了 <code>main</code> 的栈底**。</p>
+<p><strong><code>ret</code></strong> —— 做两件事：</p>
+<ol>
+<li><strong>出栈</strong>：此时栈顶放的就是 <code>call</code> 指令当初压入的，返回后下一条指令的地址</li>
+<li><strong>把出栈的值放入 CPU 的 PC 寄存器</strong>（程序计数器，x86 中叫 EIP）</li>
+</ol>
+<p>CPU 怎么知道下一条该执行哪条指令？就是看 <strong>PC 寄存器</strong>。执行完 <code>ret</code>，PC 里存的是返回地址，CPU 就跳到这个地址去执行——<strong>正好是 <code>main</code> 里 <code>call sum</code> 的下一条指令</strong><code>add esp, 8 </code></p>
+<p>三条指令执行完，<code>ebp</code> 已经回到 <code>main</code> 的栈底，<code>esp</code> 退到了形参 <code>a</code> 上：</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["ebp →　main 栈帧栈底（已恢复）"]
+    C["a = 10　　[ebp-4]"]
+    D["b = 20　　[ebp-8]"]
+    E["ret = ?　　[ebp-0Ch]"]
+    F["参数 b = 20"]
+    G["参数 a = 10"]
+    H["esp →　栈顶（停在参数 a 上）"]
+    A --> B --> C --> D --> E --> F --> G --> H
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef v fill:#dbeafe,stroke:#2c5f8a,color:#1e3a5f
+    classDef arg fill:#fef3c7,stroke:#b45309,color:#92400e
+    class B,H p
+    class C,D,E v
+    class F,G arg</pre>
+
+<p><strong>问题 1 和问题 2 到这里全部解答</strong>：</p>
+<ul>
+<li>问题 1（回到哪个函数）：进来时 <code>push ebp</code> 保存了调用方栈底，<code>pop ebp</code> 时恢复</li>
+<li>问题 2（从哪行继续）：<code>call</code> 时压入了下一条指令的地址，<code>ret</code> 时弹出到 PC 寄存器</li>
+</ul>
+<h2 id="第七步：回到-main"><a href="#第七步：回到-main" class="headerlink" title="第七步：回到 main"></a>第七步：回到 main</h2><p>CPU 跳回 <code>main</code> 后，继续执行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">add esp, 8                        ; 回收形参的栈空间</span><br><span class="line">mov dword ptr [ebp-0Ch], eax      ; 把返回值写进 ret</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>add esp, 8</code></strong> —— <code>esp</code> 向高地址移动 8 字节。这是<strong>把刚才压栈的两个形参 <code>a</code>、<code>b</code> 的空间还给系统</strong>。到这里，<code>esp</code> 和 <code>ebp</code> 都回到了 <code>main</code> 自己的位置。</p>
+<p><strong><code>mov dword ptr [ebp-0Ch], eax</code></strong> —— <code>eax</code> 里装着 <code>sum</code> 带回来的 30，虽然sum函数结束了它的生命，但是它把返回值存到了eax里，eax再把它写进 <code>main</code> 的局部变量 <code>ret</code>。</p>
+<p>两条指令执行完，栈上<strong>只剩下 <code>main</code> 自己的东西</strong>，形参空间被彻底回收：</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["ebp →　main 栈帧栈底（和调用前完全一致）"]
+    C["a = 10　　[ebp-4]"]
+    D["b = 20　　[ebp-8]"]
+    E["ret = 30　　[ebp-0Ch]　←　sum 的返回值落了进来"]
+    F["esp →　栈顶（低地址）"]
+    G["低地址"]
+    A --> B --> C --> D --> E --> F --> G
+    classDef p fill:#1d4ed8,stroke:#0f172a,stroke-width:2px,color:#ffffff
+    classDef v fill:#dbeafe,stroke:#2c5f8a,color:#1e3a5f
+    classDef res fill:#d1fae5,stroke:#047857,color:#065f46
+    class B,F p
+    class C,D v
+    class E res</pre>
+
+<blockquote>
+<p>💡 <strong>形参谁来清理？</strong> 在 C&#x2F;C++ 默认的 <code>__cdecl</code> 调用约定下，<strong>由主调函数清理</strong>（就是这里的 <code>add esp, 8</code>）。而 <code>__stdcall</code> 约定下由被调函数清理，函数返回时执行 <code>ret N</code>，在返回的同时弹出形参空间。<code>__cdecl</code> 支持可变参数，<code>__stdcall</code> 不支持。</p>
+</blockquote>
+<h2 id="返回值大小规则"><a href="#返回值大小规则" class="headerlink" title="返回值大小规则"></a>返回值大小规则</h2><p><code>sum</code> 返回的是 <code>int</code>（4 字节），用 <code>eax</code> 一个寄存器就够了。但返回值大小不同，传递方式也不同：</p>
+<table>
+<thead>
+<tr>
+<th align="left">返回值大小</th>
+<th align="left">传递方式</th>
+<th align="left">典型类型</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>≤ 4 字节</strong></td>
+<td align="left"><code>eax</code> 寄存器</td>
+<td align="left"><code>int</code>、<code>float</code>、<code>char</code>、指针</td>
+</tr>
+<tr>
+<td align="left"><strong>4 &lt; size ≤ 8 字节</strong></td>
+<td align="left"><code>eax</code> + <code>edx</code> 寄存器对</td>
+<td align="left"><code>long long</code>、<code>double</code></td>
+</tr>
+<tr>
+<td align="left"><strong>&gt; 8 字节</strong></td>
+<td align="left"><strong>临时量</strong>（主调函数分配）</td>
+<td align="left">结构体、自定义类</td>
+</tr>
+</tbody></table>
+<p><strong>大返回值（&gt; 8 字节）怎么传</strong>：</p>
+<ol>
+<li>主调函数在栈上分配一块足够大的临时空间（<strong>临时量</strong>）</li>
+<li>把这块临时空间的地址作为<strong>隐藏参数</strong>传给被调函数</li>
+<li>被调函数把返回值直接写进这块临时量（相当于调用方提供了一个”出参”）</li>
+<li>被调函数返回后，主调函数从临时量读取结果</li>
+</ol>
+<p>为什么这么设计？寄存器数量有限、容量固定，装不下结构体这样的大对象；而栈空间充足，且是主调函数自己的地盘，直接写过去最省事。</p>
+<h2 id="不要返回局部变量的地址"><a href="#不要返回局部变量的地址" class="headerlink" title="不要返回局部变量的地址"></a>不要返回局部变量的地址</h2><p>前面提到，<strong>栈帧回退只是移动 <code>esp</code> 指针，并没有清理栈上的数据</strong>。基于这一点，有一类代码<strong>极其危险</strong>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ❌ 危险代码：返回局部变量的地址</span></span><br><span class="line"><span class="function"><span class="type">int</span>* <span class="title">func</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> data = <span class="number">10</span>;</span><br><span class="line">    <span class="keyword">return</span> &amp;data;      <span class="comment">// 返回局部变量的地址</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span>* p = <span class="built_in">func</span>();</span><br><span class="line">    cout &lt;&lt; *p &lt;&lt; endl;    <span class="comment">// 未定义行为</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看起来好像”能跑”——因为栈上那块内存的数据还在。但<strong>这个空间已经交还给系统了</strong>。只要在 <code>func()</code> 返回和打印 <code>*p</code> 之间调用了任何其他函数，那块栈空间就会被新函数的栈帧复用、把 <code>10</code> 覆盖掉，此时再打印就是垃圾值。</p>
+<p>返回局部变量地址是典型的<strong>未定义行为</strong>：可能看起来正常、可能崩溃、可能输出随机值——行为完全不可预测，调试时极难定位。</p>
+<p><strong>安全的替代方案</strong>：</p>
+<ul>
+<li><strong>返回副本</strong>：直接返回值（小对象），或返回动态分配的对象</li>
+<li><strong>传入指针</strong>：由调用者分配内存传进来，被调函数往里面填</li>
+<li><strong>用静态&#x2F;全局变量</strong>：但要注意线程安全和可重入性问题</li>
+</ul>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>整个调用过程，按栈帧从高地址到低地址排下来是这样：</p>
+<pre class="mermaid">flowchart TB
+    A["高地址"]
+    B["main 的局部变量 a / b / ret"]
+    C["参数 b　　[ebp+0Ch]"]
+    D["参数 a　　[ebp+8]"]
+    E["返回地址　[ebp+4]"]
+    F["保存的 main 栈底　[ebp]"]
+    G["sum 的局部变量 temp　[ebp-4]"]
+    H["低地址"]
+    A --> B --> C --> D --> E --> F --> G --> H
+    classDef main fill:#dbeafe,stroke:#2c5f8a,color:#1e3a5f
+    classDef arg fill:#fef3c7,stroke:#b45309,color:#92400e
+    classDef mid fill:#ffe4e6,stroke:#9f1239,color:#9f1239
+    classDef sum fill:#d1fae5,stroke:#047857,color:#065f46
+    class B main
+    class C,D arg
+    class E,F mid
+    class G sum</pre>
+
+<p><strong>四组关键指令</strong>：</p>
+<table>
+<thead>
+<tr>
+<th align="left">阶段</th>
+<th align="left">指令</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>调用方压参</strong></td>
+<td align="left"><code>push</code> × N</td>
+<td align="left">从右向左压实参，为形参开辟内存</td>
+</tr>
+<tr>
+<td align="left"><strong>call</strong></td>
+<td align="left"><code>call</code></td>
+<td align="left">压入返回地址 + 跳转</td>
+</tr>
+<tr>
+<td align="left"><strong>被调函数进入</strong></td>
+<td align="left"><code>push ebp</code> &#x2F; <code>mov ebp, esp</code> &#x2F; <code>sub esp, N</code></td>
+<td align="left">保存调用方栈底、确立自己的栈底、开辟栈帧</td>
+</tr>
+<tr>
+<td align="left"><strong>被调函数退出</strong></td>
+<td align="left"><code>mov esp, ebp</code> &#x2F; <code>pop ebp</code> &#x2F; <code>ret</code></td>
+<td align="left">回退栈帧、恢复调用方栈底、弹出返回地址跳转</td>
+</tr>
+<tr>
+<td align="left"><strong>调用方收尾</strong></td>
+<td align="left"><code>add esp, N</code></td>
+<td align="left">回收形参空间（<code>__cdecl</code>）</td>
+</tr>
+</tbody></table>
+<p><strong>重点</strong>：</p>
+<ol>
+<li><strong><code>call</code> 指令是”记住回家的路”的关键</strong>——它把下一行指令的地址压栈，<code>ret</code> 时再弹回 PC 寄存器</li>
+<li><strong>形参的内存是调用方开辟的</strong>，被调函数只负责用 <code>ebp</code> 正偏移去访问</li>
+<li><strong>局部变量用 <code>ebp</code> 负偏移访问</strong>，因为栈底在高地址、局部变量在低地址</li>
+<li><strong>栈帧回退不清理数据</strong>，所以绝对不要返回局部变量的地址</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/%E6%B1%87%E7%BC%96/" rel="tag"># 汇编</a>
+              <a href="/tags/%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8/" rel="tag"># 函数调用</a>
+              <a href="/tags/%E6%A0%88%E5%B8%A7/" rel="tag"># 栈帧</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/09/13/Process_Virtual_Address_Space/" rel="prev" title="进程的虚拟地址空间内存划分和布局">
+      <i class="fa fa-chevron-left"></i> 进程的虚拟地址空间内存划分和布局
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%A4%E4%B8%AA%E9%97%AE%E9%A2%98%E5%BC%95%E5%85%A5"><span class="nav-number">1.</span> <span class="nav-text">两个问题引入</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E7%BD%AE%E7%9F%A5%E8%AF%86%EF%BC%9A%E6%A0%88%E3%80%81%E5%AF%84%E5%AD%98%E5%99%A8%E3%80%81%E5%8E%8B%E6%A0%88-%E5%87%BA%E6%A0%88%E3%80%81%E6%B1%87%E7%BC%96"><span class="nav-number">2.</span> <span class="nav-text">前置知识：栈、寄存器、压栈&#x2F;出栈、汇编</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#x86-%E5%AF%84%E5%AD%98%E5%99%A8"><span class="nav-number">2.1.</span> <span class="nav-text">x86 寄存器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E6%A0%88-%E5%87%BA%E6%A0%88%EF%BC%9Apush-%E5%92%8C-pop-%E5%88%B0%E5%BA%95%E5%81%9A%E4%BA%86%E4%BB%80%E4%B9%88"><span class="nav-number">2.2.</span> <span class="nav-text">压栈 &#x2F; 出栈：push 和 pop 到底做了什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B1%87%E7%BC%96%E8%AF%AD%E6%B3%95%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="nav-number">2.3.</span> <span class="nav-text">汇编语法基本概念</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9Amain-%E5%87%BD%E6%95%B0%E7%9A%84%E6%A0%88%E5%B8%A7%E5%B8%83%E5%B1%80"><span class="nav-number">3.</span> <span class="nav-text">第一步：main 函数的栈帧布局</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E5%8F%82%E6%95%B0%E5%8E%8B%E6%A0%88"><span class="nav-number">4.</span> <span class="nav-text">第二步：参数压栈</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9Acall-%E6%8C%87%E4%BB%A4"><span class="nav-number">5.</span> <span class="nav-text">第三步：call 指令</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9Asum-%E5%87%BD%E6%95%B0%E6%A0%88%E5%B8%A7%E7%9A%84%E5%BB%BA%E7%AB%8B"><span class="nav-number">6.</span> <span class="nav-text">第四步：sum 函数栈帧的建立</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E5%87%BD%E6%95%B0%E4%BD%93%E5%86%85%E5%A6%82%E4%BD%95%E8%AE%BF%E9%97%AE%E5%8F%82%E6%95%B0%E5%92%8C%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F"><span class="nav-number">7.</span> <span class="nav-text">第五步：函数体内如何访问参数和局部变量</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E5%8F%B3%E6%8B%AC%E5%8F%B7%E2%80%94%E2%80%94%E6%A0%88%E5%B8%A7%E5%9B%9E%E9%80%80%E4%B8%8E%E8%BF%94%E5%9B%9E"><span class="nav-number">8.</span> <span class="nav-text">第六步：右括号——栈帧回退与返回</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E5%9B%9E%E5%88%B0-main"><span class="nav-number">9.</span> <span class="nav-text">第七步：回到 main</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%94%E5%9B%9E%E5%80%BC%E5%A4%A7%E5%B0%8F%E8%A7%84%E5%88%99"><span class="nav-number">10.</span> <span class="nav-text">返回值大小规则</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E8%A6%81%E8%BF%94%E5%9B%9E%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%9A%84%E5%9C%B0%E5%9D%80"><span class="nav-number">11.</span> <span class="nav-text">不要返回局部变量的地址</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">12.</span> <span class="nav-text">总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">53</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">83</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">487k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">7:23</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>
