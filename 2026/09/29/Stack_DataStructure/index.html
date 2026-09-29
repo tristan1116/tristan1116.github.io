@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="顺序栈和链式栈的C++实现">
+<meta property="og:type" content="article">
+<meta property="og:title" content="数据结构 —— 栈">
+<meta property="og:url" content="http://tristan1116.github.io/2026/09/29/Stack_DataStructure/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="顺序栈和链式栈的C++实现">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-09-29T09:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-29T09:00:00.000Z">
+<meta property="article:tag" content="C&#x2F;C++">
+<meta property="article:tag" content="数据结构和算法">
+<meta property="article:tag" content="栈">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/09/29/Stack_DataStructure/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>数据结构 —— 栈 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<style>mjx-container[jax="SVG"] {
+  direction: ltr;
+}
+
+mjx-container[jax="SVG"] > svg {
+  overflow: visible;
+}
+
+mjx-container[jax="SVG"][display="true"] {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+}
+
+mjx-container[jax="SVG"][justify="left"] {
+  text-align: left;
+}
+
+mjx-container[jax="SVG"][justify="right"] {
+  text-align: right;
+}
+
+g[data-mml-node="merror"] > g {
+  fill: red;
+  stroke: red;
+}
+
+g[data-mml-node="merror"] > rect[data-background] {
+  fill: yellow;
+  stroke: none;
+}
+
+g[data-mml-node="mtable"] > line[data-line] {
+  stroke-width: 70px;
+  fill: none;
+}
+
+g[data-mml-node="mtable"] > rect[data-frame] {
+  stroke-width: 70px;
+  fill: none;
+}
+
+g[data-mml-node="mtable"] > .mjx-dashed {
+  stroke-dasharray: 140;
+}
+
+g[data-mml-node="mtable"] > .mjx-dotted {
+  stroke-linecap: round;
+  stroke-dasharray: 0,140;
+}
+
+g[data-mml-node="mtable"] > svg {
+  overflow: visible;
+}
+
+[jax="SVG"] mjx-tool {
+  display: inline-block;
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+[jax="SVG"] mjx-tool > mjx-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+mjx-tool > mjx-tip {
+  display: inline-block;
+  padding: .2em;
+  border: 1px solid #888;
+  font-size: 70%;
+  background-color: #F8F8F8;
+  color: black;
+  box-shadow: 2px 2px 5px #AAAAAA;
+}
+
+g[data-mml-node="maction"][data-toggle] {
+  cursor: pointer;
+}
+
+mjx-status {
+  display: block;
+  position: fixed;
+  left: 1em;
+  bottom: 1em;
+  min-width: 25%;
+  padding: .2em .4em;
+  border: 1px solid #888;
+  font-size: 90%;
+  background-color: #F8F8F8;
+  color: black;
+}
+
+foreignObject[data-mjx-xml] {
+  font-family: initial;
+  line-height: normal;
+  overflow: visible;
+}
+
+.MathJax path {
+  stroke-width: 3;
+}
+
+mjx-container[display="true"] {
+  overflow: auto hidden;
+}
+
+mjx-container[display="true"] + br {
+  display: none;
+}
+</style></head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/09/29/Stack_DataStructure/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          数据结构 —— 栈
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-09-29 09:00:00" itemprop="dateCreated datePublished" datetime="2026-09-29T09:00:00+00:00">2026-09-29</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%92%8C%E7%AE%97%E6%B3%95/" itemprop="url" rel="index"><span itemprop="name">数据结构和算法</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>4 分钟</span>
+            </span>
+            <div class="post-description">顺序栈和链式栈的C++实现</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="什么是栈"><a href="#什么是栈" class="headerlink" title="什么是栈"></a>什么是栈</h2><p><strong>栈是只允许在一端插入和删除的线性表</strong>，特点是先进后出，后进先出。</p>
+<p>允许操作的那一端叫<strong>栈顶</strong>，另一端叫<strong>栈底</strong>。元素只能从栈顶进、从栈顶出，想拿栈底的元素，必须先把上面的都弹走。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">        栈顶</span><br><span class="line">         ↓</span><br><span class="line">┌──────────────┐</span><br><span class="line">│      5       │ ← 最后入栈，最先出栈</span><br><span class="line">├──────────────┤</span><br><span class="line">│      4       │</span><br><span class="line">├──────────────┤</span><br><span class="line">│      3       │</span><br><span class="line">├──────────────┤</span><br><span class="line">│      2       │</span><br><span class="line">├──────────────┤</span><br><span class="line">│      1       │ ← 最先入栈，最后出栈</span><br><span class="line">└──────────────┘</span><br><span class="line">        栈底</span><br></pre></td></tr></table></figure>
+
+<p>基本操作：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>入栈 push</td>
+<td>把元素放到栈顶</td>
+</tr>
+<tr>
+<td>出栈 pop</td>
+<td>把栈顶元素拿走</td>
+</tr>
+<tr>
+<td>取栈顶 top</td>
+<td>看一眼栈顶元素，不拿走</td>
+</tr>
+</tbody></table>
+<p>栈可以用数组实现（<strong>顺序栈</strong>），也可以用链表实现（<strong>链式栈</strong>）。</p>
+<hr>
+<h2 id="一、顺序栈"><a href="#一、顺序栈" class="headerlink" title="一、顺序栈"></a>一、顺序栈</h2><h3 id="1-1-结构定义、构造和析构"><a href="#1-1-结构定义、构造和析构" class="headerlink" title="1.1 结构定义、构造和析构"></a>1.1 结构定义、构造和析构</h3><figure class="highlight cpp"><figcaption><span>SeqStack/main.cpp</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">SeqStack</span></span><br><span class="line">{</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="built_in">SeqStack</span>(<span class="type">int</span> size = <span class="number">10</span>) : <span class="built_in">mtop</span>(<span class="number">0</span>), <span class="built_in">mcap</span>(size)</span><br><span class="line">	{</span><br><span class="line">		mpStack = <span class="keyword">new</span> <span class="type">int</span>[mcap];</span><br><span class="line">	}</span><br><span class="line">	~<span class="built_in">SeqStack</span>()</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">delete</span>[]mpStack;</span><br><span class="line">		mpStack = <span class="literal">nullptr</span>;</span><br><span class="line">	}</span><br><span class="line">	<span class="comment">// ...</span></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	<span class="type">int</span>* mpStack;	<span class="comment">// 栈的指针</span></span><br><span class="line">	<span class="type">int</span> mtop;		<span class="comment">// 栈顶</span></span><br><span class="line">	<span class="type">int</span> mcap;		<span class="comment">// 栈的容量</span></span><br><span class="line">};</span><br></pre></td></tr></table></figure>
+
+<p>三个成员：</p>
+<ul>
+<li><code>mpStack</code> 指向堆上申请的数组</li>
+<li><code>mcap</code> 是这块数组的<strong>总容量</strong></li>
+<li><code>mtop</code> 是<strong>当前元素个数</strong></li>
+</ul>
+<p><code>mtop</code> 有两个身份，它既是”元素个数”，也是”<strong>下一个可写入位置的下标</strong>“。因为数组下标从 0 开始，存了 3 个元素时，下一个该写的位置正好是下标 3。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mpStack:  ┌────┬────┬────┬────┬────┬────┬────┬────┬────┬────┐</span><br><span class="line">          │ 10 │ 11 │ 12 │    │    │    │    │    │    │    │</span><br><span class="line">          └────┴────┴────┴────┴────┴────┴────┴────┴────┴────┘</span><br><span class="line">            [0]  [1]  [2]  [3]  ...</span><br><span class="line">                          ↑</span><br><span class="line">                    mtop = 3（下一个写入位置）</span><br><span class="line">                    栈顶元素是 mpStack[mtop-1] = mpStack[2] = 12</span><br></pre></td></tr></table></figure>
+
+<h3 id="1-2-入栈"><a href="#1-2-入栈" class="headerlink" title="1.2 入栈"></a>1.2 入栈</h3><figure class="highlight cpp"><figcaption><span>SeqStack/main.cpp - Push</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Push</span><span class="params">(<span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">if</span> (mtop == mcap)		<span class="comment">// 如果满了，先扩容</span></span><br><span class="line">	{</span><br><span class="line">		<span class="built_in">expand</span>(<span class="number">2</span> * mcap);</span><br><span class="line">	}</span><br><span class="line">	mpStack[mtop++] = val;	<span class="comment">// 写入 + 栈顶上移</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><code>mpStack[mtop++] = val</code> 是两步：先把 <code>val</code> 写到下标 <code>mtop</code> 处，再把 <code>mtop</code> 加一。写完之后 <code>mtop</code> 又指向了新的空位。</p>
+<p><code>mtop == mcap</code> 是<strong>栈满</strong>的判断。容量为 10 时下标范围是 0~9，<code>mtop</code> 涨到 10 就说明 10 个位置全占满了。</p>
+<h3 id="1-3-扩容"><a href="#1-3-扩容" class="headerlink" title="1.3 扩容"></a>1.3 扩容</h3><figure class="highlight cpp"><figcaption><span>SeqStack/main.cpp - expand</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">expand</span><span class="params">(<span class="type">int</span> size)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="type">int</span>* p = <span class="keyword">new</span> <span class="type">int</span>[size];					<span class="comment">// ① 申请新数组</span></span><br><span class="line">	<span class="built_in">memcpy</span>(p, mpStack, mtop * <span class="built_in">sizeof</span>(<span class="type">int</span>));	<span class="comment">// ② 拷贝旧数据</span></span><br><span class="line">	<span class="keyword">delete</span>[]mpStack;						<span class="comment">// ③ 释放旧数组</span></span><br><span class="line">	mpStack = p;							<span class="comment">// ④ 指针更新，指向新数组</span></span><br><span class="line">	mcap = size;							<span class="comment">// ⑤ 更新容量</span></span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>申请 → 拷贝 → 释放 → 换指针 → 改容量</strong>，顺序不能乱。</p>
+<p>拷贝长度是 <code>mtop * sizeof(int)</code> 而不是 <code>mcap * sizeof(int)</code>。只有前 <code>mtop</code> 个位置是有效数据，后面的空位不用拷。</p>
+<h3 id="1-4-出栈与取栈顶"><a href="#1-4-出栈与取栈顶" class="headerlink" title="1.4 出栈与取栈顶"></a>1.4 出栈与取栈顶</h3><figure class="highlight cpp"><figcaption><span>SeqStack/main.cpp - Pop / Top</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Pop</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">if</span> (mtop == <span class="number">0</span>)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">throw</span> <span class="string">"Stack is empty"</span>;</span><br><span class="line">	}</span><br><span class="line">	mtop--;				<span class="comment">// 栈顶下移一格 = 出栈</span></span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">Top</span><span class="params">()</span> <span class="type">const</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">if</span> (mtop == <span class="number">0</span>)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">throw</span> <span class="string">"Stack is empty"</span>;</span><br><span class="line">	}</span><br><span class="line">	<span class="keyword">return</span> mpStack[mtop - <span class="number">1</span>];</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><code>mtop--</code><strong>没有真的删除数据</strong>，因为 <code>mtop</code> 就是有效元素的边界，下标大于等于 <code>mtop</code> 的内存不会被访问到。出栈是 O(1)，不需要移动任何元素。</p>
+<h3 id="1-5-获取元素个数、判断是否为空、打印元素"><a href="#1-5-获取元素个数、判断是否为空、打印元素" class="headerlink" title="1.5 获取元素个数、判断是否为空、打印元素"></a>1.5 获取元素个数、判断是否为空、打印元素</h3><figure class="highlight cpp"><figcaption><span>SeqStack/main.cpp - 其他</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">Size</span><span class="params">()</span> </span>{ <span class="keyword">return</span> mtop; }</span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">Empty</span><span class="params">()</span> </span>{ <span class="keyword">return</span> mtop == <span class="number">0</span>; }</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Show</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; mtop; i++)	<span class="comment">// 只打印有效元素</span></span><br><span class="line">	{</span><br><span class="line">		cout &lt;&lt; mpStack[i] &lt;&lt; <span class="string">" "</span>;</span><br><span class="line">	}</span><br><span class="line">	cout &lt;&lt; endl;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="二、链式栈"><a href="#二、链式栈" class="headerlink" title="二、链式栈"></a>二、链式栈</h2><h3 id="2-1-结构定义、构造和析构"><a href="#2-1-结构定义、构造和析构" class="headerlink" title="2.1 结构定义、构造和析构"></a>2.1 结构定义、构造和析构</h3><figure class="highlight cpp"><figcaption><span>LinkStack/main.cpp</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">LinkStack</span></span><br><span class="line">{</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="built_in">LinkStack</span>() : <span class="built_in">size_</span>(<span class="number">0</span>)</span><br><span class="line">	{</span><br><span class="line">		head_ = <span class="keyword">new</span> <span class="built_in">Node</span>();		<span class="comment">// 哨兵头节点</span></span><br><span class="line">	}</span><br><span class="line">	~<span class="built_in">LinkStack</span>()           <span class="comment">//析构函数</span></span><br><span class="line">	{</span><br><span class="line">		Node* p = head_;</span><br><span class="line">		<span class="keyword">while</span> (p != <span class="literal">nullptr</span>)</span><br><span class="line">		{</span><br><span class="line">			head_ = head_-&gt;next;</span><br><span class="line">			<span class="keyword">delete</span> p;</span><br><span class="line">			p = head_;</span><br><span class="line">		}</span><br><span class="line">	}</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	<span class="keyword">struct</span> <span class="title class_">Node</span></span><br><span class="line">	{</span><br><span class="line">		<span class="built_in">Node</span>(<span class="type">int</span> data = <span class="number">0</span>) : <span class="built_in">data_</span>(data), <span class="built_in">next</span>(<span class="literal">nullptr</span>) {}</span><br><span class="line">		<span class="type">int</span> data_;</span><br><span class="line">		Node* next;</span><br><span class="line">	};</span><br><span class="line">	Node* head_;	<span class="comment">// 头节点（哨兵）</span></span><br><span class="line">	<span class="type">int</span> size_;		<span class="comment">// 元素个数</span></span><br><span class="line">};</span><br></pre></td></tr></table></figure>
+
+<p>链式栈就是<strong>带头节点的单链表</strong>，只不过所有操作都限制在一端。</p>
+<p>链式栈的栈顶不在数组末尾，而是 <code>head_-&gt;next</code>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">head_（哨兵）</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">┌──────┐    ┌──────┐    ┌──────┐    ┌──────┐</span><br><span class="line">│ next │──→ │  19  │──→ │  18  │──→ │  17  │──→ nullptr</span><br><span class="line">└──────┘    └──────┘    └──────┘    └──────┘</span><br><span class="line">    ↑</span><br><span class="line"> 栈顶（最后入栈的）</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-入栈"><a href="#2-2-入栈" class="headerlink" title="2.2 入栈"></a>2.2 入栈</h3><figure class="highlight cpp"><figcaption><span>LinkStack/main.cpp - push</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">push</span><span class="params">(<span class="type">int</span> val)</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	Node* p = <span class="keyword">new</span> <span class="built_in">Node</span>(val);</span><br><span class="line">	p-&gt;next = head_-&gt;next;	<span class="comment">// ① 新节点接上原栈顶</span></span><br><span class="line">	head_-&gt;next = p;		<span class="comment">// ② 头节点指向新节点</span></span><br><span class="line">	size_++;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<p><strong>入栈就是头插法</strong>，先让新节点接上原链，再让头节点改指向新节点。</p>
+<p>头插之后，新节点成了第一个有效节点，也就是新的栈顶。</p>
+<h3 id="2-3-出栈与取栈顶"><a href="#2-3-出栈与取栈顶" class="headerlink" title="2.3 出栈与取栈顶"></a>2.3 出栈与取栈顶</h3><figure class="highlight cpp"><figcaption><span>LinkStack/main.cpp - pop / top</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">pop</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">if</span> (head_-&gt;next == <span class="literal">nullptr</span>)		<span class="comment">// 判断是否为空栈</span></span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">throw</span> <span class="string">"stack is empty"</span>;</span><br><span class="line">	}</span><br><span class="line">	Node* p = head_-&gt;next;		<span class="comment">// 备份栈顶节点</span></span><br><span class="line">	head_-&gt;next = p-&gt;next;		<span class="comment">// 头节点跳过它</span></span><br><span class="line">	<span class="keyword">delete</span> p;					<span class="comment">// 释放</span></span><br><span class="line">	size_--;</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">top</span><span class="params">()</span> <span class="type">const</span></span></span><br><span class="line"><span class="function"></span>{</span><br><span class="line">	<span class="keyword">if</span> (head_-&gt;next == <span class="literal">nullptr</span>)</span><br><span class="line">	{</span><br><span class="line">		<span class="keyword">throw</span> <span class="string">"stack is empty"</span>;</span><br><span class="line">	}</span><br><span class="line">	<span class="keyword">return</span> head_-&gt;next-&gt;data_;</span><br><span class="line">}</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-4-遍历"><a href="#2-4-遍历" class="headerlink" title="2.4 遍历"></a>2.4 遍历</h3><figure class="highlight cpp"><figcaption><span>LinkStack/main.cpp - main</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">LinkStack s;</span><br><span class="line"><span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++)</span><br><span class="line">{</span><br><span class="line">	s.<span class="built_in">push</span>(i + <span class="number">10</span>);</span><br><span class="line">}</span><br><span class="line"><span class="keyword">while</span> (!s.<span class="built_in">empty</span>())</span><br><span class="line">{</span><br><span class="line">	cout &lt;&lt; s.<span class="built_in">top</span>() &lt;&lt; <span class="string">" "</span>;</span><br><span class="line">	s.<span class="built_in">pop</span>();</span><br><span class="line">}</span><br><span class="line">cout &lt;&lt; endl;</span><br></pre></td></tr></table></figure>
+
+<p>输出是 <code>19 18 17 16 15 14 13 12 11 10</code>，正好是入栈顺序的倒序。</p>
+<hr>
+<h2 id="三、两种实现对比"><a href="#三、两种实现对比" class="headerlink" title="三、两种实现对比"></a>三、两种实现对比</h2><table>
+<thead>
+<tr>
+<th></th>
+<th>顺序栈</th>
+<th>链式栈</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>底层结构</td>
+<td>动态数组</td>
+<td>带头节点的单链表</td>
+</tr>
+<tr>
+<td>栈顶在哪</td>
+<td><code>mpStack[mtop-1]</code></td>
+<td><code>head_-&gt;next</code></td>
+</tr>
+<tr>
+<td>入栈</td>
+<td>尾部写入，满则扩容</td>
+<td>头插</td>
+</tr>
+<tr>
+<td>出栈</td>
+<td><code>mtop--</code></td>
+<td>删第一个节点</td>
+</tr>
+<tr>
+<td>时间复杂度</td>
+<td>入栈均摊 O(1)，扩容那次 O(n)</td>
+<td>严格 O(1)</td>
+</tr>
+<tr>
+<td>额外开销</td>
+<td>有预留空间（容量 ≥ 元素数）</td>
+<td>每个节点多一个 next 指针</td>
+</tr>
+<tr>
+<td>内存布局</td>
+<td>连续，缓存友好</td>
+<td>离散</td>
+</tr>
+<tr>
+<td>容量上限</td>
+<td>受连续内存大小限制</td>
+<td>有内存就能继续加</td>
+</tr>
+</tbody></table>
+<p><strong>元素数量可预估、追求速度</strong>，选顺序栈。数组连续存储对 CPU 缓存友好，实际跑起来往往更快。</p>
+<p><strong>元素数量浮动大、不想浪费空间</strong>，选链式栈。不用扩容，用多少申请多少。</p>
+<hr>
+<h2 id="四、常见问题"><a href="#四、常见问题" class="headerlink" title="四、常见问题"></a>四、常见问题</h2><ol>
+<li><strong>栈的特点是什么？</strong> 后进先出（LIFO），只允许在栈顶一端插入和删除。</li>
+<li><strong>顺序栈和链式栈怎么选？</strong> 数量可预估、要速度选顺序栈；数量浮动大、不想预留空间选链式栈。</li>
+<li><strong>顺序栈为什么按 2 倍扩容？</strong> 均摊下来每次入栈是 O(1)。每次扩固定大小会让整体退化到 O(n²)。</li>
+<li><strong>链式栈为什么用头插？</strong> 头插 O(1)，且头节点的 next 天然就是栈顶，不用额外维护尾指针。</li>
+<li><strong>出栈为什么不真的删数据？</strong> <code>mtop</code> 就是有效元素的边界，越界部分不会被访问，清理是多余操作。</li>
+<li><strong>栈有什么实际应用？</strong> 函数调用栈、括号匹配、表达式求值（中缀转后缀）、深度优先搜索、编辑器的撤销功能。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C-C/" rel="tag"># C/C++</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%92%8C%E7%AE%97%E6%B3%95/" rel="tag"># 数据结构和算法</a>
+              <a href="/tags/%E6%A0%88/" rel="tag"># 栈</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/09/17/%E5%8A%9B%E6%89%A3021%E5%88%A0%E9%99%A4%E9%93%BE%E8%A1%A8%E7%9A%84%E5%80%92%E6%95%B0%E7%AC%ACn%E4%B8%AA%E8%8A%82%E7%82%B9%E9%A2%98%E8%A7%A3/" rel="prev" title="力扣021-删除链表的倒数第n个节点-题解">
+      <i class="fa fa-chevron-left"></i> 力扣021-删除链表的倒数第n个节点-题解
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E6%A0%88"><span class="nav-number">1.</span> <span class="nav-text">什么是栈</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E9%A1%BA%E5%BA%8F%E6%A0%88"><span class="nav-number">2.</span> <span class="nav-text">一、顺序栈</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89%E3%80%81%E6%9E%84%E9%80%A0%E5%92%8C%E6%9E%90%E6%9E%84"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 结构定义、构造和析构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-%E5%85%A5%E6%A0%88"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 入栈</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-%E6%89%A9%E5%AE%B9"><span class="nav-number">2.3.</span> <span class="nav-text">1.3 扩容</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-4-%E5%87%BA%E6%A0%88%E4%B8%8E%E5%8F%96%E6%A0%88%E9%A1%B6"><span class="nav-number">2.4.</span> <span class="nav-text">1.4 出栈与取栈顶</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-5-%E8%8E%B7%E5%8F%96%E5%85%83%E7%B4%A0%E4%B8%AA%E6%95%B0%E3%80%81%E5%88%A4%E6%96%AD%E6%98%AF%E5%90%A6%E4%B8%BA%E7%A9%BA%E3%80%81%E6%89%93%E5%8D%B0%E5%85%83%E7%B4%A0"><span class="nav-number">2.5.</span> <span class="nav-text">1.5 获取元素个数、判断是否为空、打印元素</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E9%93%BE%E5%BC%8F%E6%A0%88"><span class="nav-number">3.</span> <span class="nav-text">二、链式栈</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89%E3%80%81%E6%9E%84%E9%80%A0%E5%92%8C%E6%9E%90%E6%9E%84"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 结构定义、构造和析构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E5%85%A5%E6%A0%88"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 入栈</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E5%87%BA%E6%A0%88%E4%B8%8E%E5%8F%96%E6%A0%88%E9%A1%B6"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 出栈与取栈顶</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E9%81%8D%E5%8E%86"><span class="nav-number">3.4.</span> <span class="nav-text">2.4 遍历</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E4%B8%A4%E7%A7%8D%E5%AE%9E%E7%8E%B0%E5%AF%B9%E6%AF%94"><span class="nav-number">4.</span> <span class="nav-text">三、两种实现对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">5.</span> <span class="nav-text">四、常见问题</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">56</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">85</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">494k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">7:29</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>
