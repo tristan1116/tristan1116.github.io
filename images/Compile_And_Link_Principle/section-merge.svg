@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 860" width="1000" height="860"
+     font-family="Microsoft YaHei, PingFang SC, Hiragino Sans GB, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="860" fill="#ffffff"/>
+
+  <!-- 标题 -->
+  <text x="500" y="46" text-anchor="middle" font-size="25" font-weight="bold" fill="#1a1a1a">链接第一步：段的合并</text>
+
+  <!-- ==================== main.o ==================== -->
+  <text x="240" y="95" text-anchor="middle" font-size="18" font-weight="bold" fill="#5b21b6">main.o</text>
+
+  <rect x="100" y="112" width="280" height="105" rx="6" fill="#dbeafe" stroke="#2c5f8a" stroke-width="1.8"/>
+  <text x="240" y="152" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a5f">.text</text>
+  <text x="240" y="182" text-anchor="middle" font-size="13" fill="#1e3a5f">main() 的指令</text>
+
+  <rect x="100" y="232" width="280" height="88" rx="6" fill="#dcfce7" stroke="#166534" stroke-width="1.8"/>
+  <text x="240" y="265" text-anchor="middle" font-size="15" font-weight="bold" fill="#166534">.data</text>
+  <text x="240" y="295" text-anchor="middle" font-size="13" fill="#166534">data = 20</text>
+
+  <rect x="100" y="335" width="280" height="55" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="240" y="368" text-anchor="middle" font-size="14" fill="#64748b">.bss（空）</text>
+
+  <rect x="100" y="405" width="280" height="90" rx="6" fill="#ede9fe" stroke="#5b21b6" stroke-width="1.8"/>
+  <text x="240" y="432" text-anchor="middle" font-size="14" font-weight="bold" fill="#5b21b6">符号表</text>
+  <text x="240" y="458" text-anchor="middle" font-size="12.5" fill="#5b21b6">main、data —— 定义</text>
+  <text x="240" y="478" text-anchor="middle" font-size="12.5" fill="#5b21b6">gdata、sum —— UND（引用）</text>
+
+  <!-- ==================== sum.o ==================== -->
+  <text x="760" y="95" text-anchor="middle" font-size="18" font-weight="bold" fill="#5b21b6">sum.o</text>
+
+  <rect x="620" y="112" width="280" height="105" rx="6" fill="#dbeafe" stroke="#2c5f8a" stroke-width="1.8"/>
+  <text x="760" y="152" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a5f">.text</text>
+  <text x="760" y="182" text-anchor="middle" font-size="13" fill="#1e3a5f">sum() 的指令</text>
+
+  <rect x="620" y="232" width="280" height="88" rx="6" fill="#dcfce7" stroke="#166534" stroke-width="1.8"/>
+  <text x="760" y="265" text-anchor="middle" font-size="15" font-weight="bold" fill="#166534">.data</text>
+  <text x="760" y="295" text-anchor="middle" font-size="13" fill="#166534">gdata = 10</text>
+
+  <rect x="620" y="335" width="280" height="55" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="760" y="368" text-anchor="middle" font-size="14" fill="#64748b">.bss（空）</text>
+
+  <rect x="620" y="405" width="280" height="90" rx="6" fill="#ede9fe" stroke="#5b21b6" stroke-width="1.8"/>
+  <text x="760" y="432" text-anchor="middle" font-size="14" font-weight="bold" fill="#5b21b6">符号表</text>
+  <text x="760" y="458" text-anchor="middle" font-size="12.5" fill="#5b21b6">sum、gdata —— 定义</text>
+
+  <!-- ==================== 汇聚箭头 ==================== -->
+  <line x1="240" y1="500" x2="460" y2="552" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="760" y1="500" x2="540" y2="552" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="500" y="532" text-anchor="middle" font-size="14" fill="#64748b">合并</text>
+
+  <!-- ==================== a.out ==================== -->
+  <text x="500" y="590" text-anchor="middle" font-size="18" font-weight="bold" fill="#047857">a.out（可执行文件）</text>
+
+  <rect x="200" y="608" width="600" height="80" rx="6" fill="#dbeafe" stroke="#2c5f8a" stroke-width="2"/>
+  <text x="500" y="640" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a5f">.text</text>
+  <text x="500" y="667" text-anchor="middle" font-size="13" fill="#1e3a5f">main 的指令 + sum 的指令</text>
+
+  <rect x="200" y="700" width="600" height="72" rx="6" fill="#dcfce7" stroke="#166534" stroke-width="2"/>
+  <text x="500" y="728" text-anchor="middle" font-size="15" font-weight="bold" fill="#166534">.data</text>
+  <text x="500" y="754" text-anchor="middle" font-size="13" fill="#166534">data = 20　｜　gdata = 10</text>
+
+  <rect x="200" y="784" width="600" height="52" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="500" y="816" text-anchor="middle" font-size="14" fill="#64748b">.bss（空）</text>
+</svg>

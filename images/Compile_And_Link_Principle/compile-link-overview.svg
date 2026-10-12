@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780" width="1200" height="780"
+     font-family="Microsoft YaHei, PingFang SC, Hiragino Sans GB, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="780" fill="#ffffff"/>
+
+  <!-- 标题 -->
+  <text x="600" y="46" text-anchor="middle" font-size="26" font-weight="bold" fill="#1a1a1a">C++ 代码的编译链接过程全景</text>
+
+  <!-- ==================== ① 编译过程 ==================== -->
+  <text x="70" y="102" font-size="17" font-weight="bold" fill="#2c5f8a">① 编译过程</text>
+
+  <!-- 源文件 -->
+  <rect x="70" y="130" width="150" height="54" fill="#dbeafe" stroke="#2c5f8a" stroke-width="2"/>
+  <text x="145" y="163" text-anchor="middle" font-size="16" fill="#1e3a5f">main.cpp</text>
+
+  <rect x="70" y="216" width="150" height="54" fill="#dbeafe" stroke="#2c5f8a" stroke-width="2"/>
+  <text x="145" y="249" text-anchor="middle" font-size="16" fill="#1e3a5f">sum.cpp</text>
+
+  <!-- 三个阶段 -->
+  <rect x="295" y="140" width="135" height="120" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="2"/>
+  <text x="362" y="188" text-anchor="middle" font-size="17" font-weight="bold" fill="#92400e">预编译</text>
+  <text x="362" y="214" text-anchor="middle" font-size="12" fill="#a16207"># 开头的命令</text>
+
+  <rect x="475" y="140" width="135" height="120" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="2"/>
+  <text x="542" y="188" text-anchor="middle" font-size="17" font-weight="bold" fill="#92400e">编译</text>
+  <text x="542" y="214" text-anchor="middle" font-size="12" fill="#a16207">词法 / 语法 / 语义</text>
+  <text x="542" y="232" text-anchor="middle" font-size="12" fill="#a16207">分析 + 优化</text>
+
+  <rect x="655" y="140" width="135" height="120" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="2"/>
+  <text x="722" y="188" text-anchor="middle" font-size="17" font-weight="bold" fill="#92400e">汇编</text>
+  <text x="722" y="214" text-anchor="middle" font-size="12" fill="#a16207">汇编码 → 机器码</text>
+
+  <!-- 源文件 → 预编译 -->
+  <line x1="220" y1="157" x2="295" y2="180" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="220" y1="243" x2="295" y2="220" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- 阶段之间 -->
+  <line x1="430" y1="200" x2="475" y2="200" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="452" y="190" text-anchor="middle" font-size="12.5" fill="#64748b">.i</text>
+
+  <line x1="610" y1="200" x2="655" y2="200" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="632" y="190" text-anchor="middle" font-size="12.5" fill="#64748b">.s</text>
+
+  <!-- 汇编 → 目标文件 -->
+  <line x1="790" y1="196" x2="880" y2="172" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="790" y1="204" x2="880" y2="240" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- 目标文件 -->
+  <rect x="880" y="140" width="170" height="54" fill="#ede9fe" stroke="#5b21b6" stroke-width="2"/>
+  <text x="965" y="173" text-anchor="middle" font-size="16" fill="#5b21b6">main.o</text>
+
+  <rect x="880" y="216" width="170" height="54" fill="#ede9fe" stroke="#5b21b6" stroke-width="2"/>
+  <text x="965" y="249" text-anchor="middle" font-size="16" fill="#5b21b6">sum.o</text>
+
+  <text x="1070" y="176" font-size="12.5" fill="#7c3aed">二进制可重定位</text>
+  <text x="1070" y="196" font-size="12.5" fill="#7c3aed">目标文件</text>
+
+  <!-- 编译过程底部说明 -->
+  <text x="70" y="320" font-size="13.5" fill="#666">每个源文件独立走完这三步（可分别用 g++ -E / -S / -c 单独执行）</text>
+
+  <!-- 分隔线 -->
+  <line x1="60" y1="355" x2="1140" y2="355" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="8,6"/>
+
+  <!-- ==================== ② 链接过程 ==================== -->
+  <text x="70" y="400" font-size="17" font-weight="bold" fill="#9f1239">② 链接过程</text>
+
+  <!-- 输入 -->
+  <rect x="70" y="430" width="160" height="54" fill="#ede9fe" stroke="#5b21b6" stroke-width="2"/>
+  <text x="150" y="463" text-anchor="middle" font-size="16" fill="#5b21b6">main.o</text>
+
+  <rect x="70" y="508" width="160" height="54" fill="#ede9fe" stroke="#5b21b6" stroke-width="2"/>
+  <text x="150" y="541" text-anchor="middle" font-size="16" fill="#5b21b6">sum.o</text>
+
+  <rect x="70" y="586" width="160" height="54" fill="#ede9fe" stroke="#5b21b6" stroke-width="2"/>
+  <text x="150" y="619" text-anchor="middle" font-size="14.5" fill="#5b21b6">静态库 *.a / *.lib</text>
+
+  <!-- 链接器大框 -->
+  <rect x="290" y="415" width="440" height="250" rx="14" fill="#fff7ed" stroke="#c2410c" stroke-width="2.5"/>
+  <text x="510" y="452" text-anchor="middle" font-size="18" font-weight="bold" fill="#9a3412">链接器（两个核心步骤）</text>
+
+  <rect x="312" y="468" width="396" height="85" rx="8" fill="#ffffff" stroke="#c2410c" stroke-width="1.5"/>
+  <text x="510" y="498" text-anchor="middle" font-size="15" font-weight="bold" fill="#9a3412">步骤一：所有 .o 文件的段合并 + 符号解析</text>
+  <text x="510" y="525" text-anchor="middle" font-size="12.5" fill="#c2410c">解析完成后，给所有符号分配虚拟地址</text>
+
+  <rect x="312" y="565" width="396" height="85" rx="8" fill="#ffffff" stroke="#c2410c" stroke-width="1.5"/>
+  <text x="510" y="595" text-anchor="middle" font-size="15" font-weight="bold" fill="#9a3412">步骤二：符号重定位</text>
+  <text x="510" y="622" text-anchor="middle" font-size="12.5" fill="#c2410c">把指令里占位的 0 改成符号的真实地址</text>
+
+  <!-- 输入 → 链接器 -->
+  <line x1="230" y1="457" x2="290" y2="485" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="230" y1="535" x2="290" y2="520" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="230" y1="613" x2="290" y2="555" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- 链接器 → 输出 -->
+  <line x1="730" y1="540" x2="800" y2="522" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- 输出 -->
+  <rect x="800" y="480" width="200" height="76" rx="12" fill="#d1fae5" stroke="#047857" stroke-width="2"/>
+  <text x="900" y="512" text-anchor="middle" font-size="17" font-weight="bold" fill="#065f46">a.out / main.exe</text>
+  <text x="900" y="539" text-anchor="middle" font-size="12.5" fill="#047857">可执行文件</text>
+
+  <!-- 底部说明 -->
+  <text x="70" y="712" font-size="13.5" fill="#666">链接的输入：所有 .o 文件 + 静态库；输出：可执行文件（Linux 下默认 a.out，可用 -o 指定名称）</text>
+</svg>

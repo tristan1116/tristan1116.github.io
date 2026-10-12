@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" width="1000" height="780"
+     font-family="Microsoft YaHei, PingFang SC, Hiragino Sans GB, sans-serif">
+  <rect width="1000" height="780" fill="#ffffff"/>
+
+  <!-- 标题 -->
+  <text x="500" y="46" text-anchor="middle" font-size="25" font-weight="bold" fill="#1a1a1a">目标文件的结构：各段与两张表</text>
+
+  <!-- 标签 -->
+  <text x="500" y="95" text-anchor="middle" font-size="17" font-weight="bold" fill="#5b21b6">main.o（二进制可重定位目标文件）</text>
+
+  <!-- 文件框 -->
+  <rect x="150" y="115" width="700" height="590" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+
+  <!-- 文件头 -->
+  <rect x="175" y="135" width="650" height="68" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="500" y="163" text-anchor="middle" font-size="15" font-weight="bold" fill="#475569">文件头</text>
+  <text x="500" y="187" text-anchor="middle" font-size="12.5" fill="#64748b">标记："可重定位"——段里的地址都还没定</text>
+
+  <!-- 分组 1 -->
+  <text x="195" y="232" font-size="13.5" font-weight="bold" fill="#64748b">代码与数据</text>
+
+  <!-- .text -->
+  <rect x="175" y="245" width="650" height="72" rx="6" fill="#dbeafe" stroke="#2c5f8a" stroke-width="1.8"/>
+  <text x="500" y="273" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a5f">.text</text>
+  <text x="500" y="299" text-anchor="middle" font-size="12.5" fill="#1e3a5f">指令（代码）　标志位带 <tspan fill="#be123c">RELOC</tspan></text>
+
+  <!-- .data -->
+  <rect x="175" y="329" width="650" height="72" rx="6" fill="#dcfce7" stroke="#166534" stroke-width="1.8"/>
+  <text x="500" y="357" text-anchor="middle" font-size="15" font-weight="bold" fill="#166534">.data</text>
+  <text x="500" y="383" text-anchor="middle" font-size="12.5" fill="#166534">已初始化且非零的全局/静态数据</text>
+
+  <!-- .bss -->
+  <rect x="175" y="413" width="650" height="72" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="500" y="441" text-anchor="middle" font-size="15" font-weight="bold" fill="#64748b">.bss</text>
+  <text x="500" y="467" text-anchor="middle" font-size="12.5" fill="#64748b">未初始化或为 0 的全局/静态数据（本例 0 字节）</text>
+
+  <!-- 分组 2 -->
+  <text x="195" y="514" font-size="13.5" font-weight="bold" fill="#64748b">给链接器用的表</text>
+
+  <!-- 符号表 -->
+  <rect x="175" y="527" width="650" height="72" rx="6" fill="#ede9fe" stroke="#5b21b6" stroke-width="1.8"/>
+  <text x="500" y="555" text-anchor="middle" font-size="15" font-weight="bold" fill="#5b21b6">符号表</text>
+  <text x="500" y="581" text-anchor="middle" font-size="12.5" fill="#5b21b6">.symtab　记录每个符号：定义还是引用</text>
+
+  <!-- 重定位表 -->
+  <rect x="175" y="611" width="650" height="72" rx="6" fill="#ffe4e6" stroke="#be123c" stroke-width="1.8"/>
+  <text x="500" y="639" text-anchor="middle" font-size="15" font-weight="bold" fill="#9f1239">重定位表</text>
+  <text x="500" y="665" text-anchor="middle" font-size="12.5" fill="#9f1239">.rel.text　记录 .text 里哪些位置要修正</text>
+
+  <!-- 底部说明 -->
+  <text x="500" y="745" text-anchor="middle" font-size="13" fill="#666">段表里所有段的地址都是 0——"可重定位"就是这个意思：地址还没定，要等链接器来定</text>
+</svg>
