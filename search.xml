@@ -358,7 +358,7 @@
 <h3 id="一、前置准备：安装-Git"><a href="#一、前置准备：安装-Git" class="headerlink" title="一、前置准备：安装 Git"></a>一、前置准备：安装 Git</h3><p>Claude Code 的版本管理、工作区隔离等功能依赖 Git，必须先装好。</p>
 <p><strong>Windows 用户</strong>：</p>
 <ol>
-<li>访问 <a href="https://git-scm.com/downloads/win">https://git-scm.com/downloads/win</a>，下载 64-bit 版本<img src="/./../images/claude-code-guide/git-install.png" alt="git安装"></li>
+<li>访问 <a href="https://git-scm.com/downloads/win">https://git-scm.com/downloads/win</a>，下载 64-bit 版本（注意：这个网页加载很慢是正常的，如果可以的话请用魔法上网！）<img src="/./../images/claude-code-guide/git-install.png" alt="git安装"></li>
 <li>双击安装包，一路点 Next（所有选项用默认即可）</li>
 <li>安装完成后，在终端输入以下命令验证：</li>
 </ol>
@@ -3546,6 +3546,307 @@
       </tags>
   </entry>
   <entry>
+    <title>操作系统：线程模型</title>
+    <url>/2026/09/11/OS_Thread_Model/</url>
+    <content><![CDATA[<p>进程是资源的容器，也是操作系统调度的基本单位。但现代操作系统里，真正被 CPU 调度的东西其实是线程。</p>
+<hr>
+<h2 id="线程的使用"><a href="#线程的使用" class="headerlink" title="线程的使用"></a>线程的使用</h2><p>在传统的操作系统设计中，进程是资源分配的基本单位，每个进程都拥有独立的地址空间和至少一个控制线程。</p>
+<p>随着并发编程需求的增加，人们发现单一进程内运行多个控制流，能带来诸多优势。这些线程虽然彼此独立执行，但它们共享同一进程的地址空间及其中的所有数据，这种模式为多线程编程提供了基础。</p>
+<h3 id="资源共享"><a href="#资源共享" class="headerlink" title="资源共享"></a>资源共享</h3><p>线程之间的主要优势在于它们能够共享同一块地址空间。线程可以直接访问进程中的全局变量、静态变量，以及通过指针或引用访问的内存区域，不需要进行进程间通信（IPC）那套复杂操作。</p>
+<p>比如在一个文本编辑器里，多个线程可以同时访问并修改文档的同一部分，因为它们共享着文档的内存表示。</p>
+<h3 id="轻量级与高效性"><a href="#轻量级与高效性" class="headerlink" title="轻量级与高效性"></a>轻量级与高效性</h3><p>相比进程，线程是更加轻量级的执行单元。线程的创建和销毁通常比进程快得多，因为线程不需要为每个实例分配独立的地址空间和其他系统资源。</p>
+<p>在许多现代操作系统中，创建一个新线程的速度可以比创建一个新进程快 <strong>10 到 100 倍</strong>。这种高效性让线程成为处理高并发任务时的理想选择。</p>
+<h3 id="性能提升"><a href="#性能提升" class="headerlink" title="性能提升"></a>性能提升</h3><p>在涉及大量计算和 I&#x2F;O 处理的场景中，多线程编程能显著提升应用程序的性能。当 CPU 密集型任务与 I&#x2F;O 密集型任务交替执行时，多线程允许这些任务重叠进行，从而减少 CPU 的空闲时间。</p>
+<p>拿 Web 服务器举例：一个线程可以处理客户端的连接请求，另一个线程负责从磁盘读取数据并准备响应。这种并行处理方式提高了服务器的吞吐量和响应速度。</p>
+<p>线程作为进程内的一种轻量级执行单元，通过共享地址空间和高效性，为并发编程提供了强大的支持。在现代软件开发中，多线程编程已经成为一种普遍采用的技术手段，用于提高应用程序的并发性和性能。</p>
+<hr>
+<h3 id="Web服务器：三种解决方案"><a href="#Web服务器：三种解决方案" class="headerlink" title="Web服务器：三种解决方案"></a>Web服务器：三种解决方案</h3><p>在探讨线程应用的实例时，我们可以聚焦于web服务器的工作机制：</p>
+<h3 id="问题本身"><a href="#问题本身" class="headerlink" title="问题本身"></a>问题本身</h3><p>客户端向服务器发送页面请求，服务器把页面返回去。值得注意的是，站点上各个页面的访问频率差得很远，公司主页这类页面被请求的次数远超产品详情页。</p>
+<p>为了优化性能和响应速度，服务器采用了一种高效策略：把访问量高的那批页面预先加载进内存。这个用来存放高访问率页面的存储空间，就叫<strong>高速缓存</strong>（cache）。缓存命中就直接返回，不用访问磁盘。</p>
+<blockquote>
+<p>注：CPU 里也是同样的思路，L1、L2、L3 缓存存的是近期可能被频繁访问的数据和指令，为的是减少对主存的直接访问。</p>
+</blockquote>
+<h3 id="多线程解决方案"><a href="#多线程解决方案" class="headerlink" title="多线程解决方案"></a>多线程解决方案</h3><p>Web 服务器的一种组织方式，核心是一个叫<strong>调度线程</strong>（dispatcher thread）的组件。</p>
+<p>调度线程从网络接收工作请求，充当中央调度器。收到请求并完成初步检查后，它选择一个当前处于空闲（阻塞状态）的工作线程，把指向请求消息的指针写入该工作线程关联的数据结构（如队列或特殊字）中，然后唤醒这个处于休眠状态的工作线程，把它的状态从阻塞态转变为就绪态。</p>
+<p>被唤醒的工作线程启动后，先检查请求所需的页面是否已存在于共享高速缓存中。存在就迅速检索并返回，不需要进行磁盘 I&#x2F;O。不存在则执行 <code>read</code> 从磁盘读取，由于磁盘 I&#x2F;O 通常耗时较长，工作线程会进入阻塞状态，等待磁盘操作完成。在此期间，调度线程会选择其他就绪的工作线程执行，确保服务器能够持续处理新的请求。</p>
+<pre class="mermaid">flowchart TB
+    D["调度线程<br/>（死循环收请求）"] -->|"① 分派请求<br/>写入指针并唤醒"| W1["工作线程 1"]
+    D --> W2["工作线程 2"]
+    D --> W3["工作线程 3"]
+    W1 -->|"② 先查"| C["共享高速缓存<br/>（所有工作线程可访问）"]
+    C -->|"命中，直接返回"| R["返回页面给客户端"]
+    C -->|"未命中"| K["③ read 磁盘<br/>（阻塞）"]
+    K --> R
+    W1 -.->|"④ 处理完再次阻塞<br/>等待下一个请求"| D</pre>
+
+<p>调度线程的大致逻辑就是一个死循环：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> TRUE 1</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main_dispatcher_thread</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">request</span> <span class="title">buf</span>;</span></span><br><span class="line">    <span class="keyword">while</span> (TRUE) &#123;</span><br><span class="line">        get_next_request(&amp;buf);   <span class="comment">/* 不断从请求源获取请求 */</span></span><br><span class="line">        handoff_work(&amp;buf);       <span class="comment">/* 将请求分派给工作线程处理 */</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;   <span class="comment">/* 理论上永远不会执行到这里 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>工作线程也是死循环，但循环体里多了查缓存、读磁盘、返回页面这几步：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main_worker_thread</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">request</span> <span class="title">buf</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">page</span> *<span class="title">page</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (TRUE) &#123;</span><br><span class="line">        wait_for_work(&amp;buf);                      <span class="comment">/* 等待工作分配 */</span></span><br><span class="line">        <span class="keyword">if</span> (!look_for_page_in_cache(&amp;buf, &amp;page)) <span class="comment">/* 缓存里没有 */</span></span><br><span class="line">            read_page_from_disk(&amp;buf, page);      <span class="comment">/* 从磁盘读 */</span></span><br><span class="line">        <span class="keyword">if</span> (page != <span class="literal">NULL</span>)</span><br><span class="line">            return_page(page);                    <span class="comment">/* 返回页面 */</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;   <span class="comment">/* 同样不会执行到这里 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>调度线程靠一个死循环不断取新请求并分派，工作线程处理完一次请求就再次进入阻塞，等下一个请求到来，形成循环。</p>
+<h3 id="单线程解决方案"><a href="#单线程解决方案" class="headerlink" title="单线程解决方案"></a>单线程解决方案</h3><p>没有多线程环境时，服务器的主循环连续不断地获取客户端请求并依次处理。问题出在处理每个请求的过程中：一旦涉及磁盘 I&#x2F;O 这类耗时操作，服务器必须等待这些操作完成，期间无法响应新的请求。</p>
+<p>PDF 把这种状态称为”空转”，它显著降低了服务器的处理效率，每秒能够处理的请求数量非常有限，由此凸显出多线程对于提升程序并行性和整体性能的重要性。</p>
+<h3 id="状态机解决方案"><a href="#状态机解决方案" class="headerlink" title="状态机解决方案"></a>状态机解决方案</h3><p>还有第三种方案，专门针对那些只提供<strong>非阻塞系统调用</strong>（比如非阻塞 <code>read</code>）的环境。</p>
+<p>非阻塞 I&#x2F;O 的行为是这样的：把文件描述符设置成非阻塞模式之后，如果 I&#x2F;O 操作不能立即完成（比如从网络读数据但当前没有数据到达），系统调用会立刻返回一个错误码（<code>EAGAIN</code> 或 <code>EWOULDBLOCK</code>），而不是让调用线程进入休眠状态等待。</p>
+<p>非阻塞系统调用在需要处理多个IO源，或希望提高程序响应速度的场景中非常有用。通过将文件描述符设置为非阻塞模式，并使用适当的错误处理逻辑，程序可以在IO操作无法立即完成时继续执行其他任务，而不是阻塞等待。这有助于提高程序的并发性和整体性能。</p>
+<p>状态机方案的工作流程：</p>
+<ol>
+<li>请求到达服务器，接收线程先看内存中的高速缓存能不能立刻满足该请求。能就立即响应，无需任何等待。</li>
+<li>如果缓存里没有所需数据，就发起一个非阻塞的磁盘读取，然后把请求的状态（请求标识符、预期的数据位置等）记进服务器的内部状态表。</li>
+<li>服务器进入一个事件循环，不断监听和响应两类事件：新请求到达、先前磁盘操作完成（通常通过信号中断通知）。每当有新请求到来时，服务器检查其状态，如果处于可立即处理的状态，则开始处理；若需要等待磁盘响应，则跳过处理，继续监听。</li>
+<li>一旦收到磁盘操作完成的通知，服务器就从状态表里取出对应的请求状态，用拿到的数据完成响应准备的工作，最后发给客户端。</li>
+</ol>
+<p>这套设计体现的是<strong>有限状态机</strong>（Finite-State Machine，FSM）的核心思想。每个请求被看成一个有着有限数量状态的系统，系统根据外部事件（新请求到达、磁盘操作完成）从一个状态转移到另一个状态，每次转移都伴随着状态的保存和恢复。</p>
+<p>FSM 的应用不限于 Web 服务器，凡是需要处理并发和异步事件的场合都能用上。但是编程难度相对较高，状态转移和状态信息的保存恢复都要开发者显式管理。</p>
+<p>三种方案放一起比：</p>
+<table>
+<thead>
+<tr>
+<th align="left">模型</th>
+<th align="left">特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">单线程</td>
+<td align="left">无并行性，性能较差，阻塞系统调用</td>
+</tr>
+<tr>
+<td align="left">多线程</td>
+<td align="left">有并行性，阻塞系统调用</td>
+</tr>
+<tr>
+<td align="left">有限状态机</td>
+<td align="left">并行性，非阻塞系统调用、中断</td>
+</tr>
+</tbody></table>
+<p>多线程靠并行处理提升性能，但是增加了复杂度和线程安全问题；单线程简单但性能受限；状态机用非阻塞调用和中断机制换来高性能，但是编程难度高。</p>
+<hr>
+<h2 id="经典的线程模型"><a href="#经典的线程模型" class="headerlink" title="经典的线程模型"></a>经典的线程模型</h2><p>换个角度看进程：它是一种高效整合并管理相关<strong>资源</strong>的方式。进程承载着程序正文和数据，还装着已打开的文件句柄、派生的子进程、待触发的定时器、信号处理机制、用户账号信息这些形形色色的资源。把它们统一封装在进程内部，资源的组织和访问都简化了。</p>
+<p>而进程内部真正的执行单元是<strong>线程</strong>（thread）。每个线程配着三样关键的执行状态组件：</p>
+<ul>
+<li><strong>程序计数器</strong>，精确追踪即将执行的指令位置</li>
+<li><strong>寄存器集合</strong>，暂存线程当前操作所依赖的变量值</li>
+<li><strong>堆栈</strong>，记录方法调用与返回的路径</li>
+</ul>
+<p>线程的运行依托于进程，但进程和线程在概念上是截然分开的实体，各承载不同的职责，可以独立处理。一句话概括：<strong>进程是资源的容器，线程是 CPU 直接调度的执行单位</strong>。</p>
+<p>线程概念的引入给进程模型加了一个新维度。同一进程内部，多个线程能以较高程度的独立性并行运行，彼此互不干扰。这种架构看起来类似一台计算机上同时跑多个独立进程，区别在于线程间的资源共享紧密得多，它们共同访问同一地址空间及其他进程资源。不同进程之间虽然也共享物理内存、磁盘、外设，但访问和隔离机制要复杂得多。</p>
+<p>线程继承进程的资源，同时保持较轻量的执行上下文，所以常被叫做<strong>轻量级进程</strong>（lightweight processes）。<strong>多线程</strong>（multithreading）这个词，指的就是单个进程内部多个线程并行执行、共享资源、协同工作的模式。</p>
+<h3 id="单线程进程-vs-多线程进程"><a href="#单线程进程-vs-多线程进程" class="headerlink" title="单线程进程 vs 多线程进程"></a>单线程进程 vs 多线程进程</h3><p>三个传统的进程，每个进程有自己的地址空间和单个控制线程，各自在独立的地址空间里运行：</p>
+<pre class="mermaid">flowchart TB
+    subgraph PA["进程 A"]
+        TA["线程"] --> DA["地址空间 A"]
+    end
+    subgraph PB["进程 B"]
+        TB["线程"] --> DB["地址空间 B"]
+    end
+    subgraph PC["进程 C"]
+        TC["线程"] --> DC["地址空间 C"]
+    end</pre>
+
+<p>一个进程三个线程的情况，三个线程跑在同一个地址空间里：</p>
+<pre class="mermaid">flowchart TB
+    subgraph PD["进程 D"]
+        TD1["线程 1"] --> DD["地址空间 D"]
+        TD2["线程 2"] --> DD
+        TD3["线程 3"] --> DD
+    end</pre>
+
+<h3 id="线程之间共享什么、独有什么"><a href="#线程之间共享什么、独有什么" class="headerlink" title="线程之间共享什么、独有什么"></a>线程之间共享什么、独有什么</h3><p>线程与进程在独立性上差别很大。线程不具备进程那种强独立性。同一进程内所有线程共享一个共同的地址空间，它们能访问相同的程序代码和数据段，还共享包括全局变量在内的所有进程资源。</p>
+<pre class="mermaid">flowchart TB
+    S["每个线程独有<br/>────────<br/>程序计数器<br/>寄存器<br/>堆栈<br/>状态"]
+    G["进程内所有线程共享<br/>────────<br/>地址空间<br/>全局变量<br/>打开的文件<br/>子进程<br/>即将发生的定时器 <br/> 信号与信号处理程序 <br/> 账号信息"]</pre>
+
+<p>这张图对应 PDF 里的两张对照图，左边那列是每个线程中的内容，是线程的属性；右边那列是同一个进程中线程共享的内容，是进程的属性。</p>
+<p>共享带来便利，也带来风险。每个线程都有能力访问进程地址空间内的任意内存地址。一个线程不仅能读写自己的局部变量和堆栈，理论上它还能访问并修改同一进程中其他线程的堆栈或全局变量。比如某个线程错误地写进了一个被其他线程当作控制流程用的变量，或者覆盖了某个线程栈上的关键返回值，都可能引发难以预料的行为，甚至让程序崩溃。</p>
+<p>所以，线程间的资源共享虽然提高了执行效率和响应速度，但也要求开发者在设计多线程程序时采取额外的同步和协调机制，保证线程间的正确交互和数据一致性。手段包括互斥锁（mutexes）、信号量（semaphores）、条件变量（condition variables）这些同步原语，以及合理的线程调度策略，用来避免数据竞争（race conditions）和其他并发问题。</p>
+<h3 id="线程的状态"><a href="#线程的状态" class="headerlink" title="线程的状态"></a>线程的状态</h3><pre class="mermaid">stateDiagram-v2
+    [*] --> 就绪
+    就绪 --> 运行: 获得 CPU 时间片
+    运行 --> 就绪: 时间片用完
+    运行 --> 阻塞: 等待 I/O 或事件
+    阻塞 --> 就绪: 事件发生
+    运行 --> 终止: 任务完成 / 出错
+    终止 --> [*]</pre>
+
+
+
+<p>线程是操作系统调度的基本单位，它的生命周期同样可以划分成多个状态，跟进程的状态类似，但更侧重 CPU 的调度与执行。线程可以处于这几种状态：</p>
+<p><strong>运行中（Running）</strong>：线程获得 CPU 时间片，进入运行状态，执行任务。时间片结束后，线程可能需要把 CPU 让给其他线程。</p>
+<p><strong>阻塞（Blocked）</strong>：线程因为某些原因，比如等待外部事件或资源的就绪，而暂停执行。比如执行一个从键盘读取数据的系统调用，它会一直等到有数据可读。等待文件 I&#x2F;O 完成、等待网络响应也是常见的阻塞原因。线程通常保持阻塞状态，直到等待的事件发生或资源可用，或者被其他线程通过信号、条件变量之类的机制唤醒。</p>
+<p><strong>就绪（Ready）</strong>：线程已做好执行准备，但 CPU 被其他线程占着，暂时轮不到它。处于就绪态的线程已经完成所有必要的准备工作，只等 CPU 时间片分配下来。</p>
+<p><strong>终止（Terminated）</strong>：线程完成任务，或者因为错误、异常、程序逻辑被终止。进程状态图里没有画出这一状态，但它是线程生命周期的重要阶段，标志着线程执行的结束。</p>
+<p>线程之间的状态转换和进程之间的状态转换本质相似，遵循相同的规则和逻辑。一个正在运行的线程可能因为等待 I&#x2F;O 进入阻塞态，I&#x2F;O 完成后再次进入就绪态等 CPU 时间片；就绪态的线程拿到时间片就开始执行，进入运行态。每个线程都有自己的堆栈。</p>
+<hr>
+<h3 id="线程系统调用"><a href="#线程系统调用" class="headerlink" title="线程系统调用"></a>线程系统调用</h3><p>进程在其生命周期中通常从一个初始的单线程启动，这个线程是进程的主执行流。之后通过调用特定的库函数（比如 <code>thread_create</code>）创建新线程来执行并发任务。</p>
+<p><code>thread_create</code> 调用时需要指定新线程的某些属性，包括一个用于标识新线程的名称。调用成功后返回一个唯一的线程标识符，后续对线程的引用和管理都用它。</p>
+<p>线程完成任务后应调用退出函数（如 <code>thread_exit</code>）优雅地结束执行。线程一旦退出，状态转变为终止，此后不再参与系统调度，占用的资源被回收。</p>
+<p><code>thread_join</code> 是一种常用的同步机制，让一个线程（等待线程）暂停执行，直到另一个特定线程（被等待线程）退出。这套机制实现了线程间的依赖管理和资源回收。线程的创建和终止，在逻辑上和进程的创建与终止有诸多相似之处，都涉及资源的申请、使用和释放。</p>
+<blockquote>
+<p>线程同步是指在多线程环境下，通过一定的机制来协调各个线程的执行顺序，以保证它们能够按照一定的规则来访问共享资源或执行特定的任务。同步的目的是确保数据的一致性和程序的正确性。</p>
+</blockquote>
+<p><code>thread_yield</code> 允许当前运行的线程主动放弃 CPU，把执行机会让给同一进程内的其他线程或系统内的其他进程。这在需要公平调度或避免饥饿时特别重要，因为与进程不同，线程通常不会因时钟中断而自动放弃 CPU（具体取决于操作系统和调度策略）。通过 <code>thread_yield</code>，开发者可以更精细地控制线程的执行顺序和优先级。</p>
+<h3 id="POSIX-线程"><a href="#POSIX-线程" class="headerlink" title="POSIX 线程"></a>POSIX 线程</h3><p>为了让跨平台编写线程程序成为可能，IEEE 在标准 IEEE 1003.1c（通常叫 POSIX.1c，或简称 POSIX 线程标准）里详细定义了线程标准，引入了 <strong>Pthreads</strong>（POSIX 线程）库作为实现线程功能的一套标准接口。这一标准在多数 UNIX 系统及兼容系统中得到广泛支持。</p>
+<p>Pthreads 不依赖于特定编程语言，是一个执行和并行计算模型。它允许开发者在单个程序中创建并控制多个时间上重叠执行的线程，每个线程代表一个独立的工作流程。它的实现在 FreeBSD、NetBSD、OpenBSD、Linux、macOS、Android、Solaris 上都存在。</p>
+<p>Windows 本身不直接支持 POSIX 线程，但微软通过兼容层技术（如 Windows Services for UNIX，或后续版本的兼容性更新），在 Windows API 之上实现了对 pthread 功能的支持，使得 pthreads 程序也能在 Windows 平台上运行。</p>
+<p>常用的几个调用：</p>
+<table>
+<thead>
+<tr>
+<th align="left">线程调用</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>pthread_create</code></td>
+<td align="left">创建一个新线程</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_exit</code></td>
+<td align="left">结束调用的线程</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_join</code></td>
+<td align="left">等待一个特定的线程退出</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_yield</code></td>
+<td align="left">释放 CPU 来运行另外一个线程</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_attr_init</code></td>
+<td align="left">创建并初始化一个线程的属性结构</td>
+</tr>
+<tr>
+<td align="left"><code>pthread_attr_destroy</code></td>
+<td align="left">删除一个线程的属性结构</td>
+</tr>
+</tbody></table>
+<p>所有 Pthreads 都有一套特定属性，定义每个线程的基本特征。每个线程包含一个唯一的标识符、一组寄存器（含程序计数器）以及存储在特定结构中的其他属性集，包括堆栈大小、调度优先级和策略等。</p>
+<ul>
+<li><code>pthread_create</code> 成功执行后把新线程的标识符返回给调用者。这个机制和 UNIX 的 <code>fork</code> 系统调用相似，线程标识符在这里起到类似进程 ID（PID）的作用。</li>
+<li><code>pthread_exit</code> 终止自身，同时释放线程堆栈等分配的资源。</li>
+<li><code>pthread_join</code> 等待另一个特定线程的终止，调用时需指定被等待线程的标识符，直到该线程退出，调用线程才继续执行。</li>
+<li><code>pthread_yield</code> 请求系统把当前线程置于可运行状态中的较低优先级，让其他线程有机会运行。</li>
+<li><code>pthread_attr_init</code> 初始化一个线程属性对象并设为默认值，之后可以修改它来定制线程行为（如设置优先级）。不再需要时用 <code>pthread_attr_destroy</code> 删除并释放内存。这个过程只影响属性对象本身，对调用它的线程或任何已存在的线程没有影响。</li>
+</ul>
+<h3 id="pthread-示例"><a href="#pthread-示例" class="headerlink" title="pthread 示例"></a>pthread 示例</h3><p>下面这个程序创建多个线程，每个线程输出自己的唯一标识符：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> NUMBER_OF_THREADS 10</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* 线程函数，接收一个指向 void 的指针作为参数 */</span></span><br><span class="line"><span class="type">void</span> *<span class="title function_">print_hello_world</span><span class="params">(<span class="type">void</span> *thread_id)</span> &#123;</span><br><span class="line">    <span class="type">int</span> tid = (<span class="type">int</span>)thread_id;          <span class="comment">/* 转换回整数标识符 */</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Hello World. Greetings from thread %d\n&quot;</span>, tid);</span><br><span class="line">    pthread_exit(<span class="literal">NULL</span>);                <span class="comment">/* 线程执行完毕，退出 */</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">    <span class="type">pthread_t</span> threads[NUMBER_OF_THREADS];</span><br><span class="line">    <span class="type">int</span> status;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; NUMBER_OF_THREADS; i++) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Main thread: Creating thread %d\n&quot;</span>, i);</span><br><span class="line">        status = pthread_create(&amp;threads[i], <span class="literal">NULL</span>, print_hello_world, (<span class="type">void</span> *)i);</span><br><span class="line">        <span class="keyword">if</span> (status != <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Error: pthread_create failed with error code %d\n&quot;</span>, status);</span><br><span class="line">            <span class="built_in">exit</span>(EXIT_FAILURE);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 简化示例：主线程直接退出，不等待其他线程完成 */</span></span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主线程声明一个存放线程标识符的数组 <code>threads</code>，然后进入循环创建指定数量的线程。每个线程被赋予一个唯一标识符（循环变量 <code>i</code> 的值），通过 <code>pthread_create</code> 的最后一个参数传给线程函数 <code>print_hello_world</code>。创建成功时 <code>pthread_create</code> 返回 0，否则返回错误码，程序打印错误信息并退出。</p>
+<p>这个示例里主线程创建完所有线程后立即退出，实际应用中通常要用 <code>pthread_join</code> 等待线程完成，确保所有线程都顺利执行完毕并释放资源。原文还特别提醒：<code>exit(NULL)</code> 是不恰当的，<code>exit</code> 的参数应该是 int 类型，通常用 <code>EXIT_SUCCESS</code> 或 <code>EXIT_FAILURE</code> 宏，这个例子用 <code>exit(0)</code> 表示程序正常退出。</p>
+<hr>
+<h2 id="线程的实现"><a href="#线程的实现" class="headerlink" title="线程的实现"></a>线程的实现</h2><p>主要有三种实现方式，划分依据是线程的创建、调度、管理这些工作交给谁做：</p>
+<ul>
+<li>在用户空间中实现线程</li>
+<li>在内核空间中实现线程</li>
+<li>在用户和内核空间中混合实现</li>
+</ul>
+<h3 id="在用户空间中实现线程"><a href="#在用户空间中实现线程" class="headerlink" title="在用户空间中实现线程"></a>在用户空间中实现线程</h3><p>用户空间实现的意思是，线程的创建、调度、管理以及同步等机制完全由用户级库负责，不需要内核介入。线程对内核是透明的，内核根本不知道线程的存在，它只能看到进程。所以所有线程共享同一个进程空间，包括地址空间、文件描述符等。</p>
+<pre class="mermaid">flowchart TB
+    subgraph US["用户空间"]
+        subgraph P1["进程"]
+            subgraph RT1["运行时系统"]
+                T1["线程"] --> TT1["线程表"]
+                T2["线程"] --> TT1
+                T3["线程"] --> TT1
+            end
+        end
+        subgraph P2["进程"]
+            subgraph RT2["运行时系统"]
+                T4["线程"] --> TT2["线程表"]
+                T5["线程"] --> TT2
+                T6["线程"] --> TT2
+            end
+        end
+    end
+    subgraph KS["内核空间"]
+        K["内核"] --> PT["进程表"]
+    end</pre>
+
+<p>上图中能直接看出用户空间实现的两个特征。<strong>线程表在用户空间的运行时系统内部</strong>，每个进程各有一张，记录本进程内各线程的程序计数器、堆栈指针、寄存器值以及当前状态。<strong>内核空间里只有进程表，没有线程表</strong>，内核能看到的只有进程，对线程一无所知。所以这张图里内核那一层不需要和线程层发生任何关系。</p>
+<p>这种实现遵循一个通用架构：线程在<strong>运行时系统</strong>（Runtime System，也叫运行时环境）的监管下运行。运行时系统是程序执行的基础框架，提供程序运行的物理环境，还负责内存布局管理、变量访问机制、过程间参数传递、与操作系统底层的接口协调这些复杂任务。编译器设计时会根据目标运行时系统的特性做假设，保证生成的代码能正确执行。</p>
+<p>运行时系统通常负责初始化和管理线程的堆栈，也可能包含垃圾收集、线程调度、语言内置的动态功能等高级特性。用户空间管理线程的场景下，每个进程都要维护一个专属的<strong>线程表</strong>（Thread Table）。这张表的作用类似内核中的进程表，但记录的是进程内部各线程的详细属性，包括程序计数器、堆栈指针、寄存器值以及当前状态。</p>
+<p>线程发生状态转换时（比如从运行态转为就绪态或阻塞态），所有必要的恢复信息（执行上下文）都会存进线程表的对应条目。线程再次被调度时，运行时系统依据这些信息准确恢复线程的上下文，让线程从之前的状态无缝继续。这个过程跟内核在进程表里管理进程上下文在逻辑上是相似的，只是作用域和细节有区别。</p>
+<p>举例来说，基于用户空间线程的 Java 应用程序里，JVM 的线程管理模块就扮演运行时系统的角色，负责创建、调度和管理 Java 线程，通过内部的线程表跟踪每个 Java 线程的状态和上下文信息。Java 线程因等待 I&#x2F;O 阻塞时，JVM 把该线程的信息存进线程表，等 I&#x2F;O 完成再在合适的时机恢复它。</p>
+<h4 id="优势"><a href="#优势" class="headerlink" title="优势"></a>优势</h4><p>用户空间线程的线程状态信息保存在运行时环境提供的线程表里，调度程序（用户空间中的一个本地过程）从线程表里挑另一个就绪线程执行。整个过程完全在用户空间完成，避免了内核调用的开销，省去上下文切换，也不需要刷新 CPU 缓存。这种切换机制让用户空间线程在调度和执行上<strong>更快更灵活</strong>。</p>
+<p>另外，调度算法可以<strong>定制</strong>。每个进程能根据自身需求定制调度算法，对需要精细控制线程执行顺序或优先级的应用尤其重要。比如带垃圾收集器的应用，用户线程可以确保垃圾收集线程在合适的时机运行，不会因内核调度的不确定性打断关键操作。</p>
+<p>此外，用户空间线程能展现出良好的<strong>可扩展性</strong>。内核线程要占用内核的表空间和堆栈空间等资源，系统中内核线程数量过多时可能引发资源紧张甚至系统崩溃。用户空间线程由进程自身管理，不直接占用内核资源，大量线程存在时也能保持较好的稳定性和可扩展性。</p>
+<h4 id="劣势"><a href="#劣势" class="headerlink" title="劣势"></a>劣势</h4><p><strong>阻塞系统调用</strong>：以键盘输入为例，一个线程发起系统调用等待键盘输入，在常规用户空间线程模型里，由于内核不直接知晓线程的存在，内核只能直接操控进程，所以会导致整个进程，包括进程内所有线程，被阻塞。这违背了线程设计的初衷之一，也就是<strong>允许线程进行阻塞调用而不影响同进程内的其他线程</strong>。用户空间线程库为了解决这个问题，通常要实现复杂机制，比如使用非阻塞 I&#x2F;O、轮询，或者用专门的线程处理阻塞操作。</p>
+<p><strong>缺页中断</strong>：由于计算机内存有限，操作系统用分页机制管理内存。当程序访问到尚未加载到内存的页面时，会触发缺页中断，操作系统需要从磁盘加载缺失的页面。传统用户空间线程模型里，因为内核对线程无知，一个线程的缺页中断可能导致整个进程被阻塞，即使进程内其他线程处于可运行状态也执行不了。</p>
+<p><strong>调度上也有限制</strong>：在一个单进程内部，如果没有外部触发（比如时钟中断或线程主动让出 CPU），就无法实现基于时间的轮转调度。这意味着一旦某个线程开始执行，它会独占 CPU 直到自愿放弃，除非因为系统调用、等待 I&#x2F;O 之类的原因为被阻塞，否则同进程内的其他线程拿不到执行机会。</p>
+<p>为了解决上述问题，现代操作系统和线程库通常采用混合模式（详见最后的混合实现），结合用户空间线程和内核空间线程的优点。比如Java虚拟机JVM中的线程模型就是这么做的，Java 线程在用户空间被管理，但通过与内核线程的映射来处理阻塞调用和缺页中断，既保持用户空间线程的高效性，又解决了阻塞和调度上的难题。</p>
+<h3 id="在内核中实现线程"><a href="#在内核中实现线程" class="headerlink" title="在内核中实现线程"></a>在内核中实现线程</h3><p>转向内核实现线程的方案后，系统架构发生显著变化：运行时环境不再是必需的，因为线程的管理和调度工作直接由操作系统内核承担。相应地，每个进程内部不再维护自己的线程表，所有线程的详细信息都被统一记录在内核维护的一个<strong>全局线程表</strong>里。</p>
+<pre class="mermaid">flowchart TB
+    subgraph US["用户空间"]
+        subgraph P1["进程"]
+            direction TB
+            T1["线程"]
+            T2["线程"]
+            T3["线程"]
+        end
+        subgraph P2["进程"]
+            direction TB
+            T4["线程"]
+            T5["线程"]
+            T6["线程"]
+        end
+    end
+    subgraph KS["内核空间"]
+        subgraph K["内核"]
+            direction TB
+            TT["线程表"]
+            PT["进程表"]
+        end
+    end
+    T1 -.-> TT
+    T2 -.-> TT
+    T3 -.-> TT
+    T4 -.-> TT
+    T5 -.-> TT
+    T6 -.-> TT</pre>
+
+<p>和用户空间实现的示意图对比，主要有两点区别：<strong>线程表只在内核空间里，全系统共用一张</strong>（全局线程表），各进程内部不再有自己的线程表和运行时系统。<strong>用户空间的线程要通过系统调用进入内核的线程表</strong>，这是图中那几条跨层连线的含义，也意味着每次线程操作都要陷入内核。</p>
+<p>全局线程表是内核数据结构的一部分，跟踪系统中所有活动线程的状态、属性以及相互关系。当进程中的线程要创建或销毁线程时，它会发起一个系统调用请求，请求传递给内核处理，内核根据请求的类型（创建&#x2F;销毁），在全局线程表里做相应更新。</p>
+<p>例如，当线程执行 <code>pthread_create</code> 创建新线程时，内核接收到调用，在全局线程表中分配一个新条目，存储新线程的标识符、状态、优先级、堆栈信息等关键数据，同时为新线程分配内存和处理器时间等必要资源。</p>
+<p>与之相对的，当线程通过 <code>pthread_exit</code> 或其他机制请求销毁自身时，内核更新全局线程表，把该线程状态标记为已终止并回收其占用的资源。如果这是进程中的最后一个线程，内核还可能回收进程占用的所有资源，结束进程。</p>
+<p>这种方式提供了高度的系统可见性和控制能力，所有线程的创建、销毁和管理都由内核直接负责。但是<strong>性能开销相对较大</strong>，系统调用和内核级别的线程管理操作通常比用户空间内的<strong>操作更复杂、更耗时</strong>。</p>
+<p>内核维护的线程表详尽记录每个线程的寄存器状态、执行状态及其他关键信息。内容和用户空间线程表一致，只是物理存储位置在内核空间，保证安全隔离和高效管理。此外内核还构建了一张进程表，全面跟踪整个系统的运行状态。</p>
+<p>关于线程的阻塞与调度，所有可能引发阻塞的操作都通过系统调用机制实现。某个线程因等待资源或事件进入阻塞态时，内核有决策权，决定是否切换到同一进程内另一个就绪线程，或者调度一个来自不同进程的线程以<strong>充分利用系统资源</strong>。而在用户空间的运行时系统实现里，通常会坚持运行当前线程直到它的 CPU 时间片耗尽，或者没有其他可运行的线程可选时，内核才介入调度。</p>
+<p>考虑到内核层面创建或销毁线程的开销较高，部分系统会采用<strong>线程复用</strong>策略优化性能。一个线程被销毁时，内核不立即释放其全部资源，而是把它标记为不可运行状态，保持内部结构的完整性。之后系统需要创建新线程时，优先复用这些已存在的线程资源，重新配置状态为可用，避免从零开始构建线程的开销。</p>
+<p>当进程中的某个线程遭遇缺页故障时，内核能迅速检测并评估系统内其他可运行线程的情况。必要的时候，也就是等待所需页面从磁盘加载进内存的过程中，内核会选一个可运行的线程继续执行，保持<strong>系统的响应性和效率</strong>。但是这种灵活调度也伴随着成本，即系统调用的相对高昂代价。在频繁进行线程操作（如创建、终止）的场景中，可能会因系统调用的累积效应而显著增加总体开销。</p>
+<hr>
+<h3 id="混合实现"><a href="#混合实现" class="headerlink" title="混合实现"></a>混合实现</h3><p>为了融合用户空间与内核空间的优点，设计者引入了一种名为<strong>内核级线程</strong>（也叫内核线程）的机制，并把用户级线程与这些内核线程中的部分或全部进行高效的多路复用。这一设计赋予开发者极大的灵活性，可以根据具体应用场景控制用户线程与内核线程的数量比例。</p>
+<p>在这个模型里，每个内核级线程都是操作系统直接管理的独立调度实体。操作系统内核只负责识别、创建、调度以及管理这些内核级线程。与此同时，多个用户级线程可以绑定到同一个内核级线程上，实现资源的共享与复用。<strong>多路复用机制</strong>提高了系统资源的利用率，在并发执行大量轻量级任务时，能显著减少线程创建与销毁带来的开销。</p>
+<pre class="mermaid">flowchart TB
+    subgraph US["用户空间"]
+        U1["用户线程"]
+        U2["用户线程"]
+        U3["用户线程"]
+        U4["用户线程"]
+    end
+    subgraph KS["内核空间"]
+        K1["内核线程"]
+        K2["内核线程"]
+    end
+    U1 -.-> K1
+    U2 -.-> K1
+    U3 -.-> K2
+    U4 -.-> K2</pre>
+
+<p>这张图是前两张图的折中。<strong>用户线程在用户空间，内核线程在内核空间</strong>，两者分处两层，靠绑定关系连接。用户空间里不再有运行时系统和线程表；内核空间里的内核线程是操作系统直接管理的独立调度实体，内核只负责识别、创建、调度以及管理这些内核线程。<strong>多个用户线程可以绑定到同一个内核线程上，多路复用由此实现</strong>。开发者可以根据具体场景控制用户线程与内核线程的数量比例，既保留了用户空间线程切换的高效，又让阻塞调用和缺页中断由内核接管。</p>
+<p>举例来说，假设一个应用程序需要处理大量I&#x2F;O密集型任务，它可能会创建多个用户级线程来并发执行这些任务。然而，由于IO操作通常会导致线程阻塞，如果直接位每个用户线程分配一个内核线程，将会造成大量内核线程的闲置等待。通过采用内核级线程与用户级线程的多路复用，这些用户线程可以共享少数几个内核线程，当某个用户线程因为IO操作而阻塞时，内核线程可以无缝切换到另一个就绪的用户线程执行，从而避免了资源浪费，提高了整体的并发处理能力。</p>
+]]></content>
+      <categories>
+        <category>操作系统</category>
+      </categories>
+      <tags>
+        <tag>操作系统</tag>
+        <tag>线程</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>操作系统：进程模型</title>
     <url>/2026/09/11/OS_Process_Model/</url>
     <content><![CDATA[<p>进程是操作系统里最古老的概念之一，也是最核心的那个。几乎所有的操作系统功能都围着它转：调度器调度的是它，内存管理分配地址空间的单位是它，文件系统记录的是它打开了哪些文件。可以毫不夸张地说，没有进程这个抽象，现代操作系统根本无法实现。</p>
@@ -4048,307 +4349,6 @@
       <tags>
         <tag>操作系统</tag>
         <tag>进程</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>操作系统：线程模型</title>
-    <url>/2026/09/11/OS_Thread_Model/</url>
-    <content><![CDATA[<p>进程是资源的容器，也是操作系统调度的基本单位。但现代操作系统里，真正被 CPU 调度的东西其实是线程。</p>
-<hr>
-<h2 id="线程的使用"><a href="#线程的使用" class="headerlink" title="线程的使用"></a>线程的使用</h2><p>在传统的操作系统设计中，进程是资源分配的基本单位，每个进程都拥有独立的地址空间和至少一个控制线程。</p>
-<p>随着并发编程需求的增加，人们发现单一进程内运行多个控制流，能带来诸多优势。这些线程虽然彼此独立执行，但它们共享同一进程的地址空间及其中的所有数据，这种模式为多线程编程提供了基础。</p>
-<h3 id="资源共享"><a href="#资源共享" class="headerlink" title="资源共享"></a>资源共享</h3><p>线程之间的主要优势在于它们能够共享同一块地址空间。线程可以直接访问进程中的全局变量、静态变量，以及通过指针或引用访问的内存区域，不需要进行进程间通信（IPC）那套复杂操作。</p>
-<p>比如在一个文本编辑器里，多个线程可以同时访问并修改文档的同一部分，因为它们共享着文档的内存表示。</p>
-<h3 id="轻量级与高效性"><a href="#轻量级与高效性" class="headerlink" title="轻量级与高效性"></a>轻量级与高效性</h3><p>相比进程，线程是更加轻量级的执行单元。线程的创建和销毁通常比进程快得多，因为线程不需要为每个实例分配独立的地址空间和其他系统资源。</p>
-<p>在许多现代操作系统中，创建一个新线程的速度可以比创建一个新进程快 <strong>10 到 100 倍</strong>。这种高效性让线程成为处理高并发任务时的理想选择。</p>
-<h3 id="性能提升"><a href="#性能提升" class="headerlink" title="性能提升"></a>性能提升</h3><p>在涉及大量计算和 I&#x2F;O 处理的场景中，多线程编程能显著提升应用程序的性能。当 CPU 密集型任务与 I&#x2F;O 密集型任务交替执行时，多线程允许这些任务重叠进行，从而减少 CPU 的空闲时间。</p>
-<p>拿 Web 服务器举例：一个线程可以处理客户端的连接请求，另一个线程负责从磁盘读取数据并准备响应。这种并行处理方式提高了服务器的吞吐量和响应速度。</p>
-<p>线程作为进程内的一种轻量级执行单元，通过共享地址空间和高效性，为并发编程提供了强大的支持。在现代软件开发中，多线程编程已经成为一种普遍采用的技术手段，用于提高应用程序的并发性和性能。</p>
-<hr>
-<h3 id="Web服务器：三种解决方案"><a href="#Web服务器：三种解决方案" class="headerlink" title="Web服务器：三种解决方案"></a>Web服务器：三种解决方案</h3><p>在探讨线程应用的实例时，我们可以聚焦于web服务器的工作机制：</p>
-<h3 id="问题本身"><a href="#问题本身" class="headerlink" title="问题本身"></a>问题本身</h3><p>客户端向服务器发送页面请求，服务器把页面返回去。值得注意的是，站点上各个页面的访问频率差得很远，公司主页这类页面被请求的次数远超产品详情页。</p>
-<p>为了优化性能和响应速度，服务器采用了一种高效策略：把访问量高的那批页面预先加载进内存。这个用来存放高访问率页面的存储空间，就叫<strong>高速缓存</strong>（cache）。缓存命中就直接返回，不用访问磁盘。</p>
-<blockquote>
-<p>注：CPU 里也是同样的思路，L1、L2、L3 缓存存的是近期可能被频繁访问的数据和指令，为的是减少对主存的直接访问。</p>
-</blockquote>
-<h3 id="多线程解决方案"><a href="#多线程解决方案" class="headerlink" title="多线程解决方案"></a>多线程解决方案</h3><p>Web 服务器的一种组织方式，核心是一个叫<strong>调度线程</strong>（dispatcher thread）的组件。</p>
-<p>调度线程从网络接收工作请求，充当中央调度器。收到请求并完成初步检查后，它选择一个当前处于空闲（阻塞状态）的工作线程，把指向请求消息的指针写入该工作线程关联的数据结构（如队列或特殊字）中，然后唤醒这个处于休眠状态的工作线程，把它的状态从阻塞态转变为就绪态。</p>
-<p>被唤醒的工作线程启动后，先检查请求所需的页面是否已存在于共享高速缓存中。存在就迅速检索并返回，不需要进行磁盘 I&#x2F;O。不存在则执行 <code>read</code> 从磁盘读取，由于磁盘 I&#x2F;O 通常耗时较长，工作线程会进入阻塞状态，等待磁盘操作完成。在此期间，调度线程会选择其他就绪的工作线程执行，确保服务器能够持续处理新的请求。</p>
-<pre class="mermaid">flowchart TB
-    D["调度线程<br/>（死循环收请求）"] -->|"① 分派请求<br/>写入指针并唤醒"| W1["工作线程 1"]
-    D --> W2["工作线程 2"]
-    D --> W3["工作线程 3"]
-    W1 -->|"② 先查"| C["共享高速缓存<br/>（所有工作线程可访问）"]
-    C -->|"命中，直接返回"| R["返回页面给客户端"]
-    C -->|"未命中"| K["③ read 磁盘<br/>（阻塞）"]
-    K --> R
-    W1 -.->|"④ 处理完再次阻塞<br/>等待下一个请求"| D</pre>
-
-<p>调度线程的大致逻辑就是一个死循环：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> TRUE 1</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main_dispatcher_thread</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">request</span> <span class="title">buf</span>;</span></span><br><span class="line">    <span class="keyword">while</span> (TRUE) &#123;</span><br><span class="line">        get_next_request(&amp;buf);   <span class="comment">/* 不断从请求源获取请求 */</span></span><br><span class="line">        handoff_work(&amp;buf);       <span class="comment">/* 将请求分派给工作线程处理 */</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;   <span class="comment">/* 理论上永远不会执行到这里 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>工作线程也是死循环，但循环体里多了查缓存、读磁盘、返回页面这几步：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main_worker_thread</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">request</span> <span class="title">buf</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">page</span> *<span class="title">page</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (TRUE) &#123;</span><br><span class="line">        wait_for_work(&amp;buf);                      <span class="comment">/* 等待工作分配 */</span></span><br><span class="line">        <span class="keyword">if</span> (!look_for_page_in_cache(&amp;buf, &amp;page)) <span class="comment">/* 缓存里没有 */</span></span><br><span class="line">            read_page_from_disk(&amp;buf, page);      <span class="comment">/* 从磁盘读 */</span></span><br><span class="line">        <span class="keyword">if</span> (page != <span class="literal">NULL</span>)</span><br><span class="line">            return_page(page);                    <span class="comment">/* 返回页面 */</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;   <span class="comment">/* 同样不会执行到这里 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>调度线程靠一个死循环不断取新请求并分派，工作线程处理完一次请求就再次进入阻塞，等下一个请求到来，形成循环。</p>
-<h3 id="单线程解决方案"><a href="#单线程解决方案" class="headerlink" title="单线程解决方案"></a>单线程解决方案</h3><p>没有多线程环境时，服务器的主循环连续不断地获取客户端请求并依次处理。问题出在处理每个请求的过程中：一旦涉及磁盘 I&#x2F;O 这类耗时操作，服务器必须等待这些操作完成，期间无法响应新的请求。</p>
-<p>PDF 把这种状态称为”空转”，它显著降低了服务器的处理效率，每秒能够处理的请求数量非常有限，由此凸显出多线程对于提升程序并行性和整体性能的重要性。</p>
-<h3 id="状态机解决方案"><a href="#状态机解决方案" class="headerlink" title="状态机解决方案"></a>状态机解决方案</h3><p>还有第三种方案，专门针对那些只提供<strong>非阻塞系统调用</strong>（比如非阻塞 <code>read</code>）的环境。</p>
-<p>非阻塞 I&#x2F;O 的行为是这样的：把文件描述符设置成非阻塞模式之后，如果 I&#x2F;O 操作不能立即完成（比如从网络读数据但当前没有数据到达），系统调用会立刻返回一个错误码（<code>EAGAIN</code> 或 <code>EWOULDBLOCK</code>），而不是让调用线程进入休眠状态等待。</p>
-<p>非阻塞系统调用在需要处理多个IO源，或希望提高程序响应速度的场景中非常有用。通过将文件描述符设置为非阻塞模式，并使用适当的错误处理逻辑，程序可以在IO操作无法立即完成时继续执行其他任务，而不是阻塞等待。这有助于提高程序的并发性和整体性能。</p>
-<p>状态机方案的工作流程：</p>
-<ol>
-<li>请求到达服务器，接收线程先看内存中的高速缓存能不能立刻满足该请求。能就立即响应，无需任何等待。</li>
-<li>如果缓存里没有所需数据，就发起一个非阻塞的磁盘读取，然后把请求的状态（请求标识符、预期的数据位置等）记进服务器的内部状态表。</li>
-<li>服务器进入一个事件循环，不断监听和响应两类事件：新请求到达、先前磁盘操作完成（通常通过信号中断通知）。每当有新请求到来时，服务器检查其状态，如果处于可立即处理的状态，则开始处理；若需要等待磁盘响应，则跳过处理，继续监听。</li>
-<li>一旦收到磁盘操作完成的通知，服务器就从状态表里取出对应的请求状态，用拿到的数据完成响应准备的工作，最后发给客户端。</li>
-</ol>
-<p>这套设计体现的是<strong>有限状态机</strong>（Finite-State Machine，FSM）的核心思想。每个请求被看成一个有着有限数量状态的系统，系统根据外部事件（新请求到达、磁盘操作完成）从一个状态转移到另一个状态，每次转移都伴随着状态的保存和恢复。</p>
-<p>FSM 的应用不限于 Web 服务器，凡是需要处理并发和异步事件的场合都能用上。但是编程难度相对较高，状态转移和状态信息的保存恢复都要开发者显式管理。</p>
-<p>三种方案放一起比：</p>
-<table>
-<thead>
-<tr>
-<th align="left">模型</th>
-<th align="left">特性</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left">单线程</td>
-<td align="left">无并行性，性能较差，阻塞系统调用</td>
-</tr>
-<tr>
-<td align="left">多线程</td>
-<td align="left">有并行性，阻塞系统调用</td>
-</tr>
-<tr>
-<td align="left">有限状态机</td>
-<td align="left">并行性，非阻塞系统调用、中断</td>
-</tr>
-</tbody></table>
-<p>多线程靠并行处理提升性能，但是增加了复杂度和线程安全问题；单线程简单但性能受限；状态机用非阻塞调用和中断机制换来高性能，但是编程难度高。</p>
-<hr>
-<h2 id="经典的线程模型"><a href="#经典的线程模型" class="headerlink" title="经典的线程模型"></a>经典的线程模型</h2><p>换个角度看进程：它是一种高效整合并管理相关<strong>资源</strong>的方式。进程承载着程序正文和数据，还装着已打开的文件句柄、派生的子进程、待触发的定时器、信号处理机制、用户账号信息这些形形色色的资源。把它们统一封装在进程内部，资源的组织和访问都简化了。</p>
-<p>而进程内部真正的执行单元是<strong>线程</strong>（thread）。每个线程配着三样关键的执行状态组件：</p>
-<ul>
-<li><strong>程序计数器</strong>，精确追踪即将执行的指令位置</li>
-<li><strong>寄存器集合</strong>，暂存线程当前操作所依赖的变量值</li>
-<li><strong>堆栈</strong>，记录方法调用与返回的路径</li>
-</ul>
-<p>线程的运行依托于进程，但进程和线程在概念上是截然分开的实体，各承载不同的职责，可以独立处理。一句话概括：<strong>进程是资源的容器，线程是 CPU 直接调度的执行单位</strong>。</p>
-<p>线程概念的引入给进程模型加了一个新维度。同一进程内部，多个线程能以较高程度的独立性并行运行，彼此互不干扰。这种架构看起来类似一台计算机上同时跑多个独立进程，区别在于线程间的资源共享紧密得多，它们共同访问同一地址空间及其他进程资源。不同进程之间虽然也共享物理内存、磁盘、外设，但访问和隔离机制要复杂得多。</p>
-<p>线程继承进程的资源，同时保持较轻量的执行上下文，所以常被叫做<strong>轻量级进程</strong>（lightweight processes）。<strong>多线程</strong>（multithreading）这个词，指的就是单个进程内部多个线程并行执行、共享资源、协同工作的模式。</p>
-<h3 id="单线程进程-vs-多线程进程"><a href="#单线程进程-vs-多线程进程" class="headerlink" title="单线程进程 vs 多线程进程"></a>单线程进程 vs 多线程进程</h3><p>三个传统的进程，每个进程有自己的地址空间和单个控制线程，各自在独立的地址空间里运行：</p>
-<pre class="mermaid">flowchart TB
-    subgraph PA["进程 A"]
-        TA["线程"] --> DA["地址空间 A"]
-    end
-    subgraph PB["进程 B"]
-        TB["线程"] --> DB["地址空间 B"]
-    end
-    subgraph PC["进程 C"]
-        TC["线程"] --> DC["地址空间 C"]
-    end</pre>
-
-<p>一个进程三个线程的情况，三个线程跑在同一个地址空间里：</p>
-<pre class="mermaid">flowchart TB
-    subgraph PD["进程 D"]
-        TD1["线程 1"] --> DD["地址空间 D"]
-        TD2["线程 2"] --> DD
-        TD3["线程 3"] --> DD
-    end</pre>
-
-<h3 id="线程之间共享什么、独有什么"><a href="#线程之间共享什么、独有什么" class="headerlink" title="线程之间共享什么、独有什么"></a>线程之间共享什么、独有什么</h3><p>线程与进程在独立性上差别很大。线程不具备进程那种强独立性。同一进程内所有线程共享一个共同的地址空间，它们能访问相同的程序代码和数据段，还共享包括全局变量在内的所有进程资源。</p>
-<pre class="mermaid">flowchart TB
-    S["每个线程独有<br/>────────<br/>程序计数器<br/>寄存器<br/>堆栈<br/>状态"]
-    G["进程内所有线程共享<br/>────────<br/>地址空间<br/>全局变量<br/>打开的文件<br/>子进程<br/>即将发生的定时器 <br/> 信号与信号处理程序 <br/> 账号信息"]</pre>
-
-<p>这张图对应 PDF 里的两张对照图，左边那列是每个线程中的内容，是线程的属性；右边那列是同一个进程中线程共享的内容，是进程的属性。</p>
-<p>共享带来便利，也带来风险。每个线程都有能力访问进程地址空间内的任意内存地址。一个线程不仅能读写自己的局部变量和堆栈，理论上它还能访问并修改同一进程中其他线程的堆栈或全局变量。比如某个线程错误地写进了一个被其他线程当作控制流程用的变量，或者覆盖了某个线程栈上的关键返回值，都可能引发难以预料的行为，甚至让程序崩溃。</p>
-<p>所以，线程间的资源共享虽然提高了执行效率和响应速度，但也要求开发者在设计多线程程序时采取额外的同步和协调机制，保证线程间的正确交互和数据一致性。手段包括互斥锁（mutexes）、信号量（semaphores）、条件变量（condition variables）这些同步原语，以及合理的线程调度策略，用来避免数据竞争（race conditions）和其他并发问题。</p>
-<h3 id="线程的状态"><a href="#线程的状态" class="headerlink" title="线程的状态"></a>线程的状态</h3><pre class="mermaid">stateDiagram-v2
-    [*] --> 就绪
-    就绪 --> 运行: 获得 CPU 时间片
-    运行 --> 就绪: 时间片用完
-    运行 --> 阻塞: 等待 I/O 或事件
-    阻塞 --> 就绪: 事件发生
-    运行 --> 终止: 任务完成 / 出错
-    终止 --> [*]</pre>
-
-
-
-<p>线程是操作系统调度的基本单位，它的生命周期同样可以划分成多个状态，跟进程的状态类似，但更侧重 CPU 的调度与执行。线程可以处于这几种状态：</p>
-<p><strong>运行中（Running）</strong>：线程获得 CPU 时间片，进入运行状态，执行任务。时间片结束后，线程可能需要把 CPU 让给其他线程。</p>
-<p><strong>阻塞（Blocked）</strong>：线程因为某些原因，比如等待外部事件或资源的就绪，而暂停执行。比如执行一个从键盘读取数据的系统调用，它会一直等到有数据可读。等待文件 I&#x2F;O 完成、等待网络响应也是常见的阻塞原因。线程通常保持阻塞状态，直到等待的事件发生或资源可用，或者被其他线程通过信号、条件变量之类的机制唤醒。</p>
-<p><strong>就绪（Ready）</strong>：线程已做好执行准备，但 CPU 被其他线程占着，暂时轮不到它。处于就绪态的线程已经完成所有必要的准备工作，只等 CPU 时间片分配下来。</p>
-<p><strong>终止（Terminated）</strong>：线程完成任务，或者因为错误、异常、程序逻辑被终止。进程状态图里没有画出这一状态，但它是线程生命周期的重要阶段，标志着线程执行的结束。</p>
-<p>线程之间的状态转换和进程之间的状态转换本质相似，遵循相同的规则和逻辑。一个正在运行的线程可能因为等待 I&#x2F;O 进入阻塞态，I&#x2F;O 完成后再次进入就绪态等 CPU 时间片；就绪态的线程拿到时间片就开始执行，进入运行态。每个线程都有自己的堆栈。</p>
-<hr>
-<h3 id="线程系统调用"><a href="#线程系统调用" class="headerlink" title="线程系统调用"></a>线程系统调用</h3><p>进程在其生命周期中通常从一个初始的单线程启动，这个线程是进程的主执行流。之后通过调用特定的库函数（比如 <code>thread_create</code>）创建新线程来执行并发任务。</p>
-<p><code>thread_create</code> 调用时需要指定新线程的某些属性，包括一个用于标识新线程的名称。调用成功后返回一个唯一的线程标识符，后续对线程的引用和管理都用它。</p>
-<p>线程完成任务后应调用退出函数（如 <code>thread_exit</code>）优雅地结束执行。线程一旦退出，状态转变为终止，此后不再参与系统调度，占用的资源被回收。</p>
-<p><code>thread_join</code> 是一种常用的同步机制，让一个线程（等待线程）暂停执行，直到另一个特定线程（被等待线程）退出。这套机制实现了线程间的依赖管理和资源回收。线程的创建和终止，在逻辑上和进程的创建与终止有诸多相似之处，都涉及资源的申请、使用和释放。</p>
-<blockquote>
-<p>线程同步是指在多线程环境下，通过一定的机制来协调各个线程的执行顺序，以保证它们能够按照一定的规则来访问共享资源或执行特定的任务。同步的目的是确保数据的一致性和程序的正确性。</p>
-</blockquote>
-<p><code>thread_yield</code> 允许当前运行的线程主动放弃 CPU，把执行机会让给同一进程内的其他线程或系统内的其他进程。这在需要公平调度或避免饥饿时特别重要，因为与进程不同，线程通常不会因时钟中断而自动放弃 CPU（具体取决于操作系统和调度策略）。通过 <code>thread_yield</code>，开发者可以更精细地控制线程的执行顺序和优先级。</p>
-<h3 id="POSIX-线程"><a href="#POSIX-线程" class="headerlink" title="POSIX 线程"></a>POSIX 线程</h3><p>为了让跨平台编写线程程序成为可能，IEEE 在标准 IEEE 1003.1c（通常叫 POSIX.1c，或简称 POSIX 线程标准）里详细定义了线程标准，引入了 <strong>Pthreads</strong>（POSIX 线程）库作为实现线程功能的一套标准接口。这一标准在多数 UNIX 系统及兼容系统中得到广泛支持。</p>
-<p>Pthreads 不依赖于特定编程语言，是一个执行和并行计算模型。它允许开发者在单个程序中创建并控制多个时间上重叠执行的线程，每个线程代表一个独立的工作流程。它的实现在 FreeBSD、NetBSD、OpenBSD、Linux、macOS、Android、Solaris 上都存在。</p>
-<p>Windows 本身不直接支持 POSIX 线程，但微软通过兼容层技术（如 Windows Services for UNIX，或后续版本的兼容性更新），在 Windows API 之上实现了对 pthread 功能的支持，使得 pthreads 程序也能在 Windows 平台上运行。</p>
-<p>常用的几个调用：</p>
-<table>
-<thead>
-<tr>
-<th align="left">线程调用</th>
-<th align="left">描述</th>
-</tr>
-</thead>
-<tbody><tr>
-<td align="left"><code>pthread_create</code></td>
-<td align="left">创建一个新线程</td>
-</tr>
-<tr>
-<td align="left"><code>pthread_exit</code></td>
-<td align="left">结束调用的线程</td>
-</tr>
-<tr>
-<td align="left"><code>pthread_join</code></td>
-<td align="left">等待一个特定的线程退出</td>
-</tr>
-<tr>
-<td align="left"><code>pthread_yield</code></td>
-<td align="left">释放 CPU 来运行另外一个线程</td>
-</tr>
-<tr>
-<td align="left"><code>pthread_attr_init</code></td>
-<td align="left">创建并初始化一个线程的属性结构</td>
-</tr>
-<tr>
-<td align="left"><code>pthread_attr_destroy</code></td>
-<td align="left">删除一个线程的属性结构</td>
-</tr>
-</tbody></table>
-<p>所有 Pthreads 都有一套特定属性，定义每个线程的基本特征。每个线程包含一个唯一的标识符、一组寄存器（含程序计数器）以及存储在特定结构中的其他属性集，包括堆栈大小、调度优先级和策略等。</p>
-<ul>
-<li><code>pthread_create</code> 成功执行后把新线程的标识符返回给调用者。这个机制和 UNIX 的 <code>fork</code> 系统调用相似，线程标识符在这里起到类似进程 ID（PID）的作用。</li>
-<li><code>pthread_exit</code> 终止自身，同时释放线程堆栈等分配的资源。</li>
-<li><code>pthread_join</code> 等待另一个特定线程的终止，调用时需指定被等待线程的标识符，直到该线程退出，调用线程才继续执行。</li>
-<li><code>pthread_yield</code> 请求系统把当前线程置于可运行状态中的较低优先级，让其他线程有机会运行。</li>
-<li><code>pthread_attr_init</code> 初始化一个线程属性对象并设为默认值，之后可以修改它来定制线程行为（如设置优先级）。不再需要时用 <code>pthread_attr_destroy</code> 删除并释放内存。这个过程只影响属性对象本身，对调用它的线程或任何已存在的线程没有影响。</li>
-</ul>
-<h3 id="pthread-示例"><a href="#pthread-示例" class="headerlink" title="pthread 示例"></a>pthread 示例</h3><p>下面这个程序创建多个线程，每个线程输出自己的唯一标识符：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> NUMBER_OF_THREADS 10</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* 线程函数，接收一个指向 void 的指针作为参数 */</span></span><br><span class="line"><span class="type">void</span> *<span class="title function_">print_hello_world</span><span class="params">(<span class="type">void</span> *thread_id)</span> &#123;</span><br><span class="line">    <span class="type">int</span> tid = (<span class="type">int</span>)thread_id;          <span class="comment">/* 转换回整数标识符 */</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Hello World. Greetings from thread %d\n&quot;</span>, tid);</span><br><span class="line">    pthread_exit(<span class="literal">NULL</span>);                <span class="comment">/* 线程执行完毕，退出 */</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">    <span class="type">pthread_t</span> threads[NUMBER_OF_THREADS];</span><br><span class="line">    <span class="type">int</span> status;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; NUMBER_OF_THREADS; i++) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Main thread: Creating thread %d\n&quot;</span>, i);</span><br><span class="line">        status = pthread_create(&amp;threads[i], <span class="literal">NULL</span>, print_hello_world, (<span class="type">void</span> *)i);</span><br><span class="line">        <span class="keyword">if</span> (status != <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Error: pthread_create failed with error code %d\n&quot;</span>, status);</span><br><span class="line">            <span class="built_in">exit</span>(EXIT_FAILURE);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 简化示例：主线程直接退出，不等待其他线程完成 */</span></span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>主线程声明一个存放线程标识符的数组 <code>threads</code>，然后进入循环创建指定数量的线程。每个线程被赋予一个唯一标识符（循环变量 <code>i</code> 的值），通过 <code>pthread_create</code> 的最后一个参数传给线程函数 <code>print_hello_world</code>。创建成功时 <code>pthread_create</code> 返回 0，否则返回错误码，程序打印错误信息并退出。</p>
-<p>这个示例里主线程创建完所有线程后立即退出，实际应用中通常要用 <code>pthread_join</code> 等待线程完成，确保所有线程都顺利执行完毕并释放资源。原文还特别提醒：<code>exit(NULL)</code> 是不恰当的，<code>exit</code> 的参数应该是 int 类型，通常用 <code>EXIT_SUCCESS</code> 或 <code>EXIT_FAILURE</code> 宏，这个例子用 <code>exit(0)</code> 表示程序正常退出。</p>
-<hr>
-<h2 id="线程的实现"><a href="#线程的实现" class="headerlink" title="线程的实现"></a>线程的实现</h2><p>主要有三种实现方式，划分依据是线程的创建、调度、管理这些工作交给谁做：</p>
-<ul>
-<li>在用户空间中实现线程</li>
-<li>在内核空间中实现线程</li>
-<li>在用户和内核空间中混合实现</li>
-</ul>
-<h3 id="在用户空间中实现线程"><a href="#在用户空间中实现线程" class="headerlink" title="在用户空间中实现线程"></a>在用户空间中实现线程</h3><p>用户空间实现的意思是，线程的创建、调度、管理以及同步等机制完全由用户级库负责，不需要内核介入。线程对内核是透明的，内核根本不知道线程的存在，它只能看到进程。所以所有线程共享同一个进程空间，包括地址空间、文件描述符等。</p>
-<pre class="mermaid">flowchart TB
-    subgraph US["用户空间"]
-        subgraph P1["进程"]
-            subgraph RT1["运行时系统"]
-                T1["线程"] --> TT1["线程表"]
-                T2["线程"] --> TT1
-                T3["线程"] --> TT1
-            end
-        end
-        subgraph P2["进程"]
-            subgraph RT2["运行时系统"]
-                T4["线程"] --> TT2["线程表"]
-                T5["线程"] --> TT2
-                T6["线程"] --> TT2
-            end
-        end
-    end
-    subgraph KS["内核空间"]
-        K["内核"] --> PT["进程表"]
-    end</pre>
-
-<p>上图中能直接看出用户空间实现的两个特征。<strong>线程表在用户空间的运行时系统内部</strong>，每个进程各有一张，记录本进程内各线程的程序计数器、堆栈指针、寄存器值以及当前状态。<strong>内核空间里只有进程表，没有线程表</strong>，内核能看到的只有进程，对线程一无所知。所以这张图里内核那一层不需要和线程层发生任何关系。</p>
-<p>这种实现遵循一个通用架构：线程在<strong>运行时系统</strong>（Runtime System，也叫运行时环境）的监管下运行。运行时系统是程序执行的基础框架，提供程序运行的物理环境，还负责内存布局管理、变量访问机制、过程间参数传递、与操作系统底层的接口协调这些复杂任务。编译器设计时会根据目标运行时系统的特性做假设，保证生成的代码能正确执行。</p>
-<p>运行时系统通常负责初始化和管理线程的堆栈，也可能包含垃圾收集、线程调度、语言内置的动态功能等高级特性。用户空间管理线程的场景下，每个进程都要维护一个专属的<strong>线程表</strong>（Thread Table）。这张表的作用类似内核中的进程表，但记录的是进程内部各线程的详细属性，包括程序计数器、堆栈指针、寄存器值以及当前状态。</p>
-<p>线程发生状态转换时（比如从运行态转为就绪态或阻塞态），所有必要的恢复信息（执行上下文）都会存进线程表的对应条目。线程再次被调度时，运行时系统依据这些信息准确恢复线程的上下文，让线程从之前的状态无缝继续。这个过程跟内核在进程表里管理进程上下文在逻辑上是相似的，只是作用域和细节有区别。</p>
-<p>举例来说，基于用户空间线程的 Java 应用程序里，JVM 的线程管理模块就扮演运行时系统的角色，负责创建、调度和管理 Java 线程，通过内部的线程表跟踪每个 Java 线程的状态和上下文信息。Java 线程因等待 I&#x2F;O 阻塞时，JVM 把该线程的信息存进线程表，等 I&#x2F;O 完成再在合适的时机恢复它。</p>
-<h4 id="优势"><a href="#优势" class="headerlink" title="优势"></a>优势</h4><p>用户空间线程的线程状态信息保存在运行时环境提供的线程表里，调度程序（用户空间中的一个本地过程）从线程表里挑另一个就绪线程执行。整个过程完全在用户空间完成，避免了内核调用的开销，省去上下文切换，也不需要刷新 CPU 缓存。这种切换机制让用户空间线程在调度和执行上<strong>更快更灵活</strong>。</p>
-<p>另外，调度算法可以<strong>定制</strong>。每个进程能根据自身需求定制调度算法，对需要精细控制线程执行顺序或优先级的应用尤其重要。比如带垃圾收集器的应用，用户线程可以确保垃圾收集线程在合适的时机运行，不会因内核调度的不确定性打断关键操作。</p>
-<p>此外，用户空间线程能展现出良好的<strong>可扩展性</strong>。内核线程要占用内核的表空间和堆栈空间等资源，系统中内核线程数量过多时可能引发资源紧张甚至系统崩溃。用户空间线程由进程自身管理，不直接占用内核资源，大量线程存在时也能保持较好的稳定性和可扩展性。</p>
-<h4 id="劣势"><a href="#劣势" class="headerlink" title="劣势"></a>劣势</h4><p><strong>阻塞系统调用</strong>：以键盘输入为例，一个线程发起系统调用等待键盘输入，在常规用户空间线程模型里，由于内核不直接知晓线程的存在，内核只能直接操控进程，所以会导致整个进程，包括进程内所有线程，被阻塞。这违背了线程设计的初衷之一，也就是<strong>允许线程进行阻塞调用而不影响同进程内的其他线程</strong>。用户空间线程库为了解决这个问题，通常要实现复杂机制，比如使用非阻塞 I&#x2F;O、轮询，或者用专门的线程处理阻塞操作。</p>
-<p><strong>缺页中断</strong>：由于计算机内存有限，操作系统用分页机制管理内存。当程序访问到尚未加载到内存的页面时，会触发缺页中断，操作系统需要从磁盘加载缺失的页面。传统用户空间线程模型里，因为内核对线程无知，一个线程的缺页中断可能导致整个进程被阻塞，即使进程内其他线程处于可运行状态也执行不了。</p>
-<p><strong>调度上也有限制</strong>：在一个单进程内部，如果没有外部触发（比如时钟中断或线程主动让出 CPU），就无法实现基于时间的轮转调度。这意味着一旦某个线程开始执行，它会独占 CPU 直到自愿放弃，除非因为系统调用、等待 I&#x2F;O 之类的原因为被阻塞，否则同进程内的其他线程拿不到执行机会。</p>
-<p>为了解决上述问题，现代操作系统和线程库通常采用混合模式（详见最后的混合实现），结合用户空间线程和内核空间线程的优点。比如Java虚拟机JVM中的线程模型就是这么做的，Java 线程在用户空间被管理，但通过与内核线程的映射来处理阻塞调用和缺页中断，既保持用户空间线程的高效性，又解决了阻塞和调度上的难题。</p>
-<h3 id="在内核中实现线程"><a href="#在内核中实现线程" class="headerlink" title="在内核中实现线程"></a>在内核中实现线程</h3><p>转向内核实现线程的方案后，系统架构发生显著变化：运行时环境不再是必需的，因为线程的管理和调度工作直接由操作系统内核承担。相应地，每个进程内部不再维护自己的线程表，所有线程的详细信息都被统一记录在内核维护的一个<strong>全局线程表</strong>里。</p>
-<pre class="mermaid">flowchart TB
-    subgraph US["用户空间"]
-        subgraph P1["进程"]
-            direction TB
-            T1["线程"]
-            T2["线程"]
-            T3["线程"]
-        end
-        subgraph P2["进程"]
-            direction TB
-            T4["线程"]
-            T5["线程"]
-            T6["线程"]
-        end
-    end
-    subgraph KS["内核空间"]
-        subgraph K["内核"]
-            direction TB
-            TT["线程表"]
-            PT["进程表"]
-        end
-    end
-    T1 -.-> TT
-    T2 -.-> TT
-    T3 -.-> TT
-    T4 -.-> TT
-    T5 -.-> TT
-    T6 -.-> TT</pre>
-
-<p>和用户空间实现的示意图对比，主要有两点区别：<strong>线程表只在内核空间里，全系统共用一张</strong>（全局线程表），各进程内部不再有自己的线程表和运行时系统。<strong>用户空间的线程要通过系统调用进入内核的线程表</strong>，这是图中那几条跨层连线的含义，也意味着每次线程操作都要陷入内核。</p>
-<p>全局线程表是内核数据结构的一部分，跟踪系统中所有活动线程的状态、属性以及相互关系。当进程中的线程要创建或销毁线程时，它会发起一个系统调用请求，请求传递给内核处理，内核根据请求的类型（创建&#x2F;销毁），在全局线程表里做相应更新。</p>
-<p>例如，当线程执行 <code>pthread_create</code> 创建新线程时，内核接收到调用，在全局线程表中分配一个新条目，存储新线程的标识符、状态、优先级、堆栈信息等关键数据，同时为新线程分配内存和处理器时间等必要资源。</p>
-<p>与之相对的，当线程通过 <code>pthread_exit</code> 或其他机制请求销毁自身时，内核更新全局线程表，把该线程状态标记为已终止并回收其占用的资源。如果这是进程中的最后一个线程，内核还可能回收进程占用的所有资源，结束进程。</p>
-<p>这种方式提供了高度的系统可见性和控制能力，所有线程的创建、销毁和管理都由内核直接负责。但是<strong>性能开销相对较大</strong>，系统调用和内核级别的线程管理操作通常比用户空间内的<strong>操作更复杂、更耗时</strong>。</p>
-<p>内核维护的线程表详尽记录每个线程的寄存器状态、执行状态及其他关键信息。内容和用户空间线程表一致，只是物理存储位置在内核空间，保证安全隔离和高效管理。此外内核还构建了一张进程表，全面跟踪整个系统的运行状态。</p>
-<p>关于线程的阻塞与调度，所有可能引发阻塞的操作都通过系统调用机制实现。某个线程因等待资源或事件进入阻塞态时，内核有决策权，决定是否切换到同一进程内另一个就绪线程，或者调度一个来自不同进程的线程以<strong>充分利用系统资源</strong>。而在用户空间的运行时系统实现里，通常会坚持运行当前线程直到它的 CPU 时间片耗尽，或者没有其他可运行的线程可选时，内核才介入调度。</p>
-<p>考虑到内核层面创建或销毁线程的开销较高，部分系统会采用<strong>线程复用</strong>策略优化性能。一个线程被销毁时，内核不立即释放其全部资源，而是把它标记为不可运行状态，保持内部结构的完整性。之后系统需要创建新线程时，优先复用这些已存在的线程资源，重新配置状态为可用，避免从零开始构建线程的开销。</p>
-<p>当进程中的某个线程遭遇缺页故障时，内核能迅速检测并评估系统内其他可运行线程的情况。必要的时候，也就是等待所需页面从磁盘加载进内存的过程中，内核会选一个可运行的线程继续执行，保持<strong>系统的响应性和效率</strong>。但是这种灵活调度也伴随着成本，即系统调用的相对高昂代价。在频繁进行线程操作（如创建、终止）的场景中，可能会因系统调用的累积效应而显著增加总体开销。</p>
-<hr>
-<h3 id="混合实现"><a href="#混合实现" class="headerlink" title="混合实现"></a>混合实现</h3><p>为了融合用户空间与内核空间的优点，设计者引入了一种名为<strong>内核级线程</strong>（也叫内核线程）的机制，并把用户级线程与这些内核线程中的部分或全部进行高效的多路复用。这一设计赋予开发者极大的灵活性，可以根据具体应用场景控制用户线程与内核线程的数量比例。</p>
-<p>在这个模型里，每个内核级线程都是操作系统直接管理的独立调度实体。操作系统内核只负责识别、创建、调度以及管理这些内核级线程。与此同时，多个用户级线程可以绑定到同一个内核级线程上，实现资源的共享与复用。<strong>多路复用机制</strong>提高了系统资源的利用率，在并发执行大量轻量级任务时，能显著减少线程创建与销毁带来的开销。</p>
-<pre class="mermaid">flowchart TB
-    subgraph US["用户空间"]
-        U1["用户线程"]
-        U2["用户线程"]
-        U3["用户线程"]
-        U4["用户线程"]
-    end
-    subgraph KS["内核空间"]
-        K1["内核线程"]
-        K2["内核线程"]
-    end
-    U1 -.-> K1
-    U2 -.-> K1
-    U3 -.-> K2
-    U4 -.-> K2</pre>
-
-<p>这张图是前两张图的折中。<strong>用户线程在用户空间，内核线程在内核空间</strong>，两者分处两层，靠绑定关系连接。用户空间里不再有运行时系统和线程表；内核空间里的内核线程是操作系统直接管理的独立调度实体，内核只负责识别、创建、调度以及管理这些内核线程。<strong>多个用户线程可以绑定到同一个内核线程上，多路复用由此实现</strong>。开发者可以根据具体场景控制用户线程与内核线程的数量比例，既保留了用户空间线程切换的高效，又让阻塞调用和缺页中断由内核接管。</p>
-<p>举例来说，假设一个应用程序需要处理大量I&#x2F;O密集型任务，它可能会创建多个用户级线程来并发执行这些任务。然而，由于IO操作通常会导致线程阻塞，如果直接位每个用户线程分配一个内核线程，将会造成大量内核线程的闲置等待。通过采用内核级线程与用户级线程的多路复用，这些用户线程可以共享少数几个内核线程，当某个用户线程因为IO操作而阻塞时，内核线程可以无缝切换到另一个就绪的用户线程执行，从而避免了资源浪费，提高了整体的并发处理能力。</p>
-]]></content>
-      <categories>
-        <category>操作系统</category>
-      </categories>
-      <tags>
-        <tag>操作系统</tag>
-        <tag>线程</tag>
       </tags>
   </entry>
   <entry>
@@ -14225,6 +14225,24 @@
       </tags>
   </entry>
   <entry>
+    <title>Hello World</title>
+    <url>/2026/07/06/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
+  </entry>
+  <entry>
     <title>STM32智能小车——标准库工程整体架构解析</title>
     <url>/2026/08/12/SmartCar_StdPeriph_Architecture/</url>
     <content><![CDATA[<h2 id="一、从上一篇到这篇"><a href="#一、从上一篇到这篇" class="headerlink" title="一、从上一篇到这篇"></a>一、从上一篇到这篇</h2><p>上一篇《<a href="https://tristan1116.github.io/2026/08/10/Keil_to_VSCode_EIDE_Migration/">Keil 工程迁移到 VS Code + EIDE</a>》完成了把 Keil 标准库工程迁移到 VS Code 里编译烧录。接下来我一步步组装部件，把程序烧录到小车上，让小车成功跑了起来。<img src="/./../images/SmartCar_StdPeriph_Architecture/50b02f84e45a5d75b09044f0c7f524eb.jpg" alt="50b02f84e45a5d75b09044f0c7f524eb"></p>
@@ -14698,24 +14716,6 @@
         <tag>数据结构和算法</tag>
         <tag>栈</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>Hello World</title>
-    <url>/2026/07/06/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
   </entry>
   <entry>
     <title>hexo博客静态网站项目总结</title>
@@ -19568,6 +19568,241 @@
       </tags>
   </entry>
   <entry>
+    <title>我的个人域名网站从0到1</title>
+    <url>/2026/10/16/website-from-zero-to-one/</url>
+    <content><![CDATA[<h2 id="引入"><a href="#引入" class="headerlink" title="引入"></a>引入</h2><p>我的博客一直托管在 GitHub Pages 上。对于单纯的前端页面来说够用了，但如果想放点需要服务器的东西，比如跑个后端服务、存个数据库，还是需要自己有一台云服务器。于是有了这次建站。</p>
+<p>现在网站已经稳定运行了快一个月，拥有了主页和几个子项目，它们都跑在我的云服务器上，前后端都是自己开发的。欢迎大家访问 <a href="https://tsx.world/">https://tsx.world/</a></p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016135142309.png" alt="image-20261016135142309"></p>
+<h2 id="省流版的建站成本和时间线"><a href="#省流版的建站成本和时间线" class="headerlink" title="省流版的建站成本和时间线"></a>省流版的建站成本和时间线</h2><p>我的域名、服务器和相关服务都在阿里云上：</p>
+<table>
+<thead>
+<tr>
+<th align="left">项目</th>
+<th align="left">规格</th>
+<th align="left">价格</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">域名</td>
+<td align="left"><code>.world</code> 后缀，首年</td>
+<td align="left">23元</td>
+</tr>
+<tr>
+<td align="left">轻量应用服务器</td>
+<td align="left">2 核 2G &#x2F; 40G 系统盘 &#x2F; 峰值带宽 200Mbps</td>
+<td align="left">半年免费！</td>
+</tr>
+<tr>
+<td align="left">HTTPS 证书</td>
+<td align="left">Let’s Encrypt</td>
+<td align="left">免费，自动续期</td>
+</tr>
+<tr>
+<td align="left">备案</td>
+<td align="left">ICP + 公安备案</td>
+<td align="left">0 元（自己办，不找代办）</td>
+</tr>
+</tbody></table>
+<p><strong>时间线</strong></p>
+<table>
+<thead>
+<tr>
+<th align="left">日期</th>
+<th align="left">事项</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">8-28</td>
+<td align="left">买服务器</td>
+</tr>
+<tr>
+<td align="left">9-06</td>
+<td align="left">提交 ICP 备案订单</td>
+</tr>
+<tr>
+<td align="left">9-15</td>
+<td align="left">ICP 备案通过，等了 9 天，</td>
+</tr>
+<tr>
+<td align="left">9-19</td>
+<td align="left">域名解析 + Nginx + HTTPS + 网站上线，当天提交公安备案</td>
+</tr>
+<tr>
+<td align="left">10-10</td>
+<td align="left">公安备案通过，去掉国庆假期，等了 2 周，</td>
+</tr>
+</tbody></table>
+<p><strong>省流版总结</strong>：技术部分用agent半天就能搞定，真正占时间的是两个备案。所以<strong>顺序很重要：先提交备案，再搞技术</strong>，让等待时间和你的准备工作并行。</p>
+<p>接下来是详细介绍。</p>
+<h2 id="一、买域名"><a href="#一、买域名" class="headerlink" title="一、买域名"></a>一、买域名</h2><p>域名购买的渠道有很多，我选择在阿里云购买，因为可以和我的服务器在一起管理，域名注册等服务阿里云也会提供，比较省心。一般<code>.com</code>和<code>.cn</code>的后缀名比较贵，其他的后缀名比较便宜，所以我选择了 <code>tsx.world</code> ，我的名字缩写加上便宜且有意义的后缀名。第一年仅需23元，第二年104。</p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016141457573.png" alt="image-20261016141457573"></p>
+<p>买完第一件事是<strong>实名认证</strong>。国内注册的域名必须实名，不认证域名会被暂停解析。在阿里云控制台下图界面，按流程进行认证，一般一两天就通过了。<img src="/./../images/website-from-zero-to-one/image-20261016141805160.png" alt="image-20261016141805160"></p>
+<h2 id="二、买服务器"><a href="#二、买服务器" class="headerlink" title="二、买服务器"></a>二、买服务器</h2><p>阿里云和腾讯云的优惠力度都很大，一台轻量服务器第一年仅需一百元左右，甚至都不用。这方面网上的教程非常多，这里不再赘述。我使用了阿里云的大学生300元无门槛券，免费购买了原价270的2核2G的轻量应用服务器</p>
+<p><a href="https://university.aliyun.com/buycenter/?spm=5176.46783215">https://university.aliyun.com/buycenter/?spm=5176.46783215</a></p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016142606231.png" alt="image-20261016142606231"></p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016142629948.png" alt="image-20261016142629948"></p>
+<p>基本配置：</p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016142805352.png" alt="image-20261016142805352"></p>
+<table>
+<thead>
+<tr>
+<th align="left">项目</th>
+<th align="left">选择</th>
+<th align="left">理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">镜像</td>
+<td align="left">Ubuntu 22.04 LTS</td>
+<td align="left">长期支持版，资料多</td>
+</tr>
+<tr>
+<td align="left">规格</td>
+<td align="left">2 核 2G</td>
+<td align="left">跑 Nginx + 一两个 Go 服务够用</td>
+</tr>
+<tr>
+<td align="left">系统盘</td>
+<td align="left">40G</td>
+<td align="left">数据库 + 日志 + 快照，够用</td>
+</tr>
+</tbody></table>
+<h2 id="三、域名解析"><a href="#三、域名解析" class="headerlink" title="三、域名解析"></a>三、域名解析</h2><p>域名解析，就是把<strong>域名翻译成 IP 地址</strong>。</p>
+<p>服务器在网络里的真实地址是一串数字（比如 <code>118.31.60.18</code>），域名只是给它起的一个好记的名字。浏览器里输入 <code>tsx.world</code> 的时候，它并不知道要连哪台机器，会先去问 DNS 服务器”这个域名对应哪个 IP”，拿到答案才能连上你的服务器。</p>
+<p>所以买完域名，还要做一步解析：告诉 DNS”<code>tsx.world</code> 指向我的服务器 IP”。不做这一步，域名就是一个没人认识的空名字。</p>
+<p>在阿里云云解析 DNS 里加两条 A 记录：</p>
+<table>
+<thead>
+<tr>
+<th align="left">记录类型</th>
+<th align="left">主机记录</th>
+<th align="left">记录值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">A</td>
+<td align="left"><code>@</code></td>
+<td align="left">服务器公网 IP</td>
+</tr>
+<tr>
+<td align="left">A</td>
+<td align="left"><code>www</code></td>
+<td align="left">服务器公网 IP</td>
+</tr>
+</tbody></table>
+<p><code>@</code> 代表裸域名（<code>tsx.world</code>），<code>www</code> 代表 <code>www.tsx.world</code>。两条都加上，两个地址就都能访问。</p>
+<p>加完后本地验证一下，可能要等几分钟生效：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ping tsx.world</span><br><span class="line"><span class="comment"># 返回的 IP 应该是你的服务器公网 IP</span></span><br></pre></td></tr></table></figure>
+
+<p><img src="/./../images/website-from-zero-to-one/image-20261016143305568.png" alt="image-20261016143305568"></p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016143217066.png" alt="image-20261016143217066"></p>
+<h2 id="四、服务器初始配置"><a href="#四、服务器初始配置" class="headerlink" title="四、服务器初始配置"></a>四、服务器初始配置</h2><h3 id="4-1-可选：装个-SSH-客户端"><a href="#4-1-可选：装个-SSH-客户端" class="headerlink" title="4.1 可选：装个 SSH 客户端"></a>4.1 可选：装个 SSH 客户端</h3><p>服务器上执行的命令，都要先通过 <strong>SSH</strong> 远程登录到服务器，在它的终端里敲。Windows 自带的 PowerShell 也能连（直接输 <code>ssh root@服务器IP</code> 就行），但每次都要敲一遍 IP，日常维护可以装个专门的 SSH 客户端，能保存连接、双击即连。我用的是 <strong>Xshell</strong>。当然也可以直接让agent来帮你登录。</p>
+<p><strong>下载安装</strong>：搜「Xshell」进官网 → 选「家庭&#x2F;学校免费版」→ 填个邮箱就能下载，安装一路下一步。</p>
+<p>装好后<strong>新建连接</strong>：</p>
+<ol>
+<li>点左上角「新建」，名称随便起（比如 <code>我的服务器</code>）</li>
+<li>在「连接」页填三项：<ul>
+<li>协议：<code>SSH</code></li>
+<li>主机：你的服务器公网 IP</li>
+<li>端口号：<code>22</code></li>
+</ul>
+</li>
+<li>点「连接」——第一次会弹「SSH 安全警告」，选「接受并保存」</li>
+<li>输入用户名 <code>root</code> 和密码，回车，就登进服务器了</li>
+</ol>
+<h3 id="4-2-SSH-登录与免密配置"><a href="#4-2-SSH-登录与免密配置" class="headerlink" title="4.2 SSH 登录与免密配置"></a>4.2 SSH 登录与免密配置</h3><p>命令行方式，PowerShell 里直接连，不装 Xshell 也能用：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ssh root@你的服务器IP</span><br><span class="line"><span class="comment"># 第一次连接会问 yes/no，输 yes 后输入密码</span></span><br></pre></td></tr></table></figure>
+
+<p>登录成功后配一下<strong>免密登录</strong>（本机生成密钥对，把公钥装到服务器）：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 本机执行</span></span><br><span class="line">ssh-keygen -t ed25519          <span class="comment"># 一路回车</span></span><br><span class="line">ssh-copy-id root@服务器IP       <span class="comment"># 或手动把公钥追加到服务器</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>⚠️ <strong>我遇到的问题</strong>：在 Xshell 里粘贴长命令时，公钥被插入了换行、变成两行写进 <code>authorized_keys</code>，sshd 直接静默忽略——命令显示”安装完成”，但免密登录还是失败。诊断方法：<code>cat -A ~/.ssh/authorized_keys</code> 看有没有异常的 <code>$</code> 换行符。修复：分段用 <code>echo -n</code> 写入。</p>
+</blockquote>
+<p>配好之后，在本机 <code>~/.ssh/config</code> 加个别名，以后 <code>ssh 别名</code> 就能连：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Host myserver</span><br><span class="line">    HostName 服务器IP</span><br><span class="line">    User root</span><br><span class="line">    IdentityFile ~/.ssh/id_ed25519</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-装-Nginx-放第一个页面"><a href="#4-3-装-Nginx-放第一个页面" class="headerlink" title="4.3 装 Nginx + 放第一个页面"></a>4.3 装 Nginx + 放第一个页面</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 服务器上执行</span></span><br><span class="line">apt update &amp;&amp; apt install -y nginx</span><br><span class="line">systemctl status nginx        <span class="comment"># 确认 active</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 把首页文件放到网站目录</span></span><br><span class="line"><span class="comment"># 本机执行（scp 上传）：</span></span><br><span class="line">scp index.html root@服务器IP:/var/www/html/index.html</span><br></pre></td></tr></table></figure>
+
+<p>此时访问 <code>http://tsx.world</code> 就能看到页面了。<strong>轻量服务器的防火墙默认放行 80&#x2F;443 端口</strong>，不需要额外配置。</p>
+<h2 id="五、HTTPS：一条命令的事"><a href="#五、HTTPS：一条命令的事" class="headerlink" title="五、HTTPS：一条命令的事"></a>五、HTTPS：一条命令的事</h2><p>HTTPS 就是<strong>给网站的通信加密</strong>。</p>
+<p>HTTP 协议下，浏览器和服务器之间传输的所有数据都是明文——访客填的表单、输入的密码，在网络上经过的任何节点都能看到、能篡改。HTTPS 会在两端建立一条加密通道，数据在传输途中是加密的，中途被截获也读不出内容。另外，现在浏览器对 HTTP 网站会直接在地址栏标「不安全」，所以 HTTPS 已经是网站的标配。</p>
+<p>加密通信需要一张「证书」来证明<strong>这个服务器确实是它声称的那个域名</strong>。证书以前要花钱买，现在有 Let’s Encrypt 提供免费的，而且能自动续期。我们只需要执行下列命令：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">apt install -y certbot python3-certbot-nginx</span><br><span class="line"></span><br><span class="line">certbot --nginx -d tsx.world -d www.tsx.world \</span><br><span class="line">  --non-interactive --agree-tos \</span><br><span class="line">  --register-unsafely-without-email --redirect</span><br></pre></td></tr></table></figure>
+
+<p>这条命令自动完成三件事：申请证书 → 修改 Nginx 配置（加 443 监听 + 证书路径 + HTTP 301 跳转）→ 安装续期定时任务。完成后浏览器的网址界面就会显示这个网站是安全的。</p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016145239822.png" alt="image-20261016145239822"></p>
+<h2 id="六、ICP-备案"><a href="#六、ICP-备案" class="headerlink" title="六、ICP 备案"></a>六、ICP 备案</h2><p><strong>ICP 备案是什么</strong>：ICP 的全称是 Internet Content Provider，直译”网络内容提供商”。国内规定，网站必须向工信部登记”这个网站是谁办的、放在哪台服务器上、叫什么名字”，通过后发一个备案号。实际作用是硬性的：国内服务器上，没备案的域名不能用 80&#x2F;443 端口对外提供服务——不备案，网站直接访问不了，没有绕过的办法。</p>
+<p><strong>网站备案分成 ICP 备案和公安备案</strong>：ICP 备案归<strong>工信部</strong>管，相当于”接入许可”；公安备案归<strong>公安部</strong>管，是”网络安全责任”登记，网站上线后 30 天内办理，办理时要签一份网络安全责任书。所以顺序是：先办 ICP 备案，再办公安备案，ICP备案通过后网站就能上线。</p>
+<p>我实际经历的<strong>流程和时间线</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">9-06  在阿里云提交备案订单（填主体信息、网站信息、上传证件）</span><br><span class="line">9-08  阿里云初审通过，提交管局</span><br><span class="line">9-11  收到工信部短信，完成短信核验</span><br><span class="line">9-15  管局审核通过，收到备案号</span><br></pre></td></tr></table></figure>
+
+<p>整个过程约 <strong>9 天</strong>，其中大部分是管局审核的排队时间。</p>
+<p><strong>管局是什么</strong>：管局是<strong>各省的通信管理局</strong>，工信部在各省的分支机构。备案的最终审核单位就是它。在阿里云提交材料后，阿里云先做初审，再转交管局排队审核，等待时间主要耗在管局这一环，各省管局的处理速度不太一样。</p>
+<p>关于ICP备案，阿里云腾讯云等服务商都会有详细的备案流程介绍和指引，此处不再赘述</p>
+<p><a href="https://beian.aliyun.com/?spm=5176.30275541.J_ZGek9Blx07Hclc3Ddt9dg.1.19a92f3d84jPH8&scm=20140722.S_card@@%E4%BA%A7%E5%93%81@@3417321.S_new~UND~card.ID_card@@%E4%BA%A7%E5%93%81@@3417321-RL_%E5%A4%87%E6%A1%88-LOC_2024SPSearchCard-OR_ser-PAR1_1a0dfd2617921338496334354e671c-V_4-RE_new6-P0_0-P1_0">https://beian.aliyun.com/?spm=5176.30275541.J_ZGek9Blx07Hclc3Ddt9dg.1.19a92f3d84jPH8&amp;scm=20140722.S_card@@%E4%BA%A7%E5%93%81@@3417321.S_new~UND~card.ID_card@@%E4%BA%A7%E5%93%81@@3417321-RL_%E5%A4%87%E6%A1%88-LOC_2024SPSearchCard-OR_ser-PAR1_1a0dfd2617921338496334354e671c-V_4-RE_new6-P0_0-P1_0</a></p>
+<p><img src="/./../images/website-from-zero-to-one/image-20261016150110996.png" alt="image-20261016150110996"></p>
+<p><strong>填表注意事项</strong>：</p>
+<ol>
+<li><strong>备案期间网站不能开</strong>：提交后到通过前，域名不能访问，或者只放一个静态占位页。</li>
+<li><strong>服务器所在地</strong>按服务器实际地域填。</li>
+</ol>
+<p><strong>备案通过后：备案号上墙</strong>。</p>
+<p>备案通过后会收到工业和信息化部发来的手机短信，告知备案&#x2F;许可证编号。<img src="/./../images/website-from-zero-to-one/80f03e18c67bb17357ad9fb24daf0d9b.jpg" alt="80f03e18c67bb17357ad9fb24daf0d9b"></p>
+<p>网站底部需要挂上<strong>网站备案号</strong>，链接到 <code>https://beian.miit.gov.cn/</code>：<img src="/./../images/website-from-zero-to-one/image-20261016151607272.png" alt="image-20261016151607272"></p>
+<p><code>https://beian.miit.gov.cn/</code> 是工信部的<strong>备案信息查询系统</strong>：任何人都可以在上面输入域名，查到网站的备案号、主办单位、备案时间。备案号必须链接到它，相当于留一个”验证入口”——访客点一下就能核实这个网站确实备过案，而不是随便写的一串编号。</p>
+<figure class="highlight html"><table><tr><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;https://beian.miit.gov.cn/&quot;</span> <span class="attr">target</span>=<span class="string">&quot;_blank&quot;</span>&gt;</span>浙ICP备XXXXXXXX号-1<span class="tag">&lt;/<span class="name">a</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>⚠️ <strong>注意</strong>：备案号有两个版本——<strong>主体备案号</strong>（<code>浙ICP备XXXXXXXX号</code>）和<strong>网站备案号</strong>（带 <code>-1</code> 后缀）。<strong>网站底部要挂的是带 <code>-1</code> 的那个</strong>，后面公安备案要提供的也是这个，我一开始搞错了，导致公安备案审核不通过。</p>
+</blockquote>
+<h2 id="七、公安备案：上线后-30-天内必须办"><a href="#七、公安备案：上线后-30-天内必须办" class="headerlink" title="七、公安备案：上线后 30 天内必须办"></a>七、公安备案：上线后 30 天内必须办</h2><p>公安备案不像之前ICP备案，没有阿里云帮你推进流程，需要自己全程跟进。</p>
+<p>平台是全国互联网安全管理服务平台 <code>https://beian.mps.gov.cn</code>要自己注册账号填写。</p>
+<p>注意：备案时使用的主体信息中，地址不是户籍地址，而是现居地址！</p>
+<p>如果是个人备案的话，<strong>是否提供互联网交互服务这里一定要选否，否则过不了审！</strong><img src="/./../images/website-from-zero-to-one/image-20261016152759296.png" alt="image-20261016152759296"></p>
+<p>审核通过后拿到公安备案号，需要在网站首页显著位置挂上备案图标 + 编号：<img src="/./../images/website-from-zero-to-one/image-20261016151936026.png" alt="image-20261016151936026"></p>
+<figure class="highlight html"><table><tr><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;https://beian.mps.gov.cn/&quot;</span> <span class="attr">target</span>=<span class="string">&quot;_blank&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">img</span> <span class="attr">src</span>=<span class="string">&quot;gongan.png&quot;</span> <span class="attr">alt</span>=<span class="string">&quot;公安备案图标&quot;</span>&gt;</span></span><br><span class="line">  浙公网安备XXXXXXXXXXXXXX号</span><br><span class="line"><span class="tag">&lt;/<span class="name">a</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p><img src="/./../images/website-from-zero-to-one/image-20261016152300951.png" alt="image-20261016152300951"></p>
+<p>办理公安备案时会签署一份《网络安全责任告知书》：</p>
+<ol>
+<li><strong>网站不再开办 → 5 个工作日内</strong>申请撤销备案。别直接扔着不管。</li>
+<li>首页显著位置张贴备案图标。</li>
+</ol>
+<h2 id="八、部署工作流"><a href="#八、部署工作流" class="headerlink" title="八、部署工作流"></a>八、部署工作流</h2><p>网站上线后要持续更新的话，可以写一个脚本，所有修改都在本地做，改完运行部署脚本上传。</p>
+<p>脚本逻辑：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="meta">#!/usr/bin/env bash</span></span><br><span class="line"><span class="comment"># deploy.sh 核心三步</span></span><br><span class="line"><span class="comment"># 1. 给静态资源换版本号（防止浏览器拿旧缓存）</span></span><br><span class="line">sed -i <span class="string">&quot;s/?v=[0-9]\&#123;8\&#125;[a-z]/?v=<span class="variable">$&#123;NEW_VERSION&#125;</span>/g&quot;</span> web/*.html</span><br><span class="line"><span class="comment"># 2. 上传整个目录</span></span><br><span class="line">scp -q -r web/. myserver:/var/www/html/</span><br><span class="line"><span class="comment"># 3. 验证：对比本地和线上的文件字节数</span></span><br><span class="line"><span class="keyword">for</span> f <span class="keyword">in</span> <span class="string">&quot;<span class="variable">$&#123;PAGES[@]&#125;</span>&quot;</span>; <span class="keyword">do</span></span><br><span class="line">    LOCAL_SIZE=$(<span class="built_in">wc</span> -c &lt; <span class="string">&quot;web/<span class="variable">$f</span>&quot;</span>)</span><br><span class="line">    READ=$(curl -s -H <span class="string">&quot;Accept-Encoding: identity&quot;</span> -o /dev/null \</span><br><span class="line">           -w <span class="string">&#x27;%&#123;http_code&#125; %&#123;size_download&#125;&#x27;</span> <span class="string">&quot;https://tsx.world/<span class="variable">$f</span>&quot;</span>)</span><br><span class="line">    <span class="comment"># 两边字节数一致才算成功</span></span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure>
+
+<p>配合一个 <code>deploy.bat</code>，现在更新网站就只需要<strong>双击一下</strong>这个文件，上传完自动校验线上字节数，不一致会报错。</p>
+<h2 id="九、一台服务器跑多个项目"><a href="#九、一台服务器跑多个项目" class="headerlink" title="九、一台服务器跑多个项目"></a>九、一台服务器跑多个项目</h2><p>建站最初的时候，我只放了个主页，后来陆续加了子项目，都是在同一台服务器上通过 <strong>Nginx</strong> 路径分流。</p>
+<p>Nginx 是一个”Web 服务器”软件，职责是<strong>接收访客的请求，把对应的内容返回过去</strong>。它主要干两件事：</p>
+<ul>
+<li>访客要的是 HTML、图片这类静态文件 → 直接从服务器磁盘上读出来返回</li>
+<li>访客要的是 API 数据（需要后端程序现场处理的）→ 把请求<strong>转交</strong>给后端程序</li>
+</ul>
+<p>多项目共存靠的就是它的路径分流能力：同一个域名下，访问 <code>/pingpong/</code> 走乒乓球项目，访问 <code>/lostfound/</code> 走失物招领，互不干扰：</p>
+<figure class="highlight nginx"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 主页</span></span><br><span class="line"><span class="section">location</span> / &#123;</span><br><span class="line">    <span class="attribute">root</span> /var/www/html;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 乒乓球数据分析：前端静态 + API 反代</span></span><br><span class="line"><span class="section">location</span> /pingpong/api/ &#123;</span><br><span class="line">    <span class="attribute">proxy_pass</span> http://127.0.0.1:8081/api/;   <span class="comment"># 后端 Go 服务</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="section">location</span> /pingpong/ &#123;</span><br><span class="line">    <span class="attribute">root</span> /var/www/html;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 校园失物招领</span></span><br><span class="line"><span class="section">location</span> /lostfound/api/ &#123;</span><br><span class="line">    <span class="attribute">proxy_pass</span> http://127.0.0.1:8080/api/;   <span class="comment"># 另一个 Go 服务</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="section">location</span> /lostfound/ &#123;</span><br><span class="line">    <span class="attribute">alias</span> /opt/lostfound/web/;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>配置里的 <code>proxy_pass</code> 就是<strong>反向代理</strong>：后端 Go 程序只监听本机地址（<code>127.0.0.1:8081</code>，外网根本访问不到），Nginx 对外接收请求后替访客<strong>转交</strong>给后端，再把结果带回来。相当于后端程序躲在 Nginx 后面，由 Nginx 统一对外接待——后端不用直接暴露到公网，更安全，多个服务也能共用一个域名。</p>
+<p>每个后端服务用 <strong>systemd</strong> 托管。systemd 是 Linux 自带的”服务管家”：程序如果直接在终端里跑，窗口一关就停了；交给 systemd 托管后，程序后台常驻、开机自动启动、崩溃了自动拉起。只需要写一个配置文件告诉它”启动哪个程序”：</p>
+<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="comment"># /etc/systemd/system/myapp.service</span></span><br><span class="line"><span class="section">[Unit]</span></span><br><span class="line"><span class="attr">Description</span>=My Go backend</span><br><span class="line"><span class="attr">After</span>=network.target</span><br><span class="line"></span><br><span class="line"><span class="section">[Service]</span></span><br><span class="line"><span class="attr">Type</span>=simple</span><br><span class="line"><span class="attr">User</span>=www-data</span><br><span class="line"><span class="attr">WorkingDirectory</span>=/opt/myapp</span><br><span class="line"><span class="attr">ExecStart</span>=/opt/myapp/server -config /opt/myapp/config.yaml</span><br><span class="line"><span class="attr">Restart</span>=always</span><br><span class="line"><span class="attr">RestartSec</span>=<span class="number">3</span></span><br><span class="line"></span><br><span class="line"><span class="section">[Install]</span></span><br><span class="line"><span class="attr">WantedBy</span>=multi-user.target</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">systemctl <span class="built_in">enable</span> --now myapp    <span class="comment"># 启动 + 设为开机自启</span></span><br></pre></td></tr></table></figure>
+
+<p><code>systemctl</code> 是跟这个管家打交道的命令：<code>enable</code> 设为开机自启，<code>--now</code> 表示顺便立刻启动。平时看运行状态用 <code>systemctl status myapp</code>，改完代码重启用 <code>systemctl restart myapp</code>。</p>
+<h2 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h2><p>网站的建设一点也不难！如果你也在计划建站，希望这篇博客能有所帮助。</p>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>Nginx</tag>
+        <tag>建站</tag>
+        <tag>阿里云</tag>
+        <tag>备案</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>一次成功的Git分支统一实战</title>
     <url>/2026/07/13/%E4%B8%80%E6%AC%A1%E6%88%90%E5%8A%9F%E7%9A%84Git%E5%88%86%E6%94%AF%E7%BB%9F%E4%B8%80%E5%AE%9E%E6%88%98/</url>
     <content><![CDATA[<h1 id="一次成功的Git分支统一实战"><a href="#一次成功的Git分支统一实战" class="headerlink" title="一次成功的Git分支统一实战"></a>一次成功的Git分支统一实战</h1><hr>
@@ -19646,6 +19881,273 @@
       </categories>
       <tags>
         <tag>Git</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>前缀和与差分 —— 从概念到公式</title>
+    <url>/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/</url>
+    <content><![CDATA[<h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
+<p>最直接的做法：每次从 3 加到 7。如果数组很大（比如 10 万个数），问你 10 万次，那总共要算 100 亿次加法——太慢了。<br>如果换一种思路，我能不能<strong>提前把「前 i 个数的和」全部算好存起来</strong>，这样每次询问直接用减法得到结果？</p>
+<p>这就是<strong>前缀和</strong>的核心思想——<strong>预处理，换时间</strong>。</p>
+<hr>
+<h2 id="二、一维前缀和"><a href="#二、一维前缀和" class="headerlink" title="二、一维前缀和"></a>二、一维前缀和</h2><h3 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="2.1 定义"></a>2.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，定义前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = a[1] + a[2] + ... + a[i]   （前 i 个数的总和）</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-核心公式"><a href="#2-2-核心公式" class="headerlink" title="2.2 核心公式"></a>2.2 核心公式</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = s[i-1] + a[i]</span><br></pre></td></tr></table></figure>
+
+<p>边界条件：<code>s[0] = 0</code>（前 0 个数的和为 0）。</p>
+<blockquote>
+<p>公式的意思是：前 i 个数的和 &#x3D; 前 i-1 个数的和 + 第 i 个数。</p>
+</blockquote>
+<h3 id="2-3-图示"><a href="#2-3-图示" class="headerlink" title="2.3 图示"></a>2.3 图示</h3><p>假设原数组 <code>a</code> 如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：  1    2    3    4    5</span><br><span class="line">a[]：  2    5    3    1    4</span><br></pre></td></tr></table></figure>
+
+<p>逐个计算前缀和：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + 2 = 2</span><br><span class="line">s[2] = 2 + 5 = 7</span><br><span class="line">s[3] = 7 + 3 = 10</span><br><span class="line">s[4] = 10 + 1 = 11</span><br><span class="line">s[5] = 11 + 4 = 15</span><br></pre></td></tr></table></figure>
+
+<p>得到前缀和数组 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：  2    7    10   11   15</span><br><span class="line">      ↑    ↑    ↑    ↑    ↑</span><br><span class="line">      前1  前2  前3  前4  前5</span><br></pre></td></tr></table></figure>
+
+<p>可以直观地看到：<code>s[i]</code> 就是从第一个数一直加到第 i 个数的「累计值」。</p>
+<h3 id="2-4-用途：快速求区间和"><a href="#2-4-用途：快速求区间和" class="headerlink" title="2.4 用途：快速求区间和"></a>2.4 用途：快速求区间和</h3><p>现在想求 <code>a[2] + a[3] + a[4]</code>（即区间 <code>[2, 4]</code> 的和）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间[2,4]的和 = s[4] - s[1] = 11 - 2 = 9</span><br><span class="line">验证：5 + 3 + 1 = 9  ✅</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心公式：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间 [l, r] 的和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>文字理解：<strong>前 r 个数的和 减去 前 l-1 个数的和</strong>，剩下的就是第 l 个到第 r 个。</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                   ┌─────────── 区间[l, r] ───────────┐</span><br><span class="line">                   │                                   │</span><br><span class="line">a[1] a[2] ... a[l-1]  a[l] a[l+1] ... a[r-1] a[r]  a[r+1] ...</span><br><span class="line">├──── 前 l-1 项 ────┤├────────── 前 r 项 ──────────┤</span><br><span class="line">                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</span><br><span class="line">                     s[r] = 前 r 项的总和</span><br><span class="line">     s[l-1] = 前 l-1 项的总和</span><br><span class="line">             </span><br><span class="line">     区间和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
+
+<p>预处理完 <code>s</code> 数组后，<strong>每次求区间和只需要 O(1) 的时间</strong>（一次减法），这就是前缀和的威力。</p>
+<hr>
+<h2 id="三、二维前缀和"><a href="#三、二维前缀和" class="headerlink" title="三、二维前缀和"></a>三、二维前缀和</h2><h3 id="3-1-问题升级"><a href="#3-1-问题升级" class="headerlink" title="3.1 问题升级"></a>3.1 问题升级</h3><p>如果你面对的<strong>不是一维数组，而是一个二维矩阵</strong>，想快速求出<strong>任意一个子矩形内所有数的和</strong>，怎么办？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">    列1  列2  列3  列4</span><br><span class="line">行1   1    2    3    4</span><br><span class="line">行2   5    6    7    8</span><br><span class="line">行3   9   10   11   12</span><br></pre></td></tr></table></figure>
+
+<p>比如：求从 <code>[2][2]</code> 到 <code>[3][4]</code> 这个 2×3 矩形里所有数的和。</p>
+<p>类比一维的思路：<strong>二维前缀和</strong>就是提前算好从 <code>[1][1]</code> 到 <code>[i][j]</code> 这个矩形内所有数的总和。</p>
+<h3 id="3-2-核心公式"><a href="#3-2-核心公式" class="headerlink" title="3.2 核心公式"></a>3.2 核心公式</h3><p>定义 <code>s[i][j]</code> &#x3D; 从左上角 <code>(1,1)</code> 到右下角 <code>(i,j)</code> 的矩形区域内所有元素的和。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-3-图解：容斥原理"><a href="#3-3-图解：容斥原理" class="headerlink" title="3.3 图解：容斥原理"></a>3.3 图解：容斥原理</h3><p>公式看着复杂，其实核心就是<strong>容斥原理</strong>——两个有重叠的区域合并时，<strong>加完两边，减掉重叠</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">             列1     列2    ...   列j-1    列j    列j+1</span><br><span class="line">     ┌──────────────────────────────────────────────────┐</span><br><span class="line">行1   │                                                  │</span><br><span class="line">     │                      A区域                        │</span><br><span class="line"> ...  │                  s[i-1][j]                       │</span><br><span class="line">     │              ┌──────────────┐                     │</span><br><span class="line">行i-1 │              │  重叠部分    │                     │</span><br><span class="line">     │              │ s[i-1][j-1]  │                     │</span><br><span class="line">     │              └──────────────┘                     │</span><br><span class="line">     ├─────────────────────────────┬────────────────────┤</span><br><span class="line">行i   │          B区域             │      a[i][j]       │</span><br><span class="line">     │       s[i][j-1]            │      (当前格子)     │</span><br><span class="line">     └─────────────────────────────┴────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>把 s[i][j] 拆成三块来看：</p>
+<ul>
+<li><strong>A 区域</strong> &#x3D; <code>s[i-1][j]</code>：第 1<del>i-1 行、第 1</del>j 列（不含第 i 行）</li>
+<li><strong>B 区域</strong> &#x3D; <code>s[i][j-1]</code>：第 1<del>i 行、第 1</del>j-1 列（不含第 j 列）</li>
+<li><strong>重叠部分</strong> &#x3D; <code>s[i-1][j-1]</code>：A 和 B 都覆盖的左上角</li>
+</ul>
+<p>根据容斥原理（两个集合的并集 &#x3D; 各自之和 − 交集）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = |A ∪ B| + a[i][j]</span><br><span class="line">        = |A| + |B| − |A ∩ B| + a[i][j]</span><br><span class="line">        = s[i-1][j] + s[i][j-1] − s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-4-用途：求子矩阵和"><a href="#3-4-用途：求子矩阵和" class="headerlink" title="3.4 用途：求子矩阵和"></a>3.4 用途：求子矩阵和</h3><p>现在想求矩形区域 <code>(x1, y1)</code> 到 <code>(x2, y2)</code> 的和：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">子矩阵和 = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</span><br></pre></td></tr></table></figure>
+
+<p>同样还是<strong>面积加减法</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">(x1,y1) ───────────── (x1,y2)</span><br><span class="line">   │                     │</span><br><span class="line">   │    ┌────────────┐   │</span><br><span class="line">   │    │  目标矩形    │   │</span><br><span class="line">   │    │ (红色区域)   │   │</span><br><span class="line">   │    └────────────┘   │</span><br><span class="line">(x2,y1) ───────────── (x2,y2)</span><br></pre></td></tr></table></figure>
+
+<p>怎么从 <code>s[x2][y2]</code>（整个大矩形）扣出目标红色区域？</p>
+<ol>
+<li><strong>减</strong>掉上边部分 <code>s[x1-1][y2]</code>  </li>
+<li><strong>减</strong>掉左边部分 <code>s[x2][y1-1]</code>  </li>
+<li>左上角区域 <code>s[x1-1][y1-1]</code> 被减了两次，<strong>加</strong>回来</li>
+</ol>
+<hr>
+<h2 id="四、差分"><a href="#四、差分" class="headerlink" title="四、差分"></a>四、差分</h2><h3 id="4-1-差分是前缀和的逆运算"><a href="#4-1-差分是前缀和的逆运算" class="headerlink" title="4.1 差分是前缀和的逆运算"></a>4.1 差分是前缀和的逆运算</h3><p>先回顾前缀和的定义：<code>s[i] = a[1] + ... + a[i]</code>。</p>
+<p>那反过来，已知 <code>s</code> 怎么求 <code>a</code>？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">a[i] = s[i] - s[i-1]</span><br></pre></td></tr></table></figure>
+
+<p><strong>这就是差分。</strong> 对前缀和数组求差分，就得到原数组；对差分数组求前缀和，也得到原数组——两者互逆。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原数组 a</span><br><span class="line">  │  求前缀和</span><br><span class="line">  ▼</span><br><span class="line">前缀和数组 s</span><br><span class="line">  │  求差分（相邻两项相减）</span><br><span class="line">  ▼</span><br><span class="line">原数组 a</span><br></pre></td></tr></table></figure>
+
+<p>那差分有什么用？看一个场景：</p>
+<blockquote>
+<p>如果要反复给数组的某个区间统一加上一个数，最后再看结果，能不能快速做？</p>
+</blockquote>
+<p>暴力做法是每次从 l 到 r 逐个加，太慢。差分能做到时间复杂度是<strong>O(1)， 一次标记，最后统一还原</strong>。</p>
+<hr>
+<h2 id="五、一维差分"><a href="#五、一维差分" class="headerlink" title="五、一维差分"></a>五、一维差分</h2><h3 id="5-1-定义"><a href="#5-1-定义" class="headerlink" title="5.1 定义"></a>5.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，差分数组 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i] = a[i] - a[i-1]</span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>b[1] = a[1]</code>（<code>a[0] = 0</code>）。</p>
+<h3 id="5-2-核心操作：区间加-c"><a href="#5-2-核心操作：区间加-c" class="headerlink" title="5.2 核心操作：区间加 c"></a>5.2 核心操作：区间加 c</h3><p>给 <code>a[l] ~ a[r]</code> 每个数都加 <code>c</code>，分成两步：</p>
+<blockquote>
+<p><strong>① 在差分数组上改两个位置 → ② 再对差分数组求一次前缀和，就得到修改后的原数组</strong></p>
+</blockquote>
+<p>改哪两个位置？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[l]   += c</span><br><span class="line">b[r+1] -= c</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，在差分数组上做完标记后，<strong>只要再求一遍前缀和就能得到修改后的数组</strong>。<br>不是说好了差分和前缀和是逆运算吗？为什么这样改两个位置就能让一整段加上 c？<br>拿一个具体的例子走一遍就明白了。</p>
+<hr>
+<h4 id="举个具体的例子"><a href="#举个具体的例子" class="headerlink" title="举个具体的例子"></a>举个具体的例子</h4><p>假设原数组 <code>a</code> 长度为 6：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">a[]：      2    5    3    1    4    6</span><br></pre></td></tr></table></figure>
+
+<p>先按定义造出差分数组 <code>b</code>（<code>b[i] = a[i] - a[i-1]</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[1] = a[1] - 0      = 2</span><br><span class="line">b[2] = a[2] - a[1]   = 5 - 2   = 3</span><br><span class="line">b[3] = a[3] - a[2]   = 3 - 5   = -2</span><br><span class="line">b[4] = a[4] - a[3]   = 1 - 3   = -2</span><br><span class="line">b[5] = a[5] - a[4]   = 4 - 1   = 3</span><br><span class="line">b[6] = a[6] - a[5]   = 6 - 4   = 2</span><br><span class="line"></span><br><span class="line">b[]：      2    3   -2   -2    3    2</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="现在，我想给-a-3-a-5-每个数都加上-5"><a href="#现在，我想给-a-3-a-5-每个数都加上-5" class="headerlink" title="现在，我想给 a[3] ~ a[5] 每个数都加上 5"></a>现在，我想给 a[3] ~ a[5] 每个数都加上 5</h4><p>按照公式，改 <code>b</code> 的两个位置：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[3] += 5      （原来是 -2，变成 3）</span><br><span class="line">b[6] -= 5      （原来是 2，变成 -3）</span><br></pre></td></tr></table></figure>
+
+<p>修改后的 <code>b</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">b[]：      2    3    3   -2    3   -3</span><br><span class="line">                    ↑ b[3] 从 -2 变成 3</span><br><span class="line">                                   ↑ b[6] 从 2 变成 -3</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h4 id="关键一步：对修改后的-b-求前缀和，看看会发生什么"><a href="#关键一步：对修改后的-b-求前缀和，看看会发生什么" class="headerlink" title="关键一步：对修改后的 b 求前缀和，看看会发生什么"></a>关键一步：对修改后的 b 求前缀和，看看会发生什么</h4><p>还记得前缀和怎么算吗？**<code>s[i] = s[i-1] + b[i]</code>**。一步步来：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + b[1] = 0 + 2  = 2</span><br><span class="line">s[2] = 2 + b[2] = 2 + 3  = 5</span><br><span class="line">s[3] = 5 + b[3] = 5 + 3  = 8    ← 注意，这里用的是修改后的 b[3]（加了 5）</span><br><span class="line">s[4] = 8 + b[4] = 8 + (-2)= 6</span><br><span class="line">s[5] = 6 + b[5] = 6 + 3  = 9</span><br><span class="line">s[6] = 9 + b[6] = 9 + (-3)= 6    ← 这里用的是修改后的 b[6]（减了 5）</span><br></pre></td></tr></table></figure>
+
+<p>得到新的 <code>s</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：      2    5    8    6    9    6</span><br></pre></td></tr></table></figure>
+
+<p>对比原来的 <code>a</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原来 a：   2    5    3    1    4    6</span><br><span class="line">新的 s：   2    5    8    6    9    6</span><br><span class="line">                          ↑    ↑    ↑</span><br><span class="line">                     a[3]+5  a[4]+5  a[5]+5</span><br></pre></td></tr></table></figure>
+
+<p><strong>正好</strong>只有 <code>a[3] ~ a[5]</code> 加了 5，前面和后面都没变！–很神奇对吧！</p>
+<hr>
+<h4 id="为什么？"><a href="#为什么？" class="headerlink" title="为什么？"></a>为什么？</h4><p>原因藏在<strong>前缀和的累加特性</strong>里。把 <code>b</code> 看成一系列”<strong>标记</strong>“：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[]：  2    3    3   -2    3   -3</span><br><span class="line">                 ↑</span><br><span class="line">           这里 b[3] 多了一个 +5</span><br><span class="line">                                ↑</span><br><span class="line">                          这里 b[6] 多了一个 -5</span><br></pre></td></tr></table></figure>
+
+<p>对 <code>b</code> 求前缀和时，每个位置的值会<strong>一直往后累加</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">位置1：       2                                 = 2</span><br><span class="line">位置2：       2 + 3                             = 5</span><br><span class="line">位置3：       2 + 3 + 3      ← +5 从这里开始     = 8 ← 比原来多了 5</span><br><span class="line">位置4：       2 + 3 + 3 + (-2)    ← +5 还在继续   = 6 ← 比原来多了 5</span><br><span class="line">位置5：       2 + 3 + 3 + (-2) + 3               = 9 ← 比原来多了 5</span><br><span class="line">位置6：       2 + 3 + 3 + (-2) + 3 + (-3)        = 6 ← +5 和 -5 抵消了！</span><br><span class="line">           ↑ 前 5 项还带着 +5     这里又减了 5 ──┘</span><br></pre></td></tr></table></figure>
+
+<p>把过程画出来看更清楚：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在 b[3] 放一个 +5 → 从位置 3 开始，所有数都多了 5</span><br><span class="line">                                              ┌───────────────────</span><br><span class="line">位置:    1      2      3      4      5      6 │</span><br><span class="line">累加:    2      5      8      6      9      6 │</span><br><span class="line">        ──────────────────────────────────────┘</span><br><span class="line">                            ← +5 一直跟着 →  </span><br><span class="line">                                              然后在 b[6] 放一个 -5 → +5 被抵消</span><br><span class="line"></span><br><span class="line">位置:    1      2      3      4      5      6</span><br><span class="line">累加:    2      5      8      6      9      6  </span><br><span class="line">                                     +5 被 -5 抵消 → 变回原样</span><br></pre></td></tr></table></figure>
+
+<p><strong>结论：</strong> <code>b[l] += c</code> 让 +c 从位置 l 开始一直往后传，<code>b[r+1] -= c</code> 让它在 r+1 处被抵消。一传一挡，<strong>c 就只落在了 [l, r] 这一段上</strong>。</p>
+<h3 id="5-3-完整流程"><a href="#5-3-完整流程" class="headerlink" title="5.3 完整流程"></a>5.3 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 由原数组 a 构造差分数组 b</span><br><span class="line">2. 在 b 上进行区间修改（b[l] += c, b[r+1] -= c）</span><br><span class="line">3. 所有修改完成后，对 b 求一遍前缀和 → 得到修改后的 a</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>前缀和和差分正好互补：</p>
+<ul>
+<li><strong>前缀和</strong>：一次预处理，多次<strong>查询</strong>区间和</li>
+<li><strong>差分</strong>：多次<strong>修改</strong>区间值，最后一次性看结果</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="六、二维差分"><a href="#六、二维差分" class="headerlink" title="六、二维差分"></a>六、二维差分</h2><h3 id="6-1-定义"><a href="#6-1-定义" class="headerlink" title="6.1 定义"></a>6.1 定义</h3><p>和一维完全对称：<strong>对 b 求二维前缀和 &#x3D; 原矩阵 a</strong>。</p>
+<p>构造公式（对二维前缀和公式做逆运算）：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i][j] = a[i][j] - a[i-1][j] - a[i][j-1] + a[i-1][j-1]</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-核心操作：子矩阵加-c"><a href="#6-2-核心操作：子矩阵加-c" class="headerlink" title="6.2 核心操作：子矩阵加 c"></a>6.2 核心操作：子矩阵加 c</h3><p>给矩形 <code>(x1,y1)</code> 到 <code>(x2,y2)</code> 内每个数加 <code>c</code>，只需改<strong>四个点</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1]     += c</span><br><span class="line">b[x1][y2+1]   -= c</span><br><span class="line">b[x2+1][y1]   -= c</span><br><span class="line">b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-图解"><a href="#6-3-图解" class="headerlink" title="6.3 图解"></a>6.3 图解</h3><p>一维是在<strong>两端</strong>做标记，二维是在<strong>四个角</strong>做标记：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1] += c        b[x1][y2+1] -= c</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">     │                          │</span><br><span class="line">     │       目标区域            │</span><br><span class="line">     │      (+c 的区域)          │</span><br><span class="line">     │                          │</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">b[x2+1][y1] -= c      b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
+
+<p>和一维同理，四个标记经过二维前缀和后，只有矩形内部被加了 c。</p>
+<h3 id="6-4-完整流程"><a href="#6-4-完整流程" class="headerlink" title="6.4 完整流程"></a>6.4 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 构造二维差分数组 b</span><br><span class="line">2. 在 b 上进行子矩阵修改（改四个角）</span><br><span class="line">3. 所有修改完成后，对 b 求二维前缀和 → 得到修改后的矩阵 a</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、总结对照"><a href="#七、总结对照" class="headerlink" title="七、总结对照"></a>七、总结对照</h2><h3 id="公式速查表"><a href="#公式速查表" class="headerlink" title="公式速查表"></a>公式速查表</h3><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>公式</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一维前缀和</td>
+<td><code>s[i] = s[i-1] + a[i]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>一维区间和</td>
+<td><code>sum[l,r] = s[r] - s[l-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>二维前缀和</td>
+<td><code>s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</code></td>
+<td>预处理</td>
+</tr>
+<tr>
+<td>二维子矩阵和</td>
+<td><code>sum = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</code></td>
+<td>快速查询</td>
+</tr>
+<tr>
+<td>一维差分</td>
+<td><code>b[l] += c, b[r+1] -= c</code></td>
+<td>区间加减</td>
+</tr>
+<tr>
+<td>二维差分</td>
+<td><code>b[x1][y1] += c, b[x1][y2+1] -= c, b[x2+1][y1] -= c, b[x2+1][y2+1] += c</code></td>
+<td>子矩阵加减</td>
+</tr>
+</tbody></table>
+<h3 id="一张图理解全部关系"><a href="#一张图理解全部关系" class="headerlink" title="一张图理解全部关系"></a>一张图理解全部关系</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">         求前缀和               求差分</span><br><span class="line">原数组 ────────→ 前缀和数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">         求差分                 求前缀和</span><br><span class="line">原数组 ────────→ 差分数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">前缀和与差分就像积分与求导，是互逆的运算</span><br></pre></td></tr></table></figure>
+
+<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>什么时候用</th>
+<th>耗时</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>前缀和</strong></td>
+<td>多次<strong>查询</strong>区间和&#x2F;子矩阵和</td>
+<td>预处理 O(n)，每次查询 O(1)</td>
+</tr>
+<tr>
+<td><strong>差分</strong></td>
+<td>多次<strong>修改</strong>区间&#x2F;子矩阵的值，最后一次性查看结果</td>
+<td>每次修改 O(1)，最后恢复 O(n)</td>
+</tr>
+<tr>
+<td><strong>前缀和 + 差分</strong></td>
+<td>多次修改 + 多次查询</td>
+<td>差分做修改，前缀和做查询，中间通过「求前缀和」衔接</td>
+</tr>
+</tbody></table>
+<h3 id="关键注意点"><a href="#关键注意点" class="headerlink" title="关键注意点"></a>关键注意点</h3><ol>
+<li><strong>数组下标从 1 开始</strong>，避免出现 <code>l-1 = 0</code> 时越界</li>
+<li>设 <code>s[0] = 0</code>（一维）或 <code>s[0][*] = s[*][0] = 0</code>（二维），统一边界条件</li>
+<li><strong>先修改，后查询</strong>——差分所有的修改操作做完后，最后求一遍前缀和才能得到最终结果</li>
+<li>二维的「面积加减法」理解了，前缀和和差分的四个公式<strong>其实是一个思路</strong>，不需要死记硬背</li>
+</ol>
+<hr>
+<blockquote>
+<p>前缀和是「累加」，差分是「标记」——这对互逆的算法体现了预处理和批量操作的核心思想，是算法竞赛和面试中最高频的基础技巧之一。</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>数据结构和算法</category>
+      </categories>
+      <tags>
+        <tag>前缀和&amp;差分</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>力扣59题-螺旋矩阵-题解</title>
+    <url>/2026/07/12/%E5%8A%9B%E6%89%A3%2059%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/</url>
+    <content><![CDATA[<h1 id="力扣59题-螺旋矩阵-题解"><a href="#力扣59题-螺旋矩阵-题解" class="headerlink" title="力扣59题-螺旋矩阵-题解"></a>力扣59题-螺旋矩阵-题解</h1><h2 id="题目描述"><a href="#题目描述" class="headerlink" title="题目描述"></a>题目描述</h2><p>给你一个正整数 <code>n</code> ，生成一个包含 <code>1</code> 到 n^2^ 所有元素，且元素按顺时针顺序螺旋排列的 <code>n x n</code> 正方形矩阵 <code>matrix</code> 。</p>
+<p><strong>示例 1：</strong></p>
+<p><img src="/./../images/%E5%8A%9B%E6%89%A359%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/spiraln.jpg" alt="img"></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 3</span><br><span class="line">输出：[[1,2,3],[8,9,4],[7,6,5]]</span><br></pre></td></tr></table></figure>
+
+<p><strong>示例 2：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 1</span><br><span class="line">输出：[[1]]</span><br></pre></td></tr></table></figure>
+
+<p><strong>提示：</strong></p>
+<ul>
+<li><code>1 &lt;= n &lt;= 20</code></li>
+</ul>
+<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p>破解本题的关键在于设计四个变量，分别表示矩阵的上、下、左、右， 四个动态更新的边界.</p>
+<p>num从1开始，通过从左到右、从上到下、从右到左、从下到上的顺序不断循环填入num，同时更新边界，直到num&gt;n^2^。</p>
+<h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;vector&gt;</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">generateMatrix</span>(<span class="type">int</span> n) &#123;</span><br><span class="line">        <span class="type">int</span> top = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> bottom = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> left = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> right = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> num = <span class="number">1</span>;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">matrix</span>(n, <span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;(n, <span class="number">0</span>));</span><br><span class="line">        <span class="keyword">while</span> (num &lt;= n * n)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="comment">//从左到右</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = left; i &lt;= right; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[top][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新top</span></span><br><span class="line">            top++;</span><br><span class="line">            <span class="comment">//从上到下</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = top; i &lt;= bottom; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][right] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新right</span></span><br><span class="line">            right--;</span><br><span class="line">            <span class="comment">//从右到左</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = right; i &gt;= left; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[bottom][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新bottom</span></span><br><span class="line">            bottom--;</span><br><span class="line">            <span class="comment">//从下到上</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = bottom; i &gt;= top; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][left] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新left</span></span><br><span class="line">            left++;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> matrix;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> n;</span><br><span class="line">    <span class="built_in">scanf</span>(<span class="string">&quot;%d&quot;</span>, &amp;n);</span><br><span class="line">    Solution s;</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; matrix= s.<span class="built_in">generateMatrix</span>(n);</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; n; j++)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d\t&quot;</span>, matrix[i][j]);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>数据结构和算法</category>
+      </categories>
+      <tags>
+        <tag>暴力&amp;枚举</tag>
       </tags>
   </entry>
   <entry>
@@ -20018,273 +20520,6 @@
         <tag>C/C++</tag>
         <tag>编译原理</tag>
         <tag>开发工具</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>前缀和与差分 —— 从概念到公式</title>
-    <url>/2026/07/20/%E5%89%8D%E7%BC%80%E5%92%8C%E4%B8%8E%E5%B7%AE%E5%88%86-%E4%BB%8E%E6%A6%82%E5%BF%B5%E5%88%B0%E5%85%AC%E5%BC%8F/</url>
-    <content><![CDATA[<h2 id="一、为什么需要前缀和？"><a href="#一、为什么需要前缀和？" class="headerlink" title="一、为什么需要前缀和？"></a>一、为什么需要前缀和？</h2><p>先想一个场景：你有一个长度为 <code>n</code> 的数组，现在要<strong>反复</strong>问你「第 3 个数到第 7 个数的和是多少」。</p>
-<p>最直接的做法：每次从 3 加到 7。如果数组很大（比如 10 万个数），问你 10 万次，那总共要算 100 亿次加法——太慢了。<br>如果换一种思路，我能不能<strong>提前把「前 i 个数的和」全部算好存起来</strong>，这样每次询问直接用减法得到结果？</p>
-<p>这就是<strong>前缀和</strong>的核心思想——<strong>预处理，换时间</strong>。</p>
-<hr>
-<h2 id="二、一维前缀和"><a href="#二、一维前缀和" class="headerlink" title="二、一维前缀和"></a>二、一维前缀和</h2><h3 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="2.1 定义"></a>2.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，定义前缀和数组 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = a[1] + a[2] + ... + a[i]   （前 i 个数的总和）</span><br></pre></td></tr></table></figure>
-
-<h3 id="2-2-核心公式"><a href="#2-2-核心公式" class="headerlink" title="2.2 核心公式"></a>2.2 核心公式</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i] = s[i-1] + a[i]</span><br></pre></td></tr></table></figure>
-
-<p>边界条件：<code>s[0] = 0</code>（前 0 个数的和为 0）。</p>
-<blockquote>
-<p>公式的意思是：前 i 个数的和 &#x3D; 前 i-1 个数的和 + 第 i 个数。</p>
-</blockquote>
-<h3 id="2-3-图示"><a href="#2-3-图示" class="headerlink" title="2.3 图示"></a>2.3 图示</h3><p>假设原数组 <code>a</code> 如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：  1    2    3    4    5</span><br><span class="line">a[]：  2    5    3    1    4</span><br></pre></td></tr></table></figure>
-
-<p>逐个计算前缀和：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + 2 = 2</span><br><span class="line">s[2] = 2 + 5 = 7</span><br><span class="line">s[3] = 7 + 3 = 10</span><br><span class="line">s[4] = 10 + 1 = 11</span><br><span class="line">s[5] = 11 + 4 = 15</span><br></pre></td></tr></table></figure>
-
-<p>得到前缀和数组 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：  2    7    10   11   15</span><br><span class="line">      ↑    ↑    ↑    ↑    ↑</span><br><span class="line">      前1  前2  前3  前4  前5</span><br></pre></td></tr></table></figure>
-
-<p>可以直观地看到：<code>s[i]</code> 就是从第一个数一直加到第 i 个数的「累计值」。</p>
-<h3 id="2-4-用途：快速求区间和"><a href="#2-4-用途：快速求区间和" class="headerlink" title="2.4 用途：快速求区间和"></a>2.4 用途：快速求区间和</h3><p>现在想求 <code>a[2] + a[3] + a[4]</code>（即区间 <code>[2, 4]</code> 的和）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间[2,4]的和 = s[4] - s[1] = 11 - 2 = 9</span><br><span class="line">验证：5 + 3 + 1 = 9  ✅</span><br></pre></td></tr></table></figure>
-
-<p><strong>核心公式：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">区间 [l, r] 的和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>文字理解：<strong>前 r 个数的和 减去 前 l-1 个数的和</strong>，剩下的就是第 l 个到第 r 个。</p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">                   ┌─────────── 区间[l, r] ───────────┐</span><br><span class="line">                   │                                   │</span><br><span class="line">a[1] a[2] ... a[l-1]  a[l] a[l+1] ... a[r-1] a[r]  a[r+1] ...</span><br><span class="line">├──── 前 l-1 项 ────┤├────────── 前 r 项 ──────────┤</span><br><span class="line">                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</span><br><span class="line">                     s[r] = 前 r 项的总和</span><br><span class="line">     s[l-1] = 前 l-1 项的总和</span><br><span class="line">             </span><br><span class="line">     区间和 = s[r] - s[l-1]</span><br></pre></td></tr></table></figure>
-
-<p>预处理完 <code>s</code> 数组后，<strong>每次求区间和只需要 O(1) 的时间</strong>（一次减法），这就是前缀和的威力。</p>
-<hr>
-<h2 id="三、二维前缀和"><a href="#三、二维前缀和" class="headerlink" title="三、二维前缀和"></a>三、二维前缀和</h2><h3 id="3-1-问题升级"><a href="#3-1-问题升级" class="headerlink" title="3.1 问题升级"></a>3.1 问题升级</h3><p>如果你面对的<strong>不是一维数组，而是一个二维矩阵</strong>，想快速求出<strong>任意一个子矩形内所有数的和</strong>，怎么办？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">    列1  列2  列3  列4</span><br><span class="line">行1   1    2    3    4</span><br><span class="line">行2   5    6    7    8</span><br><span class="line">行3   9   10   11   12</span><br></pre></td></tr></table></figure>
-
-<p>比如：求从 <code>[2][2]</code> 到 <code>[3][4]</code> 这个 2×3 矩形里所有数的和。</p>
-<p>类比一维的思路：<strong>二维前缀和</strong>就是提前算好从 <code>[1][1]</code> 到 <code>[i][j]</code> 这个矩形内所有数的总和。</p>
-<h3 id="3-2-核心公式"><a href="#3-2-核心公式" class="headerlink" title="3.2 核心公式"></a>3.2 核心公式</h3><p>定义 <code>s[i][j]</code> &#x3D; 从左上角 <code>(1,1)</code> 到右下角 <code>(i,j)</code> 的矩形区域内所有元素的和。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-3-图解：容斥原理"><a href="#3-3-图解：容斥原理" class="headerlink" title="3.3 图解：容斥原理"></a>3.3 图解：容斥原理</h3><p>公式看着复杂，其实核心就是<strong>容斥原理</strong>——两个有重叠的区域合并时，<strong>加完两边，减掉重叠</strong>。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">             列1     列2    ...   列j-1    列j    列j+1</span><br><span class="line">     ┌──────────────────────────────────────────────────┐</span><br><span class="line">行1   │                                                  │</span><br><span class="line">     │                      A区域                        │</span><br><span class="line"> ...  │                  s[i-1][j]                       │</span><br><span class="line">     │              ┌──────────────┐                     │</span><br><span class="line">行i-1 │              │  重叠部分    │                     │</span><br><span class="line">     │              │ s[i-1][j-1]  │                     │</span><br><span class="line">     │              └──────────────┘                     │</span><br><span class="line">     ├─────────────────────────────┬────────────────────┤</span><br><span class="line">行i   │          B区域             │      a[i][j]       │</span><br><span class="line">     │       s[i][j-1]            │      (当前格子)     │</span><br><span class="line">     └─────────────────────────────┴────────────────────┘</span><br></pre></td></tr></table></figure>
-
-<p>把 s[i][j] 拆成三块来看：</p>
-<ul>
-<li><strong>A 区域</strong> &#x3D; <code>s[i-1][j]</code>：第 1<del>i-1 行、第 1</del>j 列（不含第 i 行）</li>
-<li><strong>B 区域</strong> &#x3D; <code>s[i][j-1]</code>：第 1<del>i 行、第 1</del>j-1 列（不含第 j 列）</li>
-<li><strong>重叠部分</strong> &#x3D; <code>s[i-1][j-1]</code>：A 和 B 都覆盖的左上角</li>
-</ul>
-<p>根据容斥原理（两个集合的并集 &#x3D; 各自之和 − 交集）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[i][j] = |A ∪ B| + a[i][j]</span><br><span class="line">        = |A| + |B| − |A ∩ B| + a[i][j]</span><br><span class="line">        = s[i-1][j] + s[i][j-1] − s[i-1][j-1] + a[i][j]</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-4-用途：求子矩阵和"><a href="#3-4-用途：求子矩阵和" class="headerlink" title="3.4 用途：求子矩阵和"></a>3.4 用途：求子矩阵和</h3><p>现在想求矩形区域 <code>(x1, y1)</code> 到 <code>(x2, y2)</code> 的和：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">子矩阵和 = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</span><br></pre></td></tr></table></figure>
-
-<p>同样还是<strong>面积加减法</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">(x1,y1) ───────────── (x1,y2)</span><br><span class="line">   │                     │</span><br><span class="line">   │    ┌────────────┐   │</span><br><span class="line">   │    │  目标矩形    │   │</span><br><span class="line">   │    │ (红色区域)   │   │</span><br><span class="line">   │    └────────────┘   │</span><br><span class="line">(x2,y1) ───────────── (x2,y2)</span><br></pre></td></tr></table></figure>
-
-<p>怎么从 <code>s[x2][y2]</code>（整个大矩形）扣出目标红色区域？</p>
-<ol>
-<li><strong>减</strong>掉上边部分 <code>s[x1-1][y2]</code>  </li>
-<li><strong>减</strong>掉左边部分 <code>s[x2][y1-1]</code>  </li>
-<li>左上角区域 <code>s[x1-1][y1-1]</code> 被减了两次，<strong>加</strong>回来</li>
-</ol>
-<hr>
-<h2 id="四、差分"><a href="#四、差分" class="headerlink" title="四、差分"></a>四、差分</h2><h3 id="4-1-差分是前缀和的逆运算"><a href="#4-1-差分是前缀和的逆运算" class="headerlink" title="4.1 差分是前缀和的逆运算"></a>4.1 差分是前缀和的逆运算</h3><p>先回顾前缀和的定义：<code>s[i] = a[1] + ... + a[i]</code>。</p>
-<p>那反过来，已知 <code>s</code> 怎么求 <code>a</code>？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">a[i] = s[i] - s[i-1]</span><br></pre></td></tr></table></figure>
-
-<p><strong>这就是差分。</strong> 对前缀和数组求差分，就得到原数组；对差分数组求前缀和，也得到原数组——两者互逆。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原数组 a</span><br><span class="line">  │  求前缀和</span><br><span class="line">  ▼</span><br><span class="line">前缀和数组 s</span><br><span class="line">  │  求差分（相邻两项相减）</span><br><span class="line">  ▼</span><br><span class="line">原数组 a</span><br></pre></td></tr></table></figure>
-
-<p>那差分有什么用？看一个场景：</p>
-<blockquote>
-<p>如果要反复给数组的某个区间统一加上一个数，最后再看结果，能不能快速做？</p>
-</blockquote>
-<p>暴力做法是每次从 l 到 r 逐个加，太慢。差分能做到时间复杂度是<strong>O(1)， 一次标记，最后统一还原</strong>。</p>
-<hr>
-<h2 id="五、一维差分"><a href="#五、一维差分" class="headerlink" title="五、一维差分"></a>五、一维差分</h2><h3 id="5-1-定义"><a href="#5-1-定义" class="headerlink" title="5.1 定义"></a>5.1 定义</h3><p>对于原数组 <code>a[1] ~ a[n]</code>，差分数组 <code>b</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i] = a[i] - a[i-1]</span><br></pre></td></tr></table></figure>
-
-<p>其中 <code>b[1] = a[1]</code>（<code>a[0] = 0</code>）。</p>
-<h3 id="5-2-核心操作：区间加-c"><a href="#5-2-核心操作：区间加-c" class="headerlink" title="5.2 核心操作：区间加 c"></a>5.2 核心操作：区间加 c</h3><p>给 <code>a[l] ~ a[r]</code> 每个数都加 <code>c</code>，分成两步：</p>
-<blockquote>
-<p><strong>① 在差分数组上改两个位置 → ② 再对差分数组求一次前缀和，就得到修改后的原数组</strong></p>
-</blockquote>
-<p>改哪两个位置？</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[l]   += c</span><br><span class="line">b[r+1] -= c</span><br></pre></td></tr></table></figure>
-
-<p>也就是说，在差分数组上做完标记后，<strong>只要再求一遍前缀和就能得到修改后的数组</strong>。<br>不是说好了差分和前缀和是逆运算吗？为什么这样改两个位置就能让一整段加上 c？<br>拿一个具体的例子走一遍就明白了。</p>
-<hr>
-<h4 id="举个具体的例子"><a href="#举个具体的例子" class="headerlink" title="举个具体的例子"></a>举个具体的例子</h4><p>假设原数组 <code>a</code> 长度为 6：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">a[]：      2    5    3    1    4    6</span><br></pre></td></tr></table></figure>
-
-<p>先按定义造出差分数组 <code>b</code>（<code>b[i] = a[i] - a[i-1]</code>）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[1] = a[1] - 0      = 2</span><br><span class="line">b[2] = a[2] - a[1]   = 5 - 2   = 3</span><br><span class="line">b[3] = a[3] - a[2]   = 3 - 5   = -2</span><br><span class="line">b[4] = a[4] - a[3]   = 1 - 3   = -2</span><br><span class="line">b[5] = a[5] - a[4]   = 4 - 1   = 3</span><br><span class="line">b[6] = a[6] - a[5]   = 6 - 4   = 2</span><br><span class="line"></span><br><span class="line">b[]：      2    3   -2   -2    3    2</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h4 id="现在，我想给-a-3-a-5-每个数都加上-5"><a href="#现在，我想给-a-3-a-5-每个数都加上-5" class="headerlink" title="现在，我想给 a[3] ~ a[5] 每个数都加上 5"></a>现在，我想给 a[3] ~ a[5] 每个数都加上 5</h4><p>按照公式，改 <code>b</code> 的两个位置：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[3] += 5      （原来是 -2，变成 3）</span><br><span class="line">b[6] -= 5      （原来是 2，变成 -3）</span><br></pre></td></tr></table></figure>
-
-<p>修改后的 <code>b</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">下标：     1    2    3    4    5    6</span><br><span class="line">b[]：      2    3    3   -2    3   -3</span><br><span class="line">                    ↑ b[3] 从 -2 变成 3</span><br><span class="line">                                   ↑ b[6] 从 2 变成 -3</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h4 id="关键一步：对修改后的-b-求前缀和，看看会发生什么"><a href="#关键一步：对修改后的-b-求前缀和，看看会发生什么" class="headerlink" title="关键一步：对修改后的 b 求前缀和，看看会发生什么"></a>关键一步：对修改后的 b 求前缀和，看看会发生什么</h4><p>还记得前缀和怎么算吗？**<code>s[i] = s[i-1] + b[i]</code>**。一步步来：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[1] = 0 + b[1] = 0 + 2  = 2</span><br><span class="line">s[2] = 2 + b[2] = 2 + 3  = 5</span><br><span class="line">s[3] = 5 + b[3] = 5 + 3  = 8    ← 注意，这里用的是修改后的 b[3]（加了 5）</span><br><span class="line">s[4] = 8 + b[4] = 8 + (-2)= 6</span><br><span class="line">s[5] = 6 + b[5] = 6 + 3  = 9</span><br><span class="line">s[6] = 9 + b[6] = 9 + (-3)= 6    ← 这里用的是修改后的 b[6]（减了 5）</span><br></pre></td></tr></table></figure>
-
-<p>得到新的 <code>s</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">s[]：      2    5    8    6    9    6</span><br></pre></td></tr></table></figure>
-
-<p>对比原来的 <code>a</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">原来 a：   2    5    3    1    4    6</span><br><span class="line">新的 s：   2    5    8    6    9    6</span><br><span class="line">                          ↑    ↑    ↑</span><br><span class="line">                     a[3]+5  a[4]+5  a[5]+5</span><br></pre></td></tr></table></figure>
-
-<p><strong>正好</strong>只有 <code>a[3] ~ a[5]</code> 加了 5，前面和后面都没变！–很神奇对吧！</p>
-<hr>
-<h4 id="为什么？"><a href="#为什么？" class="headerlink" title="为什么？"></a>为什么？</h4><p>原因藏在<strong>前缀和的累加特性</strong>里。把 <code>b</code> 看成一系列”<strong>标记</strong>“：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[]：  2    3    3   -2    3   -3</span><br><span class="line">                 ↑</span><br><span class="line">           这里 b[3] 多了一个 +5</span><br><span class="line">                                ↑</span><br><span class="line">                          这里 b[6] 多了一个 -5</span><br></pre></td></tr></table></figure>
-
-<p>对 <code>b</code> 求前缀和时，每个位置的值会<strong>一直往后累加</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">位置1：       2                                 = 2</span><br><span class="line">位置2：       2 + 3                             = 5</span><br><span class="line">位置3：       2 + 3 + 3      ← +5 从这里开始     = 8 ← 比原来多了 5</span><br><span class="line">位置4：       2 + 3 + 3 + (-2)    ← +5 还在继续   = 6 ← 比原来多了 5</span><br><span class="line">位置5：       2 + 3 + 3 + (-2) + 3               = 9 ← 比原来多了 5</span><br><span class="line">位置6：       2 + 3 + 3 + (-2) + 3 + (-3)        = 6 ← +5 和 -5 抵消了！</span><br><span class="line">           ↑ 前 5 项还带着 +5     这里又减了 5 ──┘</span><br></pre></td></tr></table></figure>
-
-<p>把过程画出来看更清楚：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在 b[3] 放一个 +5 → 从位置 3 开始，所有数都多了 5</span><br><span class="line">                                              ┌───────────────────</span><br><span class="line">位置:    1      2      3      4      5      6 │</span><br><span class="line">累加:    2      5      8      6      9      6 │</span><br><span class="line">        ──────────────────────────────────────┘</span><br><span class="line">                            ← +5 一直跟着 →  </span><br><span class="line">                                              然后在 b[6] 放一个 -5 → +5 被抵消</span><br><span class="line"></span><br><span class="line">位置:    1      2      3      4      5      6</span><br><span class="line">累加:    2      5      8      6      9      6  </span><br><span class="line">                                     +5 被 -5 抵消 → 变回原样</span><br></pre></td></tr></table></figure>
-
-<p><strong>结论：</strong> <code>b[l] += c</code> 让 +c 从位置 l 开始一直往后传，<code>b[r+1] -= c</code> 让它在 r+1 处被抵消。一传一挡，<strong>c 就只落在了 [l, r] 这一段上</strong>。</p>
-<h3 id="5-3-完整流程"><a href="#5-3-完整流程" class="headerlink" title="5.3 完整流程"></a>5.3 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 由原数组 a 构造差分数组 b</span><br><span class="line">2. 在 b 上进行区间修改（b[l] += c, b[r+1] -= c）</span><br><span class="line">3. 所有修改完成后，对 b 求一遍前缀和 → 得到修改后的 a</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>前缀和和差分正好互补：</p>
-<ul>
-<li><strong>前缀和</strong>：一次预处理，多次<strong>查询</strong>区间和</li>
-<li><strong>差分</strong>：多次<strong>修改</strong>区间值，最后一次性看结果</li>
-</ul>
-</blockquote>
-<hr>
-<h2 id="六、二维差分"><a href="#六、二维差分" class="headerlink" title="六、二维差分"></a>六、二维差分</h2><h3 id="6-1-定义"><a href="#6-1-定义" class="headerlink" title="6.1 定义"></a>6.1 定义</h3><p>和一维完全对称：<strong>对 b 求二维前缀和 &#x3D; 原矩阵 a</strong>。</p>
-<p>构造公式（对二维前缀和公式做逆运算）：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[i][j] = a[i][j] - a[i-1][j] - a[i][j-1] + a[i-1][j-1]</span><br></pre></td></tr></table></figure>
-
-<h3 id="6-2-核心操作：子矩阵加-c"><a href="#6-2-核心操作：子矩阵加-c" class="headerlink" title="6.2 核心操作：子矩阵加 c"></a>6.2 核心操作：子矩阵加 c</h3><p>给矩形 <code>(x1,y1)</code> 到 <code>(x2,y2)</code> 内每个数加 <code>c</code>，只需改<strong>四个点</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1]     += c</span><br><span class="line">b[x1][y2+1]   -= c</span><br><span class="line">b[x2+1][y1]   -= c</span><br><span class="line">b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
-
-<h3 id="6-3-图解"><a href="#6-3-图解" class="headerlink" title="6.3 图解"></a>6.3 图解</h3><p>一维是在<strong>两端</strong>做标记，二维是在<strong>四个角</strong>做标记：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">b[x1][y1] += c        b[x1][y2+1] -= c</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">     │                          │</span><br><span class="line">     │       目标区域            │</span><br><span class="line">     │      (+c 的区域)          │</span><br><span class="line">     │                          │</span><br><span class="line">     ● ──────────────────────── ●</span><br><span class="line">b[x2+1][y1] -= c      b[x2+1][y2+1] += c</span><br></pre></td></tr></table></figure>
-
-<p>和一维同理，四个标记经过二维前缀和后，只有矩形内部被加了 c。</p>
-<h3 id="6-4-完整流程"><a href="#6-4-完整流程" class="headerlink" title="6.4 完整流程"></a>6.4 完整流程</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 构造二维差分数组 b</span><br><span class="line">2. 在 b 上进行子矩阵修改（改四个角）</span><br><span class="line">3. 所有修改完成后，对 b 求二维前缀和 → 得到修改后的矩阵 a</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="七、总结对照"><a href="#七、总结对照" class="headerlink" title="七、总结对照"></a>七、总结对照</h2><h3 id="公式速查表"><a href="#公式速查表" class="headerlink" title="公式速查表"></a>公式速查表</h3><table>
-<thead>
-<tr>
-<th>场景</th>
-<th>公式</th>
-<th>用途</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>一维前缀和</td>
-<td><code>s[i] = s[i-1] + a[i]</code></td>
-<td>预处理</td>
-</tr>
-<tr>
-<td>一维区间和</td>
-<td><code>sum[l,r] = s[r] - s[l-1]</code></td>
-<td>快速查询</td>
-</tr>
-<tr>
-<td>二维前缀和</td>
-<td><code>s[i][j] = s[i-1][j] + s[i][j-1] - s[i-1][j-1] + a[i][j]</code></td>
-<td>预处理</td>
-</tr>
-<tr>
-<td>二维子矩阵和</td>
-<td><code>sum = s[x2][y2] - s[x1-1][y2] - s[x2][y1-1] + s[x1-1][y1-1]</code></td>
-<td>快速查询</td>
-</tr>
-<tr>
-<td>一维差分</td>
-<td><code>b[l] += c, b[r+1] -= c</code></td>
-<td>区间加减</td>
-</tr>
-<tr>
-<td>二维差分</td>
-<td><code>b[x1][y1] += c, b[x1][y2+1] -= c, b[x2+1][y1] -= c, b[x2+1][y2+1] += c</code></td>
-<td>子矩阵加减</td>
-</tr>
-</tbody></table>
-<h3 id="一张图理解全部关系"><a href="#一张图理解全部关系" class="headerlink" title="一张图理解全部关系"></a>一张图理解全部关系</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">         求前缀和               求差分</span><br><span class="line">原数组 ────────→ 前缀和数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">         求差分                 求前缀和</span><br><span class="line">原数组 ────────→ 差分数组 ────────→ 原数组</span><br><span class="line"></span><br><span class="line">前缀和与差分就像积分与求导，是互逆的运算</span><br></pre></td></tr></table></figure>
-
-<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><table>
-<thead>
-<tr>
-<th>算法</th>
-<th>什么时候用</th>
-<th>耗时</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>前缀和</strong></td>
-<td>多次<strong>查询</strong>区间和&#x2F;子矩阵和</td>
-<td>预处理 O(n)，每次查询 O(1)</td>
-</tr>
-<tr>
-<td><strong>差分</strong></td>
-<td>多次<strong>修改</strong>区间&#x2F;子矩阵的值，最后一次性查看结果</td>
-<td>每次修改 O(1)，最后恢复 O(n)</td>
-</tr>
-<tr>
-<td><strong>前缀和 + 差分</strong></td>
-<td>多次修改 + 多次查询</td>
-<td>差分做修改，前缀和做查询，中间通过「求前缀和」衔接</td>
-</tr>
-</tbody></table>
-<h3 id="关键注意点"><a href="#关键注意点" class="headerlink" title="关键注意点"></a>关键注意点</h3><ol>
-<li><strong>数组下标从 1 开始</strong>，避免出现 <code>l-1 = 0</code> 时越界</li>
-<li>设 <code>s[0] = 0</code>（一维）或 <code>s[0][*] = s[*][0] = 0</code>（二维），统一边界条件</li>
-<li><strong>先修改，后查询</strong>——差分所有的修改操作做完后，最后求一遍前缀和才能得到最终结果</li>
-<li>二维的「面积加减法」理解了，前缀和和差分的四个公式<strong>其实是一个思路</strong>，不需要死记硬背</li>
-</ol>
-<hr>
-<blockquote>
-<p>前缀和是「累加」，差分是「标记」——这对互逆的算法体现了预处理和批量操作的核心思想，是算法竞赛和面试中最高频的基础技巧之一。</p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>数据结构和算法</category>
-      </categories>
-      <tags>
-        <tag>前缀和&amp;差分</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>力扣59题-螺旋矩阵-题解</title>
-    <url>/2026/07/12/%E5%8A%9B%E6%89%A3%2059%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/</url>
-    <content><![CDATA[<h1 id="力扣59题-螺旋矩阵-题解"><a href="#力扣59题-螺旋矩阵-题解" class="headerlink" title="力扣59题-螺旋矩阵-题解"></a>力扣59题-螺旋矩阵-题解</h1><h2 id="题目描述"><a href="#题目描述" class="headerlink" title="题目描述"></a>题目描述</h2><p>给你一个正整数 <code>n</code> ，生成一个包含 <code>1</code> 到 n^2^ 所有元素，且元素按顺时针顺序螺旋排列的 <code>n x n</code> 正方形矩阵 <code>matrix</code> 。</p>
-<p><strong>示例 1：</strong></p>
-<p><img src="/./../images/%E5%8A%9B%E6%89%A359%E9%A2%98-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5-%E9%A2%98%E8%A7%A3/spiraln.jpg" alt="img"></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 3</span><br><span class="line">输出：[[1,2,3],[8,9,4],[7,6,5]]</span><br></pre></td></tr></table></figure>
-
-<p><strong>示例 2：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">输入：n = 1</span><br><span class="line">输出：[[1]]</span><br></pre></td></tr></table></figure>
-
-<p><strong>提示：</strong></p>
-<ul>
-<li><code>1 &lt;= n &lt;= 20</code></li>
-</ul>
-<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p>破解本题的关键在于设计四个变量，分别表示矩阵的上、下、左、右， 四个动态更新的边界.</p>
-<p>num从1开始，通过从左到右、从上到下、从右到左、从下到上的顺序不断循环填入num，同时更新边界，直到num&gt;n^2^。</p>
-<h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;vector&gt;</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">generateMatrix</span>(<span class="type">int</span> n) &#123;</span><br><span class="line">        <span class="type">int</span> top = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> bottom = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> left = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> right = n - <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> num = <span class="number">1</span>;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">matrix</span>(n, <span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;(n, <span class="number">0</span>));</span><br><span class="line">        <span class="keyword">while</span> (num &lt;= n * n)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="comment">//从左到右</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = left; i &lt;= right; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[top][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新top</span></span><br><span class="line">            top++;</span><br><span class="line">            <span class="comment">//从上到下</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = top; i &lt;= bottom; i++)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][right] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新right</span></span><br><span class="line">            right--;</span><br><span class="line">            <span class="comment">//从右到左</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = right; i &gt;= left; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[bottom][i] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新bottom</span></span><br><span class="line">            bottom--;</span><br><span class="line">            <span class="comment">//从下到上</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = bottom; i &gt;= top; i--)</span><br><span class="line">            &#123;</span><br><span class="line">                matrix[i][left] = num;</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//更新left</span></span><br><span class="line">            left++;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> matrix;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> n;</span><br><span class="line">    <span class="built_in">scanf</span>(<span class="string">&quot;%d&quot;</span>, &amp;n);</span><br><span class="line">    Solution s;</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; matrix= s.<span class="built_in">generateMatrix</span>(n);</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; n; j++)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d\t&quot;</span>, matrix[i][j]);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-]]></content>
-      <categories>
-        <category>数据结构和算法</category>
-      </categories>
-      <tags>
-        <tag>暴力&amp;枚举</tag>
       </tags>
   </entry>
   <entry>
@@ -21755,88 +21990,9 @@
       </tags>
   </entry>
   <entry>
-    <title>大一四级635，六级614，心得分享</title>
-    <url>/2026/09/02/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/</url>
-    <content><![CDATA[<p>先上成绩单 📜：</p>
-<p><img src="/./../images/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/bb871c474eec8f1893705730cf724ec7.jpg" alt="成绩单1"></p>
-<p><img src="/./../images/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/29a67b3ee80baed7c655381568091a1b.jpg" alt="成绩单2"></p>
-<h2 id="不一样的介绍"><a href="#不一样的介绍" class="headerlink" title="不一样的介绍"></a>不一样的介绍</h2><p>点进这篇博客的你，最关心的肯定是我如何备考的。</p>
-<p>事实是，<strong>我没有花多少时间在专门备考上</strong>：四级时刷了五六套真题、背了一套作文模板；六级几乎毫无准备，仅仅在考前复习了一下作文模板和做题顺序。</p>
-<p>看到这你肯定会暗自腹诽：这人也太凡尔赛了😅，啥也不准备都能考这么高，这篇博客还写个毛线啊！</p>
-<p>莫急莫急，话还没说完——我没花时间在刷题和备考上，不代表我没花时间在学英语上。接下来才是我要说的重点：</p>
-<p>学英语就像练武功，大部分时间要花在修炼内功——背单词、练听力。当你功力到了，稍微学一点套路招式，便能一通百通，以力破巧~ 🙌</p>
-<h2 id="修炼内功"><a href="#修炼内功" class="headerlink" title="修炼内功"></a>修炼内功</h2><h3 id="背单词"><a href="#背单词" class="headerlink" title="背单词"></a>背单词</h3><p>单词是一切的根基，坚持背就对了。各种碎片时间里少刷点短视频，多背点单词；一个人坚持不下来，就和别人组队背。这里点名表扬「不背单词」App——我一直在用它的组队背单词模式。</p>
-<p>这部分内容最重要，却也最没什么可说的，全看执行力💪。所以为了提高你对背单词的重视程度，我要再强调三遍：</p>
-<p><strong>单词是一切的根基，坚持背就对了！各种碎片时间里少刷点短视频！多背点单词！一个人坚持不下来就和别人组队背！</strong></p>
-<p><strong>单词是一切的根基，坚持背就对了！各种碎片时间里少刷点短视频！多背点单词！一个人坚持不下来就和别人组队背！</strong></p>
-<p><strong>单词是一切的根基，坚持背就对了！各种碎片时间里少刷点短视频！多背点单词！一个人坚持不下来就和别人组队背！</strong></p>
-<h3 id="听力"><a href="#听力" class="headerlink" title="听力"></a>听力</h3><p>听力分为<strong>泛听</strong>和<strong>精听</strong>。</p>
-<p><strong>泛听：</strong></p>
-<ul>
-<li>最好每天泛听半小时及以上，从能跟得上语速的开始，即使很慢也没关系；如果听起来非常模糊，说明这个速度对你来说太快了。</li>
-<li>举我自己的例子：大一刚开学时，听四级听力有一半左右是模糊的；到现在，六级听力听着非常清晰，能完全跟上 CNN This Morning 的语速。</li>
-<li>材料来源：VOA 慢速英语、四六级真题、VOA 常速英语、油管各种视频、CNN 新闻等等。</li>
-<li>主力 App：每日英语听力。另外我关注了一些提供「盲听 &#x2F; 英文字幕 &#x2F; 中英文字幕」三种版本视频的 UP 主，比如 B 站「纯正英语原声三十秒」。</li>
-<li>关键：<strong>要适配自己当前的速度</strong>。没太大讲究，选一些感兴趣的话题即可。</li>
-</ul>
-<p><strong>精听：</strong> 可以以听写的方式，每天听写一分钟四六级真题。我懒得听写😆，用的是偷懒版——在用背单词软件复习单词的时候，顺便听相关例句，先盲听，再看答案。</p>
-<h2 id="学习套路"><a href="#学习套路" class="headerlink" title="学习套路"></a>学习套路</h2><h3 id="阅读"><a href="#阅读" class="headerlink" title="阅读"></a>阅读</h3><p>大学时期我没有学习任何阅读技巧。当然这并不意味着不需要技巧——我没学是因为我在高中的时候，就已经学透了 B 站 UP 主「陶然 free 高考英语」的阅读技巧，并且通过大量训练，有了相当高的做题熟练度。</p>
-<p>非常概括地说，这个套路是：先看文章前几段和题目，判断文章大意和题目类型；再根据不同题目类型选择不同解题思路，带着思路去看文章。题目一般有这些类型：</p>
-<ul>
-<li>细节题：抓住题目里给出的关键词，带着关键词回头去看具体段落里面的细节。</li>
-<li>主旨大意题：需要根据文章主旨来判断答案，可以重点关注开头结尾。</li>
-<li>作者观点题：根据文章中作者明确写到、给出态度的句子来判断，不能无中生有。</li>
-</ul>
-<p>看到这里，想必你已经对阅读题的答题技巧有了一定的概念。当然，如果你没有理解上面讲的技巧，其实一点关系都没有🤣🤣🤣老实说，我无论是在刷题还是考试的时候，基本都没用上面的技巧——原因也很简单：陶然 UP 主的视频课超级多，阅读技巧也超级多，我高中时还记得，到了大学怎么可能记得住啊！</p>
-<p>所以我实际上采用的方法很简单：看文章开头 → 看题目 → 划一些关键词 → 再回头看文章 → 再和题目比对 → 再看文章……没错，就这么简单，就这么轻松~ 😎</p>
-<p>我猜，看到这里你肯定又会开始吐槽：这人高中的时候英语好，大学里又坚持背单词，词汇量很高，所以做题很 easy，我又没有这么厉害！他能不能停止他的凡尔赛行为！！！😤😤😤</p>
-<p>咳咳，言归正传。关于阅读这块，上面绕来绕去说了一大堆，其实无非就是两个意思：</p>
-<ol>
-<li><p><strong>技巧是有用且必需的。</strong> 当你的词汇量没有那么高的时候，通过学习一些阅读的技巧，并在刷题中不断运用，能很大程度上减轻做题压力；与此同时，不断刷题会让熟练度不断提高，这就为你功力大成后「以一力破万法」打下基础。可惜我大学没有学习任何新技巧，所以无法为你提供推荐，此处需要少侠自行探索~</p>
-</li>
-<li><p><strong>当你的词汇量达到一定水平，且已经通过刷题积累了足够的熟练度，恭喜你，轻舟已过万重山</strong>，接下来的路想怎么走就怎么走~</p>
-</li>
-</ol>
-<blockquote>
-<p>注：词汇量具体达到多少才算够呢？这是一个比较主观的问题。我自己考六级的时候，词汇量大概在 6000 出头，而六级大纲词汇量是 5500，所以一个粗略的标准可能就是 5500~6000。当然这并不是定死的，因为还和你的熟练度息息相关。</p>
-</blockquote>
-<h3 id="选词填空"><a href="#选词填空" class="headerlink" title="选词填空"></a>选词填空</h3><p>第一轮写这篇博客的时候，我没有把这个板块写进去（<del>其实是忘了试卷上还有这个东西🤡</del>），因为和上面的阅读一样，我也没学习任何技巧，甚至采用的方法都类似：</p>
-<p>先看文章开头 → 浏览一遍所有选项 → 再回去看文章 → 遇到不确定的先跳过。等把全篇都看过一遍，能确定七八成的答案，再去思考剩下的不确定答案，基本上两三遍思考就能解决战斗。偶尔遇到不认识的单词，就收藏到我的背单词软件里。</p>
-<p>所以还是那句话：技巧应该是有的，但是我没有用，这里也留给少侠自行探索~</p>
-<h3 id="翻译"><a href="#翻译" class="headerlink" title="翻译"></a>翻译</h3><p>六级的翻译可能是我做的最烂的一部分😵这可能和我平常主要注重输入，没有训练输出有关，所以导致很多明明背过的单词在考场上卡壳想不起来，没能做到准确地表达意思。所以这里我也不好给大家提供什么建议🥴</p>
-<h3 id="作文"><a href="#作文" class="headerlink" title="作文"></a>作文</h3><p>作为试卷里的主观题，每个人都有自己的写法，所以此处我提供我的写作思路，仅供参考。</p>
-<p>我个人认为，<strong>作文是一个从模板化到去模板化的过程</strong>：从一些固定的套路练起，在不断的练习中逐渐减少套路的占比，最后形成自己的一套风格。四级的时候，我的作文完全按照 B 站 UP 主「我是瑞思拜」提供的模板来写；六级时我尝试去套路化——用了一些模板，也用自己的逻辑。</p>
-<p>虽然我四六级的写作翻译分数差不多，但考虑到六级的翻译做的很烂，而且我也没像四级一样考前练习，所以这样的训练思路应该是合理的。</p>
-<p>作文还有一个很重要的地方：<strong>你的字。</strong> 字迹直接影响阅卷老师的第一印象。虽然本人的字写得也还算不错，但除了高中临摹过一些衡水体的字帖，基本没有什么可以分享的东西。</p>
-<p>所以为了展示我满满的诚意，本人特地邀请了一位高中同学——她的字写得好、有风格（当然这不是重点，因为我的字也清爽好看）。重点是：有些时候，她的字可以「瞒天过海」——虽然内容写得毫无道理，甚至有明显的、荒谬的逻辑错误，却依然能拿到一个不错的、甚至挺高的分数？？？（<del>此处的三个问号突出强调了作者的不解之意</del>）</p>
-<p>所以，下面是她本人花了一个半小时手打的<strong>九百字练字攻略</strong>📝：</p>
-<blockquote>
-<p>写在前面：本篇旨在用尽量精炼的语言，给正在大学阶段并想要提升自己英文书写水平的朋友们一些易于操作但重要的建议，希望能得到大家的喜欢。</p>
-</blockquote>
-<h4 id="一、纸与笔的选择"><a href="#一、纸与笔的选择" class="headerlink" title="一、纸与笔的选择"></a>一、纸与笔的选择</h4><p>这方面不同人的习惯其实不太一样，下笔时觉得笔出水顺滑、纸用着流畅即可。我个人偏爱稍微偏粗一点的笔，这样练字时笔锋会比较明显，给练字者的正反馈就比较强。太细的笔容易在纸上断触；并且如果控笔不当，轻微的手抖就会导致写出来的字看起来框架不正、歪七扭八，很打击学习者的自信心。</p>
-<h4 id="二、练字过程中需要注意的点"><a href="#二、练字过程中需要注意的点" class="headerlink" title="二、练字过程中需要注意的点"></a>二、练字过程中需要注意的点</h4><ol>
-<li>写的时候可以像我们小时候练字那样，让字母的底端紧贴横线。就我个人而言，大概熟练后，也可以选择「把某条线大致作为一行英文的中轴线」这种练习方式——这种方法让你习惯在不依赖底部横线的前提下，保持所写词句的整齐有序。这样以后在没有横线的纸（比如纯白纸）上写英文，也能保证一定的书写质量。比如下面这个单词，就是用了中轴线：</li>
-</ol>
-<p><img src="/./../images/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/948214d2201e4fa5d2092123e9ce91f3.jpg" alt="中轴线示例"></p>
-<ol start="2">
-<li><p>写偏圆的字母（比如 a、o、c）时，注意保持圆圈处的饱满度（不要让它看起来太扁）；写偏长的字母（比如 f、y、q）时，注意上下连接处的流畅。</p>
-</li>
-<li><p>熟练之后，尝试观察一个单词中间各个字母之间是否有连笔的空间：可以买本字帖看看别人是怎么操作的；也可以自己尝试把一个单词写快，在写快的过程中问问自己——为了提升书写速度，我是否特别想把某两个笔画连起来书写？如果有，可以重点关注连起来是否好看；好看就记住这种连笔方法，下次在类似的单词中也能使用。</p>
-</li>
-<li><p>上一条提到连笔，那连笔过程中有没有需要注意的地方？第一，要确保每个字母的主体大小保持一致（不能前一个字母写得很大、下一个写得很小）；第二，牢记连笔只是你书写过程中的点缀，如果你的连笔过于「大」，以至于掩盖了下一个字母的主体部分，那就是喧宾夺主，会影响整体的美观性——这种连笔就不应该被采用。</p>
-</li>
-</ol>
-<h4 id="三、平常的习惯"><a href="#三、平常的习惯" class="headerlink" title="三、平常的习惯"></a>三、平常的习惯</h4><p>作为大学生，另外花时间去练字帖性价比其实不高。我们可以选择在备考四六级的同时，在草稿纸上一边练字一边记单词，一举两得；同时也可以在纸上抄写一些例句，来建立单词与单词、句子与句子之间的连接感。</p>
-<p>笔者作为英文书写尚佳者，个人的一点经验与书写习惯已悉数列出，希望对大家有一点帮助。最后祝大家练字顺利！</p>
-<h2 id="写在最后（绝对正经）"><a href="#写在最后（绝对正经）" class="headerlink" title="写在最后（绝对正经）"></a>写在最后（绝对正经）</h2><p>我一直认为，英语是一门很公平的学科——和智商无关，和天赋无关。谁背的单词多，谁听的听力久，谁练的字好看，谁就能考高分。</p>
-<p>希望大家都能有所收获！🎉🎉🎉</p>
-]]></content>
-      <categories>
-        <category>通用技能</category>
-      </categories>
-      <tags>
-        <tag>四六级</tag>
-      </tags>
+    <title>我的第一篇hexo博客！</title>
+    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
+    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>一件关于Git分支的神奇小事 ：为什么我的 `master` 能推送到并且持续更新 `main`？</title>
@@ -21909,11 +22065,6 @@
       <tags>
         <tag>Git</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>我的第一篇hexo博客！</title>
-    <url>/2026/07/06/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87hexo%E5%8D%9A%E5%AE%A2%EF%BC%81/</url>
-    <content><![CDATA[<h2 id="这是我的第一篇博客！"><a href="#这是我的第一篇博客！" class="headerlink" title="这是我的第一篇博客！"></a>这是我的第一篇博客！</h2><h3 id="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"><a href="#接下来将记录我和团队成员一起学习开发一个静态网站的过程！" class="headerlink" title="接下来将记录我和团队成员一起学习开发一个静态网站的过程！"></a>接下来将记录我和团队成员一起学习开发一个静态网站的过程！</h3>]]></content>
   </entry>
   <entry>
     <title>数据结构 —— 顺序表</title>
@@ -22494,6 +22645,90 @@
         <tag>C/C++</tag>
         <tag>数据结构和算法</tag>
         <tag>顺序表</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>大一四级635，六级614，心得分享</title>
+    <url>/2026/09/02/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/</url>
+    <content><![CDATA[<p>先上成绩单 📜：</p>
+<p><img src="/./../images/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/bb871c474eec8f1893705730cf724ec7.jpg" alt="成绩单1"></p>
+<p><img src="/./../images/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/29a67b3ee80baed7c655381568091a1b.jpg" alt="成绩单2"></p>
+<h2 id="不一样的介绍"><a href="#不一样的介绍" class="headerlink" title="不一样的介绍"></a>不一样的介绍</h2><p>点进这篇博客的你，最关心的肯定是我如何备考的。</p>
+<p>事实是，<strong>我没有花多少时间在专门备考上</strong>：四级时刷了五六套真题、背了一套作文模板；六级几乎毫无准备，仅仅在考前复习了一下作文模板和做题顺序。</p>
+<p>看到这你肯定会暗自腹诽：这人也太凡尔赛了😅，啥也不准备都能考这么高，这篇博客还写个毛线啊！</p>
+<p>莫急莫急，话还没说完——我没花时间在刷题和备考上，不代表我没花时间在学英语上。接下来才是我要说的重点：</p>
+<p>学英语就像练武功，大部分时间要花在修炼内功——背单词、练听力。当你功力到了，稍微学一点套路招式，便能一通百通，以力破巧~ 🙌</p>
+<h2 id="修炼内功"><a href="#修炼内功" class="headerlink" title="修炼内功"></a>修炼内功</h2><h3 id="背单词"><a href="#背单词" class="headerlink" title="背单词"></a>背单词</h3><p>单词是一切的根基，坚持背就对了。各种碎片时间里少刷点短视频，多背点单词；一个人坚持不下来，就和别人组队背。这里点名表扬「不背单词」App——我一直在用它的组队背单词模式。</p>
+<p>这部分内容最重要，却也最没什么可说的，全看执行力💪。所以为了提高你对背单词的重视程度，我要再强调三遍：</p>
+<p><strong>单词是一切的根基，坚持背就对了！各种碎片时间里少刷点短视频！多背点单词！一个人坚持不下来就和别人组队背！</strong></p>
+<p><strong>单词是一切的根基，坚持背就对了！各种碎片时间里少刷点短视频！多背点单词！一个人坚持不下来就和别人组队背！</strong></p>
+<p><strong>单词是一切的根基，坚持背就对了！各种碎片时间里少刷点短视频！多背点单词！一个人坚持不下来就和别人组队背！</strong></p>
+<h3 id="听力"><a href="#听力" class="headerlink" title="听力"></a>听力</h3><p>听力分为<strong>泛听</strong>和<strong>精听</strong>。</p>
+<p><strong>泛听：</strong></p>
+<ul>
+<li>最好每天泛听半小时及以上，从能跟得上语速的开始，即使很慢也没关系；如果听起来非常模糊，说明这个速度对你来说太快了。</li>
+<li>举我自己的例子：大一刚开学时，听四级听力有一半左右是模糊的；到现在，六级听力听着非常清晰，能完全跟上 CNN This Morning 的语速。</li>
+<li>材料来源：VOA 慢速英语、四六级真题、VOA 常速英语、油管各种视频、CNN 新闻等等。</li>
+<li>主力 App：每日英语听力。另外我关注了一些提供「盲听 &#x2F; 英文字幕 &#x2F; 中英文字幕」三种版本视频的 UP 主，比如 B 站「纯正英语原声三十秒」。</li>
+<li>关键：<strong>要适配自己当前的速度</strong>。没太大讲究，选一些感兴趣的话题即可。</li>
+</ul>
+<p><strong>精听：</strong> 可以以听写的方式，每天听写一分钟四六级真题。我懒得听写😆，用的是偷懒版——在用背单词软件复习单词的时候，顺便听相关例句，先盲听，再看答案。</p>
+<h2 id="学习套路"><a href="#学习套路" class="headerlink" title="学习套路"></a>学习套路</h2><h3 id="阅读"><a href="#阅读" class="headerlink" title="阅读"></a>阅读</h3><p>大学时期我没有学习任何阅读技巧。当然这并不意味着不需要技巧——我没学是因为我在高中的时候，就已经学透了 B 站 UP 主「陶然 free 高考英语」的阅读技巧，并且通过大量训练，有了相当高的做题熟练度。</p>
+<p>非常概括地说，这个套路是：先看文章前几段和题目，判断文章大意和题目类型；再根据不同题目类型选择不同解题思路，带着思路去看文章。题目一般有这些类型：</p>
+<ul>
+<li>细节题：抓住题目里给出的关键词，带着关键词回头去看具体段落里面的细节。</li>
+<li>主旨大意题：需要根据文章主旨来判断答案，可以重点关注开头结尾。</li>
+<li>作者观点题：根据文章中作者明确写到、给出态度的句子来判断，不能无中生有。</li>
+</ul>
+<p>看到这里，想必你已经对阅读题的答题技巧有了一定的概念。当然，如果你没有理解上面讲的技巧，其实一点关系都没有🤣🤣🤣老实说，我无论是在刷题还是考试的时候，基本都没用上面的技巧——原因也很简单：陶然 UP 主的视频课超级多，阅读技巧也超级多，我高中时还记得，到了大学怎么可能记得住啊！</p>
+<p>所以我实际上采用的方法很简单：看文章开头 → 看题目 → 划一些关键词 → 再回头看文章 → 再和题目比对 → 再看文章……没错，就这么简单，就这么轻松~ 😎</p>
+<p>我猜，看到这里你肯定又会开始吐槽：这人高中的时候英语好，大学里又坚持背单词，词汇量很高，所以做题很 easy，我又没有这么厉害！他能不能停止他的凡尔赛行为！！！😤😤😤</p>
+<p>咳咳，言归正传。关于阅读这块，上面绕来绕去说了一大堆，其实无非就是两个意思：</p>
+<ol>
+<li><p><strong>技巧是有用且必需的。</strong> 当你的词汇量没有那么高的时候，通过学习一些阅读的技巧，并在刷题中不断运用，能很大程度上减轻做题压力；与此同时，不断刷题会让熟练度不断提高，这就为你功力大成后「以一力破万法」打下基础。可惜我大学没有学习任何新技巧，所以无法为你提供推荐，此处需要少侠自行探索~</p>
+</li>
+<li><p><strong>当你的词汇量达到一定水平，且已经通过刷题积累了足够的熟练度，恭喜你，轻舟已过万重山</strong>，接下来的路想怎么走就怎么走~</p>
+</li>
+</ol>
+<blockquote>
+<p>注：词汇量具体达到多少才算够呢？这是一个比较主观的问题。我自己考六级的时候，词汇量大概在 6000 出头，而六级大纲词汇量是 5500，所以一个粗略的标准可能就是 5500~6000。当然这并不是定死的，因为还和你的熟练度息息相关。</p>
+</blockquote>
+<h3 id="选词填空"><a href="#选词填空" class="headerlink" title="选词填空"></a>选词填空</h3><p>第一轮写这篇博客的时候，我没有把这个板块写进去（<del>其实是忘了试卷上还有这个东西🤡</del>），因为和上面的阅读一样，我也没学习任何技巧，甚至采用的方法都类似：</p>
+<p>先看文章开头 → 浏览一遍所有选项 → 再回去看文章 → 遇到不确定的先跳过。等把全篇都看过一遍，能确定七八成的答案，再去思考剩下的不确定答案，基本上两三遍思考就能解决战斗。偶尔遇到不认识的单词，就收藏到我的背单词软件里。</p>
+<p>所以还是那句话：技巧应该是有的，但是我没有用，这里也留给少侠自行探索~</p>
+<h3 id="翻译"><a href="#翻译" class="headerlink" title="翻译"></a>翻译</h3><p>六级的翻译可能是我做的最烂的一部分😵这可能和我平常主要注重输入，没有训练输出有关，所以导致很多明明背过的单词在考场上卡壳想不起来，没能做到准确地表达意思。所以这里我也不好给大家提供什么建议🥴</p>
+<h3 id="作文"><a href="#作文" class="headerlink" title="作文"></a>作文</h3><p>作为试卷里的主观题，每个人都有自己的写法，所以此处我提供我的写作思路，仅供参考。</p>
+<p>我个人认为，<strong>作文是一个从模板化到去模板化的过程</strong>：从一些固定的套路练起，在不断的练习中逐渐减少套路的占比，最后形成自己的一套风格。四级的时候，我的作文完全按照 B 站 UP 主「我是瑞思拜」提供的模板来写；六级时我尝试去套路化——用了一些模板，也用自己的逻辑。</p>
+<p>虽然我四六级的写作翻译分数差不多，但考虑到六级的翻译做的很烂，而且我也没像四级一样考前练习，所以这样的训练思路应该是合理的。</p>
+<p>作文还有一个很重要的地方：<strong>你的字。</strong> 字迹直接影响阅卷老师的第一印象。虽然本人的字写得也还算不错，但除了高中临摹过一些衡水体的字帖，基本没有什么可以分享的东西。</p>
+<p>所以为了展示我满满的诚意，本人特地邀请了一位高中同学——她的字写得好、有风格（当然这不是重点，因为我的字也清爽好看）。重点是：有些时候，她的字可以「瞒天过海」——虽然内容写得毫无道理，甚至有明显的、荒谬的逻辑错误，却依然能拿到一个不错的、甚至挺高的分数？？？（<del>此处的三个问号突出强调了作者的不解之意</del>）</p>
+<p>所以，下面是她本人花了一个半小时手打的<strong>九百字练字攻略</strong>📝：</p>
+<blockquote>
+<p>写在前面：本篇旨在用尽量精炼的语言，给正在大学阶段并想要提升自己英文书写水平的朋友们一些易于操作但重要的建议，希望能得到大家的喜欢。</p>
+</blockquote>
+<h4 id="一、纸与笔的选择"><a href="#一、纸与笔的选择" class="headerlink" title="一、纸与笔的选择"></a>一、纸与笔的选择</h4><p>这方面不同人的习惯其实不太一样，下笔时觉得笔出水顺滑、纸用着流畅即可。我个人偏爱稍微偏粗一点的笔，这样练字时笔锋会比较明显，给练字者的正反馈就比较强。太细的笔容易在纸上断触；并且如果控笔不当，轻微的手抖就会导致写出来的字看起来框架不正、歪七扭八，很打击学习者的自信心。</p>
+<h4 id="二、练字过程中需要注意的点"><a href="#二、练字过程中需要注意的点" class="headerlink" title="二、练字过程中需要注意的点"></a>二、练字过程中需要注意的点</h4><ol>
+<li>写的时候可以像我们小时候练字那样，让字母的底端紧贴横线。就我个人而言，大概熟练后，也可以选择「把某条线大致作为一行英文的中轴线」这种练习方式——这种方法让你习惯在不依赖底部横线的前提下，保持所写词句的整齐有序。这样以后在没有横线的纸（比如纯白纸）上写英文，也能保证一定的书写质量。比如下面这个单词，就是用了中轴线：</li>
+</ol>
+<p><img src="/./../images/%E5%9B%9B%E5%85%AD%E7%BA%A7%E9%AB%98%E5%88%86%E5%BF%83%E5%BE%97%E5%88%86%E4%BA%AB/948214d2201e4fa5d2092123e9ce91f3.jpg" alt="中轴线示例"></p>
+<ol start="2">
+<li><p>写偏圆的字母（比如 a、o、c）时，注意保持圆圈处的饱满度（不要让它看起来太扁）；写偏长的字母（比如 f、y、q）时，注意上下连接处的流畅。</p>
+</li>
+<li><p>熟练之后，尝试观察一个单词中间各个字母之间是否有连笔的空间：可以买本字帖看看别人是怎么操作的；也可以自己尝试把一个单词写快，在写快的过程中问问自己——为了提升书写速度，我是否特别想把某两个笔画连起来书写？如果有，可以重点关注连起来是否好看；好看就记住这种连笔方法，下次在类似的单词中也能使用。</p>
+</li>
+<li><p>上一条提到连笔，那连笔过程中有没有需要注意的地方？第一，要确保每个字母的主体大小保持一致（不能前一个字母写得很大、下一个写得很小）；第二，牢记连笔只是你书写过程中的点缀，如果你的连笔过于「大」，以至于掩盖了下一个字母的主体部分，那就是喧宾夺主，会影响整体的美观性——这种连笔就不应该被采用。</p>
+</li>
+</ol>
+<h4 id="三、平常的习惯"><a href="#三、平常的习惯" class="headerlink" title="三、平常的习惯"></a>三、平常的习惯</h4><p>作为大学生，另外花时间去练字帖性价比其实不高。我们可以选择在备考四六级的同时，在草稿纸上一边练字一边记单词，一举两得；同时也可以在纸上抄写一些例句，来建立单词与单词、句子与句子之间的连接感。</p>
+<p>笔者作为英文书写尚佳者，个人的一点经验与书写习惯已悉数列出，希望对大家有一点帮助。最后祝大家练字顺利！</p>
+<h2 id="写在最后（绝对正经）"><a href="#写在最后（绝对正经）" class="headerlink" title="写在最后（绝对正经）"></a>写在最后（绝对正经）</h2><p>我一直认为，英语是一门很公平的学科——和智商无关，和天赋无关。谁背的单词多，谁听的听力久，谁练的字好看，谁就能考高分。</p>
+<p>希望大家都能有所收获！🎉🎉🎉</p>
+]]></content>
+      <categories>
+        <category>通用技能</category>
+      </categories>
+      <tags>
+        <tag>四六级</tag>
       </tags>
   </entry>
   <entry>
