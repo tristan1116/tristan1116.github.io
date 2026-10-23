@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-big-counter.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"tristan1116.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="深入分析C++形参带默认值的函数，为什么只能从右向左给默认值、声明与定义怎么写、运行期到底有没有额外开销">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++ 形参带默认值的函数">
+<meta property="og:url" content="http://tristan1116.github.io/2026/10/23/Function_Default_Arguments/index.html">
+<meta property="og:site_name" content="开发者LT的博客">
+<meta property="og:description" content="深入分析C++形参带默认值的函数，为什么只能从右向左给默认值、声明与定义怎么写、运行期到底有没有额外开销">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-10-23T23:10:00.000Z">
+<meta property="article:modified_time" content="2026-10-23T23:10:00.000Z">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="汇编">
+<meta property="article:tag" content="函数">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://tristan1116.github.io/2026/10/23/Function_Default_Arguments/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var t = 'dark'; // 默认暗夜（与 :root 默认一致，避免闪烁）
+  try { t = localStorage.getItem('cyber-theme') || 'dark'; } catch (e) { t = 'dark'; }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+
+  <title>C++ 形参带默认值的函数 | 开发者LT的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">开发者LT的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://tristan1116.github.io/2026/10/23/Function_Default_Arguments/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar/potatolearning.jpg">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="博客、记录">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="开发者LT的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++ 形参带默认值的函数
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-10-23 23:10:00" itemprop="dateCreated datePublished" datetime="2026-10-23T23:10:00+00:00">2026-10-23</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/C-C/" itemprop="url" rel="index"><span itemprop="name">C/C++</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>2 分钟</span>
+            </span>
+            <div class="post-description">深入分析C++形参带默认值的函数，为什么只能从右向左给默认值、声明与定义怎么写、运行期到底有没有额外开销</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="从一个-sum-函数说起"><a href="#从一个-sum-函数说起" class="headerlink" title="从一个 sum 函数说起"></a>从一个 sum 函数说起</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a = <span class="number">10</span>, <span class="type">int</span> b = <span class="number">20</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> a = <span class="number">10</span>;</span><br><span class="line">    <span class="type">int</span> b = <span class="number">20</span>;</span><br><span class="line"></span><br><span class="line">    cout &lt;&lt; <span class="built_in">sum</span>(a, b) &lt;&lt; endl;  </span><br><span class="line">    cout &lt;&lt; <span class="built_in">sum</span>(a) &lt;&lt; endl;     <span class="comment">// b 用默认值 20</span></span><br><span class="line">    cout &lt;&lt; <span class="built_in">sum</span>() &lt;&lt; endl;      <span class="comment">// a、b 都用默认值</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>默认参数让调用方可以省略实参，缺省的部分由编译器补上。</p>
+<p>其中有一些值得注意的点：</p>
+<h2 id="一、形参给默认值只能从右向左给"><a href="#一、形参给默认值只能从右向左给" class="headerlink" title="一、形参给默认值只能从右向左给"></a>一、形参给默认值只能从右向左给</h2><p>先看一个反例：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a = <span class="number">10</span>, <span class="type">int</span> b)</span></span>;  <span class="comment">// ❌ 编译不通过</span></span><br></pre></td></tr></table></figure>
+
+<p>如果这样写合法，想“只传 b、不传 a”时，调用就只能写成：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sum</span>(, <span class="number">20</span>);  <span class="comment">// ❌ C++ 没有这种跳过参数的语法</span></span><br></pre></td></tr></table></figure>
+
+<p>实参从左往右依次匹配形参，不能跳过。因此，一个形参的默认值若要生效（即省略它对应的实参），它右边的所有形参也必须能够被省略，也就是都必须有默认值；否则这个默认值永远用不上。</p>
+<table>
+<thead>
+<tr>
+<th align="left">写法</th>
+<th align="left">结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>int sum(int a, int b = 20);</code></td>
+<td align="left">✅</td>
+</tr>
+<tr>
+<td align="left"><code>int sum(int a = 10, int b = 20);</code></td>
+<td align="left">✅</td>
+</tr>
+<tr>
+<td align="left"><code>int sum(int a = 10, int b);</code></td>
+<td align="left">❌ b 没有默认值</td>
+</tr>
+</tbody></table>
+<h2 id="二、不同传参方式的效率差距"><a href="#二、不同传参方式的效率差距" class="headerlink" title="二、不同传参方式的效率差距"></a>二、不同传参方式的效率差距</h2><p>下面有四种不同的传参方式和相应的汇编代码（x86 Debug 构建，MSVC 风格）：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> ret = <span class="built_in">sum</span>(a, b);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mov eax, dword ptr [ebp-8]   ; 取 b内存上的值，存入寄存器</span><br><span class="line">push eax                     ; 压栈</span><br><span class="line">mov ecx, dword ptr [ebp-4]   ; 取 a</span><br><span class="line">push ecx                     ; 压栈</span><br><span class="line">call sum</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> ret = <span class="built_in">sum</span>(a);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">push 14H                     ; 不用取b内存上的值，直接把20压栈</span><br><span class="line">mov ecx, dword ptr [ebp-4]   ; 取 a</span><br><span class="line">push ecx</span><br><span class="line">call sum</span><br></pre></td></tr></table></figure>
+
+<p><code>sum(a)</code> 和 <code>sum(a, b)</code> 相比，少了一条 <code>mov</code>：默认值 20 是编译期已知的常量，不需要先从内存里取出来。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> ret = <span class="built_in">sum</span>(a, <span class="number">40</span>);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">push 28H                     ; 和上面一样，直接压栈</span><br><span class="line">mov ecx, dword ptr [ebp-4]</span><br><span class="line">push ecx</span><br><span class="line">call sum</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> ret = <span class="built_in">sum</span>();</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">push 14H                     ; b = 20</span><br><span class="line">push 0AH                     ; a也不用取值了，直接压栈</span><br><span class="line">call sum</span><br></pre></td></tr></table></figure>
+
+<p>对比上面四种方式：</p>
+<table>
+<thead>
+<tr>
+<th align="left">调用</th>
+<th align="left">第二个实参从哪来</th>
+<th align="left">与 <code>sum(a, b)</code> 相比</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>sum(a, b)</code></td>
+<td align="left">变量 b，先 <code>mov</code> 再 <code>push</code></td>
+<td align="left">基准</td>
+</tr>
+<tr>
+<td align="left"><code>sum(a)</code></td>
+<td align="left">默认值 20，直接 <code>push 14H</code></td>
+<td align="left">少一条 <code>mov</code></td>
+</tr>
+<tr>
+<td align="left"><code>sum(a, 40)</code></td>
+<td align="left">常量 40，直接 <code>push 28H</code></td>
+<td align="left">少一条 <code>mov</code>，与 <code>sum(a)</code> 相同</td>
+</tr>
+<tr>
+<td align="left"><code>sum()</code></td>
+<td align="left">两个默认值，直接 <code>push</code></td>
+<td align="left">少两条 <code>mov</code>，与 <code>sum(20, 50)</code> 相同</td>
+</tr>
+</tbody></table>
+<p>由此能得到几个结论：</p>
+<ul>
+<li>与传变量相比，传默认值和传常量会省下从内存取值的 <code>mov</code>指令，调用量大时能提高效率。</li>
+<li>默认值在调用点由编译器补成实参：<code>sum(a)</code> 和 <code>sum(a, 20)</code> 传给函数的参数完全一样，函数体里没有“b 到底传没传”的判断。</li>
+</ul>
+<h2 id="三、形参默认值可以在声明或者定义都可以写，但只能写一次"><a href="#三、形参默认值可以在声明或者定义都可以写，但只能写一次" class="headerlink" title="三、形参默认值可以在声明或者定义都可以写，但只能写一次"></a>三、形参默认值可以在声明或者定义都可以写，但只能写一次</h2><p>两种都可以：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 写法一：定义处给默认值</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a = <span class="number">10</span>, <span class="type">int</span> b = <span class="number">20</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 写法二：声明处给默认值</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a = <span class="number">10</span>, <span class="type">int</span> b = <span class="number">20</span>)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    cout &lt;&lt; <span class="built_in">sum</span>() &lt;&lt; endl;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 定义处不能再写默认值</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但同一个形参的默认值，在<strong>同一作用域</strong>的声明和定义中<strong>只能写一次</strong>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b = <span class="number">20</span>)</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b = <span class="number">20</span>)</span></span>;  <span class="comment">// ❌ 重定义默认参数，值一样也不行</span></span><br></pre></td></tr></table></figure>
+
+<p>工程上的习惯是：默认值写在头文件的声明里，<code>.cpp</code> 的定义处不再重复。</p>
+<h2 id="四、多条声明要按顺序补默认值"><a href="#四、多条声明要按顺序补默认值" class="headerlink" title="四、多条声明要按顺序补默认值"></a>四、多条声明要按顺序补默认值</h2><p>函数可以声明多次，但把声明和定义按出现顺序从上往下读，每一处新增的默认值都必须满足“它右边的参数已经有默认值”。</p>
+<p>先给右边，再给左边，合法：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b = <span class="number">20</span>)</span></span>;  <span class="comment">// 第一次声明：给 b</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a = <span class="number">10</span>, <span class="type">int</span> b)</span></span>;  <span class="comment">// ✅ 第二次声明：给 a（b 上面已经给过了）</span></span><br></pre></td></tr></table></figure>
+
+<p>反过来先给左边，不合法：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a = <span class="number">10</span>, <span class="type">int</span> b)</span></span>;  <span class="comment">// ❌ 此时 b 还没有默认值</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b = <span class="number">20</span>)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>结论就是：<strong>声明按出现顺序从上往下读，默认值从右往左补，每个形参只能给一次。</strong></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><ul>
+<li>默认值从右向左给，右边所有参数都有默认值，左边才能有。</li>
+<li>缺省实参由编译器在调用点填好，函数体不判断参数是否被省略，运行期没有额外分支。</li>
+<li>传<strong>变量</strong>时，省略一个参数会少一条 <code>mov</code> 取值指令；传常量则和传默认值没有差别。</li>
+<li>声明处、定义处都能给默认值，但同一作用域内同一个形参只能出现一次。</li>
+<li>多次声明时，声明按出现顺序从上往下读，默认值从右往左补。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/%E6%B1%87%E7%BC%96/" rel="tag"># 汇编</a>
+              <a href="/tags/%E5%87%BD%E6%95%B0/" rel="tag"># 函数</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/10/16/website-from-zero-to-one/" rel="prev" title="我的个人域名网站从0到1">
+      <i class="fa fa-chevron-left"></i> 我的个人域名网站从0到1
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E%E4%B8%80%E4%B8%AA-sum-%E5%87%BD%E6%95%B0%E8%AF%B4%E8%B5%B7"><span class="nav-number">1.</span> <span class="nav-text">从一个 sum 函数说起</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%BD%A2%E5%8F%82%E7%BB%99%E9%BB%98%E8%AE%A4%E5%80%BC%E5%8F%AA%E8%83%BD%E4%BB%8E%E5%8F%B3%E5%90%91%E5%B7%A6%E7%BB%99"><span class="nav-number">2.</span> <span class="nav-text">一、形参给默认值只能从右向左给</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%8D%E5%90%8C%E4%BC%A0%E5%8F%82%E6%96%B9%E5%BC%8F%E7%9A%84%E6%95%88%E7%8E%87%E5%B7%AE%E8%B7%9D"><span class="nav-number">3.</span> <span class="nav-text">二、不同传参方式的效率差距</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%BD%A2%E5%8F%82%E9%BB%98%E8%AE%A4%E5%80%BC%E5%8F%AF%E4%BB%A5%E5%9C%A8%E5%A3%B0%E6%98%8E%E6%88%96%E8%80%85%E5%AE%9A%E4%B9%89%E9%83%BD%E5%8F%AF%E4%BB%A5%E5%86%99%EF%BC%8C%E4%BD%86%E5%8F%AA%E8%83%BD%E5%86%99%E4%B8%80%E6%AC%A1"><span class="nav-number">4.</span> <span class="nav-text">三、形参默认值可以在声明或者定义都可以写，但只能写一次</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%A4%9A%E6%9D%A1%E5%A3%B0%E6%98%8E%E8%A6%81%E6%8C%89%E9%A1%BA%E5%BA%8F%E8%A1%A5%E9%BB%98%E8%AE%A4%E5%80%BC"><span class="nav-number">5.</span> <span class="nav-text">四、多条声明要按顺序补默认值</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">6.</span> <span class="nav-text">小结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt=""
+      src="/images/avatar/potatolearning.jpg">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description">博客、记录</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">93</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">524k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">7:56</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('/js/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : 'forest',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= 主题切换 =================
+  var ROOT = document.documentElement;
+  var KEY = 'cyber-theme';
+  var saved = '';
+  try { saved = localStorage.getItem(KEY) || ''; } catch (e) { saved = ''; }
+  var theme = saved || 'dark'; // 默认暗夜
+
+  // 创建主题切换按钮（左下角）
+  var btn = document.getElementById('cyber-theme-toggle');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'cyber-theme-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '切换主题');
+    document.body.appendChild(btn);
+  }
+  function setTheme(t) {
+    ROOT.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    if (btn) {
+      btn.textContent = (t === 'dark') ? '🌙' : '☀️';
+      btn.setAttribute('title', (t === 'dark') ? '切换到亮色' : '切换到暗夜');
+    }
+  }
+  setTheme(theme);
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      setTheme(ROOT.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  // ================= 点击粒子特效 =================
+  
+  document.addEventListener('click', function (e) {
+    var r = document.createElement('span');
+    r.className = 'cyber-click-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function () { r.remove(); });
+  });
+  
+
+  // ================= 粒子连线背景 =================
+  
+  (function () {
+    // 移动端直接跳过，省性能
+    if (window.innerWidth < 768) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'cyber-bg';
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, dots = [];
+    var COUNT_MAX = 110, LINK_DIST = 140, rafId = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      var n = Math.min(Math.floor(W * H / 9500), COUNT_MAX);
+      dots = [];
+      for (var i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: Math.random() * 1.6 + 0.6
+        });
+      }
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, W, H);
+      var i, j, a, b, dx, dy, d;
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < 0 || a.x > W) a.vx *= -1;
+        if (a.y < 0 || a.y > H) a.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.85)';
+        ctx.fill();
+      }
+      for (i = 0; i < dots.length; i++) {
+        a = dots[i];
+        for (j = i + 1; j < dots.length; j++) {
+          b = dots[j];
+          dx = a.x - b.x;
+          dy = a.y - b.y;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            var alpha = (1 - d / LINK_DIST) * 0.35;
+            ctx.strokeStyle = 'rgba(0, 229, 255, ' + alpha + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    resize();
+    tick();
+    window.addEventListener('resize', resize);
+    // 页面不可见时停止动画，省资源
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cancelAnimationFrame(rafId);
+      } else {
+        tick();
+      }
+    });
+  })();
+  
+})();
+</script>
+
+
+</body>
+</html>
